@@ -27,7 +27,7 @@ class CircuitSet:
 
         self._df = pd.DataFrame(columns=['Circuits', 'Results'])
 
-        if circuits is not None:
+        if circuits is not None:  # TODO: how to handle circuits that already have results
             if isinstance(circuits, Iterable):
                 self._df['Circuits'] = circuits
                 self._df['Results'] = [dict()] * len(circuits)
@@ -59,10 +59,20 @@ class CircuitSet:
 
     @property
     def n_circuits(self) -> int:
+        """Returns the total number of circuits in the CircuitSet.
+
+        Returns:
+            int: number of circuits
+        """
         return self.__len__()
 
     @property
     def circuits(self) -> pd.Series:
+        """Returns the circuits in the CircuitSet.
+
+        Returns:
+            pd.Series: circuits
+        """
         return self._df['Circuits']
 
     @property
@@ -81,7 +91,7 @@ class CircuitSet:
         """Batch the circuits into smaller chunks.
 
         Args:
-            batch_size (int): _description_
+            batch_size (int): maximum number of circuits per total sequence.
 
         Yields:
             CircuitSet: CircuitSet of maximum size given by batch_size.
@@ -91,7 +101,31 @@ class CircuitSet:
                 self._df.iloc[i:i + batch_size]['Circuits'].tolist()
             )
 
-    def union_results(self, idx=None) -> Dict:
+    def save(self, path: str):
+        """Save the CircuitSet dataframe.
+
+        This method pickles the CircuitSet dataframe.
+
+        Args:
+            path (str): save path.
+        """
+        self._df.to_pickle(path)
+
+    def subset(self, **kwargs) -> pd.DataFrame:
+        """Subset of the full CircuitSet.
+
+        Returns a subset of the full CircuitSet given by the keyword argument.
+
+        Returns:
+            pd.DataFrame: subset of the full CircuitSet
+        """
+        df = self._df.copy()  # TODO: deep copy here?
+        for key in kwargs:
+            assert key in self._df.columns, f'{key} is not a valid column name.'
+            df = df.loc[self._df[key] == kwargs[key]]
+        return df
+
+    def union_results(self, idx: int = None) -> Dict:
         """Compute the union of all of the results.
 
         This can take in an optional index, for which the results will only
@@ -107,6 +141,5 @@ class CircuitSet:
         if idx is None:
             results_list = self._df['Results'].to_list()
 
-    def save(self):
-        pass
+        # TODO: finish
 
