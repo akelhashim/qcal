@@ -1,5 +1,12 @@
-""" 
-Module for handling many circuits in CircuitSet
+"""Submodule for handling many circuits in CircuitSet.
+
+CircuitSet takes a list of circuits and loads them into a dataframe that can be
+used to store other useful information about the circuits, enabling fast and
+easy sorting of circuits by arbitrary variables.
+
+Basic example useage:
+
+    cs = CircuitSet([list of circuits])
 """
 
 import copy
@@ -8,7 +15,19 @@ import pandas as pd
 from collections.abc import Iterable
 from typing import Any, Dict, List, Optional
 
-__all__ = ['CircuitSet']
+__all__ = ['load', 'CircuitSet']
+
+
+def load(path: str) -> pd.DataFrame:
+    """Load a saved CircuitSet
+
+    Args:
+        path (str): filepath for saved CircuitSet.
+
+    Returns:
+        pd.DataFrame: CircuitSet
+    """
+    return pd.read_pickle(path)
 
 
 class CircuitSet:
@@ -142,4 +161,3 @@ class CircuitSet:
             results_list = self._df['Results'].to_list()
 
         # TODO: finish
-
