@@ -1,0 +1,161 @@
+qubits:
+  0:
+    chan_I: 0
+    chan_Q: 1
+    amp: 0.10422
+    freq: 5465057974.8
+  1:
+    chan_I: 2
+    chan_Q: 3
+    amp: 0.11309
+    freq: 5320190488.4
+  2:
+    chan_I: 4
+    chan_Q: 5
+    amp: 0.16763
+    freq: 5186056348.9
+  3:
+    chan_I: 6
+    chan_Q: 7
+    amp: 0.15972
+    freq: 5255191483.1
+  4:
+    chan_I: 8
+    chan_Q: 9
+    amp: 0.11742
+    freq: 5467498622.5
+  5:
+    chan_I: 10
+    chan_Q: 11
+    amp: 0.11585
+    freq: 5565569182.4
+  6:
+    chan_I: 12
+    chan_Q: 13
+    amp: 0.12582
+    freq: 5869074552.1
+  7:
+    chan_I: 14
+    chan_Q: 15
+    amp: 0.10422
+    freq: 5440173127.8
+qubit_pairs:
+  (0,1):
+    amp: 0.288
+    pulse: cos_square_DRAGdouble
+    length: 2.0e-07
+    mod_freq: -391492904
+    gate:
+      CZ:
+        -[1, 0, 0, 0]
+        -[0, 1, 0, 0]
+        -[0, 0, 1, 0]
+        -[0, 0, 0, -1]
+  (1,2):
+    amp: 0.276
+    pulse: cos_square_DRAGdouble
+    length: 2.0e-07
+    mod_freq: -550458006.6
+    gate:
+      CZ:
+        -[1, 0, 0, 0]
+        -[0, 1, 0, 0]
+        -[0, 0, 1, 0]
+        -[0, 0, 0, -1]
+  (2,3):
+    amp: 0.518
+    pulse: cos_square_DRAGdouble
+    length: 2.5e-07
+    mod_freq: -580061901.137005
+    gate:
+      CZ:
+        -[1, 0, 0, 0]
+        -[0, 1, 0, 0]
+        -[0, 0, 1, 0]
+        -[0, 0, 0, -1]
+  (3,4):
+    amp: 0.546
+    pulse: cos_square_DRAGdouble
+    length: 4.0e-07
+    mod_freq: -350000000.0
+    gate:
+      CZ:
+        -[1, 0, 0, 0]
+        -[0, 1, 0, 0]
+        -[0, 0, 1, 0]
+        -[0, 0, 0, -1]
+  (4,5):
+    amp: 0.2369
+    pulse: cos_square_DRAGdouble
+    length: 2e-07
+    mod_freq: -255000000.0
+    gate:
+      CZ:
+        -[1, 0, 0, 0]
+        -[0, 1, 0, 0]
+        -[0, 0, 1, 0]
+        -[0, 0, 0, -1]
+  (5,6):
+    amp: 0.433
+    pulse: cos_square_DRAGdouble
+    length: 2.15e-07
+    mod_freq: -156000000.0
+    gate:
+      CZ:
+        -[1, 0, 0, 0]
+        -[0, 1, 0, 0]
+        -[0, 0, 1, 0]
+        -[0, 0, 0, -1]
+  (6,7):
+    amp: 0.28
+    pulse: cos_square_DRAGdouble
+    length: 2.5e-07
+    mod_freq: -151000000.0
+    gate:
+      CZ:
+        -[1, 0, 0, 0]
+        -[0, 1, 0, 0]
+        -[0, 0, 1, 0]
+        -[0, 0, 0, -1]
+  (7,0):
+    amp: 0.523
+    pulse: cos_square_DRAGdouble
+    length: 2.0e-07
+    mod_freq: -381000000.0
+    gate:
+      CZ:
+        -[1, 0, 0, 0]
+        -[0, 1, 0, 0]
+        -[0, 0, 1, 0]
+        -[0, 0, 0, -1]
+readout:
+  0:
+    amp: 0.006
+    freq:
+  1:
+    amp: 0.0085
+    freq:
+  2:
+    amp: 0.0095
+    freq:
+  3:
+    amp: 0.0075
+    freq:
+  4:
+    amp: 0.008
+    freq:
+  5:
+    amp: 0.0088
+    freq:
+  6:
+    amp: 0.008
+    freq:
+  7:
+    amp: 0.009
+    freq:
+  length: 1.0e-6
+  sample_rate: 1.8e9
+hardware:
+  qubit_LO: 5.66e9
+  readout_LO: 7.0e9
+  sample_rate: 2.4e9
