@@ -4,8 +4,9 @@ Module for constructing and running a DAG for calibration routines.
 This module is a wrapper around the networkx.Graph class.
 See: https://networkx.org/documentation/stable/tutorial.html
 """
+from qcal.plotting.graphs import draw_DAG
 
-import matplotlib.pyplot as plt
+# import matplotlib.pyplot as plt
 import networkx as nx
 
 from typing import List
@@ -34,15 +35,18 @@ class DAG:
 
         self._graph.add_node(name, protocol, kwargs)
 
-    def draw(self):
-
-        fig, ax = plt.subplots(figsize=(5,5))
-        nx.draw(self._graph, with_labels=True, font_weight='bold')
-        return ax
-
     def remove_node(self, node: str):
 
         self._graph.remove_node(node)
+
+    def draw(self):
+
+        # fig, ax = plt.subplots(figsize=(5,5))
+        # nx.draw(self._graph, ax=ax, arrows=True, with_labels=True, 
+        #         font_weight='bold')
+        # return fig, ax
+
+        draw_DAG(self._graph)
 
     def run(self, config, start: str, stop: str, skip: List[str]):
         """Run the DAG calibration.

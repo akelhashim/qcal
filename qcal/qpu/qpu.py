@@ -7,6 +7,10 @@ Basic example useage:
     qpu = QPU(config)
     qpu.run(circuit)
 """
+from qcal.compilation.compiler import Compiler, DEFAULT_COMPILER
+from qcal.config import Config
+from qcal.circuits import CircuitSet
+
 import logging
 import numpy as np
 import pandas as pd
@@ -14,10 +18,6 @@ import timeit
 
 from IPython.display import clear_output
 from typing import Any
-
-from qcal.compilation.compiler import Compiler, DEFAULT_COMPILER
-from qcal.config import Config
-from qcal.circuits import CircuitSet
 
 logger = logging.getLogger(__name__)
 
