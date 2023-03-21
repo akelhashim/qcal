@@ -15,6 +15,7 @@ import timeit
 from IPython.display import clear_output
 from typing import Any
 
+from qcal.compilation.compiler import Compiler, DEFAULT_COMPILER
 from qcal.config import Config
 from qcal.circuits import CircuitSet
 
@@ -25,6 +26,7 @@ class QPU:
 
     __slots__ = (
         '_config',
+        '_compiler',
         '_n_shots',
         '_n_batches',
         '_n_circs_per_seq',
@@ -37,12 +39,14 @@ class QPU:
     def __init__(
             self,
             config: Config,
+            compiler: Compiler = DEFAULT_COMPILER,
             n_shots: int = 1024,
             n_batches: int = 1,
-            n_circs_per_seq: int = 100,
-    ) -> None:
+            n_circs_per_seq: int = 100
+        ) -> None:
         
         self._config = config
+        self._compiler = compiler
         self._n_shots = n_shots
         self._n_batches = n_batches
         self._n_circs_per_seq = n_circs_per_seq
@@ -59,6 +63,24 @@ class QPU:
             'Total':     0.0},
           index=['Time (s)']
         )
+
+    @property
+    def config(self) -> Config:
+        """Returns the config loaded to the QPU.
+
+        Returns:
+            Config: experimental config
+        """
+        return self._config
+        
+    @property
+    def compiler(self) -> Any:
+        """Returns the compiler(s) loaded to the QPU.
+
+        Returns:
+            Any: circuit compiler
+        """
+        return self._compiler
 
     @property
     def circuits(self) -> pd.DataFrame:
@@ -89,7 +111,7 @@ class QPU:
         
     def compile(self, circuits) -> None:
         
-        compiled_circuits = None
+        compiled_circuits = self._compiler.compile(circuits)
         self._compiled_circuits.append(compiled_circuits)
         return compiled_circuits
 
@@ -156,8 +178,7 @@ class QPU:
             circuits: Any,
             n_shots=None,
             n_batches=None,
-            save: bool = True,
-    ) -> None:
+            save: bool = True) -> None:
         
         if not isinstance(circuits, CircuitSet):
             self._circuits = CircuitSet(circuits=circuits)
