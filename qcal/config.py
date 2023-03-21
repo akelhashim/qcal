@@ -11,21 +11,19 @@ Basic example useage:
 
 import copy
 import io
-import networkx as nx
 import logging
+import networkx as nx
+import numpy as np
+import plotly.graph_objects as go
 import yaml
 
-import plotly.graph_objects as go
-import plotly.io as pio
-pio.renderers.default = 'notebook'
+from typing import Any, Dict, List
 
 logger = logging.getLogger(__name__)
 
 
 class Config:
     """Class for loading and storing configuration files.
-    
-    Basic exam
     """
 
     __slots__ = ['_parameters', '_filename']
@@ -39,10 +37,10 @@ class Config:
             logger.warning('No configuration file was provided.')
             self._parameters = {}
 
-    def __call__(self) -> dict:
+    def __call__(self) -> Dict:
         return self._parameters
 
-    def __copy__(self, deep_copy=False) -> dict:
+    def __copy__(self, deep_copy=False) -> Dict:
         """Copy the config dictionary.
 
         Args:
@@ -80,23 +78,53 @@ class Config:
             str: filename of the config.yaml file.
         """
         return self._filename
+    
+    @property
+    def n_qubits(self) -> int:
+        """Number of qubits on the processor.
+
+        Returns:
+            int: number of qubits
+        """
+        return len(self.qubits)
 
     @property
-    def parameters(self) -> dict:
+    def parameters(self) -> Dict:
+        """All of the config parameters.
+
+        Returns:
+            Dict: config parameters
+        """
         return self._parameters
     
     @property
     def qubits(self) -> list:
+        """Available qubits on the processor.
 
+        Returns:
+            list: qubit labels
+        """
         return list(self.get('qubits').keys())
     
     @property
-    def qubit_pairs(self) -> list:
+    def qubit_pairs(self) -> List[tuple]:
+        """Available qubit pairs on the processor.
 
+        Returns:
+            list[tuple]: qubit pairs
+        """
         return [eval(key) for key in self.get('qubit_pairs').keys()]
     
-    def get(self, param: str):
+    def get(self, param: str) -> Any:
+        """Get the parameter from the config (if it exists).
 
+        Args:
+            param (str): parameter of interest
+
+        Returns:
+            Any: the string or value returned by config[param]. This defaults
+                to None if the parameter cannot be found in the config.
+        """
         try:
             return self._parameters[param]
         except Exception:
@@ -119,7 +147,7 @@ class Config:
     def processor(self):
         """Plot a graph displaying the connectivity of the quantum processor.
         """
-        plot_connectivity_graph(self.qubit_pairs)
+        draw_processor_connectivity(self)
 
     def save(self, filename: str = None):
 
@@ -135,19 +163,15 @@ class Config:
                 )
 
 
-def plot_connectivity_graph(list_of_qubit_pairs: list[tuple]):
-    """Plot a graph displaying the connectivity of the quantum processor.
+def draw_processor_connectivity(config):
 
-    Args:
-        list_of_qubit_pairs (list): List of tuples of qubit pairs.
-    """
     G = nx.Graph()
-    G.add_edges_from(list_of_qubit_pairs)
+    G.add_edges_from(config.qubit_pairs)
     pos = nx.spring_layout(G)
 
     node_x = []
     node_y = []
-    for node in G.nodes():
+    for i, node in enumerate(G.nodes()):
         x, y = pos[node]
         node_x.append(x)
         node_y.append(y)
@@ -164,6 +188,12 @@ def plot_connectivity_graph(list_of_qubit_pairs: list[tuple]):
         edge_y.append(y1)
         edge_y.append(None)
 
+    two_qubit_gates = []
+    for pair in config.parameters['qubit_pairs']:
+        two_qubit_gates.append(
+            list(config.parameters['qubit_pairs'][pair]['gate'].keys())[0]
+        )
+
     node_trace = go.Scatter(
         x=node_x, y=node_y,
         mode='markers',
@@ -177,7 +207,7 @@ def plot_connectivity_graph(list_of_qubit_pairs: list[tuple]):
             colorscale='YlGnBu',
             reversescale=True,
             color=[],
-            size=10,
+            size=25,
             colorbar=dict(
                 thickness=15,
                 title='Connectivity',
@@ -185,6 +215,14 @@ def plot_connectivity_graph(list_of_qubit_pairs: list[tuple]):
                 titleside='right'
             ),
             line_width=2))
+    
+    qubit_labels = go.Scatter(
+        x=node_x, y=node_y,
+        text=[str(q) for q in config.qubits],
+        mode='text',
+        hoverinfo='text',
+        marker=dict(color='#5D69B1', size=0.01)
+    )
 
     edge_trace = go.Scatter(
         x=edge_x, y=edge_y,
@@ -192,17 +230,29 @@ def plot_connectivity_graph(list_of_qubit_pairs: list[tuple]):
         hoverinfo='none',
         mode='lines')
     
+    two_qubit_gate_labels = go.Scatter(
+        x=np.ediff1d(node_x, to_end=node_x[0] - node_x[-1]), 
+        y=np.ediff1d(node_y, to_end=node_y[0] - node_y[-1]), 
+        mode="markers+text",
+        text=two_qubit_gates,
+        textposition="top center",
+        hoverinfo='text',
+        marker=dict(color='#5D69B1', size=0.01)
+    )
+    
     node_adjacencies = []
     node_text = []
     for node, adjacencies in enumerate(G.adjacency()):
         node_adjacencies.append(len(adjacencies[1]))
-        node_text.append('# of nearest neighbors: ' + str(len(adjacencies[1])))
+        node_text.append(
+            '# of nearest neighbors: ' + str(len(adjacencies[1]))
+        )
 
     node_trace.marker.color = node_adjacencies
     node_trace.text = node_text
 
     fig = go.Figure(
-        data=[edge_trace, node_trace],
+        data=[edge_trace, node_trace, qubit_labels, two_qubit_gate_labels],
         layout=go.Layout(
         # title='',
         titlefont_size=16,
