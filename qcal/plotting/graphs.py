@@ -5,6 +5,8 @@ from qcal.config import Config
 import networkx as nx
 import numpy as np
 
+from typing import Dict
+
 import plotly.graph_objects as go
 import plotly.io as pio
 pio.renderers.default = 'notebook'  # TODO: replace with settings
@@ -97,7 +99,6 @@ def draw_processor_connectivity(config: Config):
     Args:
         config (Config): qcal Config
     """
-
     G = nx.Graph()
     G.add_edges_from(config.qubit_pairs)
     pos = nx.spring_layout(G)

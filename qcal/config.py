@@ -8,7 +8,6 @@ Basic example useage:
     cfg.parameters   # Returns a dictionary of the entire config
     cfg.processor()  # Plots the processor connectivity
 """
-
 import copy
 import io
 import logging
@@ -144,6 +143,7 @@ class Config:
     def processor(self):
         """Plot a graph displaying the connectivity of the quantum processor.
         """
+        from qcal.plotting.graphs import draw_processor_connectivity
         draw_processor_connectivity(self)
 
     def save(self, filename: str = None):
