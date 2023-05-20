@@ -50,6 +50,15 @@ class Gate:
         return None
     
     @property
+    def dim(self) -> int:
+        """Returns the Hilbert space dimension of the unitary operator.
+
+        Returns:
+            int: Hilbert space dimension.
+        """
+        return self._matrix.shape[0]
+    
+    @property
     def locally_equivalent(self) -> str:
         """Returns the names of the locally-equivalent gates.
 
