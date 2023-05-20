@@ -8,8 +8,8 @@ from qcal.gates.single_qubit import id, x, y, z
 import numpy as np
 import scipy
 
-from typing import Union, Tuple
 from numpy.typing import NDArray
+from typing import Tuple, Union
 
 
 __all__ = [
@@ -134,7 +134,7 @@ def a_gate(theta: Union[int, float], phi: Union[int, float]) -> NDArray:
         phi (int, float):   second gate parameter.
 
     Returns:
-        NDARRAY: A-gate with angles theta and phi.
+        NDArray: A-gate with angles theta and phi.
     """
     return np.array([[1., 0., 0., 0.],
                      [0., np.cos(theta), np.exp(1j*phi)*np.sin(theta), 0.],
@@ -154,7 +154,7 @@ def barenco(phi:   Union[int, float],
         theta (int, float): rotation angle.
 
     Returns:
-        NDARRAY: Barenco gate with angles phi, alpha, theta.
+        NDArray: Barenco gate with angles phi, alpha, theta.
     """
     u00 = np.exp(1j*alpha)*np.cos(theta)
     u01 = -1j*np.exp(1j*(alpha-phi))*np.sin(theta)
@@ -173,7 +173,7 @@ def cphase(theta: Union[int, float] = 1) -> NDArray:
         theta (int, float): phase factor. Defaults to 1.
 
     Returns:
-        NDARRAY: ZZ gate with a rotation angle of pi*theta.
+        NDArray: ZZ gate with a rotation angle of pi*theta.
     """
     return np.array([[1., 0., 0., 0.],
                      [0., 1., 0., 0.],
@@ -195,7 +195,7 @@ def crot(theta: Union[int, float],
         nz (int, float):    z component of unit vector.
 
     Returns:
-        NDARRAY: Crot gate with a rotation angle of theta about the axis
+        NDArray: Crot gate with a rotation angle of theta about the axis
             defined by (nx, ny, nz).
     """
     assert nx**2 + ny**2 + nz**2 == 1, '(nx, ny, nz) must be a unit vector!'
@@ -210,7 +210,7 @@ def fsim(theta: Union[int, float], phi: Union[int, float]) -> NDArray:
         phi (int, float):   ZZ phase parameter.
 
     Returns:
-        NDARRAY: FSim with rotation angle theta and phase phi.
+        NDArray: FSim with rotation angle theta and phase phi.
     """
     return np.array([[1., 0., 0., 0.],
                      [0., np.cos(theta), -1.j*np.sin(theta), 0.],
@@ -225,7 +225,7 @@ def givens(theta: Union[int, float]) -> NDArray:
         theta (int, float): rotation angle.
 
     Returns:
-        NDARRAY: Givens gate with a rotation angle of theta.
+        NDArray: Givens gate with a rotation angle of theta.
     """
     return np.array([[1., 0., 0., 0],
                      [0., np.cos(theta), -np.sin(theta), 0.],
@@ -240,7 +240,7 @@ def pswap(theta: Union[int, float]) -> NDArray:
         theta (int, float): rotation angle.
 
     Returns:
-        NDARRAY: pSWAP gate with a rotation angle of theta.
+        NDArray: pSWAP gate with a rotation angle of theta.
     """
     return np.array([[1., 0., 0., 0],
                      [0., 0., np.exp(1j*theta), 0.],
@@ -255,7 +255,7 @@ def swap_alpha(alpha: Union[int, float]) -> NDArray:
         alpha (int, float): power of the SWAP gate.
 
     Returns:
-        NDARRAY: SWAP-alpha gate with a power given by alpha.
+        NDArray: SWAP-alpha gate with a power given by alpha.
     """
     angle = np.pi * alpha / 2
     return  np.exp(angle) * np.array([
@@ -273,7 +273,7 @@ def xx(t: Union[int, float] = 1) -> NDArray:
         t (int, float): phase factor. Defaults to 1.
 
     Returns:
-        NDARRAY: XX gate with a phase factor t.
+        NDArray: XX gate with a phase factor t.
     """
     return np.array([[np.cos(np.pi*t/2), 0., 0., -1j*np.sin(np.pi*t/2)],
                      [0., np.cos(np.pi*t/2), -1j*np.sin(np.pi*t/2), 0.],
@@ -288,7 +288,7 @@ def xy(t: Union[int, float] = 1) -> NDArray:
         t (int, float): phase factor. Defaults to 1.
 
     Returns:
-        NDARRAY: XY gate with a phase factor t.
+        NDArray: XY gate with a phase factor t.
     """
     return np.array([[1, 0., 0., 0],
                      [0., np.cos(np.pi*t), -1j*np.sin(np.pi*t), 0.],
@@ -303,7 +303,7 @@ def yy(t: Union[int, float] = 1) -> NDArray:
         t (int, float): phase factor. Defaults to 1.
 
     Returns:
-        NDARRAY: YY gate with a phase factor t.
+        NDArray: YY gate with a phase factor t.
     """
     return np.array([[np.cos(np.pi*t/2), 0., 0., 1j*np.sin(np.pi*t/2)],
                      [0., np.cos(np.pi*t/2), -1j*np.sin(np.pi*t/2), 0.],
@@ -318,7 +318,7 @@ def zz(t: Union[int, float] = 1) -> NDArray:
         t (int, float): phase factor. Defaults to 1.
 
     Returns:
-        NDARRAY: ZZ gate with a phase factor t.
+        NDArray: ZZ gate with a phase factor t.
     """
     return np.array([[np.exp(-1j*np.pi*t/2), 0., 0., 0.],
                      [0., np.exp(1j*np.pi*t/2), 0., 0.],
