@@ -5,22 +5,31 @@ import numpy as np
 
 from numpy.typing import NDArray
 from sympy import Matrix
+from typing import Tuple, Union
 
 
 class Gate:
 
-    __slots__ = '_matrix'
+    __slots__ = ['_matrix', '_qubits']
 
-    def __init__(self, matrix) -> None:
+    def __init__(self, 
+            matrix: NDArray, 
+            qubits: Union[int, Tuple] = None
+        ) -> None:
         """Initialize a gate using its matrix definition.
+
+        Args:
+            matrix (NDArray): numpy array defining the unitary matrix.
+            qubits (int | tuple): qubit label(s).
         """
         self._matrix = matrix
+        self._qubits = qubits if type(qubits) is tuple else tuple(qubits)
 
     def __call__(self) -> Matrix:
         """Returns the sympy expression for the numpy array.
 
         Returns:
-            sympy.matrices.dense.MutableDenseMatrix: sympy matrix.
+            Matrix: sympy matrix.
         """
         return Matrix(self._matrix.round(5))
     
@@ -84,3 +93,12 @@ class Gate:
             str: name of the gate.
         """
         return None
+    
+    @property
+    def qubits(self) -> tuple:
+        """Returns the qubit(s) that the gate acts on.
+
+        Returns:
+            tupe: qubit label(s).
+        """
+        return self._qubits
