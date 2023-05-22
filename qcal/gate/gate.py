@@ -10,20 +10,20 @@ from typing import Tuple, Union
 
 class Gate:
 
-    __slots__ = ['_matrix', '_labels']
+    __slots__ = ['_matrix', '_qubits']
 
     def __init__(self, 
             matrix: NDArray, 
-            labels: Union[int, Tuple] = None
+            qubits: Union[int, Tuple] = None
         ) -> None:
         """Initialize a gate using its matrix definition.
 
         Args:
             matrix (NDArray): numpy array defining the unitary matrix.
-            labels (int | tuple): qubit label(s).
+            qubits (int | tuple): qubit label(s).
         """
         self._matrix = matrix
-        self._labels = labels if type(labels) is tuple else (labels,)
+        self._qubits = qubits if type(qubits) is tuple else tuple(qubits)
 
     def __call__(self) -> Matrix:
         """Returns the sympy expression for the numpy array.
@@ -95,10 +95,10 @@ class Gate:
         return None
     
     @property
-    def labels(self) -> tuple:
-        """Returns the qubit labels that the gate acts on.
+    def qubits(self) -> tuple:
+        """Returns the qubit(s) that the gate acts on.
 
         Returns:
             tupe: qubit label(s).
         """
-        return self._labels
+        return self._qubits

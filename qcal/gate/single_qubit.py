@@ -127,13 +127,13 @@ def u3(theta: float, phi: float, gamma: float) -> NDArray:
 class C(Gate):
     """Class for the axis cycling (C) gate."""
 
-    def __init__(self, labels: Union[int, Tuple] = 0) -> None:
+    def __init__(self, qubits: Union[int, Tuple] = 0) -> None:
         """Initialize using the rn function.
         
         Args:
-            labels (int | tuple): qubit label(s). Defaults to 0.
+            qubits (int | tuple): qubit label(s). Defaults to 0.
         """
-        super().__init__(rn(2*np.pi/3, (1, 1, 1)/np.sqrt(3)), labels)
+        super().__init__(rn(2*np.pi/3, (1, 1, 1)/np.sqrt(3)), qubits)
 
     @property
     def angle(self) -> float:
@@ -166,13 +166,13 @@ class C(Gate):
 class H(Gate):
     """Class for the Hadamard (H) gate."""
 
-    def __init__(self, labels: Union[int, Tuple] = 0) -> None:
+    def __init__(self, qubits: Union[int, Tuple] = 0) -> None:
         """Initialize using the h gate.
         
         Args:
-            labels (int | tuple): qubit label(s). Defaults to 0.
+            qubits (int | tuple): qubit label(s). Defaults to 0.
         """
-        super().__init__(h, labels)
+        super().__init__(h, qubits)
     
     @property
     def name(self) -> str:
@@ -187,13 +187,13 @@ class H(Gate):
 class Id(Gate):
     """Class for the identity gate."""
 
-    def __init__(self, labels: Union[int, Tuple] = 0) -> None:
+    def __init__(self, qubits: Union[int, Tuple] = 0) -> None:
         """Initialize using the id gate.
         
         Args:
-            labels (int | tuple): qubit label(s). Defaults to 0.
+            qubits (int | tuple): qubit label(s). Defaults to 0.
         """
-        super().__init__(id, labels)
+        super().__init__(id, qubits)
 
     @property
     def name(self) -> str:
@@ -219,16 +219,16 @@ class Rn(Gate):
     def __init__(self,
             theta: float, 
             n: Union[List, Tuple, NDArray],
-            labels: Union[int, Tuple] = 0
+            qubits: Union[int, Tuple] = 0
         ) -> None:
         """Initialize using the rn function.
 
         Args:
             theta (float): angle of rotation.
             n (list, tuple, NDArray): unit vector defining the rotation axis.
-            labels (int | tuple): qubit label(s). Defaults to 0.
+            qubits (int | tuple): qubit label(s). Defaults to 0.
         """
-        super().__init__(rn(theta, n), labels)
+        super().__init__(rn(theta, n), qubits)
         self._angle = theta
         if n == (1, 0, 0):
             self._axis = 'x'
@@ -277,14 +277,14 @@ class Rx(Gate):
         rx.matrix  # Numpy array of the matrix
     """
 
-    def __init__(self, theta: float, labels: Union[int, Tuple] = 0) -> None:
+    def __init__(self, theta: float, qubits: Union[int, Tuple] = 0) -> None:
         """Initialize using the rx function.
 
         Args:
             theta (float): angle of rotation.
             qubit (int):   qubit label.
         """
-        super().__init__(rx(theta), labels)
+        super().__init__(rx(theta), qubits)
         self._angle = theta
 
     @property
@@ -325,14 +325,14 @@ class Ry(Gate):
         ry.matrix  # Numpy array of the matrix
     """
 
-    def __init__(self, theta: float, labels: Union[int, Tuple] = 0) -> None:
+    def __init__(self, theta: float, qubits: Union[int, Tuple] = 0) -> None:
         """Initialize using the ry function.
 
         Args:
             theta (float): angle of rotation.
             qubit (int):   qubit label.
         """
-        super().__init__(ry(theta), labels)
+        super().__init__(ry(theta), qubits)
         self._angle = theta
 
     @property
@@ -373,14 +373,14 @@ class Rz(Gate):
         rz.matrix  # Numpy array of the matrix
     """
 
-    def __init__(self, theta: float, labels: Union[int, Tuple] = 0) -> None:
+    def __init__(self, theta: float, qubits: Union[int, Tuple] = 0) -> None:
         """Initialize using the rz function.
 
         Args:
             theta (float): angle of rotation.
             qubit (int):   qubit label.
         """
-        super().__init__(rz(theta), labels)
+        super().__init__(rz(theta), qubits)
         self._angle = theta
 
     @property
@@ -414,13 +414,13 @@ class Rz(Gate):
 class S(Gate):
     """Class for the phase S = sqrt(Z) gate."""
 
-    def __init__(self, labels: Union[int, Tuple] = 0) -> None:
+    def __init__(self, qubits: Union[int, Tuple] = 0) -> None:
         """Initialize using the Rz gate.
         
         Args:
-            labels (int | tuple): qubit label(s). Defaults to 0.
+            qubits (int | tuple): qubit label(s). Defaults to 0.
         """
-        super().__init__(rz(np.pi/2), labels)
+        super().__init__(rz(np.pi/2), qubits)
         self._angle = np.pi/2
 
     @property
@@ -454,13 +454,13 @@ class S(Gate):
 class SDag(Gate):
     """Class for the phase S^dagger gate."""
 
-    def __init__(self, labels: Union[int, Tuple] = 0) -> None:
+    def __init__(self, qubits: Union[int, Tuple] = 0) -> None:
         """Initialize using the Rz gate.
         
         Args:
-            labels (int | tuple): qubit label(s). Defaults to 0.
+            qubits (int | tuple): qubit label(s). Defaults to 0.
         """
-        super().__init__(rz(-np.pi/2), labels)
+        super().__init__(rz(-np.pi/2), qubits)
         self._angle = -np.pi/2
 
     @property
@@ -494,13 +494,13 @@ class SDag(Gate):
 class T(Gate):
     """Class for the fourth-root of Z (T) gate."""
 
-    def __init__(self, labels: Union[int, Tuple] = 0) -> None:
+    def __init__(self, qubits: Union[int, Tuple] = 0) -> None:
         """Initialize using the t gate.
         
         Args:
-            labels (int | tuple): qubit label(s). Defaults to 0.
+            qubits (int | tuple): qubit label(s). Defaults to 0.
         """
-        super().__init__(t, labels)
+        super().__init__(t, qubits)
     
     @property
     def name(self) -> str:
@@ -515,13 +515,13 @@ class T(Gate):
 class TDag(Gate):
     """Class for the inverse fourth-root of Z gate."""
 
-    def __init__(self, labels: Union[int, Tuple] = 0) -> None:
+    def __init__(self, qubits: Union[int, Tuple] = 0) -> None:
         """Initialize using the tdag gate.
         
         Args:
-            labels (int | tuple): qubit label(s). Defaults to 0.
+            qubits (int | tuple): qubit label(s). Defaults to 0.
         """
-        super().__init__(tdag, labels)
+        super().__init__(tdag, qubits)
     
     @property
     def name(self) -> str:
@@ -540,7 +540,7 @@ class U3(Gate):
             theta: float,
             phi:   float,
             gamma: float,
-            labels: Union[int, Tuple] = 0
+            qubits: Union[int, Tuple] = 0
         ) -> None:
         """Initialize using the u3 function.
         
@@ -550,7 +550,7 @@ class U3(Gate):
             gamma (float): second phase angle.
             qubit (int):   qubit label.
         """
-        super().__init__(u3(theta, phi, gamma), labels)
+        super().__init__(u3(theta, phi, gamma), qubits)
     
     @property
     def name(self) -> str:
@@ -565,13 +565,13 @@ class U3(Gate):
 class V(Gate):
     """Class for the V = X90 gate."""
 
-    def __init__(self, labels: Union[int, Tuple] = 0) -> None:
+    def __init__(self, qubits: Union[int, Tuple] = 0) -> None:
         """Initialize using the rx gate.
         
         Args:
-            labels (int | tuple): qubit label(s). Defaults to 0.
+            qubits (int | tuple): qubit label(s). Defaults to 0.
         """
-        super().__init__(rx(np.pi/2), labels)
+        super().__init__(rx(np.pi/2), qubits)
         self._angle = np.pi/2
 
     @property
@@ -614,13 +614,13 @@ class V(Gate):
 class VDag(Gate):
     """Class for the VDag = X-90 gate."""
 
-    def __init__(self, labels: Union[int, Tuple] = 0) -> None:
+    def __init__(self, qubits: Union[int, Tuple] = 0) -> None:
         """Initialize using the rx gate.
         
         Args:
-            labels (int | tuple): qubit label(s). Defaults to 0.
+            qubits (int | tuple): qubit label(s). Defaults to 0.
         """
-        super().__init__(rx(-np.pi/2), labels)
+        super().__init__(rx(-np.pi/2), qubits)
         self._angle = -np.pi/2
 
     @property
@@ -663,13 +663,13 @@ class VDag(Gate):
 class X(Gate):
     """Class for the Pauli X gate."""
 
-    def __init__(self, labels: Union[int, Tuple] = 0) -> None:
+    def __init__(self, qubits: Union[int, Tuple] = 0) -> None:
         """Initialize using the x gate.
         
         Args:
-            labels (int | tuple): qubit label(s). Defaults to 0.
+            qubits (int | tuple): qubit label(s). Defaults to 0.
         """
-        super().__init__(x, labels)
+        super().__init__(x, qubits)
         self._angle = np.pi
 
     @property
@@ -703,13 +703,13 @@ class X(Gate):
 class X90(Gate):
     """Class for the X90 = sqrt(X) gate."""
 
-    def __init__(self, labels: Union[int, Tuple] = 0) -> None:
+    def __init__(self, qubits: Union[int, Tuple] = 0) -> None:
         """Initialize using the rx gate.
         
         Args:
-            labels (int | tuple): qubit label(s). Defaults to 0.
+            qubits (int | tuple): qubit label(s). Defaults to 0.
         """
-        super().__init__(rx(np.pi/2), labels)
+        super().__init__(rx(np.pi/2), qubits)
         self._angle = np.pi/2
 
     @property
@@ -752,13 +752,13 @@ class X90(Gate):
 class Y(Gate):
     """Class for the Pauli Y gate."""
 
-    def __init__(self, labels: Union[int, Tuple] = 0) -> None:
+    def __init__(self, qubits: Union[int, Tuple] = 0) -> None:
         """Initialize using the Y gate.
         
         Args:
-            labels (int | tuple): qubit label(s). Defaults to 0.
+            qubits (int | tuple): qubit label(s). Defaults to 0.
         """
-        super().__init__(y, labels)
+        super().__init__(y, qubits)
         self._angle = np.pi
 
     @property
@@ -792,13 +792,13 @@ class Y(Gate):
 class Y90(Gate):
     """Class for the Y90 = sqrt(Y) gate."""
 
-    def __init__(self, labels: Union[int, Tuple] = 0) -> None:
+    def __init__(self, qubits: Union[int, Tuple] = 0) -> None:
         """Initialize using the ry gate.
         
         Args:
-            labels (int | tuple): qubit label(s). Defaults to 0.
+            qubits (int | tuple): qubit label(s). Defaults to 0.
         """
-        super().__init__(ry(np.pi/2), labels)
+        super().__init__(ry(np.pi/2), qubits)
         self._angle = np.pi/2
 
     @property
@@ -832,13 +832,13 @@ class Y90(Gate):
 class Z(Gate):
     """Class for the Pauli Z gate."""
 
-    def __init__(self, labels: Union[int, Tuple] = 0) -> None:
+    def __init__(self, qubits: Union[int, Tuple] = 0) -> None:
         """Initialize using the z gate.
         
         Args:
-            labels (int | tuple): qubit label(s). Defaults to 0.
+            qubits (int | tuple): qubit label(s). Defaults to 0.
         """
-        super().__init__(z, labels)
+        super().__init__(z, qubits)
         self._angle = np.pi
 
     @property
