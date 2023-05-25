@@ -23,10 +23,10 @@ class Gate:
             qubits (int | tuple): qubit label(s).
         """
         self._matrix = matrix
-        self._qubits = qubits if type(qubits) is tuple else tuple(qubits)
+        self._qubits = qubits if type(qubits) is tuple else (qubits,)
 
     def __call__(self) -> Matrix:
-        """Returns the sympy expression for the numpy array.
+        """The sympy expression for the numpy array.
 
         Returns:
             Matrix: sympy matrix.
@@ -51,7 +51,7 @@ class Gate:
     
     @property
     def alias(self) -> str:
-        """Returns the alias(es) of the gate.
+        """The alias(es) of the gate.
 
         Returns:
             str: alias of the gate.
@@ -60,7 +60,7 @@ class Gate:
     
     @property
     def dim(self) -> int:
-        """Returns the Hilbert space dimension of the unitary operator.
+        """The Hilbert space dimension of the unitary operator.
 
         Returns:
             int: Hilbert space dimension.
@@ -69,7 +69,7 @@ class Gate:
     
     @property
     def locally_equivalent(self) -> str:
-        """Returns the names of the locally-equivalent gates.
+        """The names of the locally-equivalent gates.
 
         Returns:
             str: names of the locally-equivalent gates.
@@ -78,7 +78,7 @@ class Gate:
 
     @property
     def matrix(self) -> NDArray:
-        """Returns the numpy array of the matrix.
+        """The numpy array of the matrix.
 
         Returns:
             NDArray: numpy array of the matrix.
@@ -87,7 +87,7 @@ class Gate:
     
     @property
     def name(self) -> str:
-        """Returns the name of the gate.
+        """The name of the gate.
 
         Returns:
             str: name of the gate.
@@ -96,7 +96,7 @@ class Gate:
     
     @property
     def qubits(self) -> tuple:
-        """Returns the qubit(s) that the gate acts on.
+        """The qubit(s) that the gate acts on.
 
         Returns:
             tupe: qubit label(s).
