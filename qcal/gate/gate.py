@@ -1,7 +1,7 @@
 """Submodule for defining the basic gate class.
 """
 import numpy as np
-# import sympy
+import pandas as pd
 
 from numpy.typing import NDArray
 from sympy import Matrix
@@ -31,23 +31,63 @@ class Gate:
         Returns:
             Matrix: sympy matrix.
         """
-        return Matrix(self._matrix.round(5))
+        return Matrix(self._matrix.round(3))
     
     def __repr__(self) -> str:
-        """Returns a string representation of the numpy array.
+        """Returns information about the gate.
 
         Returns:
-            str: string representation of the numpy array.
+            str: string representation of the gate.
         """
-        return np.array_repr(self._matrix)
+        return (
+            f'{self._qubits} ' + f'{self.name} \n' + 
+            np.array_repr(np.around(self._matrix, 3)
+        ))
     
     def __str__(self) -> str:
-        """Returns a string representation of the numpy array.
+        """Returns information about the gate.
 
         Returns:
-            str: string representation of the numpy array.
+            str: string representation of the gate.
         """
-        return np.array_repr(self._matrix)
+        return (
+            f'{self._qubits} ' + f'{self.name} \n' + 
+            np.array_repr(np.around(self._matrix, 3)
+        ))
+    
+    def _repr_html_(self):
+        """Returns information about the gate.
+
+        Returns:
+            html: html representation of the gate.
+        """
+        df = pd.DataFrame([
+            [(pd.DataFrame(self._matrix)
+                .style
+                .format(precision=3)
+                .hide(axis='index')
+                .hide(axis='columns')
+                .set_table_attributes('class="matrix"')
+                .to_html()
+            )]
+        ], dtype="object")
+        df.index = [self._qubits]
+        df.columns = ['Matrix']
+        df.insert(0, 'Gate', [self.name])
+
+        df_styler = df.style.set_table_styles([
+            {"selector": ".matrix", "props": "position: relative;"},
+            {"selector": ".matrix:before, .matrix:after", 
+             "props":  'content: ""; position: absolute; top: 0; border: 1px \
+                solid #000; width: 6px; height: 100%;'
+            },
+            {"selector": ".matrix:before", 
+             "props": "left: -0px; border-right: -0;"},
+            {"selector": ".matrix:after",
+              "props": "right: -0px; border-left: 0;"}
+        ])
+
+        return df_styler.to_html()
     
     @property
     def alias(self) -> str:

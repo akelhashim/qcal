@@ -69,7 +69,7 @@ class Cycle:
         df = pd.DataFrame([
             [(pd.DataFrame(gate.matrix)
                 .style
-                .format(precision=2)
+                .format(precision=3)
                 .hide(axis='index')
                 .hide(axis='columns')
                 .set_table_attributes('class="matrix"')
@@ -146,7 +146,7 @@ class Cycle:
             pd.DataFrame: table of matrices.
         """
         df = pd.DataFrame(
-            data=[gate.matrix.tolist() for gate in self._gates], 
+            data=[[gate.matrix] for gate in self._gates], 
             columns=['Matrix'], 
             index=[gate.qubits for gate in self._gates]
         )
@@ -167,7 +167,7 @@ class Layer(Cycle):
 
 class Circuit:
 
-    __slots__ = ['_cycles']
+    __slots__ = ['_cycles', '_qubits']
 
     def __init__(self,
             cycles_or_layers: List[Union[Cycle, Layer]] = []
