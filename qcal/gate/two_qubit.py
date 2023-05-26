@@ -9,7 +9,7 @@ import numpy as np
 import scipy
 
 from numpy.typing import NDArray
-from typing import Tuple, Union
+from typing import List, Tuple, Union
 
 
 __all__ = [
@@ -19,10 +19,28 @@ __all__ = [
     'XX', 'YY', 'ZZ',
     'CPhase', 'CS', 'CSdag', 'CT', 'CTdag', 'CRot', 'Barenco', 'CV',
     'XY', 'Givens', 'DB',
-    'SWAPAlpha', 'SqrtSWAP', 'SqrtSWAPDag',
+    'SWAPAlpha', 'SqrtSWAP', 'SqrtSWAPdag',
     'pSWAP', 'QFT2',
     'BGate', 'ECP', 'WGate', 'AGate',
     'FSim', 'Syc'
+]
+
+paulis = [np.kron(id, id),
+          np.kron(id, x),
+          np.kron(id, y),
+          np.kron(id, z),
+          np.kron(x, id),
+          np.kron(x, x),
+          np.kron(x, y),
+          np.kron(x, z),
+          np.kron(y, id),
+          np.kron(y, x),
+          np.kron(y, y),
+          np.kron(y, z),
+          np.kron(z, id),
+          np.kron(z, x),
+          np.kron(z, y),
+          np.kron(z, z)
 ]
 
 
@@ -182,23 +200,20 @@ def cphase(theta: Union[int, float] = 1) -> NDArray:
 
 
 def crot(theta: Union[int, float],
-         nx: Union[int, float],
-         ny: Union[int, float],
-         nz: Union[int, float]
+         n:     Union[List, NDArray]
     ) -> NDArray:
     """Controlled-Rotation gate defintion.
 
     Args:
         theta (int, float): rotation angle.
-        nx (int, float):    x component of unit vector.
-        ny (int, float):    y component of unit vector.
-        nz (int, float):    z component of unit vector.
+        n (List, NDArray):  unit vector defining the axis of rotation.
 
     Returns:
         NDArray: Crot gate with a rotation angle of theta about the axis
-            defined by (nx, ny, nz).
+            defined by n = (nx, ny, nz).
     """
-    assert nx**2 + ny**2 + nz**2 == 1, '(nx, ny, nz) must be a unit vector!'
+    nx, ny, nz = n
+    assert nx**2 + ny**2 + nz**2 == 1, 'n must be a unit vector!'
     return scipy.linalg.expm(-1j*theta/2 * np.kron(id - z, nx*x + ny*y + nz*z))
 
 
@@ -361,33 +376,22 @@ class AGate(Gate):
             qubits (int | tuple): qubit labels. Defaults to (0, 1).
         """
         super().__init__(a_gate(theta, phi), qubits)
-        self._theta = theta
-        self._phi = phi
-    
-    @property
-    def locally_equivalent(self) -> str:
-        """Returns the names of the locally-equivalent gates.
-
-        Returns:
-            str: names of the locally-equivalent gates.
-        """
-        if self._theta == 0 and self._phi == 0:
-            return 'CX'
-        elif self._theta == np.pi/4 and self._phi == 0:
-            return 'WGate'
-        elif self._theta == np.pi/2 and self._phi == 0:
-            return 'SWAP'
+        
+        if theta == 0 and phi == 0:
+            loc_equiv = 'CX'
+        elif theta == np.pi/4 and phi == 0:
+            loc_equiv = 'WGate'
+        elif theta == np.pi/2 and phi == 0:
+            loc_equiv = 'SWAP'
         else:
-            return None
-    
-    @property
-    def name(self) -> str:
-        """Returns the name of the gate.
+            loc_equiv = None
 
-        Returns:
-            str: name of the gate.
-        """
-        return 'AGate'
+        self._properties['locally_equivalent'] = loc_equiv
+        self._properties['name'] = 'AGate'
+        self._properties['gate'] = {
+            'theta': theta,
+            'phi':   phi,
+        }
 
 
 class Barenco(Gate):
@@ -408,24 +412,13 @@ class Barenco(Gate):
             qubits (int | tuple): qubit labels. Defaults to (0, 1).
         """
         super().__init__(barenco(phi, alpha, theta), qubits)
-    
-    @property
-    def locally_equivalent(self) -> str:
-        """Returns the names of the locally-equivalent gates.
-
-        Returns:
-            str: names of the locally-equivalent gates.
-        """
-        return 'XX'
-    
-    @property
-    def name(self) -> str:
-        """Returns the name of the gate.
-
-        Returns:
-            str: name of the gate.
-        """
-        return 'Barenco'
+        self._properties['locally_equivalent'] = 'XX'
+        self._properties['name'] = 'Barenco'
+        self._properties['gate'] = {
+            'theta': theta,
+            'alpha': alpha,
+            'phi':   phi
+        }
     
 
 class BGate(Gate):
@@ -438,24 +431,8 @@ class BGate(Gate):
             qubits (int | tuple): qubit labels. Defaults to (0, 1).
         """
         super().__init__(b_gate, qubits)
-    
-    @property
-    def alias(self) -> str:
-        """Returns the alias(es) of the gate.
-
-        Returns:
-            str: alias of the gate.
-        """
-        return 'Berkeley'
-    
-    @property
-    def name(self) -> str:
-        """Returns the name of the gate.
-
-        Returns:
-            str: name of the gate.
-        """
-        return 'BGate'
+        self._properties['alias'] = 'Berkeley'
+        self._properties['name'] = 'BGate'
     
 
 class CH(Gate):
@@ -468,24 +445,9 @@ class CH(Gate):
             qubits (int | tuple): qubit labels. Defaults to (0, 1).
         """
         super().__init__(ch, qubits)
-    
-    @property
-    def name(self) -> str:
-        """Returns the name of the gate.
-
-        Returns:
-            str: name of the gate.
-        """
-        return 'CH'
-    
-    @property
-    def locally_equivalent(self) -> str:
-        """Returns the names of the locally-equivalent gates.
-
-        Returns:
-            str: names of the locally-equivalent gates.
-        """
-        return 'CX'
+        self._properties['alias'] = 'Controlled-H'
+        self._properties['locally_equivalent'] = 'CX'
+        self._properties['name'] = 'CH'
 
 
 class CNot(Gate):
@@ -498,34 +460,10 @@ class CNot(Gate):
             qubits (int | tuple): qubit labels. Defaults to (0, 1).
         """
         super().__init__(cnot, qubits)
-    
-    @property
-    def alias(self) -> str:
-        """Returns the alias(es) of the gate.
+        self._properties['alias'] = 'CX'
+        self._properties['locally_equivalent'] = 'CY\nCZ'
+        self._properties['name'] = 'CNot'
 
-        Returns:
-            str: alias of the gate.
-        """
-        return 'CX'
-    
-    @property
-    def locally_equivalent(self) -> str:
-        """Returns the names of the locally-equivalent gates.
-
-        Returns:
-            str: names of the locally-equivalent gates.
-        """
-        return 'CY\nCZ'
-    
-    @property
-    def name(self) -> str:
-        """Returns the name of the gate.
-
-        Returns:
-            str: name of the gate.
-        """
-        return 'CNot'
-    
 
 class CPhase(Gate):
     """Class for the Controlled-Phase gate."""
@@ -541,48 +479,31 @@ class CPhase(Gate):
             qubits (int | tuple): qubit labels. Defaults to (0, 1).
         """
         super().__init__(cphase(theta), qubits)
-        self._theta = theta
 
-    @property
-    def alias(self) -> str:
-        """Returns the alias(es) of the gate.
-
-        Returns:
-            str: alias of the gate.
-        """
-        if self._theta == 1:
-            return 'CZ'
-        elif self._theta == 0.5:
-            return 'CS'
-        elif self._theta == -0.5:
-            return 'CSdag'
-        elif self._theta == 0.25:
-            return 'CT'
-        elif self._theta == -0.25:
-            return 'CTdag'
+        if theta == 1:
+            alias = 'CZ'
+        elif theta == 0.5:
+            alias = 'CS'
+        elif theta == -0.5:
+            alias = 'CSdag'
+        elif theta == 0.25:
+            alias = 'CT'
+        elif theta == -0.25:
+            alias = 'CTdag'
         else:
-            return None
-    
-    @property
-    def locally_equivalent(self) -> str:
-        """Returns the names of the locally-equivalent gates.
+            alias = None
 
-        Returns:
-            str: names of the locally-equivalent gates.
-        """
-        if self._theta == 1:
-            return 'CX\nCY'
+        if theta == 1:
+            loc_equiv = 'CX\nCY'
         else:
-            return None
-    
-    @property
-    def name(self) -> str:
-        """Returns the name of the gate.
+            loc_equiv = None
 
-        Returns:
-            str: name of the gate.
-        """
-        return 'CPhase'
+        self._properties['alias'] = alias
+        self._properties['locally_equivalent'] = loc_equiv
+        self._properties['name'] = 'CPhase'
+        self._properties['gate'] = {
+            'angle': theta,
+        }
     
 
 class CRot(Gate):
@@ -590,30 +511,22 @@ class CRot(Gate):
 
     def __init__(self,
             theta:  Union[int, float],
-            nx:     Union[int, float],
-            ny:     Union[int, float],
-            nz:     Union[int, float],
+            n:      Union[List, NDArray],
             qubits: Tuple = (0, 1)
         ) -> None:
         """Initialize using the crot gate.
         
         Args:
             theta (int, float):   rotation angle.
-            nx (int, float):      x component of unit vector.
-            ny (int, float):      y component of unit vector.
-            nz (int, float):      z component of unit vector.
+            n (List, NDarray):    unit vector defining the axis of rotation.
             qubits (int | tuple): qubit labels. Defaults to (0, 1).
         """
-        super().__init__(crot(theta, nx, ny, nz), qubits)
-    
-    @property
-    def name(self) -> str:
-        """Returns the name of the gate.
-
-        Returns:
-            str: name of the gate.
-        """
-        return 'CRot'
+        super().__init__(crot(theta, n), qubits)
+        self._properties['name'] = 'CRot'
+        self._properties['gate'] = {
+            'angle': theta,
+            'axis':  n
+        }
     
 
 class CS(Gate):
@@ -626,15 +539,11 @@ class CS(Gate):
             qubits (int | tuple): qubit labels. Defaults to (0, 1).
         """
         super().__init__(cphase(0.5), qubits)
-    
-    @property
-    def name(self) -> str:
-        """Returns the name of the gate.
-
-        Returns:
-            str: name of the gate.
-        """
-        return 'CS'
+        self._properties['alias'] = 'sqrt(CZ)'
+        self._properties['name'] = 'CS'
+        self._properties['gate'] = {
+            'angle': np.pi/2,
+        }
     
 
 class CSdag(Gate):
@@ -647,15 +556,11 @@ class CSdag(Gate):
             qubits (int | tuple): qubit labels. Defaults to (0, 1).
         """
         super().__init__(cphase(-0.5), qubits)
-    
-    @property
-    def name(self) -> str:
-        """Returns the name of the gate.
-
-        Returns:
-            str: name of the gate.
-        """
-        return 'CSdag'
+        self._properties['alias'] = 'sqrt(CZ)dag'
+        self._properties['name'] = 'CSDdag'
+        self._properties['gate'] = {
+            'angle': -np.pi/2,
+        }
     
 
 class CT(Gate):
@@ -668,15 +573,11 @@ class CT(Gate):
             qubits (int | tuple): qubit labels. Defaults to (0, 1).
         """
         super().__init__(cphase(0.25), qubits)
-    
-    @property
-    def name(self) -> str:
-        """Returns the name of the gate.
-
-        Returns:
-            str: name of the gate.
-        """
-        return 'CT'
+        self._properties['alias'] = 'CZ^(1/4)'
+        self._properties['name'] = 'CT'
+        self._properties['gate'] = {
+            'angle': np.pi/4,
+        }
     
 
 class CTdag(Gate):
@@ -689,15 +590,11 @@ class CTdag(Gate):
             qubits (int | tuple): qubit labels. Defaults to (0, 1).
         """
         super().__init__(cphase(-0.25), qubits)
-    
-    @property
-    def name(self) -> str:
-        """Returns the name of the gate.
-
-        Returns:
-            str: name of the gate.
-        """
-        return 'CTdag'
+        self._properties['alias'] = 'CZ^(-1/4)'
+        self._properties['name'] = 'CTdag'
+        self._properties['gate'] = {
+            'angle': -np.pi/4,
+        }
     
 
 class CV(Gate):
@@ -710,33 +607,12 @@ class CV(Gate):
             qubits (int | tuple): qubit labels. Defaults to (0, 1).
         """
         super().__init__(cv, qubits)
-    
-    @property
-    def alias(self) -> str:
-        """Returns the alias(es) of the gate.
-
-        Returns:
-            str: alias of the gate.
-        """
-        return 'SqrtCNot'
-    
-    @property
-    def locally_equivalent(self) -> str:
-        """Returns the names of the locally-equivalent gates.
-
-        Returns:
-            str: names of the locally-equivalent gates.
-        """
-        return 'CY\nCZ'
-    
-    @property
-    def name(self) -> str:
-        """Returns the name of the gate.
-
-        Returns:
-            str: name of the gate.
-        """
-        return 'CV'
+        self._properties['alias'] = 'SqrtCNot'
+        self._properties['locally_equivalent'] = 'CY\nCZ'
+        self._properties['name'] = 'CV'
+        self._properties['gate'] = {
+            'angle': np.pi/2
+        }
     
 
 class CX(Gate):
@@ -749,33 +625,12 @@ class CX(Gate):
             qubits (int | tuple): qubit labels. Defaults to (0, 1).
         """
         super().__init__(cx, qubits)
-    
-    @property
-    def alias(self) -> str:
-        """Returns the alias(es) of the gate.
-
-        Returns:
-            str: alias of the gate.
-        """
-        return 'CNot'
-    
-    @property
-    def locally_equivalent(self) -> str:
-        """Returns the names of the locally-equivalent gates.
-
-        Returns:
-            str: names of the locally-equivalent gates.
-        """
-        return 'CY\nCZ'
-    
-    @property
-    def name(self) -> str:
-        """Returns the name of the gate.
-
-        Returns:
-            str: name of the gate.
-        """
-        return 'CX'
+        self._properties['alias'] = 'CNot'
+        self._properties['locally_equivalent'] = 'CY\nCZ'
+        self._properties['name'] = 'CX'
+        self._properties['gate'] = {
+            'angle': np.pi
+        }
     
 
 class CY(Gate):
@@ -788,24 +643,11 @@ class CY(Gate):
             qubits (int | tuple): qubit labels. Defaults to (0, 1).
         """
         super().__init__(cy, qubits)
-    
-    @property
-    def name(self) -> str:
-        """Returns the name of the gate.
-
-        Returns:
-            str: name of the gate.
-        """
-        return 'CY'
-    
-    @property
-    def locally_equivalent(self) -> str:
-        """Returns the names of the locally-equivalent gates.
-
-        Returns:
-            str: names of the locally-equivalent gates.
-        """
-        return 'CX\nCZ'
+        self._properties['locally_equivalent'] = 'CX\nCZ'
+        self._properties['name'] = 'CY'
+        self._properties['gate'] = {
+            'angle': np.pi
+        }
     
 
 class CZ(Gate):
@@ -818,24 +660,11 @@ class CZ(Gate):
             qubits (int | tuple): qubit labels. Defaults to (0, 1).
         """
         super().__init__(cz, qubits)
-    
-    @property
-    def name(self) -> str:
-        """Returns the name of the gate.
-
-        Returns:
-            str: name of the gate.
-        """
-        return 'CZ'
-    
-    @property
-    def locally_equivalent(self) -> str:
-        """Returns the names of the locally-equivalent gates.
-
-        Returns:
-            str: names of the locally-equivalent gates.
-        """
-        return 'CY\nCZ'
+        self._properties['locally_equivalent'] = 'CX\nCY'
+        self._properties['name'] = 'CZ'
+        self._properties['gate'] = {
+            'angle': np.pi
+        }
     
 
 class DB(Gate):
@@ -848,24 +677,8 @@ class DB(Gate):
             qubits (int | tuple): qubit labels. Defaults to (0, 1).
         """
         super().__init__(db, qubits)
-
-    @property
-    def locally_equivalent(self) -> str:
-        """Returns the names of the locally-equivalent gates.
-
-        Returns:
-            str: names of the locally-equivalent gates.
-        """
-        return 'XY'
-    
-    @property
-    def name(self) -> str:
-        """Returns the name of the gate.
-
-        Returns:
-            str: name of the gate.
-        """
-        return 'DB'
+        self._properties['locally_equivalent'] = 'XY'
+        self._properties['name'] = 'DB'
     
 
 class DCNot(Gate):
@@ -878,24 +691,8 @@ class DCNot(Gate):
             qubits (int | tuple): qubit labels. Defaults to (0, 1).
         """
         super().__init__(dcnot, qubits)
-    
-    @property
-    def name(self) -> str:
-        """Returns the name of the gate.
-
-        Returns:
-            str: name of the gate.
-        """
-        return 'DCNot'
-    
-    @property
-    def locally_equivalent(self) -> str:
-        """Returns the names of the locally-equivalent gates.
-
-        Returns:
-            str: names of the locally-equivalent gates.
-        """
-        return 'fSWAP\niSWAP'
+        self._properties['locally_equivalent'] = 'fSWAP\niSWAP'
+        self._properties['name'] = 'DCNot'
     
 
 class ECP(Gate):
@@ -908,24 +705,8 @@ class ECP(Gate):
             qubits (int | tuple): qubit labels. Defaults to (0, 1).
         """
         super().__init__(ecp, qubits)
-
-    @property
-    def locally_equivalent(self) -> str:
-        """Returns the names of the locally-equivalent gates.
-
-        Returns:
-            str: names of the locally-equivalent gates.
-        """
-        return 'WGate'
-    
-    @property
-    def name(self) -> str:
-        """Returns the name of the gate.
-
-        Returns:
-            str: name of the gate.
-        """
-        return 'ECP'
+        self._properties['locally_equivalent'] = 'WGate'
+        self._properties['name'] = 'ECP'
     
 
 class FSim(Gate):
@@ -944,15 +725,11 @@ class FSim(Gate):
             qubits (int | tuple): qubit labels. Defaults to (0, 1).
         """
         super().__init__(fsim(theta, phi), qubits)
-    
-    @property
-    def name(self) -> str:
-        """Returns the name of the gate.
-
-        Returns:
-            str: name of the gate.
-        """
-        return 'FSim'
+        self._properties['name'] = 'FSim'
+        self._properties['gate'] = {
+            'theta': theta,
+            'phi':   phi,
+        }
     
 
 class fSWAP(Gate):
@@ -965,24 +742,8 @@ class fSWAP(Gate):
             qubits (int | tuple): qubit labels. Defaults to (0, 1).
         """
         super().__init__(fswap, qubits)
-    
-    @property
-    def name(self) -> str:
-        """Returns the name of the gate.
-
-        Returns:
-            str: name of the gate.
-        """
-        return 'fSWAP'
-    
-    @property
-    def locally_equivalent(self) -> str:
-        """Returns the names of the locally-equivalent gates.
-
-        Returns:
-            str: names of the locally-equivalent gates.
-        """
-        return 'iSWAP\nDCNot'
+        self._properties['locally_equivalent'] = 'iSWAP\nDCNot'
+        self._properties['name'] = 'fSWAP'
     
 
 class Givens(Gate):
@@ -999,24 +760,11 @@ class Givens(Gate):
             qubits (int | tuple): qubit labels. Defaults to (0, 1).
         """
         super().__init__(givens(theta), qubits)
-    
-    @property
-    def name(self) -> str:
-        """Returns the name of the gate.
-
-        Returns:
-            str: name of the gate.
-        """
-        return 'Givens'
-    
-    @property
-    def locally_equivalent(self) -> str:
-        """Returns the names of the locally-equivalent gates.
-
-        Returns:
-            str: names of the locally-equivalent gates.
-        """
-        return 'XY'
+        self._properties['locally_equivalent'] = 'XY'
+        self._properties['name'] = 'Givens'
+        self._properties['gate'] = {
+            'angle': theta
+        }
 
 
 class iSWAP(Gate):
@@ -1029,24 +777,8 @@ class iSWAP(Gate):
             qubits (int | tuple): qubit labels. Defaults to (0, 1).
         """
         super().__init__(iswap, qubits)
-    
-    @property
-    def name(self) -> str:
-        """Returns the name of the gate.
-
-        Returns:
-            str: name of the gate.
-        """
-        return 'iSWAP'
-    
-    @property
-    def locally_equivalent(self) -> str:
-        """Returns the names of the locally-equivalent gates.
-
-        Returns:
-            str: names of the locally-equivalent gates.
-        """
-        return 'fSWAP\nDCNot'
+        self._properties['locally_equivalent'] = 'fSWAP\nDCNot'
+        self._properties['name'] = 'iSWAP'
     
 
 class M(Gate):
@@ -1059,24 +791,9 @@ class M(Gate):
             qubits (int | tuple): qubit labels. Defaults to (0, 1).
         """
         super().__init__(m, qubits)
-    
-    @property
-    def name(self) -> str:
-        """Returns the name of the gate.
-
-        Returns:
-            str: name of the gate.
-        """
-        return 'M'
-    
-    @property
-    def locally_equivalent(self) -> str:
-        """Returns the names of the locally-equivalent gates.
-
-        Returns:
-            str: names of the locally-equivalent gates.
-        """
-        return 'CX'
+        self._properties['alias'] = 'Magic'
+        self._properties['locally_equivalent'] = 'CX'
+        self._properties['name'] = 'M'
     
 
 class MS(Gate):
@@ -1089,24 +806,8 @@ class MS(Gate):
             qubits (int | tuple): qubit labels. Defaults to (0, 1).
         """
         super().__init__(ms, qubits)
-    
-    @property
-    def name(self) -> str:
-        """Returns the name of the gate.
-
-        Returns:
-            str: name of the gate
-        """
-        return 'MS'
-    
-    @property
-    def locally_equivalent(self) -> str:
-        """Returns the names of the locally-equivalent gates.
-
-        Returns:
-            str: names of the locally-equivalent gates.
-        """
-        return 'CX'
+        self._properties['locally_equivalent'] = 'CX'
+        self._properties['name'] = 'MS'
     
 
 class pSWAP(Gate):
@@ -1119,27 +820,15 @@ class pSWAP(Gate):
         """Initialize using the pswap gate.
         
         Args:
+            theta (int, float): rotation angle.
             qubits (int | tuple): qubit labels. Defaults to (0, 1).
         """
         super().__init__(pswap(theta), qubits)
-    
-    @property
-    def name(self) -> str:
-        """Returns the name of the gate.
-
-        Returns:
-            str: name of the gate.
-        """
-        return 'pSWAP'
-    
-    @property
-    def locally_equivalent(self) -> str:
-        """Returns the names of the locally-equivalent gates.
-
-        Returns:
-            str: names of the locally-equivalent gates.
-        """
-        return 'QFT2'
+        self._properties['locally_equivalent'] = 'QFT2'
+        self._properties['name'] = 'pSWAP'
+        self._properties['gate'] = {
+            'angle': theta
+        }
 
 
 class QFT2(Gate):
@@ -1152,24 +841,8 @@ class QFT2(Gate):
             qubits (int | tuple): qubit labels. Defaults to (0, 1).
         """
         super().__init__(qft2, qubits)
-    
-    @property
-    def name(self) -> str:
-        """Returns the name of the gate.
-
-        Returns:
-            str: name of the gate.
-        """
-        return 'QFT2'
-    
-    @property
-    def locally_equivalent(self) -> str:
-        """Returns the names of the locally-equivalent gates.
-
-        Returns:
-            str: names of the locally-equivalent gates.
-        """
-        return 'pSWAP'
+        self._properties['locally_equivalent'] = 'pSWAP'
+        self._properties['name'] = 'QFT2'
 
 
 class SWAP(Gate):
@@ -1182,15 +855,7 @@ class SWAP(Gate):
             qubits (int | tuple): qubit labels. Defaults to (0, 1).
         """
         super().__init__(swap, qubits)
-    
-    @property
-    def name(self) -> str:
-        """Returns the name of the gate.
-
-        Returns:
-            str: name of the gate.
-        """
-        return 'SWAP'
+        self._properties['name'] = 'SWAP'
     
 
 class SWAPAlpha(Gate):
@@ -1203,27 +868,15 @@ class SWAPAlpha(Gate):
         """Initialize using the swap-alpha gate.
         
         Args:
+            alpha (int, float): power of the SWAP gate.
             qubits (int | tuple): qubit labels. Defaults to (0, 1).
         """
         super().__init__(swap_alpha(alpha), qubits)
-    
-    @property
-    def name(self) -> str:
-        """Returns the name of the gate.
-
-        Returns:
-            str: name of the gate.
-        """
-        return 'SWAP-alpha'
-    
-    @property
-    def locally_equivalent(self) -> str:
-        """Returns the names of the locally-equivalent gates.
-
-        Returns:
-            str: names of the locally-equivalent gates
-        """
-        return 'SqrtSWAP\nSqrtSWAPDag'
+        self._properties['locally_equivalent'] = 'SqrtSWAP\nSqrtSWAPdag'
+        self._properties['name'] = 'SWAPAlpha'
+        self._properties['gate'] = {
+            'alpha': alpha
+        }
     
 
 class SqrtSWAP(Gate):
@@ -1236,28 +889,12 @@ class SqrtSWAP(Gate):
             qubits (int | tuple): qubit labels. Defaults to (0, 1).
         """
         super().__init__(sqrt_swap, qubits)
-    
-    @property
-    def name(self) -> str:
-        """Returns the name of the gate.
-
-        Returns:
-            str: name of the gate.
-        """
-        return 'SqrtSWAP'
-    
-    @property
-    def locally_equivalent(self) -> str:
-        """Returns the names of the locally-equivalent gates.
-
-        Returns:
-            str: names of the locally-equivalent gates
-        """
-        return 'SWAPAlpha\nSqrtSWAPDag'
+        self._properties['locally_equivalent'] = 'SWAPAlpha\nSqrtSWAPdag'
+        self._properties['name'] = 'SqrtSWAP'
     
 
-class SqrtSWAPDag(Gate):
-    """Class for the Sqrt SWAP dagger gate."""
+class SqrtSWAPdag(Gate):
+    """Class for the Sqrt(SWAP)^dagger gate."""
 
     def __init__(self, qubits: Tuple = (0, 1)) -> None:
         """Initialize using the sqrt_swap_dag gate.
@@ -1266,24 +903,8 @@ class SqrtSWAPDag(Gate):
             qubits (int | tuple): qubit labels. Defaults to (0, 1).
         """
         super().__init__(sqrt_swap_dag, qubits)
-    
-    @property
-    def name(self) -> str:
-        """Returns the name of the gate.
-
-        Returns:
-            str: name of the gate.
-        """
-        return 'SqrtSWAPDag'
-    
-    @property
-    def locally_equivalent(self) -> str:
-        """Returns the names of the locally-equivalent gates.
-
-        Returns:
-            str: names of the locally-equivalent gates.
-        """
-        return 'SWAPAlpha\nSqrtSWAP'
+        self._properties['locally_equivalent'] = 'SWAPAlpha\nSqrtSWAP'
+        self._properties['name'] = 'SqrtSWAPdag'
     
 
 class Syc(Gate):
@@ -1296,15 +917,8 @@ class Syc(Gate):
             qubits (int | tuple): qubit labels. Defaults to (0, 1).
         """
         super().__init__(syc, qubits)
-    
-    @property
-    def name(self) -> str:
-        """Returns the name of the gate.
-
-        Returns:
-            str: name of the gate.
-        """
-        return 'SWAP'
+        self._properties['alias'] = 'Sycamore'
+        self._properties['name'] = 'Syc'
     
 
 class WGate(Gate):
@@ -1317,24 +931,8 @@ class WGate(Gate):
             qubits (int | tuple): qubit labels. Defaults to (0, 1).
         """
         super().__init__(w_gate, qubits)
-    
-    @property
-    def name(self) -> str:
-        """Returns the name of the gate.
-
-        Returns:
-            str: name of the gate.
-        """
-        return 'WGate'
-    
-    @property
-    def locally_equivalent(self) -> str:
-        """Returns the names of the locally-equivalent gates.
-
-        Returns:
-            str: names of the locally-equivalent gates.
-        """
-        return 'ECP'
+        self._properties['locally_equivalent'] = 'ECP'
+        self._properties['name'] = 'WGate'
     
 
 class XX(Gate):
@@ -1351,15 +949,10 @@ class XX(Gate):
             qubits (int | tuple): qubit labels. Defaults to (0, 1).
         """
         super().__init__(xx(t), qubits)
-    
-    @property
-    def name(self) -> str:
-        """Returns the name of the gate.
-
-        Returns:
-            str: name of the gate.
-        """
-        return 'XX'
+        self._properties['name'] = 'XX'
+        self._properties['gate'] = {
+            'phase factor': t
+        }
     
 
 class XY(Gate):
@@ -1376,24 +969,11 @@ class XY(Gate):
             qubits (int | tuple): qubit labels. Defaults to (0, 1).
         """
         super().__init__(xy(t), qubits)
-    
-    @property
-    def alias(self) -> str:
-        """Returns the alias(es) of the gate.
-
-        Returns:
-            str: alias of the gate.
-        """
-        return 'piSWAP'
-    
-    @property
-    def name(self) -> str:
-        """Returns the name of the gate.
-
-        Returns:
-            str: name of the gate.
-        """
-        return 'XY'
+        self._properties['alias'] = 'piSWAP'
+        self._properties['name'] = 'XY'
+        self._properties['gate'] = {
+            'phase factor': t
+        }
     
 
 class YY(Gate):
@@ -1410,15 +990,10 @@ class YY(Gate):
             qubits (int | tuple): qubit labels. Defaults to (0, 1).
         """
         super().__init__(yy(t), qubits)
-    
-    @property
-    def name(self) -> str:
-        """Returns the name of the gate.
-
-        Returns:
-            str: name of the gate.
-        """
-        return 'YY'
+        self._properties['name'] = 'YY'
+        self._properties['gate'] = {
+            'phase factor': t
+        }
     
 
 class ZZ(Gate):
@@ -1435,12 +1010,7 @@ class ZZ(Gate):
             qubits (int | tuple): qubit labels. Defaults to (0, 1).
         """
         super().__init__(zz(t), qubits)
-    
-    @property
-    def name(self) -> str:
-        """Returns the name of the gate.
-
-        Returns:
-            str: name of the gate.
-        """
-        return 'ZZ'
+        self._properties['name'] = 'ZZ'
+        self._properties['gate'] = {
+            'phase factor': t
+        }

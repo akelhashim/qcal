@@ -3,6 +3,7 @@
 See https://threeplusone.com/pubs/on_gates.pdf for relevant definitions.
 """
 from qcal.gate.gate import Gate
+from qcal.units import ns
 
 import numpy as np
 
@@ -12,8 +13,8 @@ from typing import List, Tuple, Union
 # TODO: add Clifford gates
 
 
-__all__ = ['C', 'H', 'Id', 'Rn', 'Rx', 'Ry', 'Rz', 'S', 'SDag', 'T', 'TDag',
-           'U3', 'V', 'VDag', 'X', 'X90', 'Y', 'Y90', 'Z']
+__all__ = ['C', 'H', 'Id', 'Rn', 'Rx', 'Ry', 'Rz', 'S', 'Sdag', 'T', 'Tdag',
+           'U3', 'V', 'Vdag', 'X', 'X90', 'Y', 'Y90', 'Z']
 
 
 id = sigma0 = np.array([[1., 0.],
@@ -21,6 +22,9 @@ id = sigma0 = np.array([[1., 0.],
 
 h = hadamard = np.array([[1/np.sqrt(2), 1/np.sqrt(2)],
                          [1/np.sqrt(2), -1/np.sqrt(2)]])
+
+meas = np.array([[1., 0.],
+                 [0., 0.]])
 
 t = np.array([[1., 0.],
               [0., np.exp(1j*np.pi/4)]])
@@ -36,6 +40,8 @@ y = y180 = sigma2 = sigma_y = np.array([[0., -1.j],
 
 z = z180 = sigma3 = sigma_z = np.array([[1., 0.],
                                         [0., -1.]])
+
+paulis = [id, x, y, z]
 
 
 def rn(theta: float, n: Union[List, Tuple, NDArray]) -> NDArray:
@@ -127,82 +133,80 @@ def u3(theta: float, phi: float, gamma: float) -> NDArray:
 class C(Gate):
     """Class for the axis cycling (C) gate."""
 
-    def __init__(self, qubits: Union[int, Tuple] = 0) -> None:
+    def __init__(self, qubit: int = 0) -> None:
         """Initialize using the rn function.
         
         Args:
-            qubits (int | tuple): qubit label(s). Defaults to 0.
+            qubit (int): qubit label. Defaults to 0.
         """
-        super().__init__(rn(2*np.pi/3, (1, 1, 1)/np.sqrt(3)), qubits)
-
-    @property
-    def angle(self) -> float:
-        """Returns the angle of rotation.
-
-        Returns:
-            float: angle of rotation.
-        """
-        return 2*np.pi/3
-    
-    @property
-    def axis(self) -> str:
-        """Returns the axis of rotation.
-
-        Returns:
-            str: axis of rotation.
-        """
-        return str((1, 1, 1)/np.sqrt(3))
-    
-    @property
-    def name(self) -> str:
-        """Returns the name of the gate.
-
-        Returns:
-            str: name of the gate.
-        """
-        return 'C'
+        super().__init__(rn(2*np.pi/3, (1, 1, 1)/np.sqrt(3)), qubit)
+        self._properties['name'] = 'C'
+        self._properties['gate'] = {
+            'angle': 2*np.pi/3,
+            'axis': str((1, 1, 1)/np.sqrt(3))
+        }
 
 
 class H(Gate):
     """Class for the Hadamard (H) gate."""
 
-    def __init__(self, qubits: Union[int, Tuple] = 0) -> None:
+    def __init__(self, qubit: int = 0) -> None:
         """Initialize using the h gate.
         
         Args:
-            qubits (int | tuple): qubit label(s). Defaults to 0.
+            qubit (int): qubit label. Defaults to 0.
         """
-        super().__init__(h, qubits)
-    
-    @property
-    def name(self) -> str:
-        """Returns the name of the gate.
-
-        Returns:
-            str: name of the gate.
-        """
-        return 'Hadamard'
+        super().__init__(h, qubit)
+        self._properties['alias'] = 'QFT'
+        self._properties['name'] = 'H'
 
 
 class Id(Gate):
     """Class for the identity gate."""
 
-    def __init__(self, qubits: Union[int, Tuple] = 0) -> None:
+    def __init__(self, qubit: int = 0) -> None:
         """Initialize using the id gate.
         
         Args:
-            qubits (int | tuple): qubit label(s). Defaults to 0.
+            qubit (int): qubit label. Defaults to 0.
         """
-        super().__init__(id, qubits)
+        super().__init__(id, qubit)
+        self._properties['name'] = 'I'
+        self._properties['gate'] = {
+            'angle': 0,
+        }
 
-    @property
-    def name(self) -> str:
-        """Returns the name of the gate.
 
-        Returns:
-            str: name of the gate.
+class Idle(Gate):
+    """Class for the idle gate."""
+
+    def __init__(self, qubit: int = 0, duration: float = 30*ns) -> None:
+        """Initialize using the id gate.
+        
+        Args:
+            qubit (int): qubit label. Defaults to 0.
+            duration (float): idle duration. Defaults to 30 ns.
         """
-        return 'Identity'
+        super().__init__(id, qubit)
+        self._properties['alias'] = 'I'
+        self._properties['name'] = 'Idle'
+        self._properties['gate'] = {
+            'angle': 0,
+            'duration': duration
+        }
+
+
+class Meas(Gate):
+    """Class for a single-qubit measurement operation."""
+
+    def __init__(self, qubit: int = 0) -> None:
+        """Initialize using the meas matrix.
+        
+        Args:
+            qubit (int): qubit label. Defaults to 0.
+        """
+        super().__init__(meas, qubit)
+        self._properties['name'] = 'Meas'
     
 
 class Rn(Gate):
@@ -219,52 +223,21 @@ class Rn(Gate):
     def __init__(self,
             theta: float, 
             n: Union[List, Tuple, NDArray],
-            qubits: Union[int, Tuple] = 0
+            qubit: int = 0
         ) -> None:
         """Initialize using the rn function.
 
         Args:
             theta (float): angle of rotation.
-            n (list, tuple, NDArray): unit vector defining the rotation axis.
-            qubits (int | tuple): qubit label(s). Defaults to 0.
+            n (List, Tuple, NDArray): unit vector defining the rotation axis.
+            qubit (int): qubit label. Defaults to 0.
         """
-        super().__init__(rn(theta, n), qubits)
-        self._angle = theta
-        if n == (1, 0, 0):
-            self._axis = 'x'
-        elif n == (0, 1, 0):
-            self._axis = 'y'
-        elif n == (0, 0, 1):
-            self._axis = 'z'
-        else:
-            self._axis = str(n)
-
-    @property
-    def angle(self) -> float:
-        """Returns the angle of rotation.
-
-        Returns:
-            float: angle of rotation.
-        """
-        return self._angle
-    
-    @property
-    def axis(self) -> str:
-        """Returns the axis of rotation.
-
-        Returns:
-            str: axis of rotation.
-        """
-        return self._axis
-    
-    @property
-    def name(self) -> str:
-        """Returns the name of the gate.
-
-        Returns:
-            str: name of the gate.
-        """
-        return 'Rx'
+        super().__init__(rn(theta, n), qubit)
+        self._properties['name'] = 'Rn'
+        self._properties['gate'] = {
+            'angle': theta,
+            'axis':  n,
+        }
     
 
 class Rx(Gate):
@@ -277,42 +250,19 @@ class Rx(Gate):
         rx.matrix  # Numpy array of the matrix
     """
 
-    def __init__(self, theta: float, qubits: Union[int, Tuple] = 0) -> None:
+    def __init__(self, theta: float, qubit: int = 0) -> None:
         """Initialize using the rx function.
 
         Args:
             theta (float): angle of rotation.
-            qubit (int):   qubit label.
+            qubit (int):   qubit label. Defaults to 0.
         """
-        super().__init__(rx(theta), qubits)
-        self._angle = theta
-
-    @property
-    def angle(self) -> float:
-        """Returns the angle of rotation.
-
-        Returns:
-            float: angle of rotation.
-        """
-        return self._angle
-    
-    @property
-    def axis(self) -> str:
-        """Returns the axis of rotation.
-
-        Returns:
-            str: axis of rotation.
-        """
-        return 'x'
-    
-    @property
-    def name(self) -> str:
-        """Returns the name of the gate.
-
-        Returns:
-            str: name of the gate.
-        """
-        return 'Rx'
+        super().__init__(rx(theta), qubit)
+        self._properties['name'] = 'Rx'
+        self._properties['gate'] = {
+            'angle': theta,
+            'axis':  'x'
+        }
     
 
 class Ry(Gate):
@@ -325,42 +275,19 @@ class Ry(Gate):
         ry.matrix  # Numpy array of the matrix
     """
 
-    def __init__(self, theta: float, qubits: Union[int, Tuple] = 0) -> None:
+    def __init__(self, theta: float, qubit: int = 0) -> None:
         """Initialize using the ry function.
 
         Args:
             theta (float): angle of rotation.
-            qubit (int):   qubit label.
+            qubit (int):   qubit label. Defaults to 0.
         """
-        super().__init__(ry(theta), qubits)
-        self._angle = theta
-
-    @property
-    def angle(self) -> float:
-        """Returns the angle of rotation.
-
-        Returns:
-            float: angle of rotation.
-        """
-        return self._angle
-    
-    @property
-    def axis(self) -> str:
-        """Returns the axis of rotation.
-
-        Returns:
-            str: axis of rotation.
-        """
-        return 'y'
-    
-    @property
-    def name(self) -> str:
-        """Returns the name of the gate.
-
-        Returns:
-            str: name of the gate.
-        """
-        return 'Ry'
+        super().__init__(ry(theta), qubit)
+        self._properties['name'] = 'Ry'
+        self._properties['gate'] = {
+            'angle': theta,
+            'axis':  'y',
+        }
     
 
 class Rz(Gate):
@@ -373,164 +300,91 @@ class Rz(Gate):
         rz.matrix  # Numpy array of the matrix
     """
 
-    def __init__(self, theta: float, qubits: Union[int, Tuple] = 0) -> None:
+    def __init__(self, theta: float, qubit: int = 0) -> None:
         """Initialize using the rz function.
 
         Args:
             theta (float): angle of rotation.
-            qubit (int):   qubit label.
+            qubit (int):   qubit label. Defaults to 0.
         """
-        super().__init__(rz(theta), qubits)
-        self._angle = theta
-
-    @property
-    def angle(self) -> float:
-        """Returns the angle of rotation.
-
-        Returns:
-            float: angle of rotation.
-        """
-        return self._angle
-    
-    @property
-    def axis(self) -> str:
-        """Returns the axis of rotation.
-
-        Returns:
-            str: axis of rotation.
-        """
-        return 'z'
-    
-    @property
-    def name(self) -> str:
-        """Returns the name of the gate.
-
-        Returns:
-            str: name of the gate.
-        """
-        return 'Rz'
+        super().__init__(rz(theta), qubit)
+        self._properties['name'] = 'Rz'
+        self._properties['gate'] = {
+            'angle': theta,
+            'axis':  'z',
+        }
     
 
 class S(Gate):
     """Class for the phase S = sqrt(Z) gate."""
 
-    def __init__(self, qubits: Union[int, Tuple] = 0) -> None:
+    def __init__(self, qubit: int = 0) -> None:
         """Initialize using the Rz gate.
         
         Args:
-            qubits (int | tuple): qubit label(s). Defaults to 0.
+            qubit (int): qubit label. Defaults to 0.
         """
-        super().__init__(rz(np.pi/2), qubits)
-        self._angle = np.pi/2
-
-    @property
-    def angle(self) -> float:
-        """Returns the angle of rotation.
-
-        Returns:
-            float: angle of rotation.
-        """
-        return self._angle
-    
-    @property
-    def axis(self) -> str:
-        """Returns the axis of rotation.
-
-        Returns:
-            str: axis of rotation.
-        """
-        return 'z'
-    
-    @property
-    def name(self) -> str:
-        """Returns the name of the gate.
-
-        Returns:
-            str: name of the gate.
-        """
-        return 'S'
+        super().__init__(rz(np.pi/2), qubit)
+        self._properties['alias'] = 'sqrt(Z)\nZ90'
+        self._properties['name'] = 'S'
+        self._properties['gate'] = {
+            'angle': np.pi/2,
+            'axis':  'z',
+        }
     
 
-class SDag(Gate):
+class Sdag(Gate):
     """Class for the phase S^dagger gate."""
 
-    def __init__(self, qubits: Union[int, Tuple] = 0) -> None:
+    def __init__(self, qubit: int = 0) -> None:
         """Initialize using the Rz gate.
         
         Args:
-            qubits (int | tuple): qubit label(s). Defaults to 0.
+            qubit (int): qubit label. Defaults to 0.
         """
-        super().__init__(rz(-np.pi/2), qubits)
-        self._angle = -np.pi/2
-
-    @property
-    def angle(self) -> float:
-        """Returns the angle of rotation.
-
-        Returns:
-            float: angle of rotation.
-        """
-        return self._angle
-    
-    @property
-    def axis(self) -> str:
-        """Returns the axis of rotation.
-
-        Returns:
-            str: axis of rotation.
-        """
-        return 'z'
-    
-    @property
-    def name(self) -> str:
-        """Returns the name of the gate.
-
-        Returns:
-            str: name of the gate.
-        """
-        return 'SDag'
+        super().__init__(rz(-np.pi/2), qubit)
+        self._properties['alias'] = 'SqrtZdag\nZ-90'
+        self._properties['name'] = 'Sdag'
+        self._properties['gate'] = {
+            'angle': -np.pi/2,
+            'axis':  'z',
+        }
     
 
 class T(Gate):
     """Class for the fourth-root of Z (T) gate."""
 
-    def __init__(self, qubits: Union[int, Tuple] = 0) -> None:
+    def __init__(self, qubit: int = 0) -> None:
         """Initialize using the t gate.
         
         Args:
-            qubits (int | tuple): qubit label(s). Defaults to 0.
+            qubit (int): qubit label. Defaults to 0.
         """
-        super().__init__(t, qubits)
-    
-    @property
-    def name(self) -> str:
-        """Returns the name of the gate.
-
-        Returns:
-            str: name of the gate.
-        """
-        return 'T'
+        super().__init__(t, qubit)
+        self._properties['alias'] = 'Z^(1/4)'
+        self._properties['name'] = 'T'
+        self._properties['gate'] = {
+            'angle': np.pi/4,
+            'axis':  'z',
+        }
     
 
-class TDag(Gate):
+class Tdag(Gate):
     """Class for the inverse fourth-root of Z gate."""
 
-    def __init__(self, qubits: Union[int, Tuple] = 0) -> None:
+    def __init__(self, qubit: int = 0) -> None:
         """Initialize using the tdag gate.
         
         Args:
-            qubits (int | tuple): qubit label(s). Defaults to 0.
+            qubit (int): qubit label. Defaults to 0.
         """
-        super().__init__(tdag, qubits)
-    
-    @property
-    def name(self) -> str:
-        """Returns the name of the gate.
-
-        Returns:
-            str: name of the gate.
-        """
-        return 'TDag'
+        super().__init__(tdag, qubit)
+        self._properties['alias'] = 'Z^(1/4)dag'
+        self._properties['name'] = 'Tdag'
+        self._properties['gate'] = {
+            'angle': -np.pi/4,
+            'axis':  'z',
+        }
     
 
 class U3(Gate):
@@ -540,7 +394,7 @@ class U3(Gate):
             theta: float,
             phi:   float,
             gamma: float,
-            qubits: Union[int, Tuple] = 0
+            qubit: int = 0
         ) -> None:
         """Initialize using the u3 function.
         
@@ -550,320 +404,132 @@ class U3(Gate):
             gamma (float): second phase angle.
             qubit (int):   qubit label.
         """
-        super().__init__(u3(theta, phi, gamma), qubits)
-    
-    @property
-    def name(self) -> str:
-        """Returns the name of the gate.
-
-        Returns:
-            str: name of the gate.
-        """
-        return 'U3'
+        super().__init__(u3(theta, phi, gamma), qubit)
+        self._properties['name'] = 'U3'
+        self._properties['gate'] = {
+            'theta': theta,
+            'phi':   phi,
+            'gamma': gamma
+        }
     
 
 class V(Gate):
     """Class for the V = X90 gate."""
 
-    def __init__(self, qubits: Union[int, Tuple] = 0) -> None:
+    def __init__(self, qubit: int = 0) -> None:
         """Initialize using the rx gate.
         
         Args:
-            qubits (int | tuple): qubit label(s). Defaults to 0.
+            qubit (int): qubit label. Defaults to 0.
         """
-        super().__init__(rx(np.pi/2), qubits)
-        self._angle = np.pi/2
-
-    @property
-    def alias(self) -> str:
-        """Returns the alias(es) of the gate.
-
-        Returns:
-            str: alias of the gate.
-        """
-        return 'X90'
-    
-    @property
-    def angle(self) -> float:
-        """Returns the angle of rotation.
-
-        Returns:
-            float: angle of rotation.
-        """
-        return self._angle
-    
-    @property
-    def axis(self) -> str:
-        """Returns the axis of rotation.
-
-        Returns:
-            str: axis of rotation.
-        """
-        return 'x'
-    
-    @property
-    def name(self) -> str:
-        """Returns the name of the gate.
-
-        Returns:
-            str: name of the gate.
-        """
-        return 'V'
+        super().__init__(rx(np.pi/2), qubit)
+        self._properties['alias'] = 'X90'
+        self._properties['name'] = 'V'
+        self._properties['gate'] = {
+            'angle': np.pi/2,
+            'axis':  'x',
+        }
     
 
-class VDag(Gate):
-    """Class for the VDag = X-90 gate."""
+class Vdag(Gate):
+    """Class for the Vdag = X-90 gate."""
 
-    def __init__(self, qubits: Union[int, Tuple] = 0) -> None:
+    def __init__(self, qubit: int = 0) -> None:
         """Initialize using the rx gate.
         
         Args:
-            qubits (int | tuple): qubit label(s). Defaults to 0.
+            qubit (int): qubit label. Defaults to 0.
         """
-        super().__init__(rx(-np.pi/2), qubits)
-        self._angle = -np.pi/2
-
-    @property
-    def alias(self) -> str:
-        """Returns the alias(es) of the gate.
-
-        Returns:
-            str: alias of the gate.
-        """
-        return 'X-90'
-    
-    @property
-    def angle(self) -> float:
-        """Returns the angle of rotation.
-
-        Returns:
-            float: angle of rotation.
-        """
-        return self._angle
-    
-    @property
-    def axis(self) -> str:
-        """Returns the axis of rotation.
-
-        Returns:
-            str: axis of rotation.
-        """
-        return 'x'
-    
-    @property
-    def name(self) -> str:
-        """Returns the name of the gate.
-
-        Returns:
-            str: name of the gate.
-        """
-        return 'VDag'
+        super().__init__(rx(-np.pi/2), qubit)
+        self._properties['alias'] = 'X-90'
+        self._properties['name'] = 'Vdag'
+        self._properties['gate'] = {
+            'angle': -np.pi/2,
+            'axis':  'x',
+        }
     
 
 class X(Gate):
     """Class for the Pauli X gate."""
 
-    def __init__(self, qubits: Union[int, Tuple] = 0) -> None:
+    def __init__(self, qubit: int = 0) -> None:
         """Initialize using the x gate.
         
         Args:
-            qubits (int | tuple): qubit label(s). Defaults to 0.
+            qubit (int): qubit label. Defaults to 0.
         """
-        super().__init__(x, qubits)
-        self._angle = np.pi
-
-    @property
-    def angle(self) -> float:
-        """Returns the angle of rotation.
-
-        Returns:
-            float: angle of rotation.
-        """
-        return self._angle
-    
-    @property
-    def axis(self) -> str:
-        """Returns the axis of rotation.
-
-        Returns:
-            str: axis of rotation.
-        """
-        return 'x'
-    
-    @property
-    def name(self) -> str:
-        """Returns the name of the gate.
-
-        Returns:
-            str: name of the gate.
-        """
-        return 'Pauli-X'
+        super().__init__(x, qubit)
+        self._properties['name'] = 'X'
+        self._properties['gate'] = {
+            'angle': np.pi,
+            'axis':  'x',
+        }
     
 
 class X90(Gate):
     """Class for the X90 = sqrt(X) gate."""
 
-    def __init__(self, qubits: Union[int, Tuple] = 0) -> None:
+    def __init__(self, qubit: int = 0) -> None:
         """Initialize using the rx gate.
         
         Args:
-            qubits (int | tuple): qubit label(s). Defaults to 0.
+            qubit (int): qubit label. Defaults to 0.
         """
-        super().__init__(rx(np.pi/2), qubits)
-        self._angle = np.pi/2
+        super().__init__(rx(np.pi/2), qubit)
+        self._properties['alias'] = 'V'
+        self._properties['name'] = 'X90'
+        self._properties['gate'] = {
+            'angle': np.pi/2,
+            'axis':  'x',
+        }
 
-    @property
-    def alias(self) -> str:
-        """Returns the alias(es) of the gate.
-
-        Returns:
-            str: alias of the gate.
-        """
-        return 'V'
-    
-    @property
-    def angle(self) -> float:
-        """Returns the angle of rotation.
-
-        Returns:
-            float: angle of rotation.
-        """
-        return self._angle
-    
-    @property
-    def axis(self) -> str:
-        """Returns the axis of rotation.
-
-        Returns:
-            str: axis of rotation.
-        """
-        return 'x'
-    
-    @property
-    def name(self) -> str:
-        """Returns the name of the gate.
-
-        Returns:
-            str: name of the gate.
-        """
-        return 'X90'
-    
 
 class Y(Gate):
     """Class for the Pauli Y gate."""
 
-    def __init__(self, qubits: Union[int, Tuple] = 0) -> None:
+    def __init__(self, qubit: int = 0) -> None:
         """Initialize using the Y gate.
         
         Args:
-            qubits (int | tuple): qubit label(s). Defaults to 0.
+            qubit (int): qubit label. Defaults to 0.
         """
-        super().__init__(y, qubits)
-        self._angle = np.pi
-
-    @property
-    def angle(self) -> float:
-        """Returns the angle of rotation.
-
-        Returns:
-            float: angle of rotation.
-        """
-        return self._angle
-    
-    @property
-    def axis(self) -> str:
-        """Returns the axis of rotation.
-
-        Returns:
-            str: axis of rotation.
-        """
-        return 'y'
-    
-    @property
-    def name(self) -> str:
-        """Returns the name of the gate.
-
-        Returns:
-            str: name of the gate.
-        """
-        return 'Pauli-Y'
+        super().__init__(y, qubit)
+        self._properties['name'] = 'Y'
+        self._properties['gate'] = {
+            'angle': np.pi,
+            'axis':  'y',
+        }
     
 
 class Y90(Gate):
     """Class for the Y90 = sqrt(Y) gate."""
 
-    def __init__(self, qubits: Union[int, Tuple] = 0) -> None:
+    def __init__(self, qubit: int = 0) -> None:
         """Initialize using the ry gate.
         
         Args:
-            qubits (int | tuple): qubit label(s). Defaults to 0.
+            qubit (int): qubit label. Defaults to 0.
         """
-        super().__init__(ry(np.pi/2), qubits)
-        self._angle = np.pi/2
-
-    @property
-    def angle(self) -> float:
-        """Returns the angle of rotation.
-
-        Returns:
-            float: angle of rotation.
-        """
-        return self._angle
-    
-    @property
-    def axis(self) -> str:
-        """Returns the axis of rotation.
-
-        Returns:
-            str: axis of rotation.
-        """
-        return 'y'
-
-    @property
-    def name(self) -> str:
-        """Returns the name of the gate.
-
-        Returns:
-            str: name of the gate.
-        """
-        return 'Y90'
+        super().__init__(ry(np.pi/2), qubit)
+        self._properties['name'] = 'Y90'
+        self._properties['gate'] = {
+            'angle': np.pi/2,
+            'axis':  'y',
+        }
     
 
 class Z(Gate):
     """Class for the Pauli Z gate."""
 
-    def __init__(self, qubits: Union[int, Tuple] = 0) -> None:
+    def __init__(self, qubit: int = 0) -> None:
         """Initialize using the z gate.
         
         Args:
-            qubits (int | tuple): qubit label(s). Defaults to 0.
+            qubit (int): qubit label. Defaults to 0.
         """
-        super().__init__(z, qubits)
-        self._angle = np.pi
-
-    @property
-    def angle(self) -> float:
-        """Returns the angle of rotation.
-
-        Returns:
-            float: angle of rotation.
-        """
-        return self._angle
-    
-    @property
-    def axis(self) -> str:
-        """Returns the axis of rotation.
-
-        Returns:
-            str: axis of rotation.
-        """
-        return 'z'
-    
-    @property
-    def name(self) -> str:
-        """Returns the name of the gate.
-
-        Returns:
-            str: name of the gate.
-        """
-        return 'Pauli-Z'
+        super().__init__(z, qubit)
+        self._properties['name'] = 'Z'
+        self._properties['gate'] = {
+            'angle': np.pi,
+            'axis':  'z',
+        }

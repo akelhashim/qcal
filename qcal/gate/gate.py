@@ -5,12 +5,12 @@ import pandas as pd
 
 from numpy.typing import NDArray
 from sympy import Matrix
-from typing import Tuple, Union
+from typing import Dict, Tuple, Union
 
 
 class Gate:
 
-    __slots__ = ['_matrix', '_qubits']
+    __slots__ = ['_matrix', '_properties']
 
     def __init__(self, 
             matrix: NDArray, 
@@ -23,7 +23,15 @@ class Gate:
             qubits (int | tuple): qubit label(s).
         """
         self._matrix = matrix
-        self._qubits = qubits if type(qubits) is tuple else (qubits,)
+        self._properties = {
+            'alias':  None,
+            'dim':    self._matrix.shape[0],
+            'locally_equivalent': None,
+            'matrix': matrix,
+            'name':   'Gate',
+            'qubits': qubits if type(qubits) is Tuple else (qubits,),
+            'gate': {}
+        }
 
     def __call__(self) -> Matrix:
         """The sympy expression for the numpy array.
@@ -96,7 +104,7 @@ class Gate:
         Returns:
             str: alias of the gate.
         """
-        return None
+        return self._properties['alias']
     
     @property
     def dim(self) -> int:
@@ -105,7 +113,31 @@ class Gate:
         Returns:
             int: Hilbert space dimension.
         """
-        return self._matrix.shape[0]
+        return self._properties['dim']
+    
+    @property
+    def is_single_qubit(self) -> bool: # TODO: make compatible with qutrits
+        """Whethor or not the gate acts on a single qubit.
+
+        Returns:
+            bool: single-qubit gate or not.
+        """
+        if len(self.qubits) == 1:
+            return True
+        else:
+            return False
+        
+    @property
+    def is_multi_qubit(self) -> bool: # TODO: make compatible with qutrits
+        """Whethor or not the gate acts on multiple qubits.
+
+        Returns:
+            bool: multi-qubit gate or not.
+        """
+        if len(self.qubits) == 1:
+            return True
+        else:
+            return False
     
     @property
     def locally_equivalent(self) -> str:
@@ -114,7 +146,7 @@ class Gate:
         Returns:
             str: names of the locally-equivalent gates.
         """
-        return None
+        return self._properties['locally_equivalent']
 
     @property
     def matrix(self) -> NDArray:
@@ -132,7 +164,16 @@ class Gate:
         Returns:
             str: name of the gate.
         """
-        return None
+        return self._properties['name']
+    
+    @property
+    def properties(self) -> Dict:
+        """Properties of the gate.
+
+        Returns:
+            Dict: gate properties.
+        """
+        return self._properties
     
     @property
     def qubits(self) -> tuple:
@@ -141,4 +182,4 @@ class Gate:
         Returns:
             tupe: qubit label(s).
         """
-        return self._qubits
+        return self._properties['qubits']
