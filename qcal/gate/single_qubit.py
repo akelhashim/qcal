@@ -13,8 +13,8 @@ from typing import List, Tuple, Union
 # TODO: add Clifford gates
 
 
-__all__ = ['C', 'H', 'Id', 'Rn', 'Rx', 'Ry', 'Rz', 'S', 'Sdag', 'T', 'Tdag',
-           'U3', 'V', 'Vdag', 'X', 'X90', 'Y', 'Y90', 'Z']
+__all__ = ['C', 'H', 'Id', 'Meas', 'Rn', 'Rx', 'Ry', 'Rz', 'S', 'Sdag', 'T', 
+           'Tdag', 'U3', 'V', 'Vdag', 'X', 'X90', 'Y', 'Y90', 'Z']
 
 
 id = sigma0 = np.array([[1., 0.],
@@ -41,7 +41,24 @@ y = y180 = sigma2 = sigma_y = np.array([[0., -1.j],
 z = z180 = sigma3 = sigma_z = np.array([[1., 0.],
                                         [0., -1.]])
 
-paulis = [id, x, y, z]
+paulis = (id, x, y, z)
+
+
+def basis_rotation(meas):
+    """Returns the gate which rotates the qubit to the measurement basis.
+
+    Args:
+        meas (Meas): measurement object.
+
+    Returns:
+        Gate: gate object.
+    """
+    basis_map = {
+        'X': Ry(-np.pi/2, meas.qubits[0]),
+        'Y': Rx(np.pi/2, meas.qubits[0]),
+        'Z': Id(meas.qubits[0])
+    }
+    return basis_map[meas.properties['params']['basis'].upper()]
 
 
 def rn(theta: float, n: Union[List, Tuple, NDArray]) -> NDArray:
@@ -141,7 +158,7 @@ class C(Gate):
         """
         super().__init__(rn(2*np.pi/3, (1, 1, 1)/np.sqrt(3)), qubit)
         self._properties['name'] = 'C'
-        self._properties['gate'] = {
+        self._properties['params'] = {
             'angle': 2*np.pi/3,
             'axis': str((1, 1, 1)/np.sqrt(3))
         }
@@ -172,7 +189,7 @@ class Id(Gate):
         """
         super().__init__(id, qubit)
         self._properties['name'] = 'I'
-        self._properties['gate'] = {
+        self._properties['params'] = {
             'angle': 0,
         }
 
@@ -190,7 +207,7 @@ class Idle(Gate):
         super().__init__(id, qubit)
         self._properties['alias'] = 'I'
         self._properties['name'] = 'Idle'
-        self._properties['gate'] = {
+        self._properties['params'] = {
             'angle': 0,
             'duration': duration
         }
@@ -199,14 +216,16 @@ class Idle(Gate):
 class Meas(Gate):
     """Class for a single-qubit measurement operation."""
 
-    def __init__(self, qubit: int = 0) -> None:
+    def __init__(self, qubit: int = 0, basis: str = 'Z') -> None:
         """Initialize using the meas matrix.
         
         Args:
             qubit (int): qubit label. Defaults to 0.
+            basis (str): measurement basis. Defaults to Z.
         """
         super().__init__(meas, qubit)
         self._properties['name'] = 'Meas'
+        self._properties['params']['basis'] = basis
     
 
 class Rn(Gate):
@@ -234,7 +253,7 @@ class Rn(Gate):
         """
         super().__init__(rn(theta, n), qubit)
         self._properties['name'] = 'Rn'
-        self._properties['gate'] = {
+        self._properties['params'] = {
             'angle': theta,
             'axis':  n,
         }
@@ -259,7 +278,7 @@ class Rx(Gate):
         """
         super().__init__(rx(theta), qubit)
         self._properties['name'] = 'Rx'
-        self._properties['gate'] = {
+        self._properties['params'] = {
             'angle': theta,
             'axis':  'x'
         }
@@ -284,7 +303,7 @@ class Ry(Gate):
         """
         super().__init__(ry(theta), qubit)
         self._properties['name'] = 'Ry'
-        self._properties['gate'] = {
+        self._properties['params'] = {
             'angle': theta,
             'axis':  'y',
         }
@@ -309,7 +328,7 @@ class Rz(Gate):
         """
         super().__init__(rz(theta), qubit)
         self._properties['name'] = 'Rz'
-        self._properties['gate'] = {
+        self._properties['params'] = {
             'angle': theta,
             'axis':  'z',
         }
@@ -327,7 +346,7 @@ class S(Gate):
         super().__init__(rz(np.pi/2), qubit)
         self._properties['alias'] = 'sqrt(Z)\nZ90'
         self._properties['name'] = 'S'
-        self._properties['gate'] = {
+        self._properties['params'] = {
             'angle': np.pi/2,
             'axis':  'z',
         }
@@ -345,7 +364,7 @@ class Sdag(Gate):
         super().__init__(rz(-np.pi/2), qubit)
         self._properties['alias'] = 'SqrtZdag\nZ-90'
         self._properties['name'] = 'Sdag'
-        self._properties['gate'] = {
+        self._properties['params'] = {
             'angle': -np.pi/2,
             'axis':  'z',
         }
@@ -363,7 +382,7 @@ class T(Gate):
         super().__init__(t, qubit)
         self._properties['alias'] = 'Z^(1/4)'
         self._properties['name'] = 'T'
-        self._properties['gate'] = {
+        self._properties['params'] = {
             'angle': np.pi/4,
             'axis':  'z',
         }
@@ -381,7 +400,7 @@ class Tdag(Gate):
         super().__init__(tdag, qubit)
         self._properties['alias'] = 'Z^(1/4)dag'
         self._properties['name'] = 'Tdag'
-        self._properties['gate'] = {
+        self._properties['params'] = {
             'angle': -np.pi/4,
             'axis':  'z',
         }
@@ -406,7 +425,7 @@ class U3(Gate):
         """
         super().__init__(u3(theta, phi, gamma), qubit)
         self._properties['name'] = 'U3'
-        self._properties['gate'] = {
+        self._properties['params'] = {
             'theta': theta,
             'phi':   phi,
             'gamma': gamma
@@ -425,7 +444,7 @@ class V(Gate):
         super().__init__(rx(np.pi/2), qubit)
         self._properties['alias'] = 'X90'
         self._properties['name'] = 'V'
-        self._properties['gate'] = {
+        self._properties['params'] = {
             'angle': np.pi/2,
             'axis':  'x',
         }
@@ -443,7 +462,7 @@ class Vdag(Gate):
         super().__init__(rx(-np.pi/2), qubit)
         self._properties['alias'] = 'X-90'
         self._properties['name'] = 'Vdag'
-        self._properties['gate'] = {
+        self._properties['params'] = {
             'angle': -np.pi/2,
             'axis':  'x',
         }
@@ -460,7 +479,7 @@ class X(Gate):
         """
         super().__init__(x, qubit)
         self._properties['name'] = 'X'
-        self._properties['gate'] = {
+        self._properties['params'] = {
             'angle': np.pi,
             'axis':  'x',
         }
@@ -478,7 +497,7 @@ class X90(Gate):
         super().__init__(rx(np.pi/2), qubit)
         self._properties['alias'] = 'V'
         self._properties['name'] = 'X90'
-        self._properties['gate'] = {
+        self._properties['params'] = {
             'angle': np.pi/2,
             'axis':  'x',
         }
@@ -495,7 +514,7 @@ class Y(Gate):
         """
         super().__init__(y, qubit)
         self._properties['name'] = 'Y'
-        self._properties['gate'] = {
+        self._properties['params'] = {
             'angle': np.pi,
             'axis':  'y',
         }
@@ -512,7 +531,7 @@ class Y90(Gate):
         """
         super().__init__(ry(np.pi/2), qubit)
         self._properties['name'] = 'Y90'
-        self._properties['gate'] = {
+        self._properties['params'] = {
             'angle': np.pi/2,
             'axis':  'y',
         }
@@ -529,7 +548,7 @@ class Z(Gate):
         """
         super().__init__(z, qubit)
         self._properties['name'] = 'Z'
-        self._properties['gate'] = {
+        self._properties['params'] = {
             'angle': np.pi,
             'axis':  'z',
         }

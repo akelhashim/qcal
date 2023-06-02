@@ -388,7 +388,7 @@ class AGate(Gate):
 
         self._properties['locally_equivalent'] = loc_equiv
         self._properties['name'] = 'AGate'
-        self._properties['gate'] = {
+        self._properties['params'] = {
             'theta': theta,
             'phi':   phi,
         }
@@ -414,7 +414,7 @@ class Barenco(Gate):
         super().__init__(barenco(phi, alpha, theta), qubits)
         self._properties['locally_equivalent'] = 'XX'
         self._properties['name'] = 'Barenco'
-        self._properties['gate'] = {
+        self._properties['params'] = {
             'theta': theta,
             'alpha': alpha,
             'phi':   phi
@@ -461,7 +461,7 @@ class CNot(Gate):
         """
         super().__init__(cnot, qubits)
         self._properties['alias'] = 'CX'
-        self._properties['locally_equivalent'] = 'CY\nCZ'
+        self._properties['locally_equivalent'] = 'CY, CZ'
         self._properties['name'] = 'CNot'
 
 
@@ -494,14 +494,14 @@ class CPhase(Gate):
             alias = None
 
         if theta == 1:
-            loc_equiv = 'CX\nCY'
+            loc_equiv = 'CX, CY'
         else:
             loc_equiv = None
 
         self._properties['alias'] = alias
         self._properties['locally_equivalent'] = loc_equiv
         self._properties['name'] = 'CPhase'
-        self._properties['gate'] = {
+        self._properties['params'] = {
             'angle': theta,
         }
     
@@ -523,7 +523,7 @@ class CRot(Gate):
         """
         super().__init__(crot(theta, n), qubits)
         self._properties['name'] = 'CRot'
-        self._properties['gate'] = {
+        self._properties['params'] = {
             'angle': theta,
             'axis':  n
         }
@@ -541,7 +541,7 @@ class CS(Gate):
         super().__init__(cphase(0.5), qubits)
         self._properties['alias'] = 'sqrt(CZ)'
         self._properties['name'] = 'CS'
-        self._properties['gate'] = {
+        self._properties['params'] = {
             'angle': np.pi/2,
         }
     
@@ -558,7 +558,7 @@ class CSdag(Gate):
         super().__init__(cphase(-0.5), qubits)
         self._properties['alias'] = 'sqrt(CZ)dag'
         self._properties['name'] = 'CSDdag'
-        self._properties['gate'] = {
+        self._properties['params'] = {
             'angle': -np.pi/2,
         }
     
@@ -575,7 +575,7 @@ class CT(Gate):
         super().__init__(cphase(0.25), qubits)
         self._properties['alias'] = 'CZ^(1/4)'
         self._properties['name'] = 'CT'
-        self._properties['gate'] = {
+        self._properties['params'] = {
             'angle': np.pi/4,
         }
     
@@ -592,7 +592,7 @@ class CTdag(Gate):
         super().__init__(cphase(-0.25), qubits)
         self._properties['alias'] = 'CZ^(-1/4)'
         self._properties['name'] = 'CTdag'
-        self._properties['gate'] = {
+        self._properties['params'] = {
             'angle': -np.pi/4,
         }
     
@@ -608,9 +608,9 @@ class CV(Gate):
         """
         super().__init__(cv, qubits)
         self._properties['alias'] = 'SqrtCNot'
-        self._properties['locally_equivalent'] = 'CY\nCZ'
+        self._properties['locally_equivalent'] = 'CVdag'
         self._properties['name'] = 'CV'
-        self._properties['gate'] = {
+        self._properties['params'] = {
             'angle': np.pi/2
         }
     
@@ -626,9 +626,9 @@ class CX(Gate):
         """
         super().__init__(cx, qubits)
         self._properties['alias'] = 'CNot'
-        self._properties['locally_equivalent'] = 'CY\nCZ'
+        self._properties['locally_equivalent'] = 'CY, CZ'
         self._properties['name'] = 'CX'
-        self._properties['gate'] = {
+        self._properties['params'] = {
             'angle': np.pi
         }
     
@@ -643,9 +643,9 @@ class CY(Gate):
             qubits (int | tuple): qubit labels. Defaults to (0, 1).
         """
         super().__init__(cy, qubits)
-        self._properties['locally_equivalent'] = 'CX\nCZ'
+        self._properties['locally_equivalent'] = 'CX, CZ'
         self._properties['name'] = 'CY'
-        self._properties['gate'] = {
+        self._properties['params'] = {
             'angle': np.pi
         }
     
@@ -660,9 +660,9 @@ class CZ(Gate):
             qubits (int | tuple): qubit labels. Defaults to (0, 1).
         """
         super().__init__(cz, qubits)
-        self._properties['locally_equivalent'] = 'CX\nCY'
+        self._properties['locally_equivalent'] = 'CX, CY'
         self._properties['name'] = 'CZ'
-        self._properties['gate'] = {
+        self._properties['params'] = {
             'angle': np.pi
         }
     
@@ -691,7 +691,7 @@ class DCNot(Gate):
             qubits (int | tuple): qubit labels. Defaults to (0, 1).
         """
         super().__init__(dcnot, qubits)
-        self._properties['locally_equivalent'] = 'fSWAP\niSWAP'
+        self._properties['locally_equivalent'] = 'fSWAP, iSWAP'
         self._properties['name'] = 'DCNot'
     
 
@@ -726,7 +726,7 @@ class FSim(Gate):
         """
         super().__init__(fsim(theta, phi), qubits)
         self._properties['name'] = 'FSim'
-        self._properties['gate'] = {
+        self._properties['params'] = {
             'theta': theta,
             'phi':   phi,
         }
@@ -742,7 +742,7 @@ class fSWAP(Gate):
             qubits (int | tuple): qubit labels. Defaults to (0, 1).
         """
         super().__init__(fswap, qubits)
-        self._properties['locally_equivalent'] = 'iSWAP\nDCNot'
+        self._properties['locally_equivalent'] = 'iSWAP, DCNot'
         self._properties['name'] = 'fSWAP'
     
 
@@ -762,7 +762,7 @@ class Givens(Gate):
         super().__init__(givens(theta), qubits)
         self._properties['locally_equivalent'] = 'XY'
         self._properties['name'] = 'Givens'
-        self._properties['gate'] = {
+        self._properties['params'] = {
             'angle': theta
         }
 
@@ -777,7 +777,7 @@ class iSWAP(Gate):
             qubits (int | tuple): qubit labels. Defaults to (0, 1).
         """
         super().__init__(iswap, qubits)
-        self._properties['locally_equivalent'] = 'fSWAP\nDCNot'
+        self._properties['locally_equivalent'] = 'fSWAP, DCNot'
         self._properties['name'] = 'iSWAP'
     
 
@@ -826,7 +826,7 @@ class pSWAP(Gate):
         super().__init__(pswap(theta), qubits)
         self._properties['locally_equivalent'] = 'QFT2'
         self._properties['name'] = 'pSWAP'
-        self._properties['gate'] = {
+        self._properties['params'] = {
             'angle': theta
         }
 
@@ -872,9 +872,9 @@ class SWAPAlpha(Gate):
             qubits (int | tuple): qubit labels. Defaults to (0, 1).
         """
         super().__init__(swap_alpha(alpha), qubits)
-        self._properties['locally_equivalent'] = 'SqrtSWAP\nSqrtSWAPdag'
+        self._properties['locally_equivalent'] = 'SqrtSWAP, SqrtSWAPdag'
         self._properties['name'] = 'SWAPAlpha'
-        self._properties['gate'] = {
+        self._properties['params'] = {
             'alpha': alpha
         }
     
@@ -889,7 +889,7 @@ class SqrtSWAP(Gate):
             qubits (int | tuple): qubit labels. Defaults to (0, 1).
         """
         super().__init__(sqrt_swap, qubits)
-        self._properties['locally_equivalent'] = 'SWAPAlpha\nSqrtSWAPdag'
+        self._properties['locally_equivalent'] = 'SWAPAlpha, SqrtSWAPdag'
         self._properties['name'] = 'SqrtSWAP'
     
 
@@ -903,7 +903,7 @@ class SqrtSWAPdag(Gate):
             qubits (int | tuple): qubit labels. Defaults to (0, 1).
         """
         super().__init__(sqrt_swap_dag, qubits)
-        self._properties['locally_equivalent'] = 'SWAPAlpha\nSqrtSWAP'
+        self._properties['locally_equivalent'] = 'SWAPAlpha, SqrtSWAP'
         self._properties['name'] = 'SqrtSWAPdag'
     
 
@@ -950,7 +950,7 @@ class XX(Gate):
         """
         super().__init__(xx(t), qubits)
         self._properties['name'] = 'XX'
-        self._properties['gate'] = {
+        self._properties['params'] = {
             'phase factor': t
         }
     
@@ -971,7 +971,7 @@ class XY(Gate):
         super().__init__(xy(t), qubits)
         self._properties['alias'] = 'piSWAP'
         self._properties['name'] = 'XY'
-        self._properties['gate'] = {
+        self._properties['params'] = {
             'phase factor': t
         }
     
@@ -991,7 +991,7 @@ class YY(Gate):
         """
         super().__init__(yy(t), qubits)
         self._properties['name'] = 'YY'
-        self._properties['gate'] = {
+        self._properties['params'] = {
             'phase factor': t
         }
     
@@ -1011,6 +1011,6 @@ class ZZ(Gate):
         """
         super().__init__(zz(t), qubits)
         self._properties['name'] = 'ZZ'
-        self._properties['gate'] = {
+        self._properties['params'] = {
             'phase factor': t
         }

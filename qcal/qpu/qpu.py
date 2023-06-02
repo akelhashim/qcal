@@ -9,7 +9,7 @@ Basic example useage:
 """
 from qcal.compilation.compiler import Compiler, DEFAULT_COMPILER
 from qcal.config import Config
-from qcal.circuits import CircuitSet
+from qcal.circuit import CircuitSet
 
 import logging
 import numpy as np

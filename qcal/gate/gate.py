@@ -29,8 +29,8 @@ class Gate:
             'locally_equivalent': None,
             'matrix': matrix,
             'name':   'Gate',
-            'qubits': qubits if type(qubits) is Tuple else (qubits,),
-            'gate': {}
+            'qubits': qubits if type(qubits) is tuple else (qubits,),
+            'params': {}
         }
 
     def __call__(self) -> Matrix:
@@ -48,7 +48,7 @@ class Gate:
             str: string representation of the gate.
         """
         return (
-            f'{self._qubits} ' + f'{self.name} \n' + 
+            f'{self.qubits} ' + f'{self.name} \n' + 
             np.array_repr(np.around(self._matrix, 3)
         ))
     
@@ -59,7 +59,7 @@ class Gate:
             str: string representation of the gate.
         """
         return (
-            f'{self._qubits} ' + f'{self.name} \n' + 
+            f'{self.qubits} ' + f'{self.name} \n' + 
             np.array_repr(np.around(self._matrix, 3)
         ))
     
@@ -79,7 +79,7 @@ class Gate:
                 .to_html()
             )]
         ], dtype="object")
-        df.index = [self._qubits]
+        df.index = [self.qubits]
         df.columns = ['Matrix']
         df.insert(0, 'Gate', [self.name])
 
@@ -134,7 +134,7 @@ class Gate:
         Returns:
             bool: multi-qubit gate or not.
         """
-        if len(self.qubits) == 1:
+        if len(self.qubits) > 1:
             return True
         else:
             return False

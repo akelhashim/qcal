@@ -15,6 +15,7 @@ Basic example useage:
     cs = CircuitSet([list of circuits])
 """
 from qcal.gate.gate import Gate
+from qcal.gate.single_qubit import basis_rotation, Meas
 
 import copy
 # import itertools
@@ -30,7 +31,7 @@ __all__ = ['Cycle', 'Layer', 'Circuit', 'CircuitSet']
 class Cycle:
     """Class defining a cycle in a circuit."""
 
-    __slots__ = ['_gates', '_qubits']
+    __slots__ = ('_gates', '_qubits')
 
     def __init__(self, gates: List[Gate] = []) -> None:
         """
@@ -49,6 +50,9 @@ class Cycle:
     def __copy__(self) -> List:
         return Cycle(copy.deepcopy(self._gates))
     
+    def __iter__(self):
+        return iter(self._gates)
+    
     def __repr__(self) -> str:
         df = pd.DataFrame(
             data=[gate.name for gate in self._gates], 
@@ -60,7 +64,9 @@ class Cycle:
     def __str__(self) -> str:
         df = pd.DataFrame(
             data=[gate.name for gate in self._gates], 
-            columns=['Cycle'], 
+            columns=[
+                'Layer' if isinstance(self._gates[0], Layer) else 'Cycle'
+            ], 
             index=[gate.qubits for gate in self._gates]
         )
         return repr(df)
@@ -119,7 +125,7 @@ class Cycle:
         Returns:
             List: gates in cycle/layer.
         """
-        return [gate.name for gate in self._gates]
+        return [gate for gate in self._gates]
     
     @property
     def qubits(self) -> Tuple:
@@ -167,7 +173,7 @@ class Layer(Cycle):
 
 class Circuit:
 
-    __slots__ = ['_cycles', '_qubits']
+    __slots__ = ('_cycles', '_qubits')
 
     def __init__(self,
             cycles_or_layers: List[Union[Cycle, Layer]] = []
@@ -179,6 +185,9 @@ class Circuit:
             qubits += cycle.qubits
         self._qubits = tuple(sorted(set(qubits)))
 
+    def __iter__(self):
+        return iter(self._cycles)
+    
     def __len__(self) -> int:
         return len(self._cycles)
 
@@ -189,7 +198,7 @@ class Circuit:
         Returns:
             deque: list of cycles.
         """
-        return self._cycles
+        return [cycle for cycle in self._cycles]
     
     @property
     def layers(self) -> deque:
@@ -198,7 +207,7 @@ class Circuit:
         Returns:
             deque: list of layers.
         """
-        return self._cycles
+        return [cycle for cycle in self._cycles]
     
     @property
     def circuit_depth(self) -> int:
@@ -245,6 +254,15 @@ class Circuit:
         """
         return len(self._qubits)
     
+    @property
+    def qubits(self) -> Tuple[int]:
+        """The qubits in the circuit.
+
+        Returns:
+            Tuple: qubit labels.
+        """
+        return self._qubits
+    
     def _update_qubits(self) -> None:
         """Updates the qubits after mutating the cycles."""
         qubits = tuple()
@@ -283,6 +301,7 @@ class Circuit:
         self._cycles.extend(circuit._cycles)
         self._update_qubits()
 
+    # TODO
     def get_index(self,
             cycle_or_layer: Union[List, Cycle, Layer], beg=0, end=-1
         ) -> int:
@@ -327,6 +346,33 @@ class Circuit:
         self._cycles.insert(idx, cycle_or_layer)
         self._update_qubits()
 
+    def measure(self,
+            qubits: Union[Tuple, List] = None,
+            basis:  Union[Tuple, List] = None,
+        ) -> None:
+        """Appends a measurement cycle to the end of the circuit.
+
+        Args:
+            qubits (Union[Tuple, List], optional): qubits to measure. Defaults
+                to None.
+            basis (Union[Tuple, List], optional):  measurement basis for each
+                qubit. Defaults to None.
+        """
+        if qubits is None:
+            qubits = self._qubits
+        if basis is None:
+            basis = ('Z',) * len(qubits)
+
+        meas_cycle = Cycle([Meas(q, b) for q, b in zip(qubits, basis)])
+        if all([meas.properties['params']['basis'].upper() == 'Z' for meas in 
+                meas_cycle]):
+            self.append(meas_cycle)
+        else:
+            self.append(
+                Cycle([basis_rotation(meas) for meas in meas_cycle])
+            )
+            self.append(meas_cycle)
+
     def pop(self) -> None:
         """Removes the last cycle/layer to the end of the circuit."""
         self._cycles.pop()
@@ -341,7 +387,7 @@ class Circuit:
         """Prepends a cycle/layer to the end of the circuit.
 
         Args:
-            cycle_or_layer (List, Cycle, Layer): cycle/layer to prepend.
+            cycle_or_layer (Union[List, Cycle, Layer]): cycle/layer to prepend.
         """
         if isinstance(cycle_or_layer, List):
             cycle_or_layer = Cycle(cycle_or_layer)
@@ -367,7 +413,12 @@ class Circuit:
             ), "circuit must be a Circuit object!"
         self._cycles.extendleft(circuit._cycles)
         self._update_qubits()
+
+    # TODO
+    def relable(self, map: Dict) -> None:
+        pass
     
+    # TODO
     def remove(self, cycle_or_layer: Union[List, Cycle, Layer]) -> None:
         """Removes the first instance of the cycle/layer found in the circuit.
 
@@ -383,7 +434,8 @@ class Circuit:
             ), "cycle_or_layer must be a Cycle or Layer object!"
         self._cycles.remove(cycle_or_layer)
         self._update_qubits()
-        
+
+    # TODO    
     def replace(self, 
             old_cycle_or_layer: Union[List, Cycle, Layer],
             new_cycle_or_layer: Union[List, Cycle, Layer]
@@ -441,7 +493,7 @@ class CircuitSet:
         Args:
             circuits (List[Any], optional): Circuits to store in the 
                 CircuitSet. Defaults to None.
-            index (list[int], optional): Indices for the circuits in the 
+            index (List[int], optional): Indices for the circuits in the 
                 DataFrame. Defaults to None.
         """
 
