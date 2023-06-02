@@ -25,6 +25,10 @@ from collections import Iterable, deque
 from typing import Any, Dict, List, Tuple, Union
 # from types import IntType, NoneType
 
+import plotly.io as pio
+pio.renderers.default = 'colab'  # TODO: replace with settings
+
+
 __all__ = ['Cycle', 'Layer', 'Circuit', 'CircuitSet']
 
 
@@ -190,6 +194,12 @@ class Circuit:
     
     def __len__(self) -> int:
         return len(self._cycles)
+    
+    def _repr_html_(self) -> str:
+        """Draw the html formatted circuit."""
+        from qcal.plotting.graphs import draw_circuit
+        fig = draw_circuit(self, show=False)
+        return pio.to_html(fig)
 
     @property
     def cycles(self) -> deque:
@@ -300,6 +310,11 @@ class Circuit:
             ), "circuit must be a Circuit object!"
         self._cycles.extend(circuit._cycles)
         self._update_qubits()
+
+    def draw(self) -> None:
+        """Draw the circuit."""
+        from qcal.plotting.graphs import draw_circuit
+        draw_circuit(self)
 
     # TODO
     def get_index(self,
