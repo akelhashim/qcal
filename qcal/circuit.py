@@ -29,8 +29,49 @@ import plotly.io as pio
 pio.renderers.default = 'colab'  # TODO: replace with settings
 
 
-__all__ = ['Cycle', 'Layer', 'Circuit', 'CircuitSet']
+__all__ = ['Barrier', 'Cycle', 'Layer', 'Circuit', 'CircuitSet']
 
+
+class Barrier:
+    """Class defining a barrier in a circuit."""
+
+    def __init__(self) -> None:
+        pass
+
+    def __repr__(self) -> str:
+        """Draw the circuit as a string."""
+        return '|\n|\n|\n|\n|\n|\n|\n|\n|\n|\n'
+    
+    def __str__(self) -> str:
+        """Draw the circuit as a string."""
+        return '|\n|\n|\n|\n|\n|\n|\n|\n|\n|\n'
+
+    @property
+    def is_barrier(self) -> bool:
+        """Whether or not the cycle is a barrier.
+
+        Returns:
+            bool: True
+        """
+        return True
+    
+    @property
+    def name(self) -> str:
+        """Name of the barrier cycle.
+
+        Returns:
+            str: 'Barrier'
+        """
+        return 'Barrier'
+    
+    @property
+    def qubits(self) -> Tuple:
+        """Empty tuple of qubit labels.
+
+        Returns:
+            Tuple: empty tuple.
+        """
+        return tuple()
 
 class Cycle:
     """Class defining a cycle in a circuit."""
@@ -58,6 +99,7 @@ class Cycle:
         return iter(self._gates)
     
     def __repr__(self) -> str:
+        """Draw the circuit as a string."""
         df = pd.DataFrame(
             data=[gate.name for gate in self._gates], 
             columns=['Cycle'], 
@@ -66,6 +108,7 @@ class Cycle:
         return repr(df)
     
     def __str__(self) -> str:
+        """Draw the circuit as a string."""
         df = pd.DataFrame(
             data=[gate.name for gate in self._gates], 
             columns=[
@@ -76,6 +119,7 @@ class Cycle:
         return repr(df)
     
     def _repr_html_(self):
+        """Draw the circuit as an html string."""
         df = pd.DataFrame([
             [(pd.DataFrame(gate.matrix)
                 .style
@@ -103,6 +147,15 @@ class Cycle:
         ])
 
         return df_styler.to_html()
+    
+    @property
+    def is_barrier(self) -> bool:
+        """Whether or not the cycle is a barrier.
+
+        Returns:
+            bool: False
+        """
+        return False
     
     @property
     def n_gates(self) -> int:
@@ -220,13 +273,13 @@ class Circuit:
         return [cycle for cycle in self._cycles]
     
     @property
-    def circuit_depth(self) -> int:
+    def circuit_depth(self) -> int:  # TODO: exclude measurement cycle?
         """The number of layers/cycles in the circuit.
 
         Returns:
             int: circuit depth in terms of layers/cycles.
         """
-        return len(self._cycles)
+        return len([cycle for cycle in self._cycles if not cycle.is_barrier])
     
     @property
     def circuit_width(self) -> int:
@@ -244,7 +297,7 @@ class Circuit:
         Returns:
             int: number of cycles.
         """
-        return len(self._cycles)
+        return self.circuit_depth
     
     @property
     def n_layers(self) -> int:
@@ -253,7 +306,7 @@ class Circuit:
         Returns:
             int: number of layers.
         """
-        return len(self._cycles)
+        return self.circuit_depth
     
     @property
     def n_qubits(self) -> int:

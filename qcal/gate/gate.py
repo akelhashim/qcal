@@ -117,7 +117,7 @@ class Gate:
     
     @property
     def is_single_qubit(self) -> bool: # TODO: make compatible with qutrits
-        """Whethor or not the gate acts on a single qubit.
+        """Whether or not the gate acts on a single qubit.
 
         Returns:
             bool: single-qubit gate or not.
@@ -129,7 +129,7 @@ class Gate:
         
     @property
     def is_multi_qubit(self) -> bool: # TODO: make compatible with qutrits
-        """Whethor or not the gate acts on multiple qubits.
+        """Whether or not the gate acts on multiple qubits.
 
         Returns:
             bool: multi-qubit gate or not.

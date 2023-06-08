@@ -69,21 +69,28 @@ def draw_circuit(circuit: Circuit, show: bool = True):
     node_text = []
     node_symbols = []
     marker_colors = []
+    barrier_locs = []
+    n_barriers = 0
     for c, cycle in enumerate(circuit.cycles):
-        for gate in cycle.gates:
-            if gate.is_single_qubit:
-                node_x.append(c)
-                node_y.append(gate.qubits[0])
-                node_text.append(format_gate_text(gate))
-                node_symbols.append(symbol_map[gate.name][0])
-                marker_colors.append(color_map[gate.name])
-            elif gate.is_multi_qubit:
-                for q in gate.qubits:
+        if cycle.is_barrier:
+            barrier_locs.append(c - n_barriers - 0.5)
+            n_barriers += 1
+        else:
+            c -= n_barriers
+            for gate in cycle.gates:
+                if gate.is_single_qubit:
                     node_x.append(c)
-                    node_y.append(q)
-                node_text.extend([format_gate_text(gate)]*2)
-                node_symbols.extend(symbol_map[gate.name])
-                marker_colors.extend(['grey', 'grey'])
+                    node_y.append(gate.qubits[0])
+                    node_text.append(format_gate_text(gate))
+                    node_symbols.append(symbol_map[gate.name][0])
+                    marker_colors.append(color_map[gate.name])
+                elif gate.is_multi_qubit:
+                    for q in gate.qubits:
+                        node_x.append(c)
+                        node_y.append(q)
+                    node_text.extend([format_gate_text(gate)]*2)
+                    node_symbols.extend(symbol_map[gate.name])
+                    marker_colors.extend(['grey', 'grey'])
 
     ms_scale = 200
     node_trace = go.Scatter(
@@ -114,22 +121,28 @@ def draw_circuit(circuit: Circuit, show: bool = True):
                 hoverinfo='none',
                 mode='lines'
         ))
+    
+    n_barriers = 0
     for c, cycle in enumerate(circuit.cycles):
-        for gate in cycle.gates:
-            edge_x_mq = []
-            edge_y_mq = []
-            if gate.is_multi_qubit:
-                for q in gate.qubits:
-                    edge_x_mq.append(c)
-                    edge_y_mq.append(q)
-                edge_traces.append(
-                    go.Scatter(
-                    x=edge_x_mq, y=edge_y_mq,
-                    line=dict(width=2, color='#888'),
-                    hoverinfo='none',
-                    mode='lines'
+        if cycle.is_barrier:
+            n_barriers += 1
+        else:
+            c -= n_barriers
+            for gate in cycle.gates:
+                edge_x_mq = []
+                edge_y_mq = []
+                if gate.is_multi_qubit:
+                    for q in gate.qubits:
+                        edge_x_mq.append(c)
+                        edge_y_mq.append(q)
+                    edge_traces.append(
+                        go.Scatter(
+                        x=edge_x_mq, y=edge_y_mq,
+                        line=dict(width=2, color='#888'),
+                        hoverinfo='none',
+                        mode='lines'
+                        )
                     )
-                )
 
     fig = go.Figure(
         data= edge_traces + [node_trace],
@@ -150,6 +163,10 @@ def draw_circuit(circuit: Circuit, show: bool = True):
                    showgrid=False, zeroline=False, showticklabels=True))
     )
     fig['layout']['yaxis']['autorange'] = "reversed"
+    for loc in barrier_locs:
+        fig.add_vline(x=loc, line_width=3,
+                      line_dash="dash", line_color="black")
+
     # fig.update_layout(
     #     autosize=True)
     if show:
