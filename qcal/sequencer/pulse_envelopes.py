@@ -204,3 +204,13 @@ def square(
     return np.array(
             amp * np.ones(n_points) * np.exp(1j*phase)
         ).astype('complex64')
+
+
+pulse_envelopes = {
+    'cosine_square': cosine_square, 
+    'DRAG': DRAG, 
+    'linear': linear, 
+    'gaussian': gaussian, 
+    'sine': sine, 
+    'square': square
+}
