@@ -17,7 +17,7 @@ import pandas as pd
 import timeit
 
 from IPython.display import clear_output
-from typing import Any
+from typing import Any, Union
 
 logger = logging.getLogger(__name__)
 
@@ -39,10 +39,10 @@ class QPU:
     def __init__(
             self,
             config: Config,
-            compiler: Compiler = DEFAULT_COMPILER,
+            compiler: Union[Compiler, None] = DEFAULT_COMPILER,
             n_shots: int = 1024,
             n_batches: int = 1,
-            n_circs_per_seq: int = 100
+            n_circs_per_seq: int = 1
         ) -> None:
         
         self._config = config
@@ -111,9 +111,12 @@ class QPU:
         
     def compile(self, circuits) -> None:
         
-        compiled_circuits = self._compiler.compile(circuits)
-        self._compiled_circuits.append(compiled_circuits)
-        return compiled_circuits
+        if self._compiler is not None:
+            compiled_circuits = self._compiler.compile(circuits)
+            self._compiled_circuits.append(compiled_circuits)
+            return compiled_circuits
+        else:
+            self._compiled_circuits = self._circuits.__copy__()
 
     def transpile(self, circuits=None) -> None:
 
