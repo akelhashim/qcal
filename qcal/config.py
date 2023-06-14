@@ -11,11 +11,60 @@ Basic example useage:
 import copy
 import io
 import logging
+import pandas as pd
 import yaml
 
 from typing import Any, Dict, List
 
 logger = logging.getLogger(__name__)
+
+
+__all__ = ['Config']
+
+
+# TODO: make recursive
+def nested_index(dictionary: Dict, n_levels: int = 2) -> List[List]:
+    """Returns a nested list for a multi-index Dataframe.
+
+    Args:
+        dictionary (Dict): nested dictionary.
+        n_levels (int, optional): number of recursive levels to index.
+            Defaults to 2.
+
+    Returns:
+        List[List]: nested index list.
+    """
+    index = []
+    for _ in range(n_levels):
+        index.append(list())
+
+    for key, value in (dictionary.items()):
+        if isinstance(value, dict):
+            index[0].extend([key] * len(value))
+            for k in value.keys():
+                index[1].append(k)
+        else:
+            index[0].append(key)
+            for n in range(1, n_levels):
+                index[n].append('')
+
+    return index
+
+
+def recursive_values(dictionary: Dict):
+    """Yields all of the values in a nested dictionary.
+
+    Args:
+        dictionary (Dict): nested dictionary.
+
+    Yields:
+        Any: values in nested dictionary.
+    """
+    for value in dictionary.values():
+        if isinstance(value, dict):
+            yield from recursive_values(value)
+        else:
+            yield value
 
 
 class Config:
@@ -57,14 +106,14 @@ class Config:
     def __len__(self) -> int:
         return len(self._parameters)
 
-    def __next__(self):
-        return self._parameters_dict.__next__()
-
-    def __str__(self) -> str:
-        return str(self._parameters_dict)
+    # def __next__(self):
+    #     return self._parameters.__next__()
 
     def __repr__(self) -> str:
         return repr(self._parameters)
+    
+    def __str__(self) -> str:
+        return str(self._parameters)
 
     @property
     def filename(self) -> str:
@@ -80,7 +129,7 @@ class Config:
         """Number of qubits on the processor.
 
         Returns:
-            int: number of qubits
+            int: number of qubits.
         """
         return len(self.qubits)
 
@@ -89,7 +138,7 @@ class Config:
         """All of the config parameters.
 
         Returns:
-            Dict: config parameters
+            Dict: config parameters.
         """
         return self._parameters
     
@@ -98,18 +147,56 @@ class Config:
         """Available qubits on the processor.
 
         Returns:
-            list: qubit labels
+            list: qubit labels.
         """
-        return list(self.get('qubits').keys())
+        return list(
+            q for q in self.parameters['single_qubit'].keys() if q[0] == 'Q'
+        )
     
     @property
     def qubit_pairs(self) -> List[tuple]:
         """Available qubit pairs on the processor.
 
         Returns:
-            list[tuple]: qubit pairs
+            list[tuple]: qubit pairs.
         """
-        return [eval(key) for key in self.get('qubit_pairs').keys()]
+        return [eval(key) for key in self.get('two_qubit').keys()]
+    
+    @property
+    def single_qubit(self) -> pd.DataFrame:
+        """Single-qubit parameters in a table format.
+
+        Returns:
+            pd.DataFrame: table of single-qubit parameters.
+        """
+        
+        dfs = []
+        dfs.append(pd.DataFrame(
+            data=list(map(list, zip(*[
+                    [val for val in recursive_values(
+                            self.parameters['single_qubit'][q]
+                        )
+                    ] for q in self.qubits]
+                ))),
+            columns=self.qubits,
+            index=nested_index(self.parameters['single_qubit'][self.qubits[0]])
+        ))
+
+        for key in self.parameters['single_qubit'].keys():
+            if key not in self.qubits:
+                dfs.append(
+                    pd.DataFrame(
+                        data=[val for val in recursive_values(
+                                self.parameters['single_qubit'][key]
+                            )],
+                        columns=[key],
+                        index=nested_index(
+                                self.parameters['single_qubit'][key]
+                            )
+                    )
+                )
+
+        return pd.concat(dfs, join='outer')
     
     def get(self, param: str) -> Any:
         """Get the parameter from the config (if it exists).
@@ -143,8 +230,8 @@ class Config:
     def processor(self):
         """Plot a graph displaying the connectivity of the quantum processor.
         """
-        from qcal.plotting.graphs import draw_processor_connectivity
-        draw_processor_connectivity(self)
+        from qcal.plotting.graphs import draw_processor
+        draw_processor(self)
 
     def save(self, filename: str = None):
 

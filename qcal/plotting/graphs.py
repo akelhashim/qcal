@@ -8,10 +8,12 @@ import networkx as nx
 import numpy as np
 
 from collections import defaultdict
+from typing import Dict
 
 import plotly.graph_objects as go
 import plotly.io as pio
 pio.renderers.default = 'colab'  # TODO: replace with settings
+
 
 def format_gate_text(gate: Gate):
     """Format Gate text using the gate properties metadata.
@@ -257,7 +259,27 @@ def draw_DAG(G: nx.Graph):
     fig.show()
 
 
-def draw_processor_connectivity(config: Config):
+def format_qubit_text(qubit: Dict) -> str:
+    """Format qubit node text in processor plot.
+
+    Args:
+        qubit (Dict): dictionary of qubit properties.
+
+    Returns:
+        str: text formatted for Plotly plot.
+    """
+    for key, value in qubit.items():
+        if not isinstance(value, dict):
+            text = f'{key.capitalize()}: {qubit[key]}<br>'
+        else:
+            text += f'{key}:<br>'
+            for k, v in qubit[key].items():
+                if not isinstance(v, dict) and not isinstance(v, list):
+                    text += f'  {k.capitalize()}: {qubit[key][k]}<br>'
+    return text
+
+
+def draw_processor(config: Config):
     """Draw a processor connectivity graph for a given config.
 
     Args:
@@ -287,9 +309,9 @@ def draw_processor_connectivity(config: Config):
         edge_y.append(None)
 
     two_qubit_gates = []
-    for pair in config.parameters['qubit_pairs']:
+    for pair in config.parameters['two_qubit']:
         two_qubit_gates.append(
-            list(config.parameters['qubit_pairs'][pair]['gate'].keys())[0]
+            list(config.parameters['two_qubit'][pair]['gate'].keys())[0]
         )
 
     node_trace = go.Scatter(
@@ -308,7 +330,7 @@ def draw_processor_connectivity(config: Config):
             size=25,
             colorbar=dict(
                 thickness=15,
-                title='Connectivity',
+                title='Qubit Connectivity',
                 xanchor='left',
                 titleside='right'),
             line_width=2)
@@ -338,14 +360,16 @@ def draw_processor_connectivity(config: Config):
         marker=dict(color='#5D69B1', size=0.01)
     )
     
-    node_adjacencies = []
     node_text = []
+    for q in config.qubits:
+        node_text.append(format_qubit_text(
+            config.parameters['single_qubit'][str(q)]
+        ))
+
+    node_adjacencies = []
     for node, adjacencies in enumerate(G.adjacency()):
         node_adjacencies.append(len(adjacencies[1]))
-        node_text.append(
-            '# of nearest neighbors: ' + str(len(adjacencies[1]))
-        )
-
+        node_text[node] += 'Connectivity: '+str(len(adjacencies[1]))
     node_trace.marker.color = node_adjacencies
     node_trace.text = node_text
 

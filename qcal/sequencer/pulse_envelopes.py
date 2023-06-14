@@ -3,6 +3,7 @@
 """
 import numpy as np
 
+from collections import defaultdict
 from numpy.typing import NDArray
 from typing import Union
 
@@ -11,13 +12,13 @@ all = ['cosine_square', 'DRAG', 'linear', 'gaussian', 'sine', 'square']
 
 
 def cosine_square(
-        width: float, sample_rate: float, amp: float = 1.0,
+        length: float, sample_rate: float, amp: float = 1.0,
         phase: float = 0.0, ramp_fraction: float = 0.25
     ) -> NDArray:
     """Pulse envelope with cosine ramps and a flat top.
 
     Args:
-        width (float): pulse width in seconds.
+        length (float): pulse length in seconds.
         sample_rate (float): sample rate in Hz.
         amp (float, optional): pulse amplitude. Defaults to 1.0.
         phase (float, optional): pulse phase. Defaults to 0.0.
@@ -28,7 +29,7 @@ def cosine_square(
         NDArray: envelope with cosine ramps and a flat top.
     """
     assert ramp_fraction <= 0.5, 'ramp_fraction cannot be more than 0.5!'
-    n_points = int(round(width * sample_rate))
+    n_points = int(round(length * sample_rate))
     n_points_cos = int(round(n_points * ramp_fraction))
     n_points_square = n_points - 2 * n_points_cos
     freq = 1. / (2 * n_points_cos)
@@ -44,7 +45,7 @@ def cosine_square(
 
 
 def DRAG(
-        width: float, sample_rate: float, alpha: float = 1.0, 
+        length: float, sample_rate: float, alpha: float = 1.0, 
         amp: float = 1.0, anh: float = -270e6, df: float = 0.0,
         n_sigma: int = 3, phase: float = 0.0
     ) -> NDArray:
@@ -56,7 +57,7 @@ def DRAG(
     https://journals.aps.org/prl/abstract/10.1103/PhysRevLett.116.020501
 
     Args:
-        width (float): pulse width in seconds.
+        length (float): pulse length in seconds.
         sample_rate (float): sample rate in Hz.
         alpha (float, optional): DRAG parameter. Defaults to 1.0. For phase
             errors, alpha should be 0.5. For leakage errors, alpha should be 1.
@@ -71,12 +72,12 @@ def DRAG(
     """
     df = 2 * np.pi * df / sample_rate
     delta = 2 * np.pi * anh / sample_rate - df
-    n_points = int(round(width * sample_rate))
+    n_points = int(round(length * sample_rate))
     sigma = n_points / (2. * n_sigma)
     x = np.arange(0, n_points)
     det = np.exp(2 * np.pi * 1j * df * x)
 
-    gauss = gaussian(width, sample_rate, amp, n_sigma, phase)
+    gauss = gaussian(length, sample_rate, amp, n_sigma, phase)
     dgauss_dx = -(x - n_points / 2.) / (sigma ** 2) * gauss
     return np.array(
             det * (gauss - 1j * alpha * dgauss_dx / delta)
@@ -84,14 +85,14 @@ def DRAG(
 
 
 def linear(
-        width: float, sample_rate: float, amp: float = 1.0, phase: float = 0.0
+        length: float, sample_rate: float, amp: float = 1.0, phase: float = 0.0
     ) -> NDArray:
     """Linear ramp pulse envelope.
 
     The linear ramp starts at 0, and ends at amp.
 
     Args:
-        width (float): pulse width in seconds.
+        length (float): pulse length in seconds.
         sample_rate (float): sample rate in Hz.
         amp (float, optional): pulse amplitude. Defaults to 1.0.
         phase (float, optional): pulse phase. Defaults to 0.0.
@@ -99,20 +100,20 @@ def linear(
     Returns:
         NDArray: linear ramp envelop.
     """
-    n_points = int(round(width * sample_rate))
+    n_points = int(round(length * sample_rate))
     return np.array(
             amp * np.linspace(0, 1, n_points) * np.exp(1j*phase)
         ).astype(np.complex64)
 
 
 def gaussian(
-        width: float, sample_rate: float, amp: float = 1.0,
+        length: float, sample_rate: float, amp: float = 1.0,
          n_sigma: Union[float, int] = 3, phase: float = 0.0
     ) -> NDArray:
     """Gaussian pulse envelope.
 
     Args:
-        width (float): pulse width in seconds.
+        length (float): pulse length in seconds.
         sample_rate (float): sample rate in Hz.
         amp (float, optional): pulse amplitude. Defaults to 1.0.
         n_sigma (int, optional): number of standard deviations. Defaults to 3.
@@ -121,7 +122,7 @@ def gaussian(
     Returns:
         NDArray: Gaussian envelope.
     """
-    n_points = int(round(width * sample_rate))
+    n_points = int(round(length * sample_rate))
     sigma = n_points / (2. * n_sigma)
     x = np.arange(0, n_points)
     gauss = np.exp(-0.5 * (x - n_points / 2.) ** 2 / sigma ** 2)
@@ -129,13 +130,13 @@ def gaussian(
 
 
 def gaussian_square(
-        width: float, sample_rate: float, amp: float = 1.0,
+        length: float, sample_rate: float, amp: float = 1.0,
         n_sigma: int = 3, phase: float = 0.0, ramp_fraction: float = 0.25
     ) -> NDArray:
     """Pulse envelope with Gaussian ramps and a flat top.
 
     Args:
-        width (float): pulse width in seconds.
+        length (float): pulse length in seconds.
         sample_rate (float): sample rate in Hz.
         amp (float, optional): pulse amplitude. Defaults to 1.0.
         phase (float, optional): pulse phase. Defaults to 0.0.
@@ -147,7 +148,7 @@ def gaussian_square(
         NDArray: _description_
     """
     assert ramp_fraction <= 0.5, 'ramp_fraction cannot be more than 0.5!'
-    n_points = int(round(width * sample_rate))
+    n_points = int(round(length * sample_rate))
     n_points_gauss = int(round(n_points * ramp_fraction))
     n_points_square = n_points - 2 * n_points_gauss
     sigma = n_points_gauss / n_sigma
@@ -163,14 +164,14 @@ def gaussian_square(
         ).astype(np.complex64)
 
 
-def sin(
-        width: float, sample_rate: float, amp: float = 1.0, 
+def sine(
+        length: float, sample_rate: float, amp: float = 1.0, 
         freq: float = 0.0, phase: float= 0.0
     ) -> NDArray:
     """Sine pulse envelope.
 
     Args:
-        width (float): pulse width in seconds.
+        length (float): pulse length in seconds.
         sample_rate (float): sample rate in Hz.
         amp (float, optional): pulse amplitude. Defaults to 1.0.
         freq (float, optional): frequency of the sine wave. Defaults to 0.0.
@@ -179,20 +180,20 @@ def sin(
     Returns:
         NDArray: sine envelope.
     """
-    n_points = int(round(width * sample_rate))
-    t = np.linspace(0, width, n_points)
+    n_points = int(round(length * sample_rate))
+    t = np.linspace(0, length, n_points)
     return np.array(
         amp * np.exp(1j * (2.0 * np.pi * freq * t + phase)).astype('complex64')
     )
 
 
 def square(
-        width: float, sample_rate: float, amp: float = 1.0, phase: float = 0.0
+        length: float, sample_rate: float, amp: float = 1.0, phase: float = 0.0
     ) -> NDArray:
     """Square pulse envelope.
 
     Args:
-        width (float): pulse width in seconds.
+        length (float): pulse length in seconds.
         sample_rate (float): sample rate in Hz.
         amp (float, optional): pulse amplitude. Defaults to 1.0.
         phase (float, optional): pulse phase. Defaults to 0.0.
@@ -200,17 +201,17 @@ def square(
     Returns:
         NDArray: square envelope.
     """
-    n_points = int(round(width * sample_rate))
+    n_points = int(round(length * sample_rate))
     return np.array(
             amp * np.ones(n_points) * np.exp(1j*phase)
         ).astype('complex64')
 
 
-pulse_envelopes = {
-    'cosine_square': cosine_square, 
-    'DRAG': DRAG, 
-    'linear': linear, 
-    'gaussian': gaussian, 
-    'sine': sine, 
-    'square': square
-}
+pulse_envelopes = defaultdict(lambda: 'Pulse envelope not available!',
+    {'cosine_square': cosine_square, 
+     'DRAG': DRAG, 
+     'linear': linear, 
+     'gaussian': gaussian, 
+     'sine': sine, 
+     'square': square}
+)
