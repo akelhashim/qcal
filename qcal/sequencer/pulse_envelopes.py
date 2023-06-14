@@ -207,11 +207,11 @@ def square(
         ).astype('complex64')
 
 
-pulse_envelopes = defaultdict(lambda: 'Pulse envelope not available!',
-    {'cosine_square': cosine_square, 
-     'DRAG': DRAG, 
-     'linear': linear, 
-     'gaussian': gaussian, 
-     'sine': sine, 
-     'square': square}
-)
+pulse_envelopes = defaultdict(lambda: 'Pulse envelope not available!', {
+    'cosine_square': cosine_square, 
+    'DRAG': DRAG, 
+    'linear': linear, 
+    'gaussian': gaussian, 
+    'sine': sine, 
+    'square': square
+})

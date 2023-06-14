@@ -7,14 +7,17 @@ from qcal.units import ns
 
 import numpy as np
 
+from collections import defaultdict
 from numpy.typing import NDArray
 from typing import List, Tuple, Union
 
 # TODO: add Clifford gates
 
 
-__all__ = ['C', 'H', 'Id', 'Meas', 'Rn', 'Rx', 'Ry', 'Rz', 'S', 'Sdag', 'T', 
-           'Tdag', 'U3', 'V', 'Vdag', 'X', 'X90', 'Y', 'Y90', 'Z']
+__all__ = [
+    'C', 'H', 'Id', 'Idle', 'Meas', 'Rn', 'Rx', 'Ry', 'Rz', 'S', 'Sdag', 'T', 
+    'Tdag', 'U3', 'V', 'Vdag', 'VirtualZ', 'X', 'X90', 'Y', 'Y90', 'Z'
+]
 
 
 id = sigma0 = np.array([[1., 0.],
@@ -466,6 +469,24 @@ class Vdag(Gate):
             'angle': -np.pi/2,
             'axis':  'x',
         }
+
+
+class VirtualZ(Gate):
+    """Class for virtual Z gate."""
+
+    def __init__(self, theta: float, qubit: int = 0) -> None:
+        """Initialize using the rz function.
+
+        Args:
+            theta (float): angle of rotation.
+            qubit (int):   qubit label. Defaults to 0.
+        """
+        super().__init__(rz(theta), qubit)
+        self._properties['name'] = 'VirtualZ'
+        self._properties['params'] = {
+            'angle': theta,
+            'axis':  'z',
+        }
     
 
 class X(Gate):
@@ -488,7 +509,7 @@ class X(Gate):
 class X90(Gate):
     """Class for the X90 = sqrt(X) gate."""
 
-    def __init__(self, qubit: int = 0) -> None:
+    def __init__(self, qubit: int = 0, subspace='GE') -> None:
         """Initialize using the rx gate.
         
         Args:
@@ -498,8 +519,9 @@ class X90(Gate):
         self._properties['alias'] = 'V'
         self._properties['name'] = 'X90'
         self._properties['params'] = {
-            'angle': np.pi/2,
-            'axis':  'x',
+            'angle':    np.pi/2,
+            'axis':     'x',
+            'subspace': subspace
         }
 
 
@@ -552,3 +574,11 @@ class Z(Gate):
             'angle': np.pi,
             'axis':  'z',
         }
+
+
+single_qubit_gates = defaultdict(lambda: 'Single-qubit gate not available!', {
+    'C': C, 'H': H, 'Id': Id, 'Idle': Idle, 'Meas': Meas, 'Rn': Rn, 'Rx': Rx, 
+    'Ry': Ry, 'Rz': Rz, 'S': S, 'Sdag': Sdag, 'T': T, 'Tdag': Tdag, 'U3': U3,
+    'V': V, 'Vdag': Vdag, 'VirtualZ': VirtualZ, 'X': X, 'X90': X90, 'Y': Y, 
+    'Y90': Y90, 'Z': Z
+})
