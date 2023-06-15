@@ -9,14 +9,36 @@ import numpy as np
 
 from collections import defaultdict
 from numpy.typing import NDArray
+from random import gauss, randint
 from typing import List, Tuple, Union
 
 # TODO: add Clifford gates
 
 
 __all__ = [
-    'C', 'H', 'Id', 'Idle', 'Meas', 'Rn', 'Rx', 'Ry', 'Rz', 'S', 'Sdag', 'T', 
-    'Tdag', 'U3', 'V', 'Vdag', 'VirtualZ', 'X', 'X90', 'Y', 'Y90', 'Z'
+    'C',
+    'H',
+    'Id',
+    'Idle',
+    'Meas',
+    'RandSU2',
+    'Rn',
+    'Rx',
+    'Ry',
+    'Rz',
+    'S',
+    'Sdag',
+    'T',
+    'Tdag',
+    'U3',
+    'V',
+    'Vdag',
+    'VirtualZ',
+    'X',
+    'X90',
+    'Y',
+    'Y90',
+    'Z'
 ]
 
 
@@ -77,7 +99,7 @@ def rn(theta: float, n: Union[List, Tuple, NDArray]) -> NDArray:
     """
     nx, ny, nz = n
     length = np.sqrt(nx**2 + ny**2 + nz**2)
-    assert length == 1., "n must be a unit vector!"
+    assert round(length, 5) == 1., "n must be a unit vector!"
 
     return np.array([
         [np.cos(theta/2.) - 1.j*nz*np.sin(theta/2.),
@@ -229,7 +251,27 @@ class Meas(Gate):
         super().__init__(meas, qubit)
         self._properties['name'] = 'Meas'
         self._properties['params']['basis'] = basis
-    
+
+
+class RandSU2(Gate):
+    """Class for a random SU(2) gate."""
+
+    def __init__(self, qubit: int = 0) -> None:
+        """Initialize using the rn function.
+
+        Args:
+            qubit (int): qubit label. Defaults to 0.
+        """
+        vec = [gauss(0, 1) for i in range(3)]
+        mag = sum(x**2 for x in vec) ** .5
+        n = [x/mag for x in vec]
+        theta = randint(-180, 180)
+        super().__init__(rn(theta, n), qubit)
+        self._properties['name'] = 'RandSU2'
+        self._properties['params'] = {
+            'angle': theta,
+            'axis':  n,
+        }
 
 class Rn(Gate):
     """Class for parametrized n rotations.
@@ -577,8 +619,27 @@ class Z(Gate):
 
 
 single_qubit_gates = defaultdict(lambda: 'Single-qubit gate not available!', {
-    'C': C, 'H': H, 'Id': Id, 'Idle': Idle, 'Meas': Meas, 'Rn': Rn, 'Rx': Rx, 
-    'Ry': Ry, 'Rz': Rz, 'S': S, 'Sdag': Sdag, 'T': T, 'Tdag': Tdag, 'U3': U3,
-    'V': V, 'Vdag': Vdag, 'VirtualZ': VirtualZ, 'X': X, 'X90': X90, 'Y': Y, 
-    'Y90': Y90, 'Z': Z
+    'C': C,
+    'H': H,
+    'Id': Id,
+    'Idle': Idle,
+    'Meas': Meas,
+    'RandSU2': RandSU2,
+    'Rn': Rn,
+    'Rx': Rx, 
+    'Ry': Ry,
+    'Rz': Rz,
+    'S': S,
+    'Sdag': Sdag,
+    'T': T,
+    'Tdag': Tdag,
+    'U3': U3,
+    'V': V,
+    'Vdag': Vdag,
+    'VirtualZ': VirtualZ,
+    'X': X,
+    'X90': X90,
+    'Y': Y, 
+    'Y90': Y90,
+    'Z': Z
 })
