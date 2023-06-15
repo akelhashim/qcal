@@ -62,9 +62,10 @@ def draw_circuit(circuit: Circuit, show: bool = True):
          'CX':     ['circle', 'circle-cross'],
          'CY':     ['circle', 'square'],
          'CZ':     ['circle', 'circle'],
-         'SWAP':   ['x-thin', 'x-thin']}
+         'SWAP':   ['x-thin', 'x-thin'],
+         'iSWAP':  ['square-x', 'square-x']}
     )
-    color_map = defaultdict(lambda: 'blue', {'Meas': 'red'})
+    color_map = defaultdict(lambda: '#3366CC', {'Meas': '#B82E2E'})
 
     node_x = []
     node_y = []
@@ -94,7 +95,7 @@ def draw_circuit(circuit: Circuit, show: bool = True):
                     node_symbols.extend(symbol_map[gate.name])
                     marker_colors.extend(['grey', 'grey'])
 
-    ms_scale = 200
+    # ms_scale = 200
     node_trace = go.Scatter(
         x=node_x, y=node_y,
         mode='markers',
@@ -105,7 +106,7 @@ def draw_circuit(circuit: Circuit, show: bool = True):
             showscale=False,
             reversescale=False,
             color=marker_colors,
-            size=ms_scale/circuit.circuit_width,
+            size=30, #ms_scale/circuit.circuit_width,
             line_width=2)
         )
     node_trace.text = node_text
@@ -169,10 +170,14 @@ def draw_circuit(circuit: Circuit, show: bool = True):
         fig.add_vline(x=loc, line_width=3,
                       line_dash="dash", line_color="black")
 
-    # fig.update_layout(
-    #     autosize=True)
+    fig.update_layout(
+        autosize=False,
+        width=75 * circuit.circuit_depth,
+        height=75 * circuit.circuit_width
+    )
+    
     if show:
-        fig.show()
+        fig.show(renderer="colab") # TODO
     else:
         return fig
 

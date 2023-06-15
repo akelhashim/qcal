@@ -40,11 +40,11 @@ class Barrier:
 
     def __repr__(self) -> str:
         """Draw the circuit as a string."""
-        return '|\n|\n|\n|\n|\n|\n|\n|\n|\n|\n'
+        return '\nBarrier\n|\n|\n|\n|\n|\n'
     
     def __str__(self) -> str:
         """Draw the circuit as a string."""
-        return '|\n|\n|\n|\n|\n|\n|\n|\n|\n|\n'
+        return '\nBarrier\n|\n|\n|\n|\n|\n'
 
     @property
     def is_barrier(self) -> bool:

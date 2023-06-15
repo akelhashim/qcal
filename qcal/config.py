@@ -14,7 +14,7 @@ import logging
 import pandas as pd
 import yaml
 
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Union
 
 logger = logging.getLogger(__name__)
 
@@ -34,21 +34,63 @@ def nested_index(dictionary: Dict, n_levels: int = 2) -> List[List]:
     Returns:
         List[List]: nested index list.
     """
+    def itterdict(dct, lst, idx):
+        for key, value in dct.items():
+            if isinstance(value, dict):
+                lst[idx].extend(
+                    [key] * sum([len(v) if isinstance(v, dict) else 1 for v in 
+                                 value.values()]
+                            )
+                    )
+                itterdict(value, lst, idx+1)
+            else:
+                index[idx].append(key)
+                for n in range(idx+1, len(lst)):
+                    index[n].append('')
+
     index = []
     for _ in range(n_levels):
         index.append(list())
 
-    for key, value in (dictionary.items()):
-        if isinstance(value, dict):
-            index[0].extend([key] * len(value))
-            for k in value.keys():
-                index[1].append(k)
-        else:
-            index[0].append(key)
-            for n in range(1, n_levels):
-                index[n].append('')
+    itterdict(dictionary, index, 0)
+
+    # for key, value in dictionary.items():
+    #     if isinstance(value, dict):
+    #         index[0].extend([key] * len(value))
+
+    #         for k, v in value.items():
+    #             if isinstance(v, dict):
+    #                 index[1].extend([k] * len(v))
+    #                 for k in v.keys():
+    #                     index[2].append(k)
+
+    #             else:
+    #                 index[1].append(k)
+    #                 for n in range(2, n_levels):
+    #                     index[n].append('')
+            
+    #     else:
+    #         index[0].append(key)
+    #         for n in range(1, n_levels):
+    #             index[n].append('')
 
     return index
+
+
+def recursive_items(dictionary: Dict):
+    """Yields all of the items in a nested dictionary.
+
+    Args:
+        dictionary (Dict): nested dictionary.
+
+    Yields:
+        Any: items in nested dictionary.
+    """
+    for key, value in dictionary.items():
+        if isinstance(value, dict):
+            yield from recursive_items(value)
+        else:
+            yield (key, value)
 
 
 def recursive_values(dictionary: Dict):
@@ -179,37 +221,48 @@ class Config:
                     ] for q in self.qubits]
                 ))),
             columns=self.qubits,
-            index=nested_index(self.parameters['single_qubit'][self.qubits[0]])
+            index=nested_index(
+                self.parameters['single_qubit'][self.qubits[0]],
+                n_levels=3
+            )
         ))
 
-        for key in self.parameters['single_qubit'].keys():
-            if key not in self.qubits:
-                dfs.append(
-                    pd.DataFrame(
-                        data=[val for val in recursive_values(
-                                self.parameters['single_qubit'][key]
-                            )],
-                        columns=[key],
-                        index=nested_index(
-                                self.parameters['single_qubit'][key]
-                            )
-                    )
-                )
+        # for key in self.parameters['single_qubit'].keys():
+        #     if key not in self.qubits:
+        #         dfs.append(
+        #             pd.DataFrame(
+        #                 data=[val for val in recursive_values(
+        #                         self.parameters['single_qubit'][key]
+        #                     )],
+        #                 columns=[key],
+        #                 index=nested_index(
+        #                         self.parameters['single_qubit'][key]
+        #                     )
+        #             )
+        #         )
 
         return pd.concat(dfs, join='outer')
     
-    def get(self, param: str) -> Any:
+    def get(self, param: Union[List[str], str]) -> Any:
         """Get the parameter from the config (if it exists).
 
         Args:
-            param (str): parameter of interest
+            param (Union[List[str], str]): parameter of interest. This can be a
+                str (e.g. 'single_qubit') or a list of strings (e.g.
+                ['single_qubit', 'Q0', 'GE', 'freq']).
 
         Returns:
             Any: the string or value returned by config[param]. This defaults
                 to None if the parameter cannot be found in the config.
         """
         try:
-            return self._parameters[param]
+            if isinstance(param, list):
+                params = self._parameters
+                for p in param:
+                    params =  params[p]
+                return params
+            else:        
+                return self._parameters[param]
         except Exception:
             logger.warning(f"Parameter '{param}' not found in the config!")
             return None

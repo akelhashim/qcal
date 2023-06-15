@@ -3,166 +3,306 @@ single_qubit:
     channel: Q0.qdrv
     GE:
       freq: 4461736318.073627
-      X90:
-        - env: 'DRAG'
-          kwargs:
-            alpha: 0.0 
-            amp: 0.1
-            anh: -270e6
-            df: 0.0
-            phase: 0.0
+      gate:
+        X90:
+          - env: 'DRAG'
+            length: 2.4e-8
+            kwargs:
+              alpha: 0.0 
+              amp: 0.1
+              anh: -270e6
+              df: 0.0
+              phase: 0.0
+        X180:
+          - env: 'cosine_square'
+            length: 4.8e-8
+            kwargs:
+              amp: 0.1
+              phase: 0.0
+              ramp_fraction: 0.25
     EF:
       freq: 4181258902.85729
-      X90:
-        - env: 'cosine_square'
-          kwargs:
-            amp: 0.1
-            phase: 0.0
-            ramp_fraction: 0.25
+      gate:
+        X90:
+          - env: 'cosine_square'
+            length: 2.4e-8
+            kwargs:
+              amp: 0.1
+              phase: 0.0
+              ramp_fraction: 0.25
+        X180:
+          - env: 'cosine_square'
+            length: 4.8e-8
+            kwargs:
+              amp: 0.1
+              phase: 0.0
+              ramp_fraction: 0.25
   Q1:
     channel: Q1.qdrv
     GE:
       freq: 4675260858.059634
-      X90:
-        - env: 'DRAG'
-          kwargs:
-            alpha: 0.0 
-            amp: 0.1
-            anh: -270e6
-            df: 0.0
-            phase: 0.0
+      gate:
+        X90:
+          - env: 'DRAG'
+            length: 2.4e-8
+            kwargs:
+              alpha: 0.0 
+              amp: 0.1
+              anh: -270e6
+              df: 0.0
+              phase: 0.0
+        X180:
+          - env: 'cosine_square'
+            length: 4.8e-8
+            kwargs:
+              amp: 0.1
+              phase: 0.0
+              ramp_fraction: 0.25
     EF:
       freq: 4400700000.0
-      X90:
-        - env: 'cosine_square'
-          kwargs:
-            amp: 0.1
-            phase: 0.0
-            ramp_fraction: 0.25
+      gate:
+        X90:
+          - env: 'cosine_square'
+            length: 2.4e-8
+            kwargs:
+              amp: 0.1
+              phase: 0.0
+              ramp_fraction: 0.25
+        X180:
+          - env: 'cosine_square'
+            length: 4.8e-8
+            kwargs:
+              amp: 0.1
+              phase: 0.0
+              ramp_fraction: 0.25
   Q2:
     channel: Q2.qdrv
     GE:
       freq: 4944461837.827577
-      X90:
-        - env: 'DRAG'
-          kwargs:
-            alpha: 0.0 
-            amp: 0.1
-            anh: -270e6
-            df: 0.0
-            phase: 0.0
+      gate:
+        X90:
+          - env: 'DRAG'
+            length: 2.4e-8
+            kwargs:
+              alpha: 0.0 
+              amp: 0.1
+              anh: -270e6
+              df: 0.0
+              phase: 0.0
+        X180:
+          - env: 'cosine_square'
+            length: 4.8e-8
+            kwargs:
+              amp: 0.1
+              phase: 0.0
+              ramp_fraction: 0.25
     EF:
       freq: 4672600000.0
-      X90:
-        - env: 'cosine_square'
-          kwargs:
-            amp: 0.1
-            phase: 0.0
-            ramp_fraction: 0.25
+      gate:
+        X90:
+          - env: 'cosine_square'
+            length: 2.4e-8
+            kwargs:
+              amp: 0.1
+              phase: 0.0
+              ramp_fraction: 0.25
+        X180:
+          - env: 'cosine_square'
+            length: 4.8e-8
+            kwargs:
+              amp: 0.1
+              phase: 0.0
+              ramp_fraction: 0.25
   Q3:
     channel: Q3.qdrv
     GE:
       freq: 5114911040.024481
-      X90:
-        - env: 'DRAG'
-          kwargs:
-            alpha: 0.0 
-            amp: 0.1
-            anh: -270e6
-            df: 0.0
-            phase: 0.0
+      gate:
+        X90:
+          - env: 'DRAG'
+            length: 2.4e-8
+            kwargs:
+              alpha: 0.0 
+              amp: 0.1
+              anh: -270e6
+              df: 0.0
+              phase: 0.0
+        X180:
+          - env: 'cosine_square'
+            length: 4.8e-8
+            kwargs:
+              amp: 0.1
+              phase: 0.0
+              ramp_fraction: 0.25
     EF:
       freq: 4849300000.0
-      X90:
-        - env: 'cosine_square'
-          kwargs:
-            amp: 0.1
-            phase: 0.0
-            ramp_fraction: 0.25
+      gate:
+        X90:
+          - env: 'cosine_square'
+            length: 2.4e-8
+            kwargs:
+              amp: 0.1
+              phase: 0.0
+              ramp_fraction: 0.25
+        X180:
+          - env: 'cosine_square'
+            length: 4.8e-8
+            kwargs:
+              amp: 0.1
+              phase: 0.0
+              ramp_fraction: 0.25
   Q4:
     channel: Q4.qdrv
     GE:
       freq: 5350927547.979777
-      X90:
-        - env: 'DRAG'
-          kwargs:
-            alpha: 0.0 
-            amp: 0.1
-            anh: -270e6
-            df: 0.0
-            phase: 0.0
+      gate:
+        X90:
+          - env: 'DRAG'
+            length: 2.4e-8
+            kwargs:
+              alpha: 0.0 
+              amp: 0.1
+              anh: -270e6
+              df: 0.0
+              phase: 0.0
+        X180:
+          - env: 'cosine_square'
+            length: 4.8e-8
+            kwargs:
+              amp: 0.1
+              phase: 0.0
+              ramp_fraction: 0.25
     EF:
       freq: 5089500000.0
-      X90:
-        - env: 'cosine_square'
-          kwargs:
-            amp: 0.1
-            phase: 0.0
-            ramp_fraction: 0.25
+      gate:
+        X90:
+          - env: 'cosine_square'
+            length: 2.4e-8
+            kwargs:
+              amp: 0.1
+              phase: 0.0
+              ramp_fraction: 0.25
+        X180:
+          - env: 'cosine_square'
+            length: 4.8e-8
+            kwargs:
+              amp: 0.1
+              phase: 0.0
+              ramp_fraction: 0.25
   Q5:
     channel: Q5.qdrv
     GE:
       freq: 5581471962.572675
-      X90:
-        - env: 'DRAG'
-          kwargs:
-            alpha: 0.0 
-            amp: 0.1
-            anh: -270e6
-            df: 0.0
-            phase: 0.0
+      gate:
+        X90:
+          - env: 'DRAG'
+            length: 2.4e-8
+            kwargs:
+              alpha: 0.0 
+              amp: 0.1
+              anh: -270e6
+              df: 0.0
+              phase: 0.0
+        X180:
+          - env: 'cosine_square'
+            length: 4.8e-8
+            kwargs:
+              amp: 0.1
+              phase: 0.0
+              ramp_fraction: 0.25
     EF:
       freq: 5263900000.0
-      X90:
-        - env: 'cosine_square'
-          kwargs:
-            amp: 0.1
-            phase: 0.0
-            ramp_fraction: 0.25
+      gate:
+        X90:
+          - env: 'cosine_square'
+            length: 2.4e-8
+            kwargs:
+              amp: 0.1
+              phase: 0.0
+              ramp_fraction: 0.25
+        X180:
+          - env: 'cosine_square'
+            length: 4.8e-8
+            kwargs:
+              amp: 0.1
+              phase: 0.0
+              ramp_fraction: 0.25
   Q6:
     channel: Q6.qdrv
     GE:
       freq: 5880552778.000434
-      X90:
-        - env: 'DRAG'
-          kwargs:
-            alpha: 0.0 
-            amp: 0.1
-            anh: -270e6
-            df: 0.0
-            phase: 0.0
+      gate:
+        X90:
+          - env: 'DRAG'
+            length: 2.4e-8
+            kwargs:
+              alpha: 0.0 
+              amp: 0.1
+              anh: -270e6
+              df: 0.0
+              phase: 0.0
+        X180:
+          - env: 'cosine_square'
+            length: 4.8e-8
+            kwargs:
+              amp: 0.1
+              phase: 0.0
+              ramp_fraction: 0.25
     EF:
       freq: 5615900000.0
-      X90:
-        - env: 'cosine_square'
-          kwargs:
-            amp: 0.1
-            phase: 0.0
-            ramp_fraction: 0.25
+      gate:
+        X90:
+          - env: 'cosine_square'
+            length: 2.4e-8
+            kwargs:
+              amp: 0.1
+              phase: 0.0
+              ramp_fraction: 0.25
+        X180:
+          - env: 'cosine_square'
+            length: 4.8e-8
+            kwargs:
+              amp: 0.1
+              phase: 0.0
+              ramp_fraction: 0.25
   Q7:
     channel: Q7.qdrv
     GE:
       freq: 5621010772.789028
-      X90:
-        - env: 'DRAG'
-          kwargs:
-            alpha: 0.0 
-            amp: 0.1
-            anh: -270e6
-            df: 0.0
-            phase: 0.0
+      gate:
+        X90:
+          - env: 'DRAG'
+            length: 2.4e-8
+            kwargs:
+              alpha: 0.0 
+              amp: 0.1
+              anh: -270e6
+              df: 0.0
+              phase: 0.0
+        X180:
+          - env: 'cosine_square'
+            length: 4.8e-8
+            kwargs:
+              amp: 0.1
+              phase: 0.0
+              ramp_fraction: 0.25
     EF:
       freq: 5356000000.0
-      X90:
-        - env: 'cosine_square'
-          kwargs:
-            amp: 0.1
-            phase: 0.0
-            ramp_fraction: 0.25
-  common:
-    length:
-      X90: 2.4e-8
-      X180: 4.8e-8
+      gate:
+        X90:
+          - env: 'cosine_square'
+            length: 2.4e-8
+            kwargs:
+              amp: 0.1
+              phase: 0.0
+              ramp_fraction: 0.25
+        X180:
+          - env: 'cosine_square'
+            length: 4.8e-8
+            kwargs:
+              amp: 0.1
+              phase: 0.0
+              ramp_fraction: 0.25
 two_qubit:
   (0,1):
     amp: 0.288
@@ -277,7 +417,7 @@ readout:
   7:
     amp: 0.93
     freq: 6835470849.262068
-  env: cos_edge_square
+  env: cosine_square
   delay: 0.0
   ramp_fraction: 0.25
   length: 1.0e-6

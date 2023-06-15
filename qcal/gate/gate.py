@@ -30,7 +30,8 @@ class Gate:
             'matrix': matrix,
             'name':   'Gate',
             'qubits': qubits if type(qubits) is tuple else (qubits,),
-            'params': {}
+            'params': {'subspace': 'GE'}
+
         }
 
     def __call__(self) -> Matrix:

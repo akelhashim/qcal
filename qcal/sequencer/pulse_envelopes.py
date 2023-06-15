@@ -8,7 +8,14 @@ from numpy.typing import NDArray
 from typing import Union
 
 
-all = ['cosine_square', 'DRAG', 'linear', 'gaussian', 'sine', 'square']
+all = [
+    'cosine_square',
+    'DRAG',
+    'linear',
+    'gaussian',
+    'sine',
+    'square'
+]
 
 
 def cosine_square(
