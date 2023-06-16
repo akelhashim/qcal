@@ -11,8 +11,8 @@ from collections import defaultdict
 from typing import Dict
 
 import plotly.graph_objects as go
-import plotly.io as pio
-pio.renderers.default = 'colab'  # TODO: replace with settings
+# import plotly.io as pio
+# pio.renderers.default = 'colab'  # TODO: replace with settings
 
 
 def format_gate_text(gate: Gate):
@@ -177,7 +177,7 @@ def draw_circuit(circuit: Circuit, show: bool = True):
     )
     
     if show:
-        fig.show(renderer="colab") # TODO
+        fig.show()
     else:
         return fig
 
@@ -273,6 +273,7 @@ def format_qubit_text(qubit: Dict) -> str:
     Returns:
         str: text formatted for Plotly plot.
     """
+    text = ''
     for key, value in qubit.items():
         if not isinstance(value, dict):
             text = f'{key.capitalize()}: {qubit[key]}<br>'
@@ -303,6 +304,8 @@ def draw_processor(config: Config):
 
     edge_x = []
     edge_y = []
+    middle_node_x = []
+    middle_node_y = []
     for edge in G.edges():
         x0, y0 = pos[edge[0]]
         x1, y1 = pos[edge[1]]
@@ -312,12 +315,8 @@ def draw_processor(config: Config):
         edge_y.append(y0)
         edge_y.append(y1)
         edge_y.append(None)
-
-    two_qubit_gates = []
-    for pair in config.parameters['two_qubit']:
-        two_qubit_gates.append(
-            list(config.parameters['two_qubit'][pair]['gate'].keys())[0]
-        )
+        middle_node_x.append((x0+x1)/2)
+        middle_node_y.append((y0+y1)/2)
 
     node_trace = go.Scatter(
         x=node_x, y=node_y,
@@ -340,10 +339,21 @@ def draw_processor(config: Config):
                 titleside='right'),
             line_width=2)
     )
+    node_text = []
+    for q in config.qubits:
+        node_text.append(format_qubit_text(
+            config.parameters['single_qubit'][q]
+        ))
+    node_adjacencies = []
+    for node, adjacencies in enumerate(G.adjacency()):
+        node_adjacencies.append(len(adjacencies[1]))
+        node_text[node] += 'Connectivity: '+str(len(adjacencies[1]))
+    node_trace.marker.color = node_adjacencies
+    node_trace.text = node_text
     
     qubit_labels = go.Scatter(
         x=node_x, y=node_y,
-        text=[str(q) for q in config.qubits],
+        text=[f'Q{q}' for q in config.qubits],
         mode='text',
         hoverinfo='text',
         marker=dict(color='#5D69B1', size=0.01)
@@ -354,32 +364,27 @@ def draw_processor(config: Config):
         line=dict(width=0.5, color='#888'),
         hoverinfo='none',
         mode='lines')
-    
-    two_qubit_gate_labels = go.Scatter(
-        x=np.ediff1d(node_x, to_end=node_x[0] - node_x[-1]), 
-        y=np.ediff1d(node_y, to_end=node_y[0] - node_y[-1]), 
-        mode="markers+text",
-        text=two_qubit_gates,
-        textposition="top center",
-        hoverinfo='text',
-        marker=dict(color='#5D69B1', size=0.01)
-    )
-    
-    node_text = []
-    for q in config.qubits:
-        node_text.append(format_qubit_text(
-            config.parameters['single_qubit'][str(q)]
-        ))
 
-    node_adjacencies = []
-    for node, adjacencies in enumerate(G.adjacency()):
-        node_adjacencies.append(len(adjacencies[1]))
-        node_text[node] += 'Connectivity: '+str(len(adjacencies[1]))
-    node_trace.marker.color = node_adjacencies
-    node_trace.text = node_text
+    middle_node_text = []
+    for pair in config.qubit_pairs:
+        middle_node_text.append(
+            format_qubit_text(
+                config.parameters['two_qubit'][str(pair)]
+            )
+        )
+    middle_node_trace = go.Scatter(
+        x=middle_node_x,
+        y=middle_node_y,
+        text=middle_node_text,
+        mode='markers',
+        hoverinfo='text',
+        marker=go.Marker(
+            opacity=0
+        )
+    )
 
     fig = go.Figure(
-        data=[edge_trace, node_trace, qubit_labels, two_qubit_gate_labels],
+        data=[edge_trace, node_trace, qubit_labels, middle_node_trace],
         layout=go.Layout(
             # title='',
             titlefont_size=16,

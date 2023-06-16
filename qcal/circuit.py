@@ -248,7 +248,7 @@ class Circuit:
     def __len__(self) -> int:
         return len(self._cycles)
     
-    def _repr_html_(self) -> str:
+    def _repr_html_(self) -> str:  # TODO: sometimes causes notebook to crash
         """Draw the html formatted circuit."""
         from qcal.plotting.graphs import draw_circuit
         fig = draw_circuit(self, show=False)

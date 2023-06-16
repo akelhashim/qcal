@@ -562,9 +562,9 @@ class X90(Gate):
         self._properties['name'] = 'X90'
         self._properties['params'] = {
             'angle':    np.pi/2,
-            'axis':     'x',
-            'subspace': subspace
+            'axis':     'x'
         }
+        self._properties['subspace'] = subspace
 
 
 class Y(Gate):

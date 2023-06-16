@@ -142,8 +142,8 @@ class Config:
         else:
             return self._parameters.copy()
 
-    def __iter__(self):
-        return self._parameters.__iter__()
+    # def __iter__(self):
+    #     return self._parameters.__iter__()
 
     def __len__(self) -> int:
         return len(self._parameters)
@@ -156,15 +156,58 @@ class Config:
     
     def __str__(self) -> str:
         return str(self._parameters)
+    
+    @property
+    def basis_gates(self) -> Dict:
+        """Basis gates for each qubit (subspace) and qubit pair.
+
+        Returns:
+            Dict: basis gates.
+        """
+        basis_gates = dict()
+
+        single_qubit = dict()
+        for q in self.qubits:
+            subspace = {}
+            for sbsp in self.parameters['single_qubit'][q].keys():
+                gates = []
+                for k, v in self.parameters['single_qubit'][q][sbsp].items():
+                    if isinstance(v, dict) and 'pulse' in v.keys():
+                        gates.append(k)
+                subspace[sbsp] = gates
+            single_qubit[q] = subspace
+        basis_gates['single_qubit'] = single_qubit
+
+        two_qubit = dict()
+        for p in self.qubit_pairs:
+            gates = []
+            for k, v in self.parameters['two_qubit'][str(p)].items():
+                if isinstance(v, dict) and 'pulse' in v.keys():
+                        gates.append(k)
+            two_qubit[p] = gates
+        basis_gates['two_qubit'] = two_qubit
+
+        return basis_gates
 
     @property
     def filename(self) -> str:
-        """Returns the filename of the config.yaml file.
+        """The filename of the config.yaml file.
 
         Returns:
             str: filename of the config.yaml file.
         """
         return self._filename
+    
+    @property
+    def hardware(self) -> pd.DataFrame:
+        """Hardware parameters in a table format.
+
+        Returns:
+            pd.DataFrame: hardware properties.
+        """
+        return pd.DataFrame.from_dict(
+            self.parameters['hardware'], orient='index', columns=['hardware']
+        )
     
     @property
     def n_qubits(self) -> int:
@@ -185,24 +228,51 @@ class Config:
         return self._parameters
     
     @property
-    def qubits(self) -> list:
-        """Available qubits on the processor.
+    def readout(self) -> pd.DataFrame:
+        """Readout parameters in a table format.
 
         Returns:
-            list: qubit labels.
+            pd.DataFrame: readout parameters.
         """
-        return list(
-            q for q in self.parameters['single_qubit'].keys() if q[0] == 'Q'
+        dfs = []
+        dfs.append(pd.DataFrame(
+                    data=list(map(list, zip(*[
+                            [val for val in recursive_values(
+                                    self.parameters['readout'][q]
+                                )
+                            ] for q in self.qubits]
+                        ))),
+                    columns=self.qubits,
+                    index=self.parameters['readout'][self.qubits[0]].keys()
+                    )
         )
+                
+        for key, value in self.parameters['readout'].items():
+            if key not in self.qubits:
+                dfs.append(pd.DataFrame.from_dict(
+                        {key: [value] * self.n_qubits},
+                        orient='index'
+                    )
+                )
+
+        df = pd.concat(dfs, ignore_index=False)
+        return df
     
     @property
-    def qubit_pairs(self) -> List[tuple]:
-        """Available qubit pairs on the processor.
+    def reset(self) -> pd.DataFrame:
+        """Reset parameters in table format.
 
         Returns:
-            list[tuple]: qubit pairs.
+            pd.DataFrame: reset parameters.
         """
-        return [eval(key) for key in self.get('two_qubit').keys()]
+        return pd.DataFrame(
+            data=[val for val in recursive_values(self.parameters['reset'])],
+            columns=['reset'],
+            index=nested_index(
+                self.parameters['reset'],
+                n_levels=2
+            )
+        )
     
     @property
     def single_qubit(self) -> pd.DataFrame:
@@ -211,9 +281,7 @@ class Config:
         Returns:
             pd.DataFrame: table of single-qubit parameters.
         """
-        
-        dfs = []
-        dfs.append(pd.DataFrame(
+        df = pd.DataFrame(
             data=list(map(list, zip(*[
                     [val for val in recursive_values(
                             self.parameters['single_qubit'][q]
@@ -225,23 +293,48 @@ class Config:
                 self.parameters['single_qubit'][self.qubits[0]],
                 n_levels=3
             )
-        ))
+        )
+        return df
 
-        # for key in self.parameters['single_qubit'].keys():
-        #     if key not in self.qubits:
-        #         dfs.append(
-        #             pd.DataFrame(
-        #                 data=[val for val in recursive_values(
-        #                         self.parameters['single_qubit'][key]
-        #                     )],
-        #                 columns=[key],
-        #                 index=nested_index(
-        #                         self.parameters['single_qubit'][key]
-        #                     )
-        #             )
-        #         )
+    @property
+    def two_qubit(self) -> pd.DataFrame:
+        """Two-qubit parameters in a table format.
 
-        return pd.concat(dfs, join='outer')
+        Returns:
+            pd.DataFrame: table of two-qubit parameters.
+        """
+        df = pd.DataFrame(
+            data=list(map(list, zip(*[
+                    [val for val in recursive_values(
+                            self.parameters['two_qubit'][str(p)]
+                        )
+                    ] for p in self.qubit_pairs]
+                ))),
+            columns=self.qubit_pairs,
+            index=nested_index(
+                self.parameters['two_qubit'][str(self.qubit_pairs[0])],
+                n_levels=3
+            )
+        )
+        return df
+    
+    @property
+    def qubits(self) -> list:
+        """Available qubits on the processor.
+
+        Returns:
+            list: qubit labels.
+        """
+        return tuple(self.parameters['single_qubit'].keys())
+    
+    @property
+    def qubit_pairs(self) -> List[tuple]:
+        """Available qubit pairs on the processor.
+
+        Returns:
+            list[tuple]: qubit pairs.
+        """
+        return [eval(key) for key in self.get('two_qubit').keys()]
     
     def get(self, param: Union[List[str], str]) -> Any:
         """Get the parameter from the config (if it exists).

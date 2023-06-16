@@ -30,7 +30,8 @@ class Gate:
             'matrix': matrix,
             'name':   'Gate',
             'qubits': qubits if type(qubits) is tuple else (qubits,),
-            'params': {'subspace': 'GE'}
+            'params': {},
+            'subspace': 'GE'
 
         }
 
