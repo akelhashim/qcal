@@ -140,6 +140,15 @@ class Gate:
             return True
         else:
             return False
+        
+    @property
+    def is_measurement(self) -> bool:
+        """Whether or not gate is a measurement operation.
+
+        Returns:
+            bool: measurement or not.
+        """
+        return False
     
     @property
     def locally_equivalent(self) -> str:

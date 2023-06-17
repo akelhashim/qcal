@@ -252,6 +252,15 @@ class Meas(Gate):
         self._properties['name'] = 'Meas'
         self._properties['params']['basis'] = basis
 
+    @property
+    def is_measurement(self) -> bool:
+        """Whether or not gate is a measurement operation.
+
+        Returns:
+            bool: measurement or not.
+        """
+        return True
+
 
 class RandSU2(Gate):
     """Class for a random SU(2) gate."""
