@@ -35,8 +35,20 @@ __all__ = ['Barrier', 'Cycle', 'Layer', 'Circuit', 'CircuitSet']
 class Barrier:
     """Class defining a barrier in a circuit."""
 
-    def __init__(self) -> None:
-        pass
+    __slots__ = ('_qubits')
+
+    def __init__(self, qubits: Tuple[int] = tuple()) -> None:
+        """Initialize the Barrier class. 
+        
+        Barrier takes an option qubits kwarg. If qubits does not include every
+        qubit in full quantum register, then only a partial barrier is
+        implemented.
+
+        Args:
+            qubits (Tuple[int], optional): qubits to enforce a barrier between.
+                Defaults to tuple().
+        """
+        self._qubits = qubits
 
     def __repr__(self) -> str:
         """Draw the circuit as a string."""
@@ -71,7 +83,7 @@ class Barrier:
         Returns:
             Tuple: empty tuple.
         """
-        return tuple()
+        return self._qubits
 
 class Cycle:
     """Class defining a cycle in a circuit."""
@@ -236,6 +248,11 @@ class Circuit:
             cycles_or_layers: List[Union[Cycle, Layer]] = []
         ) -> None:
         
+        if cycles_or_layers:
+            cycles_or_layers = [
+                cycle if isinstance(cycle, (Cycle, Layer, Barrier)) else 
+                Cycle(cycle) for cycle in cycles_or_layers
+            ]
         self._cycles = deque(cycles_or_layers)
         qubits = tuple()
         for cycle in self._cycles:

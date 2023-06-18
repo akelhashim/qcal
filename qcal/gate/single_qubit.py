@@ -525,7 +525,7 @@ class Vdag(Gate):
 class VirtualZ(Gate):
     """Class for virtual Z gate."""
 
-    def __init__(self, theta: float, qubit: int = 0) -> None:
+    def __init__(self, theta: float, qubit: int = 0, subspace='GE') -> None:
         """Initialize using the rz function.
 
         Args:
@@ -535,9 +535,10 @@ class VirtualZ(Gate):
         super().__init__(rz(theta), qubit)
         self._properties['name'] = 'VirtualZ'
         self._properties['params'] = {
-            'angle': theta,
+            'phase': theta,
             'axis':  'z',
         }
+        self._properties['subspace'] = subspace
     
 
 class X(Gate):

@@ -214,11 +214,29 @@ def square(
         ).astype('complex64')
 
 
+def virtualz(
+        length: float, sample_rate: float, amp: float = 1.0, phase: float= 0.0
+    ) -> np.complex64:
+    """_summary_
+
+    Args:
+        length (float): _description_
+        sample_rate (float): _description_
+        amp (float, optional): _description_. Defaults to 1.0.
+        phase (float, optional): _description_. Defaults to 0.0.
+
+    Returns:
+        np.complex64: _description_
+    """
+    return np.exp(1j*phase).astype(np.complex64)
+
+
 pulse_envelopes = defaultdict(lambda: 'Pulse envelope not available!', {
     'cosine_square': cosine_square, 
-    'DRAG': DRAG, 
-    'linear': linear, 
+    'DRAG':     DRAG, 
+    'linear':   linear, 
     'gaussian': gaussian, 
-    'sine': sine, 
-    'square': square
+    'sine':     sine, 
+    'square':   square,
+    'virtualz': virtualz
 })
