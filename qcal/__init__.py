@@ -7,3 +7,5 @@ from qcal.gate.two_qubit import *
 from qcal.circuit import *
 
 from qcal.config import Config
+
+from qcal import interface

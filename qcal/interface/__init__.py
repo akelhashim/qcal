@@ -1,1 +1,1 @@
-from .qubic.qubic import to_qubic
+from .qubic import qubic

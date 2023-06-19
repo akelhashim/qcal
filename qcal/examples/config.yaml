@@ -659,15 +659,26 @@ readout:
     channel: 8
     amp: 0.93
     freq: 6835470849.262068
+  esp:
+    enable: True
+    qubits:
+      - 0
+      - 1
+      - 2
+      - 3
+      - 4
+      - 5
+      - 6
+      - 7
   delay: 0.0
-  env: cosine_square
-  kwargs:
-    phase: 0.0
-    ramp_fraction: 0.25
   herald: True
   length: 1.0e-6
   reset: 1.e+5
   sample_rate: 8.e+9
+  env: cosine_square
+  kwargs:
+    phase: 0.0
+    ramp_fraction: 0.25
 reset:
   active:
     enable: False

@@ -11,7 +11,7 @@ from qcal.sequencer.pulse_envelopes import pulse_envelopes
 import logging
 
 from collections import defaultdict
-from typing import List, Tuple, Union
+from typing import List, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -20,20 +20,20 @@ __all__ = ['to_qubic']
 
 
 def add_reset(
-        config: Config, qubits: Union[List, Tuple], circuit: List
+        config: Config, qubits: List | Tuple, circuit: List
     ) -> None:
     """Add active or passive reset to the beginning of a circuit.
 
     Args:
-        config (Config):             config object.
-        qubits (Union[List, Tuple]): qubits to reset.
-        circuit (List):              qubic circuit.
+        config (Config):       config object.
+        qubits (List | Tuple): qubits to reset.
+        circuit (List):        qubic circuit.
     """
     if config.reset.reset.active.enable:
         reset_circuit = []
         for _ in range(config.reset.reset.active.n_resets):
             for q in qubits:
-                add_measurement(config, q, reset_circuit)
+                add_measurement(config, q, reset_circuit)  # TODO: ESP
                 reset_circuit.append(
                     {'name': 'branch_fproc',
                      'alu_cond': 'eq',
@@ -77,14 +77,14 @@ def add_reset(
 
 
 def add_heralding(
-        config: Config, qubits: Union[List, Tuple], circuit: List
+        config: Config, qubits: List | Tuple, circuit: List
     ) -> None:
     """Add heralded readout to the beginning of the circuit.
 
     Args:
-        config (Config):             config object.
-        qubits (Union[List, Tuple]): qubits to reset.
-        circuit (List):              qubic circuit.
+        config (Config):       config object.
+        qubits (List | Tuple): qubits to reset.
+        circuit (List):        qubic circuit.
     """
     for q in qubits: # TODO: Pass multiple qubits in the same list?
         add_measurement(config, q, circuit)
@@ -98,19 +98,20 @@ def add_heralding(
          
 
 def add_measurement(
-        config: Config, qubit_or_gate: Union[int, Gate], circuit: List
+        config: Config, qubit_or_gate: int | Gate, circuit: List
     ) -> None:
     """Add measurement to a circuit.
 
     Args:
-        config (Config):                  config object.
-        qubit_or_gate (Union[int, Gate]): qubit label or Gate object.
-        circuit (List):                   qubic circuit.
+        config (Config):            config object.
+        qubit_or_gate (int | Gate): qubit label or Gate object.
+        circuit (List):             qubic circuit.
     """
     if isinstance(qubit_or_gate, int):
         qubit = qubit_or_gate
     elif isinstance(qubit_or_gate, Gate):
         qubit = qubit_or_gate.qubits[0]
+
     circuit.append({'name': 'read', 'qubit': [f'Q{qubit}']})
     # circuit.extend((
     #         {'name': 'pulse',
@@ -232,8 +233,16 @@ def add_multi_qubit_gate(config: Config, gate: Gate, circuit: List) -> None:
             )
 
 
-def to_qubic(config: Config, circuit: Circuit):
+def to_qubic(config: Config, circuit: Circuit) -> List:
+    """Compile a qcal circuit to a qubic circuit.
 
+    Args:
+        config (Config): config object.
+        circuit (Circuit): qcal Circuit.
+
+    Returns:
+        List: compiled qubic circuit.
+    """
     sq_gate_mapper = defaultdict(lambda: 'Cannot transpile a non-native gate!',
         {'Meas':      add_measurement,
          'VirtualZ':  add_virtualz_gate,

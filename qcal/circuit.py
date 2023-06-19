@@ -21,7 +21,8 @@ import copy
 # import itertools
 import pandas as pd
 
-from collections import Iterable, deque
+from collections import deque
+from collections.abc import Iterable
 from typing import Any, Dict, List, Tuple, Union
 # from types import IntType, NoneType
 
@@ -111,7 +112,7 @@ class Cycle:
         return iter(self._gates)
     
     def __repr__(self) -> str:
-        """Draw the circuit as a string."""
+        """Draw the cycle as a string."""
         df = pd.DataFrame(
             data=[gate.name for gate in self._gates], 
             columns=['Cycle'], 
@@ -120,7 +121,7 @@ class Cycle:
         return repr(df)
     
     def __str__(self) -> str:
-        """Draw the circuit as a string."""
+        """Draw the cycle as a string."""
         df = pd.DataFrame(
             data=[gate.name for gate in self._gates], 
             columns=[
@@ -573,24 +574,28 @@ class CircuitSet:
 
     __slots__ = '_df'
     
-    def __init__(self, circuits: List[Any] = None, index: List[int] = None):
-        """
+    def __init__(self, 
+                 circuits: List[Any] | None = None, 
+                 index: List[int] | None = None
+        ) -> None:
+        """Initialize a CircuitSet.
+
         Args:
-            circuits (List[Any], optional): Circuits to store in the 
+            circuits (List[Any] | None, optional): circuits to store in a 
                 CircuitSet. Defaults to None.
-            index (List[int], optional): Indices for the circuits in the 
+            index (List[int] | None, optional): Indices for the circuits in the 
                 DataFrame. Defaults to None.
         """
+        self._df = pd.DataFrame(columns=['Circuits'])
 
-        self._df = pd.DataFrame(columns=['Circuits', 'Results'])
-
-        if circuits is not None:  # TODO: how to handle circuits that already have results
+        # TODO: how to handle circuits that already have results
+        if circuits is not None:
             if isinstance(circuits, Iterable):
-                self._df['Circuits'] = circuits
-                self._df['Results'] = [dict()] * len(circuits)
+                self._df['circuits'] = circuits
+                # self._df['Results'] = [dict()] * len(circuits)
             else:
-                self._df['Circuits'] = [circuits]
-                self._df['Results'] = [dict()] * len([circuits])
+                self._df['circuits'] = [circuits]
+                # self._df['Results'] = [dict()] * len([circuits])
         
         if index is not None:
             self._df = self._df.set_index(pd.Index(index))
@@ -608,11 +613,14 @@ class CircuitSet:
     def __len__(self) -> int:
         return len(self._df)
 
-    def __iter__(self):
-        return iter(self._df)
+    # def __iter__(self):
+    #     return iter(self._df)
 
     def __repr__(self) -> str:
         return repr(self._df)
+    
+    def _repr_html_(self) -> str:
+        return self._df.to_html()
 
     @property
     def n_circuits(self) -> int:
