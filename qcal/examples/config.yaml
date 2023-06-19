@@ -425,7 +425,7 @@ two_qubit:
           length: 0.0
           kwargs:
             phase: 0.0
-        - channel: Q0.qdrv
+        - channel: Q1.qdrv
           env: virtualz
           length: 0.0
           kwargs:
@@ -659,17 +659,18 @@ readout:
     channel: 8
     amp: 0.93
     freq: 6835470849.262068
-  length: 1.0e-6
+  delay: 0.0
   env: cosine_square
   kwargs:
     phase: 0.0
     ramp_fraction: 0.25
-  delay: 0.0
+  herald: True
+  length: 1.0e-6
   reset: 1.e+5
   sample_rate: 8.e+9
 reset:
   active:
-    enable: True
+    enable: False
     n_resets: 10
   passive:
     delay: 5.e-4

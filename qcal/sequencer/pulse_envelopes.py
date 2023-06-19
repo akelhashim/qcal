@@ -8,7 +8,7 @@ from numpy.typing import NDArray
 from typing import Union
 
 
-all = [
+__all__ = [
     'cosine_square',
     'DRAG',
     'linear',

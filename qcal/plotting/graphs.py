@@ -172,8 +172,10 @@ def draw_circuit(circuit: Circuit, show: bool = True):
 
     fig.update_layout(
         autosize=False,
-        width=75 * circuit.circuit_depth,
-        height=75 * circuit.circuit_width
+        width=75 * (circuit.circuit_depth + 0.5) if circuit.circuit_depth > 1 
+              else 150,
+        height=75 * (circuit.circuit_width + 0.5) if circuit.circuit_width > 1 
+               else 150,
     )
     
     if show:

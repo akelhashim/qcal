@@ -1,0 +1,1 @@
+from .qubic.qubic import to_qubic

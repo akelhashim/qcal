@@ -22,6 +22,9 @@ from typing import Any, Union
 logger = logging.getLogger(__name__)
 
 
+__all__ = ['QPU']
+
+
 class QPU:
 
     __slots__ = (
