@@ -165,6 +165,7 @@ class Config:
             Dict: basis gates.
         """
         basis_gates = dict()
+        basis_set = set()
 
         single_qubit = dict()
         for q in self.qubits:
@@ -174,6 +175,7 @@ class Config:
                 for k, v in self.parameters['single_qubit'][q][sbsp].items():
                     if isinstance(v, dict) and 'pulse' in v.keys():
                         gates.append(k)
+                        basis_set.add(k)
                 subspace[sbsp] = gates
             single_qubit[q] = subspace
         basis_gates['single_qubit'] = single_qubit
@@ -184,8 +186,11 @@ class Config:
             for k, v in self.parameters['two_qubit'][str(p)].items():
                 if isinstance(v, dict) and 'pulse' in v.keys():
                         gates.append(k)
+                        basis_set.add(k)
             two_qubit[p] = gates
         basis_gates['two_qubit'] = two_qubit
+
+        basis_gates['set'] = basis_set
 
         return basis_gates
 

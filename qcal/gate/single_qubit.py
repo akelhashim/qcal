@@ -15,7 +15,7 @@ from typing import List, Tuple, Union
 # TODO: add Clifford gates
 
 
-__all__ = [
+__all__ = (
     'C',
     'H',
     'Id',
@@ -39,7 +39,7 @@ __all__ = [
     'Y',
     'Y90',
     'Z'
-]
+)
 
 
 id = sigma0 = np.array([[1., 0.],

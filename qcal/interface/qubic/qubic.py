@@ -3,6 +3,7 @@
 References:
 https://ieeexplore.ieee.org/document/9552516
 """
+import qcal
 from qcal.circuit import Circuit
 from qcal.config import Config
 from qcal.gate.gate import Gate
@@ -11,7 +12,7 @@ from qcal.sequencer.pulse_envelopes import pulse_envelopes
 import logging
 
 from collections import defaultdict
-from typing import List, Tuple
+from typing import Dict, List, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -56,7 +57,7 @@ def add_reset(
                                 **pulse['kwargs']
                              )}
                         # TODO: add X90 capability
-                        for pulse in config.single_qubit[q]['GE']['X180'].pulse
+                        for pulse in config.single_qubit[q]['GE']['X'].pulse
                         ],
                         'false': []
                     },
@@ -159,17 +160,17 @@ def add_virtualz_gate(config: Config, gate: Gate, circuit: List):
     )
 
 
-def add_X90_gate(config: Config, gate: Gate, circuit: List) -> None:
-    """Add an X90 gate.
+def add_single_qubit_gate(config: Config, gate: Gate, circuit: List) -> None:
+    """Add a single-qubit gate.
 
     Args:
         config (Config): config object.
-        gate (Gate):     X90 gate.
+        gate (Gate):     single-qubit gate.
         circuit (List):  qubic circuit.
     """
     subspace = gate.properties['subspace']
     for pulse in (
-        config.single_qubit[gate.qubits[0]][subspace]['X90'].pulse):
+        config.single_qubit[gate.qubits[0]][subspace][gate.name].pulse):
 
         if pulse['env'] == 'virtualz':
             circuit.append(
@@ -233,24 +234,30 @@ def add_multi_qubit_gate(config: Config, gate: Gate, circuit: List) -> None:
             )
 
 
-def to_qubic(config: Config, circuit: Circuit) -> List:
+def compilation_error(*args):
+    """Generic compilation error.
+
+    Raises:
+        Exception: compilation error for non-native gate.
+    """
+    raise Exception(
+        f'Cannot compile! {args[1].name} is a non-native gate.'
+    ) 
+
+
+def compile(
+        config: Config, circuit: Circuit, gate_mapper: defaultdict
+    ) -> List:
     """Compile a qcal circuit to a qubic circuit.
 
     Args:
-        config (Config): config object.
-        circuit (Circuit): qcal Circuit.
+        config (Config):           config object.
+        circuit (Circuit):         cal Circuit.
+        gate_mapper (defaultdict): map between qcal to QubiC gates.
 
     Returns:
         List: compiled qubic circuit.
     """
-    sq_gate_mapper = defaultdict(lambda: 'Cannot transpile a non-native gate!',
-        {'Meas':      add_measurement,
-         'VirtualZ':  add_virtualz_gate,
-         'X90':       add_X90_gate,
-        #  'Y90':       add_Y90_gate  # TODO
-        }
-    )
-
     qubic_circuit = []
     
     # Add reset to the beginning of the circuit
@@ -264,12 +271,9 @@ def to_qubic(config: Config, circuit: Circuit) -> List:
 
         if not cycle.is_barrier:
             for gate in cycle:
-                if gate.is_single_qubit:
-                    sq_gate_mapper[gate.name](config, gate, qubic_circuit)
-                elif gate.is_multi_qubit:
-                    add_multi_qubit_gate(config, gate, qubic_circuit)
+                gate_mapper[gate.name](config, gate, qubic_circuit)
 
-        else:
+        elif cycle.is_barrier:
             qubits = cycle.qubits if cycle.qubits else circuit.qubits
             qubic_circuit.append(
                 {'name': 'barrier', 
@@ -277,3 +281,64 @@ def to_qubic(config: Config, circuit: Circuit) -> List:
             )
 
     return qubic_circuit
+
+
+class Compiler:
+    """Generic qubic compiler."""
+
+    __slots__ = ('_config', '_gate_mapper')
+
+    def __init__(self, config: Config) -> None:
+        """Initialize with a qcal config object.
+
+        Args:
+            config (Config): config object.
+        """
+        self._config = config
+        
+        self._gate_mapper = defaultdict(lambda: compilation_error,
+            {'Meas':     add_measurement,
+             'VirtualZ': add_virtualz_gate
+            }
+        )
+        for gate in config.basis_gates['set']:
+            if gate in qcal.gate.single_qubit.__all__:
+                self._gate_mapper[gate] = add_single_qubit_gate
+            else:
+                self._gate_mapper[gate] = add_multi_qubit_gate
+
+    @property
+    def config(self) -> Config:
+        """Config object.
+
+        Returns:
+            Config: config object.
+        """
+        return self._config
+    
+    @property
+    def gate_mapper(self) -> defaultdict:
+        """Gate mapper.
+
+        This dictionary controls how gates are mapped from qcal to QubiC.
+
+        Returns:
+            defaultdict: gate mapper.
+        """
+        return self._gate_mapper
+
+    def compile(self, circuits: List[Circuit]) -> List[Dict]:
+        """Compile all circuits.
+
+        Args:
+            circuits (List[Circuit]): circuits to compile.
+
+        Returns:
+            List[Dict]: compiled circuits.
+        """
+        compiled_circuits = [
+            compile(
+                self._config, circuit, self._gate_mapper
+            ) for circuit in circuits
+        ]
+        return compiled_circuits

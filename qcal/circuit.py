@@ -18,13 +18,11 @@ from qcal.gate.gate import Gate
 from qcal.gate.single_qubit import basis_rotation, Meas
 
 import copy
-# import itertools
 import pandas as pd
 
 from collections import deque
 from collections.abc import Iterable
 from typing import Any, Dict, List, Tuple, Union
-# from types import IntType, NoneType
 
 import plotly.io as pio
 pio.renderers.default = 'colab'  # TODO: replace with settings
@@ -53,11 +51,11 @@ class Barrier:
 
     def __repr__(self) -> str:
         """Draw the circuit as a string."""
-        return '\nBarrier\n|\n|\n|\n|\n|\n'
+        return self.name
     
     def __str__(self) -> str:
         """Draw the circuit as a string."""
-        return '\nBarrier\n|\n|\n|\n|\n|\n'
+        return self.name
 
     @property
     def is_barrier(self) -> bool:
@@ -112,24 +110,12 @@ class Cycle:
         return iter(self._gates)
     
     def __repr__(self) -> str:
-        """Draw the cycle as a string."""
-        df = pd.DataFrame(
-            data=[gate.name for gate in self._gates], 
-            columns=['Cycle'], 
-            index=[gate.qubits for gate in self._gates]
-        )
-        return repr(df)
+        """Draw the cycle/layer as a string."""
+        return self.to_str()
     
     def __str__(self) -> str:
-        """Draw the cycle as a string."""
-        df = pd.DataFrame(
-            data=[gate.name for gate in self._gates], 
-            columns=[
-                'Layer' if isinstance(self._gates[0], Layer) else 'Cycle'
-            ], 
-            index=[gate.qubits for gate in self._gates]
-        )
-        return repr(df)
+        """Draw the cycle/layer as a string."""
+        return self.to_str()
     
     def _repr_html_(self):
         """Draw the circuit as an html string."""
@@ -227,6 +213,17 @@ class Cycle:
             index=[gate.qubits for gate in self._gates]
         )
         return df
+    
+    def to_str(self) -> str:
+        """Convert the cycle to a string.
+
+        Returns:
+            str: string representation of the cycle.
+        """
+        str_rep = 'Cycle'
+        for gate in self._gates:
+            str_rep += f' {gate.name}:{gate.qubits}'
+        return str_rep
 
 
 class Layer(Cycle):
@@ -239,6 +236,17 @@ class Layer(Cycle):
 
     def __copy__(self) -> List:
         return Layer(copy.deepcopy(self._gates))
+    
+    def to_str(self) -> str:
+        """Convert the cycle to a string.
+
+        Returns:
+            str: string representation of the cycle.
+        """
+        str_rep = 'Layer'
+        for gate in self._gates:
+            str_rep += f' {gate.name}:{gate.qubits}'
+        return str_rep
     
 
 class Circuit:
@@ -586,7 +594,7 @@ class CircuitSet:
             index (List[int] | None, optional): Indices for the circuits in the 
                 DataFrame. Defaults to None.
         """
-        self._df = pd.DataFrame(columns=['Circuits'])
+        self._df = pd.DataFrame(columns=['circuits'])
 
         # TODO: how to handle circuits that already have results
         if circuits is not None:
@@ -638,7 +646,7 @@ class CircuitSet:
         Returns:
             pd.Series: circuits
         """
-        return self._df['Circuits']
+        return self._df['circuits']
 
     @property
     def results(self) -> pd.Series:
@@ -663,7 +671,7 @@ class CircuitSet:
         """
         for i in range(0, len(self), batch_size):
             yield CircuitSet(
-                self._df.iloc[i:i + batch_size]['Circuits'].tolist()
+                self._df.iloc[i:i + batch_size]['circuits'].tolist()
             )
 
     def save(self, path: str):
@@ -704,7 +712,7 @@ class CircuitSet:
             Dict: unioned bit string results.
         """
         if idx is None:
-            results_list = self._df['Results'].to_list()
+            results_list = self._df['results'].to_list()
 
         # TODO: finish
 

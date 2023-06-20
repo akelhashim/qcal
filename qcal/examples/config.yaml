@@ -26,7 +26,7 @@ single_qubit:
             length: 0.0
             kwargs:
               phase: 0.0
-      X180:
+      X:
         pulse:
           - channel: Q0.qdrv
             env: 'cosine_square'
@@ -49,7 +49,7 @@ single_qubit:
               amp: 0.1
               phase: 0.0
               ramp_fraction: 0.25
-      X180:
+      X:
         pulse:
           - channel: Q0.qdrv
             env: 'cosine_square'
@@ -75,7 +75,7 @@ single_qubit:
               anh: -270.e+6
               df: 0.0
               phase: 0.0
-      X180:
+      X:
         pulse:
           - channel: Q1.qdrv
             env: 'cosine_square'
@@ -98,7 +98,7 @@ single_qubit:
               amp: 0.1
               phase: 0.0
               ramp_fraction: 0.25
-      X180:
+      X:
         pulse:
           - channel: Q1.qdrv
             env: 'cosine_square'
@@ -124,7 +124,7 @@ single_qubit:
               anh: -270.e+6
               df: 0.0
               phase: 0.0
-      X180:
+      X:
         pulse:
           - channel: Q2.qdrv
             env: 'cosine_square'
@@ -147,7 +147,7 @@ single_qubit:
               amp: 0.1
               phase: 0.0
               ramp_fraction: 0.25
-      X180:
+      X:
         pulse:
           - channel: Q2.qdrv
             env: 'cosine_square'
@@ -173,7 +173,7 @@ single_qubit:
               anh: -270.e+6
               df: 0.0
               phase: 0.0
-      X180:
+      X:
         pulse:
           - channel: Q3.qdrv
             env: 'cosine_square'
@@ -196,7 +196,7 @@ single_qubit:
               amp: 0.1
               phase: 0.0
               ramp_fraction: 0.25
-      X180:
+      X:
         pulse:
           - channel: Q3.qdrv
             env: 'cosine_square'
@@ -222,7 +222,7 @@ single_qubit:
               anh: -270.e+6
               df: 0.0
               phase: 0.0
-      X180:
+      X:
         pulse:
           - channel: Q4.qdrv
             env: 'cosine_square'
@@ -245,7 +245,7 @@ single_qubit:
               amp: 0.1
               phase: 0.0
               ramp_fraction: 0.25
-      X180:
+      X:
         pulse:
           - channel: Q4.qdrv
             env: 'cosine_square'
@@ -271,7 +271,7 @@ single_qubit:
               anh: -270.e+6
               df: 0.0
               phase: 0.0
-      X180:
+      X:
         pulse:
           - channel: Q5.qdrv
             env: 'cosine_square'
@@ -294,7 +294,7 @@ single_qubit:
               amp: 0.1
               phase: 0.0
               ramp_fraction: 0.25
-      X180:
+      X:
         pulse:
           - channel: Q5.qdrv
             env: 'cosine_square'
@@ -320,7 +320,7 @@ single_qubit:
               anh: -270.e+6
               df: 0.0
               phase: 0.0
-      X180:
+      X:
         pulse:
           - channel: Q6.qdrv
             env: 'cosine_square'
@@ -343,7 +343,7 @@ single_qubit:
               amp: 0.1
               phase: 0.0
               ramp_fraction: 0.25
-      X180:
+      X:
         pulse:
           - channel: Q6.qdrv
             env: 'cosine_square'
@@ -369,7 +369,7 @@ single_qubit:
               anh: -270.e+6
               df: 0.0
               phase: 0.0
-      X180:
+      X:
         pulse:
           - channel: Q7.qdrv
             env: 'cosine_square'
@@ -392,7 +392,7 @@ single_qubit:
               amp: 0.1
               phase: 0.0
               ramp_fraction: 0.25
-      X180:
+      X:
         pulse:
           - channel: Q7.qdrv
             env: 'cosine_square'
@@ -656,7 +656,7 @@ readout:
     amp: 0.0305
     freq: 6785153568.914835
   7:
-    channel: 8
+    channel: 0
     amp: 0.93
     freq: 6835470849.262068
   esp:

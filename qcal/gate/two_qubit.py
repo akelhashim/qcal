@@ -12,9 +12,9 @@ from numpy.typing import NDArray
 from typing import List, Tuple, Union
 
 
-__all__ = [
-    'CNot', 'CX', 'CY', 'CZ', 'CH', 'M', 'MS',
-    'DCNot', 'fSWAP', 'iSWAP', 
+__all__ = (
+    'CNOT', 'CX', 'CY', 'CZ', 'CH', 'M', 'MS',
+    'DCNOT', 'fSWAP', 'iSWAP', 
     'SWAP',
     'XX', 'YY', 'ZZ',
     'CPhase', 'CS', 'CSdag', 'CT', 'CTdag', 'CRot', 'Barenco', 'CV',
@@ -23,25 +23,26 @@ __all__ = [
     'pSWAP', 'QFT2',
     'BGate', 'ECP', 'WGate', 'AGate',
     'FSim', 'Syc'
-]
+)
 
-paulis = [np.kron(id, id),
-          np.kron(id, x),
-          np.kron(id, y),
-          np.kron(id, z),
-          np.kron(x, id),
-          np.kron(x, x),
-          np.kron(x, y),
-          np.kron(x, z),
-          np.kron(y, id),
-          np.kron(y, x),
-          np.kron(y, y),
-          np.kron(y, z),
-          np.kron(z, id),
-          np.kron(z, x),
-          np.kron(z, y),
-          np.kron(z, z)
-]
+paulis = (
+    np.kron(id, id),
+    np.kron(id, x),
+    np.kron(id, y),
+    np.kron(id, z),
+    np.kron(x, id),
+    np.kron(x, x),
+    np.kron(x, y),
+    np.kron(x, z),
+    np.kron(y, id),
+    np.kron(y, x),
+    np.kron(y, y),
+    np.kron(y, z),
+    np.kron(z, id),
+    np.kron(z, x),
+    np.kron(z, y),
+    np.kron(z, z)
+)
 
 
 b_gate = berkeley = np.sqrt(2 - np.sqrt(2)) / 2 * np.array([
@@ -450,7 +451,7 @@ class CH(Gate):
         self._properties['name'] = 'CH'
 
 
-class CNot(Gate):
+class CNOT(Gate):
     """Class for the Controlled-Not gate."""
 
     def __init__(self, qubits: Tuple = (0, 1)) -> None:
@@ -462,7 +463,7 @@ class CNot(Gate):
         super().__init__(cnot, qubits)
         self._properties['alias'] = 'CX'
         self._properties['locally_equivalent'] = 'CY, CZ'
-        self._properties['name'] = 'CNot'
+        self._properties['name'] = 'CNOT'
 
 
 class CPhase(Gate):
@@ -598,7 +599,7 @@ class CTdag(Gate):
     
 
 class CV(Gate):
-    """Class for the Controlled-V (Square-root CNot) gate."""
+    """Class for the Controlled-V (Square-root CNOT) gate."""
 
     def __init__(self, qubits: Tuple = (0, 1)) -> None:
         """Initialize using the cv gate.
@@ -607,7 +608,7 @@ class CV(Gate):
             qubits (int | tuple): qubit labels. Defaults to (0, 1).
         """
         super().__init__(cv, qubits)
-        self._properties['alias'] = 'SqrtCNot'
+        self._properties['alias'] = 'SqrtCNOT'
         self._properties['locally_equivalent'] = 'CVdag'
         self._properties['name'] = 'CV'
         self._properties['params'] = {
@@ -625,7 +626,7 @@ class CX(Gate):
             qubits (int | tuple): qubit labels. Defaults to (0, 1).
         """
         super().__init__(cx, qubits)
-        self._properties['alias'] = 'CNot'
+        self._properties['alias'] = 'CNOT'
         self._properties['locally_equivalent'] = 'CY, CZ'
         self._properties['name'] = 'CX'
         self._properties['params'] = {
@@ -681,7 +682,7 @@ class DB(Gate):
         self._properties['name'] = 'DB'
     
 
-class DCNot(Gate):
+class DCNOT(Gate):
     """Class for the Double Controlled-NOT gate."""
 
     def __init__(self, qubits: Tuple = (0, 1)) -> None:
@@ -692,7 +693,7 @@ class DCNot(Gate):
         """
         super().__init__(dcnot, qubits)
         self._properties['locally_equivalent'] = 'fSWAP, iSWAP'
-        self._properties['name'] = 'DCNot'
+        self._properties['name'] = 'DCNOT'
     
 
 class ECP(Gate):
@@ -742,7 +743,7 @@ class fSWAP(Gate):
             qubits (int | tuple): qubit labels. Defaults to (0, 1).
         """
         super().__init__(fswap, qubits)
-        self._properties['locally_equivalent'] = 'iSWAP, DCNot'
+        self._properties['locally_equivalent'] = 'iSWAP, DCNOT'
         self._properties['name'] = 'fSWAP'
     
 
@@ -777,7 +778,7 @@ class iSWAP(Gate):
             qubits (int | tuple): qubit labels. Defaults to (0, 1).
         """
         super().__init__(iswap, qubits)
-        self._properties['locally_equivalent'] = 'fSWAP, DCNot'
+        self._properties['locally_equivalent'] = 'fSWAP, DCNOT'
         self._properties['name'] = 'iSWAP'
     
 
