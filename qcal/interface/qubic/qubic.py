@@ -34,18 +34,21 @@ def add_reset(
         reset_circuit = []
         for _ in range(config.reset.reset.active.n_resets):
             for q in qubits:
-                add_measurement(config, q, reset_circuit)  # TODO: ESP
+                add_measurement(config, q, reset_circuit)
                 reset_circuit.append(
                     {'name': 'branch_fproc',
                      'alu_cond': 'eq',
                      'cond_lhs': 1,
                      'func_id': int(config.readout[q].channel),
-                     'scope': [f'Q{q}'],  # TODO: replace with qubit channel
-                        'true': [  # Why delay?
-                            {'name': 'delay', 't': 200.e-9, 'qubit': [f'Q{q}']}
-                        ] + [
+                     'scope': [f'Q{q}'],
+                        'true': [
+                            {'name': 'delay', 
+                             't': config.reset.reset.active.feedback_delay, 
+                             'qubit': [f'Q{q}']
+                            }
+                        ] + 
+                        [
                             {'name': 'pulse',
-                             # TODO: make compatible with qutrit reset
                              'freq': config.single_qubit[q]['GE'].freq[0],
                              'amp': 1.0,
                              'dest': pulse['channel'], 
@@ -87,7 +90,7 @@ def add_heralding(
         qubits (List | Tuple): qubits to reset.
         circuit (List):        qubic circuit.
     """
-    for q in qubits: # TODO: Pass multiple qubits in the same list?
+    for q in qubits:
         add_measurement(config, q, circuit)
 
     circuit.extend((
@@ -113,49 +116,85 @@ def add_measurement(
     elif isinstance(qubit_or_gate, Gate):
         qubit = qubit_or_gate.qubits[0]
 
-    circuit.append({'name': 'read', 'qubit': [f'Q{qubit}']})
-    # circuit.extend((
-    #         {'name': 'pulse',
-    #          'dest': f'Q{qubit}.rdrv',
-    #          'freq': config.readout[qubit].freq,
-    #          'amp': 1.0, 
-    #          'phase': 0.0,
-    #          'twidth': config.readout[qubit].length,
-    #          'env': pulse_envelopes[config.readout[qubit].env](
-    #                 config.readout[qubit].length,
-    #                 config.readout[qubit].sample_rate,
-    #                 amp=config.readout[qubit].amp,
-    #                 **config.readout[qubit].kwargs
-    #             )
-    #         },
-    #         {'name': 'pulse', # Is this right?
-    #          'dest': f'Q{qubit}.rdlo',
-    #          'freq': config.readout[qubit].freq,
-    #          'amp': 1.0,
-    #          'phase': 1.4806632895920675,  # <-- What is this phase?
-    #          'twidth': config.readout[qubit].length,
-    #          't0': 6e-07,  # <-- Hardcoded? Readout delay?
-    #          'env': pulse_envelopes['square'](
-    #                 config.readout[qubit].length,
-    #                 config.readout[qubit].sample_rate,
-    #             )
-    #         }
-    #     )
-    # )
+    # Excited state promotion
+    if config.parameters['readout']['esp']['enable']:
+        # TODO: add X90 capability
+        if qubit in config.parameters['readout']['esp']['qubits']:
+            circuit.extend([
+                    {'name': 'pulse',
+                     'freq': config.single_qubit[qubit].EF.freq[0],
+                     'amp': 1.0,
+                     'dest': pulse['channel'], 
+                     'phase': 0.0,
+                     'twidth': pulse['length'],
+                     'env': pulse_envelopes[pulse['env']](
+                     pulse['length'],
+                     config.hardware.loc['DAC_sample_rate'][0],
+                     **pulse['kwargs']
+                    )
+                }
+            for pulse in config.single_qubit[qubit].EF.X.pulse
+            ]
+        )
+        
+        else:
+            length = 0.
+            for pulse in config.single_qubit[qubit].EF.X.pulse:
+                length += pulse['length']
+            circuit.append(
+                {'name': 'delay',
+                 't': length,
+                 'qubit': [f'Q{qubit}']
+                }
+            )
+        
+        circuit.append({'name': 'barrier', 'qubit': [f'Q{qubit}']})
+
+    circuit.extend((
+            {'name': 'pulse',
+             'dest': f'Q{qubit}.rdrv',
+             'freq': config.readout[qubit].freq,
+             'amp': 1.0, 
+             'phase': 0.0,
+             'twidth': config.readout[qubit].length,
+             'env': pulse_envelopes[config.readout[qubit].env](
+                    config.readout[qubit].length,
+                    config.readout[qubit].sample_rate,
+                    amp=config.readout[qubit].amp,
+                    **config.readout[qubit].kwargs
+                )
+            },
+            {'name': 'delay',
+             't': config.parameters['readout']['delay'],
+             'qubit': [f'Q{qubit}.rdlo']
+            },
+            {'name': 'pulse',
+             'dest': f'Q{qubit}.rdlo',
+             'freq': config.readout[qubit].freq,
+             'amp': 1.0,
+             'phase': config.readout[qubit].phase,  # Rotation in IQ plane
+             'twidth': config.readout[qubit].length,
+             'env': pulse_envelopes['square'](
+                    config.readout[qubit].length,
+                    config.readout[qubit].sample_rate,
+                )
+            }
+        )
+    )
 
 
-def add_virtualz_gate(config: Config, gate: Gate, circuit: List):
+def add_virtualz_gate(config: Config, gate: Gate, circuit: List) -> None:
     """Add a virtual Z gate.
 
     Args:
         config (Config): config object.
-        gate (Gate):     VirtualZ gate.
+        gate (Gate):     Z-type gate.
         circuit (List):  qubic circuit.
     """
     circuit.append(
         {'name': 'virtualz',
          'qubit': [f'Q{gate.qubits[0]}'],
-        #  'freq': config.single_qubit[gate.qubits[0]][subspace].freq[0]
+        #  'freq': config.single_qubit[gate.qubits[0]][subspace].freq[0],
          'phase': gate.properties['params']['phase']}
     )
 
@@ -234,18 +273,18 @@ def add_multi_qubit_gate(config: Config, gate: Gate, circuit: List) -> None:
             )
 
 
-def compilation_error(*args):
-    """Generic compilation error.
+def transpilation_error(*args):
+    """Generic transpilation error.
 
     Raises:
-        Exception: compilation error for non-native gate.
+        Exception: transpilation error for non-native gate.
     """
     raise Exception(
-        f'Cannot compile! {args[1].name} is a non-native gate.'
+        f'Cannot transpile {args[1].name}! is a non-native gate.'
     ) 
 
 
-def compile(
+def to_qubic(
         config: Config, circuit: Circuit, gate_mapper: defaultdict
     ) -> List:
     """Compile a qcal circuit to a qubic circuit.
@@ -283,29 +322,42 @@ def compile(
     return qubic_circuit
 
 
-class Compiler:
-    """Generic qubic compiler."""
+class Transpiler:
+    """Generic qubic Transpiler."""
 
     __slots__ = ('_config', '_gate_mapper')
 
-    def __init__(self, config: Config) -> None:
+    def __init__(
+            self, config: Config, gate_mapper: defaultdict | None = None
+        ) -> None:
         """Initialize with a qcal config object.
 
         Args:
-            config (Config): config object.
+            config (Config): qcal config object.
+            gate_mapper (defaultdict | None, optional): dictionar which maps
+                circuit gates to Qubic gates. Defaults to None.
         """
         self._config = config
         
-        self._gate_mapper = defaultdict(lambda: compilation_error,
-            {'Meas':     add_measurement,
-             'VirtualZ': add_virtualz_gate
-            }
-        )
-        for gate in config.basis_gates['set']:
-            if gate in qcal.gate.single_qubit.__all__:
-                self._gate_mapper[gate] = add_single_qubit_gate
-            else:
-                self._gate_mapper[gate] = add_multi_qubit_gate
+        if gate_mapper is None:
+            self._gate_mapper = defaultdict(lambda: transpilation_error,
+                {'Meas':     add_measurement,
+                 'Rz':       add_virtualz_gate,
+                 'S':        add_virtualz_gate,
+                 'Sdag':     add_virtualz_gate,
+                 'T':        add_virtualz_gate,
+                 'Tdag':     add_virtualz_gate,
+                 'VirtualZ': add_virtualz_gate,
+                 'Z':        add_virtualz_gate,
+                }
+            )
+            for gate in config.basis_gates['set']:
+                if gate in qcal.gate.single_qubit.__all__:
+                    self._gate_mapper[gate] = add_single_qubit_gate
+                else:
+                    self._gate_mapper[gate] = add_multi_qubit_gate
+        else:
+            self._gate_mapper = gate_mapper
 
     @property
     def config(self) -> Config:
@@ -327,17 +379,17 @@ class Compiler:
         """
         return self._gate_mapper
 
-    def compile(self, circuits: List[Circuit]) -> List[Dict]:
-        """Compile all circuits.
+    def transpile(self, circuits: List[Circuit]) -> List[Dict]:
+        """Transpile all circuits.
 
         Args:
-            circuits (List[Circuit]): circuits to compile.
+            circuits (List[Circuit]): circuits to transpile.
 
         Returns:
             List[Dict]: compiled circuits.
         """
         compiled_circuits = [
-            compile(
+            to_qubic(
                 self._config, circuit, self._gate_mapper
             ) for circuit in circuits
         ]

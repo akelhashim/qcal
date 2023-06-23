@@ -383,7 +383,7 @@ class Rz(Gate):
         super().__init__(rz(theta), qubit)
         self._properties['name'] = 'Rz'
         self._properties['params'] = {
-            'angle': theta,
+            'phase': theta,
             'axis':  'z',
         }
     
@@ -401,7 +401,7 @@ class S(Gate):
         self._properties['alias'] = 'sqrt(Z)\nZ90'
         self._properties['name'] = 'S'
         self._properties['params'] = {
-            'angle': np.pi/2,
+            'phase': np.pi/2,
             'axis':  'z',
         }
     
@@ -419,7 +419,7 @@ class Sdag(Gate):
         self._properties['alias'] = 'SqrtZdag\nZ-90'
         self._properties['name'] = 'Sdag'
         self._properties['params'] = {
-            'angle': -np.pi/2,
+            'phase': -np.pi/2,
             'axis':  'z',
         }
     
@@ -437,7 +437,7 @@ class T(Gate):
         self._properties['alias'] = 'Z^(1/4)'
         self._properties['name'] = 'T'
         self._properties['params'] = {
-            'angle': np.pi/4,
+            'phase': np.pi/4,
             'axis':  'z',
         }
     
@@ -455,7 +455,7 @@ class Tdag(Gate):
         self._properties['alias'] = 'Z^(1/4)dag'
         self._properties['name'] = 'Tdag'
         self._properties['params'] = {
-            'angle': -np.pi/4,
+            'phase': -np.pi/4,
             'axis':  'z',
         }
     
@@ -623,7 +623,7 @@ class Z(Gate):
         super().__init__(z, qubit)
         self._properties['name'] = 'Z'
         self._properties['params'] = {
-            'angle': np.pi,
+            'phase': np.pi,
             'axis':  'z',
         }
 

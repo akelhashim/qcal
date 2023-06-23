@@ -631,34 +631,42 @@ readout:
     channel: 7
     amp: 0.019724226371142798
     freq: 6554368952.374638
+    phase: 0.0
   1:
     channel: 4
     amp: 0.01829905189877411
     freq: 6558439922.632911
+    phase: 0.0
   2:
     channel: 1
     amp: 0.016645073053349783
     freq: 6658008967.32158
+    phase: 0.0
   3:
     channel: 3
     amp: 0.017906057102356918
     freq: 6700134795.120309
+    phase: 0.0
   4:
     channel: 5
     amp: 0.016127662739686993
     freq: 6711440184.690463
+    phase: 0.0
   5:
     channel: 6
     amp: 0.0183
     freq: 6708160370.806432
+    phase: 0.0
   6:
     channel: 2
     amp: 0.0305
     freq: 6785153568.914835
+    phase: 0.0
   7:
     channel: 0
     amp: 0.93
     freq: 6835470849.262068
+    phase: 0.0
   esp:
     enable: True
     qubits:
@@ -670,7 +678,7 @@ readout:
       - 5
       - 6
       - 7
-  delay: 0.0
+  delay: 6.e-07
   herald: True
   length: 1.0e-6
   reset: 1.e+5
@@ -683,8 +691,9 @@ reset:
   active:
     enable: False
     n_resets: 10
+    feedback_delay: 2.e-7
   passive:
-    delay: 5.e-4
+    delay: 5.e-4 
 hardware:
   ADC_sample_rate: 
   DAC_sample_rate: 8.e+9

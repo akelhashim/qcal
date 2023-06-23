@@ -54,26 +54,6 @@ def nested_index(dictionary: Dict, n_levels: int = 2) -> List[List]:
 
     itterdict(dictionary, index, 0)
 
-    # for key, value in dictionary.items():
-    #     if isinstance(value, dict):
-    #         index[0].extend([key] * len(value))
-
-    #         for k, v in value.items():
-    #             if isinstance(v, dict):
-    #                 index[1].extend([k] * len(v))
-    #                 for k in v.keys():
-    #                     index[2].append(k)
-
-    #             else:
-    #                 index[1].append(k)
-    #                 for n in range(2, n_levels):
-    #                     index[n].append('')
-            
-    #     else:
-    #         index[0].append(key)
-    #         for n in range(1, n_levels):
-    #             index[n].append('')
-
     return index
 
 

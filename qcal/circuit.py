@@ -370,7 +370,8 @@ class Circuit:
         else:
             assert (
                 isinstance(cycle_or_layer, Cycle) or 
-                isinstance(cycle_or_layer, Layer)
+                isinstance(cycle_or_layer, Layer) or
+                isinstance(cycle_or_layer, Barrier)
             ), "cycle_or_layer must be a Cycle or Layer object!"
         self._cycles.append(cycle_or_layer)
         self._update_qubits()
@@ -460,11 +461,13 @@ class Circuit:
         meas_cycle = Cycle([Meas(q, b) for q, b in zip(qubits, basis)])
         if all([meas.properties['params']['basis'].upper() == 'Z' for meas in 
                 meas_cycle]):
+            self.append(Barrier(tuple(q for q in self.qubits)))
             self.append(meas_cycle)
         else:
             self.append(
                 Cycle([basis_rotation(meas) for meas in meas_cycle])
             )
+            self.append(Barrier(tuple(q for q in self.qubits)))
             self.append(meas_cycle)
 
     def pop(self) -> None:
