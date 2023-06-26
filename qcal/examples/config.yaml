@@ -668,7 +668,7 @@ readout:
     freq: 6835470849.262068
     phase: 0.0
   esp:
-    enable: True
+    enable: False
     qubits:
       - 0
       - 1
@@ -689,8 +689,8 @@ readout:
     ramp_fraction: 0.25
 reset:
   active:
-    enable: False
-    n_resets: 10
+    enable: True
+    n_resets: 1
     feedback_delay: 2.e-7
   passive:
     delay: 5.e-4 
