@@ -659,7 +659,7 @@ class CircuitSet:
         """Appends circuit(s) to the circuit collection."""
         if not isinstance(circuits, CircuitSet):
             circuits = CircuitSet(circuits, index)
-        self._df = pd.concat([self._df, circuits.df],
+        self._df = pd.concat([self._df, circuits._df],
                             ignore_index=True if index is None else False)
         return self._df
 

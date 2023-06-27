@@ -679,10 +679,10 @@ readout:
       - 6
       - 7
   delay: 6.e-07
-  herald: True
+  herald: False
   length: 1.0e-6
   reset: 1.e+5
-  sample_rate: 8.e+9
+  sample_rate: 5.e+8
   env: cosine_square
   kwargs:
     phase: 0.0

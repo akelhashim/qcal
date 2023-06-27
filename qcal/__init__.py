@@ -8,4 +8,4 @@ from qcal.circuit import *
 
 from qcal.config import Config
 
-from qcal import interface
+# from qcal import interface

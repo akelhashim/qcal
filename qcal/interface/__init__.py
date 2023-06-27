@@ -1,1 +1,1 @@
-from .qubic import qubic
+# from .qubic import qubic_transpiler
