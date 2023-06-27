@@ -4,7 +4,7 @@ import numpy as np
 
 from matplotlib.patches import FancyArrowPatch, Circle
 from mpl_toolkits.mplot3d import proj3d
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, AnyStr
 
 
 class Arrow3D(FancyArrowPatch):
@@ -280,30 +280,21 @@ class BlochSphere:
                 self.ax2.set_yticklabels([-1, -0.5, 0, 0.5, 1],
                                          fontsize=self.tick_label_fontsize)
 
-    def add_points(self, points, color=None, label=None, linewidth=1.5, 
-                   size=None) -> None:
+    def add_points(self, points: List, color: str = None, label: str = None, 
+                   linewidth: float = 1.5, size: float = None) -> None:
         """Adds points to the Bloch sphere.
 
         Args:
-            points (list[list]): [x, y, z] coordinates for a point. Each can be an individual list of multiple coordinates for multiple points.
-            color (_type_, optional): _description_. Defaults to None.
-            label (_type_, optional): _description_. Defaults to None.
-            linewidth (float, optional): _description_. Defaults to 1.5.
-            size (_type_, optional): _description_. Defaults to None.
-        """
-        """Adds points to the Bloch sphere.
-
-        :param points: [x, y, z] coordinates for a point
-            Each can be an individual list of multiple coordinates for multiple points.
-        :type points: list|np.array
-        :param color: color of points for scatter point (default: None)
-        :type color: None|str|RGB
-        :param label: label of the points for the legend (default: None)
-        :type label: None|str
-        :param linewidth: width of the edgecolor around the points
-        :type linewidth: int|float
-        :param size: size of the scatter points
-        :type size: int|float
+            points (list[list]): [x, y, z] coordinates for a point. Each can be
+                an individual list of multiple coordinates for multiple points.
+            color (str, RGB, optional): color of points for scatter point. 
+                Defaults to None.
+            label (str, optional): label of the points for the legend. 
+                Defaults to None.
+            linewidth (float, int, optional): width of the edgecolor around the 
+                points. Defaults to 1.5.
+            size (float, int, optional): size of the scatter points. Defaults 
+                to None.
         """
         if self.fig is None:
             self.draw_bloch_sphere()
@@ -313,46 +304,66 @@ class BlochSphere:
 
         x, y, z = points
         if color is None:
-            sc = self.ax.scatter3D(x, y, z, alpha=self.point_alpha, edgecolor=self.point_edgecolor,
-                                   lw=linewidth, label=label, s=self.point_size if size is None else size)
+            sc = self.ax.scatter3D(x, y, z, 
+                                   alpha=self.point_alpha, 
+                                   edgecolor=self.point_edgecolor,
+                                   lw=linewidth, label=label, 
+                                   s=self.point_size if size is None else size)
             color = sc.get_facecolor()
         else:
-            self.ax.scatter3D(x, y, z, color=color, alpha=self.point_alpha, edgecolor=self.point_edgecolor,
-                              lw=linewidth, label=label, s=self.point_size if size is None else size)
+            self.ax.scatter3D(x, y, z, 
+                              color=color, alpha=self.point_alpha,
+                              edgecolor=self.point_edgecolor, lw=linewidth, 
+                              label=label,
+                              s=self.point_size if size is None else size)
 
         if self.xy_projection is True:
 
             if self.show_3d_projection is True:
-                self.ax.scatter(x, y, zs=-1, zdir='z', color=color, alpha=self.point_alpha,
-                                edgecolor=self.point_edgecolor, lw=linewidth, zorder=self.zorder,
+                self.ax.scatter(x, y, 
+                                zs=-1, zdir='z', color=color, 
+                                alpha=self.point_alpha,
+                                edgecolor=self.point_edgecolor, lw=linewidth, 
+                                zorder=self.zorder,
                                 s=self.point_size if size is None else size)
 
             if self.plot_2d_slice is True:
-                self.ax1.scatter(x, y, color=color, alpha=self.point_alpha,
+                self.ax1.scatter(x, y, 
+                                 color=color, alpha=self.point_alpha,
                                  edgecolor=self.point_edgecolor, lw=linewidth,
                                  s=self.point_size if size is None else size)
 
         if self.yz_projection is True:
 
             if self.show_3d_projection is True:
-                self.ax.scatter(y, z, zs=-1*self.sign_yz, zdir='x', color=color,
-                                alpha=self.point_alpha, edgecolor=self.point_edgecolor, lw=linewidth,
-                                zorder=self.zorder, s=self.point_size if size is None else size)
+                self.ax.scatter(y, z, 
+                                zs=-1*self.sign_yz, zdir='x', color=color,
+                                alpha=self.point_alpha, 
+                                edgecolor=self.point_edgecolor, lw=linewidth,
+                                zorder=self.zorder, 
+                                s=self.point_size if size is None else size)
 
             if self.plot_2d_slice is True:
-                self.ax3.scatter(y, z, color=color, alpha=self.point_alpha,
-                                 edgecolor=self.point_edgecolor, lw=linewidth, s=self.point_size if size is None else size)
+                self.ax3.scatter(y, z, 
+                                 color=color, alpha=self.point_alpha,
+                                 edgecolor=self.point_edgecolor, lw=linewidth, 
+                                 s=self.point_size if size is None else size)
 
         if self.zx_projection is True:
 
             if self.show_3d_projection is True:
-                self.ax.scatter(x, z, zs=-1*self.sign_zx, zdir='y', color=color,
-                                alpha=self.point_alpha, edgecolor=self.point_edgecolor, lw=linewidth,
-                                zorder=self.zorder, s=self.point_size if size is None else size)
+                self.ax.scatter(x, z, 
+                                zs=-1*self.sign_zx, zdir='y', color=color,
+                                alpha=self.point_alpha, 
+                                edgecolor=self.point_edgecolor, lw=linewidth,
+                                zorder=self.zorder, 
+                                s=self.point_size if size is None else size)
 
             if self.plot_2d_slice is True:
-                self.ax2.scatter(x, z, color=color, alpha=self.point_alpha,
-                                 edgecolor=self.point_edgecolor, lw=linewidth, s=self.point_size if size is None else size)
+                self.ax2.scatter(x, z, 
+                                 color=color, alpha=self.point_alpha,
+                                 edgecolor=self.point_edgecolor, lw=linewidth, 
+                                 s=self.point_size if size is None else size)
 
         self.zorder += 1
 

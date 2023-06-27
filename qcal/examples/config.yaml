@@ -60,7 +60,7 @@ single_qubit:
               ramp_fraction: 0.25
   1:
     GE:
-      freq: 4461736318.073627
+      freq: 4675260858.059634
       T1:
       T2*:
       T2e:
@@ -85,7 +85,7 @@ single_qubit:
               phase: 0.0
               ramp_fraction: 0.25
     EF:
-      freq: 4181258902.85729
+      freq: 4400700000.0
       T1:
       T2*:
       T2e:
@@ -109,7 +109,7 @@ single_qubit:
               ramp_fraction: 0.25
   2:
     GE:
-      freq: 4461736318.073627
+      freq: 4944461837.827577
       T1:
       T2*:
       T2e:
@@ -134,7 +134,7 @@ single_qubit:
               phase: 0.0
               ramp_fraction: 0.25
     EF:
-      freq: 4181258902.85729
+      freq: 4672600000.0
       T1:
       T2*:
       T2e:
@@ -158,7 +158,7 @@ single_qubit:
               ramp_fraction: 0.25
   3:
     GE:
-      freq: 4461736318.073627
+      freq: 5114911040.024481
       T1:
       T2*:
       T2e:
@@ -183,7 +183,7 @@ single_qubit:
               phase: 0.0
               ramp_fraction: 0.25
     EF:
-      freq: 4181258902.85729
+      freq: 4849300000.0
       T1:
       T2*:
       T2e:
@@ -207,7 +207,7 @@ single_qubit:
               ramp_fraction: 0.25
   4:
     GE:
-      freq: 4461736318.073627
+      freq: 5350927547.979777
       T1:
       T2*:
       T2e:
@@ -232,7 +232,7 @@ single_qubit:
               phase: 0.0
               ramp_fraction: 0.25
     EF:
-      freq: 4181258902.85729
+      freq: 5089500000.0
       T1:
       T2*:
       T2e:
@@ -256,7 +256,7 @@ single_qubit:
               ramp_fraction: 0.25
   5:
     GE:
-      freq: 4461736318.073627
+      freq: 5581471962.572675
       T1:
       T2*:
       T2e:
@@ -281,7 +281,7 @@ single_qubit:
               phase: 0.0
               ramp_fraction: 0.25
     EF:
-      freq: 4181258902.85729
+      freq: 5263900000.0
       T1:
       T2*:
       T2e:
@@ -305,7 +305,7 @@ single_qubit:
               ramp_fraction: 0.25
   6:
     GE:
-      freq: 4461736318.073627
+      freq: 5880552778.000434
       T1:
       T2*:
       T2e:
@@ -330,7 +330,7 @@ single_qubit:
               phase: 0.0
               ramp_fraction: 0.25
     EF:
-      freq: 4181258902.85729
+      freq: 5615900000.0
       T1:
       T2*:
       T2e:
@@ -354,7 +354,7 @@ single_qubit:
               ramp_fraction: 0.25
   7:
     GE:
-      freq: 4461736318.073627
+      freq: 5621010772.789028
       T1:
       T2*:
       T2e:
@@ -379,7 +379,7 @@ single_qubit:
               phase: 0.0
               ramp_fraction: 0.25
     EF:
-      freq: 4181258902.85729
+      freq: 5356000000.0
       T1:
       T2*:
       T2e:
@@ -404,7 +404,7 @@ single_qubit:
 two_qubit:
   (0, 1):
     CZ:
-      freq: -391492904
+      freq: 4.43e+9
       pulse:
         - channel: Q0.qdrv
           env: cosine_square
@@ -432,7 +432,7 @@ two_qubit:
             phase: 0.0
   (1, 2):
     CZ:
-      freq: -391492904
+      freq: 4.63e+9
       pulse:
         - channel: Q1.qdrv
           env: cosine_square
@@ -460,7 +460,7 @@ two_qubit:
             phase: 0.0
   (2, 3):
     CZ:
-      freq: -391492904
+      freq: 4.9e+9
       pulse:
         - channel: Q2.qdrv
           env: cosine_square
@@ -488,7 +488,7 @@ two_qubit:
             phase: 0.0
   (3, 4):
     CZ:
-      freq: -391492904
+      freq: 5.03e+9
       pulse:
         - channel: Q3.qdrv
           env: cosine_square
@@ -516,7 +516,7 @@ two_qubit:
             phase: 0.0
   (4, 5):
     CZ:
-      freq: -391492904
+      freq: 5.3e+9
       pulse:
         - channel: Q4.qdrv
           env: cosine_square
@@ -544,7 +544,7 @@ two_qubit:
             phase: 0.0
   (5, 6):
     CZ:
-      freq: -391492904
+      freq: 5.5e+9
       pulse:
         - channel: Q5.qdrv
           env: cosine_square
@@ -572,7 +572,7 @@ two_qubit:
             phase: 0.0
   (6, 7):
     CZ:
-      freq: -391492904
+      freq: 5.55e+9
       pulse:
         - channel: Q6.qdrv
           env: cosine_square
@@ -600,7 +600,7 @@ two_qubit:
             phase: 0.0
   (7, 0):
     CZ:
-      freq: -391492904
+      freq: 4.9e+9
       pulse:
         - channel: Q7.qdrv
           env: cosine_square
@@ -631,7 +631,7 @@ readout:
     channel: 7
     amp: 0.019724226371142798
     freq: 6554368952.374638
-    phase: 0.0
+    phase: 1.4806632895920675
   1:
     channel: 4
     amp: 0.01829905189877411
@@ -646,27 +646,27 @@ readout:
     channel: 3
     amp: 0.017906057102356918
     freq: 6700134795.120309
-    phase: 0.0
+    phase: 1.7667152004688211
   4:
     channel: 5
     amp: 0.016127662739686993
     freq: 6711440184.690463
-    phase: 0.0
+    phase: 3.624878768638384
   5:
     channel: 6
     amp: 0.0183
-    freq: 6708160370.806432
-    phase: 0.0
+    freq: 6709360370.806432
+    phase: 6.275011358862511
   6:
     channel: 2
     amp: 0.0305
     freq: 6785153568.914835
-    phase: 0.0
+    phase: 0.9312892237695153
   7:
     channel: 0
-    amp: 0.93
+    amp: 0.014136
     freq: 6835470849.262068
-    phase: 0.0
+    phase: 4.256638268772688
   esp:
     enable: False
     qubits:
@@ -680,7 +680,7 @@ readout:
       - 7
   delay: 6.e-07
   herald: False
-  length: 1.0e-6
+  length: 4.0e-6
   reset: 1.e+5
   sample_rate: 5.e+8
   env: cosine_square
@@ -689,7 +689,7 @@ readout:
     ramp_fraction: 0.25
 reset:
   active:
-    enable: True
+    enable: False
     n_resets: 1
     feedback_delay: 2.e-7
   passive:
