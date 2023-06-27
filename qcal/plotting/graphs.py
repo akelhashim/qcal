@@ -112,7 +112,8 @@ def draw_circuit(circuit: Circuit, show: bool = True):
     node_trace.text = node_text
 
     edge_traces = []
-    for i in range(circuit.circuit_width):
+    q0 = circuit.qubits[0]
+    for i in range(q0, circuit.circuit_width + q0):
         edge_x = []
         for j in range(1, circuit.circuit_depth):
             edge_x.extend([j-1, j])

@@ -404,7 +404,7 @@ single_qubit:
 two_qubit:
   (0, 1):
     CZ:
-      freq: -391492904
+      freq: 4.43e+9
       pulse:
         - channel: Q0.qdrv
           env: cosine_square
@@ -432,7 +432,7 @@ two_qubit:
             phase: 0.0
   (1, 2):
     CZ:
-      freq: -391492904
+      freq: 4.63e+9
       pulse:
         - channel: Q1.qdrv
           env: cosine_square
@@ -460,7 +460,7 @@ two_qubit:
             phase: 0.0
   (2, 3):
     CZ:
-      freq: -391492904
+      freq: 4.9e+9
       pulse:
         - channel: Q2.qdrv
           env: cosine_square
@@ -488,7 +488,7 @@ two_qubit:
             phase: 0.0
   (3, 4):
     CZ:
-      freq: -391492904
+      freq: 5.03e+9
       pulse:
         - channel: Q3.qdrv
           env: cosine_square
@@ -516,7 +516,7 @@ two_qubit:
             phase: 0.0
   (4, 5):
     CZ:
-      freq: -391492904
+      freq: 5.3e+9
       pulse:
         - channel: Q4.qdrv
           env: cosine_square
@@ -544,7 +544,7 @@ two_qubit:
             phase: 0.0
   (5, 6):
     CZ:
-      freq: -391492904
+      freq: 5.5e+9
       pulse:
         - channel: Q5.qdrv
           env: cosine_square
@@ -572,7 +572,7 @@ two_qubit:
             phase: 0.0
   (6, 7):
     CZ:
-      freq: -391492904
+      freq: 5.55e+9
       pulse:
         - channel: Q6.qdrv
           env: cosine_square
@@ -600,7 +600,7 @@ two_qubit:
             phase: 0.0
   (7, 0):
     CZ:
-      freq: -391492904
+      freq: 4.9e+9
       pulse:
         - channel: Q7.qdrv
           env: cosine_square

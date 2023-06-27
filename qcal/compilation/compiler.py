@@ -2,15 +2,15 @@
 """
 from qcal.config import Config
 
-import bqskit
-from bqskit import compile
-from bqskit import MachineModel
-from bqskit.ir import Circuit as BqCircuit
-from bqskit.ir.gates import BarrierPlaceholder as BqBarrier
-from bqskit.ir.gates import ConstantUnitaryGate
-from bqskit.ir.gates import (
-    CZGate, XGate, RZGate, SXGate, #ZGate, SGate, SdgGate, TGate, TdgGate
-)
+# import bqskit
+# from bqskit import compile
+# from bqskit import MachineModel
+# from bqskit.ir import Circuit as BqCircuit
+# from bqskit.ir.gates import BarrierPlaceholder as BqBarrier
+# from bqskit.ir.gates import ConstantUnitaryGate
+# from bqskit.ir.gates import (
+#     CZGate, XGate, RZGate, SXGate, #ZGate, SGate, SdgGate, TGate, TdgGate
+# )
 
 import logging
 logger = logging.getLogger(__name__)

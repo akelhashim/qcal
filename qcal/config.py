@@ -357,11 +357,48 @@ class Config:
             except yaml.YAMLError as exc:
                 print(exc)
 
-    def processor(self):
+    def draw_processor(self):
         """Plot a graph displaying the connectivity of the quantum processor.
         """
         from qcal.plotting.graphs import draw_processor
         draw_processor(self)
+
+    def plot_freqs(self):
+        """Plot all qubit, two_qubit and readout frequencies."""
+        from qcal.plotting.frequency import plot_freq_spectrum
+        plot_freq_spectrum(
+            self, 
+            plot_GE=True, 
+            plot_EF=True, # TODO: add checking EF
+            plot_readout=True, 
+            plot_two_qubit=True
+        )
+
+    def plot_qubit_freqs(self, plot_EF: bool = False):
+        """Plot all qubit frequencies.
+
+        Args:
+            plot_EF (bool, optional): plot EF frequencies. Defaults to False.
+        """
+        from qcal.plotting.frequency import plot_freq_spectrum
+        plot_freq_spectrum(
+            self, 
+            plot_GE=True, 
+            plot_EF=plot_EF,
+            plot_readout=False, 
+            plot_two_qubit=False
+        )
+
+    def plot_readout_freqs(self):
+        """Plot all readout frequencies."""
+        from qcal.plotting.frequency import plot_freq_spectrum
+        plot_freq_spectrum(
+            self, 
+            plot_GE=False, 
+            plot_EF=False,
+            plot_readout=True, 
+            plot_two_qubit=False
+        )
 
     def save(self, filename: str = None):
 
