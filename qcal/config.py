@@ -22,7 +22,6 @@ logger = logging.getLogger(__name__)
 __all__ = ['Config']
 
 
-# TODO: make recursive
 def nested_index(dictionary: Dict, n_levels: int = 2) -> List[List]:
     """Returns a nested list for a multi-index Dataframe.
 
