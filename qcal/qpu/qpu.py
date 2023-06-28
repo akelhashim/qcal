@@ -20,7 +20,9 @@ from collections.abc import Iterable
 from IPython.display import clear_output
 from typing import Any, List
 
-logger = logging.getLogger(__name__)
+# logger = logging.getLogger(__name__)
+logger = logging.getLogger('QPU')
+logging.getLogger().setLevel(logging.INFO)
 
 
 __all__ = ['QPU']
@@ -131,8 +133,8 @@ class QPU:
         return self._sequence
     
     def initialize(self, 
-                   circuits: Any | List[Any],
-                   n_shots: int | None = None,
+                   circuits:  Any | List[Any],
+                   n_shots:   int | None = None,
                    n_batches: int | None = None
         ) -> None:
         """Initialize the experiment.
@@ -209,19 +211,23 @@ class QPU:
             return circuits
         
     def generate_sequence(self, circuits: Iterable) -> None:
-        # generate self._sequence
+        """Generate a sequence from circuits."""
+        pass
+
+    def write(self) -> None:
+        """Write the sequence to hardware."""
         pass
 
     def acquire(self) -> None:
-        # measure self._sequence
+        "Measure the sequence."
         pass
 
     def process(self) -> None:
-        # process self._measurement
+        """Post-process the data."""
         pass
 
     def save(self) -> None:
-
+        """Save all circuits."""
         pass
         # filepath = ''  # TODO
         
@@ -237,36 +243,42 @@ class QPU:
         Args:
             circuits (Any): circuits to measure.
         """
+        logger.info(' Compiling circuits...')
         t0 = timeit.default_timer()
         compiled_circuits = self.compile(circuits)
         self._runtime['Compile'][0] += round(
                 timeit.default_timer() - t0, 1
             )
 
+        logger.info(' Transpiling circuits...')
         t0 = timeit.default_timer()
         transpiled_circuits = self.transpile(compiled_circuits)
         self._runtime['Transpile'][0] += round(
                 timeit.default_timer() - t0, 1
             )
         
+        logger.info(' Generating sequences...')
         t0 = timeit.default_timer()
         self.generate_sequence(transpiled_circuits)
         self._runtime['Sequencing'][0] += round(
             timeit.default_timer() - t0, 1
         )
 
+        logger.info(' Writing sequences...')
         t0 = timeit.default_timer()
         self.write()
         self._runtime['Write'][0] += round(
             timeit.default_timer() - t0, 1
         )
 
+        logger.info(' Measuring...')
         t0 = timeit.default_timer()
         self.acquire()
         self._runtime['Measure'][0] += round(
                 timeit.default_timer() - t0, 1
             )
 
+        logger.info(' Processing...')
         t0 = timeit.default_timer()
         self.process()
         self._runtime['Process'][0] += round(
@@ -278,23 +290,23 @@ class QPU:
         n_circ_batches = int(
                 np.ceil(self._circuits.n_circuits / self._n_circs_per_seq)
             )
-        logger.info((
-                f"Dividing {self._circuits.n_circuits} circuits into "
-                f"{n_circ_batches} batches of size {self._n_circs_per_seq}..."
-            ))
+        logger.info(
+            f' Dividing {self._circuits.n_circuits} circuits into '
+            f'{n_circ_batches} batches of size {self._n_circs_per_seq}...'
+        )
         
         for i, circuits in enumerate(
             self._circuits.batch(self._n_circs_per_seq)):
             if i > 4:
                 clear_output(wait=True)
             logger.info(
-                f"Batch {i+1}/{n_circ_batches}: {circuits.n_circuits} circuits"
+                f'Batch {i+1}/{n_circ_batches}: {circuits.n_circuits} circuits'
             )
             self.measure(circuits)
 
     def run(self,
-            circuits: Any | List[Any],
-            n_shots: int | None = None,
+            circuits:  Any | List[Any],
+            n_shots:   int | None = None,
             n_batches: int | None = None
         ) -> None:
         """Run all experimental methods.
@@ -309,7 +321,7 @@ class QPU:
         t_start = timeit.default_timer()
         self.initialize(circuits, n_shots, n_batches)
         
-        if self._circuits.n_circuits <= self._n_circs_per_seq:
+        if self._circuits.n_circuits >= self._n_circs_per_seq:
             logger.info('No batching...')
             self.measure(self._circuits)
         else:
@@ -318,5 +330,5 @@ class QPU:
         self._runtime['Total'][0] += round(timeit.default_timer() - t_start, 1)
 
         clear_output(wait=True)
-        logger.info("Done!")
+        logger.info(" Done!")
         print(f"Runtime: {repr(self._runtime)[8:]}\n")
