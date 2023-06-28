@@ -8,6 +8,8 @@ Basic example useage:
     cfg.parameters   # Returns a dictionary of the entire config
     cfg.processor()  # Plots the processor connectivity
 """
+import qcal.settings as settings
+
 import copy
 import io
 import logging
@@ -100,8 +102,16 @@ class Config:
         if filename is not None:
             self.load(filename)
         else:
-            logger.warning('No configuration file was provided.')
-            self._parameters = {}
+            try:
+                self.load(
+                    settings.Settings.config_directory + 'config.yaml'
+                )
+                self._filename = (
+                    settings.Settings.config_directory + 'config.yaml'
+                )
+            except Exception:
+                logger.warning('No configuration file was provided.')
+                self._parameters = {}
 
     def __call__(self) -> Dict:
         return self._parameters
