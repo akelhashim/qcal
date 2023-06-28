@@ -16,3 +16,7 @@ qcal/__pycache__/
 qcal/plotting/__pycache__/__init__.cpython-39.pyc
 
 *.pyc
+
+build/
+
+qcal.egg-info/
