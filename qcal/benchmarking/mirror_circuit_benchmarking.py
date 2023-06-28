@@ -30,7 +30,7 @@ logger = logging.getLogger(__name__)
 #     else:
 #         globals()[libname] = lib
 
-import pygsti
+# import pygsti
 # from pygsti.io import load_circuit_list, read_circuit_list
 # from qiskit import QuantumCircuit
 
