@@ -111,6 +111,7 @@ class QubicQPU(QPU):
                 reload_freq:         bool = True,
                 reload_env:          bool = True,
                 zero_between_reload: bool = True,
+                gmm_manager               = None,
                 rpc_ip_address:      str = '192.168.1.247'
         ) -> None:
         super().__init__(
@@ -137,6 +138,13 @@ class QubicQPU(QPU):
         self._reload_freq = reload_freq
         self._reload_env = reload_env
         self._zero_between_reload = zero_between_reload
+        self._gmm_manager = gmm_manager
+
+        if gmm_manager == None:
+            logger.warning(
+                'No gmm_manager provided! ' 
+                'Measurements will fit to their own gmm.'
+            )
 
         # self._fpga_config = qubic.rfsoc.hwconfig.FPGAConfig(
         self._fpga_config = FPGAConfig(
@@ -158,7 +166,11 @@ class QubicQPU(QPU):
         self._runner = rpc_client.CircuitRunnerClient(ip=rpc_ip_address)
         # self._jobman = qubic.job_manager.JobManager(
         self._jobman = job_manager.JobManager(
-            self._fpga_config, self._channel_config, self._runner, self._qchip
+            self._fpga_config,
+            self._channel_config,
+            self._runner,
+            self._qchip,
+            gmm_manager=self._gmm_manager
         )
         self._compiled_program = None
 
@@ -173,6 +185,36 @@ class QubicQPU(QPU):
             self._qchip.qubits[f'Q{q}'].readfreq = (
                 self._config.single_qubit[0].GE.freq[0]
             )
+
+    @property
+    def fpga_config(self):
+        """QubiC FPGA config object."""
+        return self._fpga_config
+    
+    @property
+    def channel_config(self):
+        """QubiC channel config object."""
+        return self._channel_config
+
+    @property
+    def qchip(self):
+        """QubiC quantum chip object."""
+        return self._qchip
+    
+    @property
+    def runner(self):
+        """QubiC runner object."""
+        return self._runner
+    
+    @property
+    def jobman(self):
+        """QubiC job_manager object."""
+        return self._jobman
+    
+    @property
+    def compiled_program(self):
+        """QubiC compiled_program object."""
+        return self._compiled_program
         
     def generate_sequence(self, circuits: List[Dict]) -> None:
         """Generate a QubiC sequence.
@@ -209,7 +251,7 @@ class QubicQPU(QPU):
             self._sequence, 
             self._n_shots, 
             ['s11', 'shots', 'counts'], 
-            fit_gmm=True,
+            fit_gmm=False if self._gmm_manager is not None else True,
             reads_per_shot=self._n_reads_per_shot,
             delay_per_shot=self._delay_per_shot,
             reload_cmd=self._reload_cmd,
