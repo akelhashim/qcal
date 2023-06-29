@@ -410,15 +410,21 @@ class Config:
             plot_two_qubit=False
         )
 
-    def save(self, filename: str = None):
+    def save(self, filename: str | None = None):
+        """Save the config to a yaml file.
 
-        # assert self._yaml_file is not None, ""
-
+        Args:
+            filename (str | None, optional): filename. Defaults to None.
+        """
+        filename = filename if filename is not None else self._filename
         with io.open(
                 filename if filename is not None else self._yaml_file, 'w', 
                 encoding='utf8'
             ) as yaml_file:
                 yaml.dump(
-                    self._parameters, yaml_file, default_flow_style=False, 
-                    allow_unicode=True
+                    self._parameters, 
+                    yaml_file, 
+                    default_flow_style=False, 
+                    allow_unicode=True,
+                    sort_keys=False
                 )
