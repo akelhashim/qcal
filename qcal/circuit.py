@@ -16,6 +16,7 @@ Basic example useage:
 """
 from qcal.gate.gate import Gate
 from qcal.gate.single_qubit import basis_rotation, Meas
+from qcal.results import Results
 
 import copy
 import pandas as pd
@@ -99,6 +100,17 @@ class Cycle:
         for gate in gates:
             qubits += gate.qubits
         self._qubits = tuple(sorted(set(qubits)))
+
+    def __getitem__(self, idx: int) -> Gate:
+        """Index the gates in the cycle/layer.
+
+        Args:
+            idx (int): index of a gate.
+
+        Returns:
+            Gate: Gate object.
+        """
+        return self._gates[idx]
     
     def __call__(self) -> List:
         return self._gates
@@ -251,7 +263,7 @@ class Layer(Cycle):
 
 class Circuit:
 
-    __slots__ = ('_cycles', '_qubits')
+    __slots__ = ('_cycles', '_qubits', '_results')
 
     def __init__(self,
             cycles_or_layers: List[Union[Cycle, Layer]] = []
@@ -267,6 +279,19 @@ class Circuit:
         for cycle in self._cycles:
             qubits += cycle.qubits
         self._qubits = tuple(sorted(set(qubits)))
+
+        self._results = Results()
+
+    def __getitem__(self, idx: int) -> Cycle | Layer:
+        """Index the Circuit object to obtain a given cycle/layer.
+
+        Args:
+            idx (int): index of a cycle/layer.
+
+        Returns:
+            Cycle | Layer: individual cycle or layer in a circuit.
+        """
+        return self._cycles[idx]
 
     def __iter__(self):
         return iter(self._cycles)
@@ -344,6 +369,15 @@ class Circuit:
         return len(self._qubits)
     
     @property
+    def results(self) -> Results:
+        """Circuit results.
+
+        Returns:
+            Results: Results object.
+        """
+        return self._results
+    
+    @property
     def qubits(self) -> Tuple[int]:
         """The qubits in the circuit.
 
@@ -351,6 +385,14 @@ class Circuit:
             Tuple: qubit labels.
         """
         return self._qubits
+    
+    @results.setter
+    def results(self, results: Dict):
+        """Write a dictionary of results to the circuit Results object.
+
+        Args:
+            results (Dict): dictionary of bitstring and counts.
+        """
     
     def _update_qubits(self) -> None:
         """Updates the qubits after mutating the cycles."""
