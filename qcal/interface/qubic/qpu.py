@@ -126,9 +126,10 @@ class QubicQPU(QPU):
 
         # import qubic
         # import qubitconfig
-        from qubitconfig.qchip import QChip
-        from qubic.rfsoc.hwconfig import FPGAConfig, load_channel_configs
         from qubic import rpc_client, job_manager
+        from qubic.rfsoc.hwconfig import FPGAConfig, load_channel_configs
+        from qubic.state_disc import GMMManager
+        from qubitconfig.qchip import QChip
 
         self._n_reads_per_shot = (calculate_n_reads(config) 
             if n_reads_per_shot is None else n_reads_per_shot
@@ -138,15 +139,10 @@ class QubicQPU(QPU):
         self._reload_freq = reload_freq
         self._reload_env = reload_env
         self._zero_between_reload = zero_between_reload
-        self._gmm_manager = gmm_manager
-
-        if gmm_manager == None:
-            logger.warning(
-                'No gmm_manager provided! ' 
-                'Measurements will fit to their own gmm.'
-            )
-
-        # self._fpga_config = qubic.rfsoc.hwconfig.FPGAConfig(
+        
+        self._gmm_manager = gmm_manager if gmm_manager is not None else (
+            os.path.join(os.path.dirname(__file__), 'gmm_manager.pkl')
+        )
         self._fpga_config = FPGAConfig(
             **{'fpga_clk_period': 2.e-9,
                'alu_instr_clks': 5,
@@ -154,7 +150,6 @@ class QubicQPU(QPU):
                'jump_fproc_clks': 5, 
                'pulse_regwrite_clks': 3}
         )
-        # self._channel_config = qubic.rfsoc.hwconfig.load_channel_configs(
         self._channel_config = load_channel_configs(
             os.path.join(os.path.dirname(__file__), 'channel_config.json')
         )
@@ -162,9 +157,7 @@ class QubicQPU(QPU):
         self._qchip = QChip(
             os.path.join(os.path.dirname(__file__), 'qubic_cfg.json')
         )
-        # self._runner = qubic.rpc_client.CircuitRunnerClient(ip='192.168.1.247')
         self._runner = rpc_client.CircuitRunnerClient(ip=rpc_ip_address)
-        # self._jobman = qubic.job_manager.JobManager(
         self._jobman = job_manager.JobManager(
             self._fpga_config,
             self._channel_config,
@@ -251,7 +244,7 @@ class QubicQPU(QPU):
             self._sequence, 
             self._n_shots, 
             ['s11', 'shots', 'counts'], 
-            fit_gmm=False if self._gmm_manager is not None else True,
+            fit_gmm=False,
             reads_per_shot=self._n_reads_per_shot,
             delay_per_shot=self._delay_per_shot,
             reload_cmd=self._reload_cmd,
