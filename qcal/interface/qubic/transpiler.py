@@ -17,7 +17,7 @@ from typing import Dict, List, Tuple
 logger = logging.getLogger(__name__)
 
 
-__all__ = ['to_qubic']
+__all__ = ('to_qubic', 'Transpiler')
 
 
 def add_reset(
@@ -183,6 +183,21 @@ def add_measurement(
     )
 
 
+def add_delay(config: Config, gate: Gate, circuit: List) -> None:
+    """Add a delay for an idle gate.
+
+    Args:
+        config (Config): config object.
+        gate (Gate):     single-qubit gate.
+        circuit (List):  qubic circuit.
+    """
+    circuit.append(
+        {'name': 'delay',
+         't': gate.properties['params']['duration'],
+         'qubit': [f'Q{gate.qubits[0]}']}
+    )
+
+
 def add_virtualz_gate(config: Config, gate: Gate, circuit: List) -> None:
     """Add a virtual Z gate.
 
@@ -342,6 +357,8 @@ class Transpiler:
         if gate_mapper is None:
             self._gate_mapper = defaultdict(lambda: transpilation_error,
                 {'Meas':     add_measurement,
+                 'I':        add_delay,
+                 'Idle':     add_delay,
                  'Rz':       add_virtualz_gate,
                  'S':        add_virtualz_gate,
                  'Sdag':     add_virtualz_gate,

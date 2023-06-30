@@ -91,10 +91,9 @@ def recursive_values(dictionary: Dict):
 
 
 class Config:
-    """Class for loading and storing configuration files.
-    """
+    """Class for loading and storing configuration files."""
 
-    __slots__ = ['_parameters', '_filename']
+    __slots__ = ('_parameters', '_filename')
 
     def __init__(self, filename: str = None) -> None:
 

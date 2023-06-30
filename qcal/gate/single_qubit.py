@@ -216,18 +216,19 @@ class Id(Gate):
         self._properties['name'] = 'I'
         self._properties['params'] = {
             'angle': 0,
+            'duration': 0.
         }
 
 
 class Idle(Gate):
     """Class for the idle gate."""
 
-    def __init__(self, qubit: int = 0, duration: float = 30*ns) -> None:
+    def __init__(self, qubit: int = 0, duration: float = 0*ns) -> None:
         """Initialize using the id gate.
         
         Args:
             qubit (int): qubit label. Defaults to 0.
-            duration (float): idle duration. Defaults to 30 ns.
+            duration (float): idle duration. Defaults to 0 ns.
         """
         super().__init__(id, qubit)
         self._properties['alias'] = 'I'
@@ -544,7 +545,7 @@ class VirtualZ(Gate):
 class X(Gate):
     """Class for the Pauli X gate."""
 
-    def __init__(self, qubit: int = 0) -> None:
+    def __init__(self, qubit: int = 0, subspace='GE') -> None:
         """Initialize using the x gate.
         
         Args:
@@ -556,6 +557,7 @@ class X(Gate):
             'angle': np.pi,
             'axis':  'x',
         }
+        self._properties['subspace'] = subspace
     
 
 class X90(Gate):
