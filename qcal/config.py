@@ -16,7 +16,7 @@ import logging
 import pandas as pd
 import yaml
 
-from typing import Any, Dict, List, Union
+from typing import Any, Dict, List
 
 logger = logging.getLogger(__name__)
 
@@ -330,42 +330,56 @@ class Config:
         """
         return [eval(key) for key in self.get('two_qubit').keys()]
     
-    def get(self, param: Union[List[str], str]) -> Any:
+    def get(self, param: List[Any]) -> Any:
         """Get the parameter from the config (if it exists).
 
         Args:
-            param (Union[List[str], str]): parameter of interest. This can be a
-                str (e.g. 'single_qubit') or a list of strings (e.g.
-                ['single_qubit', 'Q0', 'GE', 'freq']).
+            param (Union[List[Any]]): parameter of interest. This should be a
+                list of entries used to index the parameters dictionary (e.g.
+                ['single_qubit', 0, 'GE', 'freq']).
 
         Returns:
             Any: the string or value returned by config[param]. This defaults
                 to None if the parameter cannot be found in the config.
         """
         try:
-            if isinstance(param, list):
-                params = self._parameters
-                for p in param:
-                    params =  params[p]
-                return params
-            else:        
-                return self._parameters[param]
+            cfg_param = self._parameters
+            for p in param:
+                cfg_param =  cfg_param[p]
+            return cfg_param
         except Exception:
             logger.warning(f"Parameter '{param}' not found in the config!")
             return None
         
+    def set(self, param: List[str] | str, value) -> None:
+        """Set the parameter in the config to the given value.
+
+        Args:
+            param (Union[List[str], str]): parameter of interest. This can be a
+                str (e.g. 'single_qubit/Q0/GE/freq') or a list of strings (e.g.
+                ['single_qubit', 'Q0', 'GE', 'freq']).
+
+        Returns:
+            Any: the string or value returned by config[param]. This defaults
+                to None if the parameter cannot be found in the config.
+        """
+        cfg_param = self.get(param[:-1])
+        cfg_param[param[-1]] = value
+        logger.info(f'Param {param} set to {value}.')
+        
     def items(self) -> tuple:
         return self._parameters.items()
 
-    def load(self, yaml_file):
+    def load(self, filename: str | None = None):
+        """(Re)load the yaml file."""
+        if filename is None:
+            filename = self._filename
 
-        # TODO: add automatic saved backup of file after each load
-
-        with open(yaml_file, "r") as config:
+        with open(filename, "r") as config:
             try:
                 self._parameters = yaml.load(config, Loader=yaml.FullLoader)
             except yaml.YAMLError as exc:
-                print(exc)
+                logger.error(exc)
 
     def draw_processor(self):
         """Plot a graph displaying the connectivity of the quantum processor.
