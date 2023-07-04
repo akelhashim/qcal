@@ -4,7 +4,7 @@ References:
 https://ieeexplore.ieee.org/document/9552516
 """
 import qcal
-from qcal.circuit import Circuit
+from qcal.circuit import Circuit, CircuitSet
 from qcal.config import Config
 from qcal.gate.gate import Gate
 from qcal.sequencer.pulse_envelopes import pulse_envelopes
@@ -222,7 +222,7 @@ def add_single_qubit_gate(config: Config, gate: Gate, circuit: List) -> None:
         gate (Gate):     single-qubit gate.
         circuit (List):  qubic circuit.
     """
-    subspace = gate.properties['subspace']
+    subspace = gate.subspace
     for pulse in (
         config.single_qubit[gate.qubits[0]][subspace][gate.name].pulse):
 
@@ -396,18 +396,22 @@ class Transpiler:
         """
         return self._gate_mapper
 
-    def transpile(self, circuits: List[Circuit]) -> List[Dict]:
+    def transpile(self, circuits: CircuitSet | List[Circuit]) -> List[Dict]:
         """Transpile all circuits.
 
         Args:
-            circuits (List[Circuit]): circuits to transpile.
+            circuits (CircuitSet | List[Circuit]): circuits to transpile.
 
         Returns:
-            List[Dict]: compiled circuits.
+            List[Dict]: transpiled circuits.
         """
-        compiled_circuits = [
+        if isinstance(circuits, CircuitSet):
+            circuits = circuits.circuits
+
+        tranpiled_circuits = [
             to_qubic(
                 self._config, circuit, self._gate_mapper
             ) for circuit in circuits
         ]
-        return compiled_circuits
+
+        return tranpiled_circuits

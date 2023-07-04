@@ -1,18 +1,17 @@
 """Custom QPU submodule for QubiC
 
 """
-from qcal.circuit import CircuitSet
+# from qcal.circuit import CircuitSet
 from qcal.config import Config
 from .transpiler import Transpiler
 from qcal.qpu.qpu import QPU
-from qcal.utils import save
 
 import logging
 import os
-import sys
+# import sys
 
-from collections.abc import Iterable
-from typing import Any, Dict, List
+# from collections.abc import Iterable
+from typing import Any, List
 
 logger = logging.getLogger(__name__)
 
@@ -106,7 +105,7 @@ class QubicQPU(QPU):
                 n_circs_per_seq:     int = 1,
                 n_levels:            int = 2,
                 n_reads_per_shot:    int | None = None,
-                delay_per_shot:      float | None = None,
+                delay_per_shot:      float | None = 0.,
                 reload_cmd:          bool = True,
                 reload_freq:         bool = True,
                 reload_env:          bool = True,
@@ -216,7 +215,8 @@ class QubicQPU(QPU):
         """QubiC compiled_program object."""
         return self._compiled_program
         
-    def generate_sequence(self, circuits: List[Dict]) -> None:
+    # def generate_sequence(self, circuits: List[Dict]) -> None:
+    def generate_sequence(self) -> None:
         """Generate a QubiC sequence.
 
         This occurs in two steps:
@@ -226,11 +226,14 @@ class QubicQPU(QPU):
             "sequence."
 
         Args:
-            circuits (List): _description_
+            circuits (List): TODO
         """
         from qubic.toolchain import run_compile_stage, run_assemble_stage
+        # self._compiled_program = run_compile_stage(
+        #     circuits, self._fpga_config, self._qchip
+        # )
         self._compiled_program = run_compile_stage(
-            circuits, self._fpga_config, self._qchip
+            self.__exp_circuits, self._fpga_config, self._qchip
         )
         self._sequence = run_assemble_stage(
             self._compiled_program, self._channel_config
@@ -238,16 +241,16 @@ class QubicQPU(QPU):
 
     def acquire(self) -> None:
         """Measure all circuits."""
-        if self._delay_per_shot == None:
-            self._delay_per_shot = (
-                calculate_delay_per_shot(
-                    self._config,
-                    self._compiled_program,
-                    self._channel_config
-                )
-            )
+        # if self._delay_per_shot is None:
+        #     self._delay_per_shot = (
+        #         calculate_delay_per_shot(
+        #             self._config,
+        #             self._compiled_program,
+        #             self._channel_config
+        #         )
+        #     )
         
-        self._measurement = self._jobman.build_and_run_circuits(
+        measurement = self._jobman.build_and_run_circuits(
             self._sequence, 
             self._n_shots, 
             ['s11', 'shots', 'counts'], 
@@ -259,6 +262,7 @@ class QubicQPU(QPU):
             reload_env=self._reload_env,
             zero_between_reload=self._zero_between_reload
         )
+        self._measurements.append(measurement)
 
     def process(self) -> None:
         pass

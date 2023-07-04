@@ -1,6 +1,7 @@
 """Helper functions.
 """
 import logging
+import pandas as pd
 import pickle
 
 from typing import Any
@@ -15,6 +16,8 @@ def save(data: Any, filename: str) -> None:
         data (Any): data of any datatype.
         filename (str): filename for saved data.
     """
+    if isinstance(data, pd.DataFrame):
+        data.to_pickle(f'{filename}.pkl')
     with open(f'{filename}.pkl', 'wb') as handle:
         pickle.dump(data, handle, protocol=pickle.HIGHEST_PROTOCOL)
 

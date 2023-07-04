@@ -6,18 +6,18 @@ class _Settings:
 
     def __init__(self) -> None:
         """Initialize the settings attributes."""
-        self._config_directory = ''
+        self._config_path = ''
         self._save_data = True
-        self._data_save_directory = ''
+        self._data_save_path = ''
 
     @property
-    def config_directory(self) -> str:
-        """Directory where the config is located.
+    def config_path(self) -> str:
+        """Path where the config is located.
 
         Returns:
-            str: config directory.
+            str: config path.
         """
-        return self._config_directory
+        return self._config_path
     
     @property
     def save_data(self) -> bool:
@@ -29,19 +29,19 @@ class _Settings:
         return self._save_data
 
     @property
-    def data_save_directory(self) -> str:
-        """Directory where data is saved.
+    def data_save_path(self) -> str:
+        """Path where data is saved.
 
         Returns:
-            str: data save directory.
+            str: data save path.
         """
-        return self._data_save_directory
+        return self._data_save_path
     
-    @config_directory.setter
-    def config_directory(self, value):
-        """Setter for config_directory."""
+    @config_path.setter
+    def config_path(self, value):
+        """Setter for config_path."""
         assert isinstance(value, str), "The passed value must be a string!"
-        self._config_directory = value
+        self._config_path = value
     
     @save_data.setter
     def save_data(self, value):
@@ -49,11 +49,11 @@ class _Settings:
         assert isinstance(value, bool), "The passed value must be a boolean!"
         self._save_data = value
 
-    @data_save_directory.setter
-    def data_save_directory(self, value):
-        """Setter for data_save_directory."""
+    @data_save_path.setter
+    def data_save_path(self, value):
+        """Setter for data_save_path."""
         assert isinstance(value, str), "The passed value must be a string!"
-        self._data_save_directory = value
+        self._data_save_path = value
     
 
 Settings = _Settings()
