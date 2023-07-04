@@ -462,6 +462,9 @@ class Config:
                 encoding='utf8'
             ) as yaml_file:
                 yaml.dump(
-                    self._parameters, yaml_file, default_flow_style=False, 
-                    allow_unicode=True
+                    self._parameters, 
+                    yaml_file, 
+                    default_flow_style=False, 
+                    allow_unicode=True,
+                    sort_keys=False
                 )

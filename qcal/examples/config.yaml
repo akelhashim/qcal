@@ -2,646 +2,646 @@ single_qubit:
   0:
     GE:
       freq: 4461736318.073627
-      T1:
-      T2*:
-      T2e:
+      T1: null
+      T2*: null
+      T2e: null
       X90:
         pulse:
-          - channel: Q0.qdrv
-            env: virtualz
-            length: 0.0
-            kwargs:
-              phase: 0.0
-          - channel: Q0.qdrv
-            env: 'DRAG'
-            length: 2.4e-8
-            kwargs:
-              alpha: 0.0 
-              amp: 0.1
-              anh: -270.e+6
-              df: 0.0
-              phase: 0.0
-          - channel: Q0.qdrv
-            env: virtualz
-            length: 0.0
-            kwargs:
-              phase: 0.0
+        - channel: Q0.qdrv
+          env: virtualz
+          length: 0.0
+          kwargs:
+            phase: 0.0
+        - channel: Q0.qdrv
+          env: DRAG
+          length: 2.4e-08
+          kwargs:
+            alpha: 0.0
+            amp: 0.1
+            anh: -270000000.0
+            df: 0.0
+            phase: 0.0
+        - channel: Q0.qdrv
+          env: virtualz
+          length: 0.0
+          kwargs:
+            phase: 0.0
       X:
         pulse:
-          - channel: Q0.qdrv
-            env: 'cosine_square'
-            length: 4.8e-8
-            kwargs:
-              amp: 0.1
-              phase: 0.0
-              ramp_fraction: 0.25
+        - channel: Q0.qdrv
+          env: cosine_square
+          length: 4.8e-08
+          kwargs:
+            amp: 0.1
+            phase: 0.0
+            ramp_fraction: 0.25
     EF:
       freq: 4181258902.85729
-      T1:
-      T2*:
-      T2e:
+      T1: null
+      T2*: null
+      T2e: null
       X90:
         pulse:
-          - channel: Q0.qdrv
-            env: 'cosine_square'
-            length: 2.4e-8
-            kwargs:
-              amp: 0.1
-              phase: 0.0
-              ramp_fraction: 0.25
+        - channel: Q0.qdrv
+          env: cosine_square
+          length: 2.4e-08
+          kwargs:
+            amp: 0.1
+            phase: 0.0
+            ramp_fraction: 0.25
       X:
         pulse:
-          - channel: Q0.qdrv
-            env: 'cosine_square'
-            length: 4.8e-8
-            kwargs:
-              amp: 0.1
-              phase: 0.0
-              ramp_fraction: 0.25
+        - channel: Q0.qdrv
+          env: cosine_square
+          length: 4.8e-08
+          kwargs:
+            amp: 0.1
+            phase: 0.0
+            ramp_fraction: 0.25
   1:
     GE:
       freq: 4675260858.059634
-      T1:
-      T2*:
-      T2e:
+      T1: null
+      T2*: null
+      T2e: null
       X90:
         pulse:
-          - channel: Q1.qdrv
-            env: 'DRAG'
-            length: 2.4e-8
-            kwargs:
-              alpha: 0.0 
-              amp: 0.1
-              anh: -270.e+6
-              df: 0.0
-              phase: 0.0
+        - channel: Q1.qdrv
+          env: DRAG
+          length: 2.4e-08
+          kwargs:
+            alpha: 0.0
+            amp: 0.1
+            anh: -270000000.0
+            df: 0.0
+            phase: 0.0
       X:
         pulse:
-          - channel: Q1.qdrv
-            env: 'cosine_square'
-            length: 4.8e-8
-            kwargs:
-              amp: 0.1
-              phase: 0.0
-              ramp_fraction: 0.25
+        - channel: Q1.qdrv
+          env: cosine_square
+          length: 4.8e-08
+          kwargs:
+            amp: 0.1
+            phase: 0.0
+            ramp_fraction: 0.25
     EF:
       freq: 4400700000.0
-      T1:
-      T2*:
-      T2e:
+      T1: null
+      T2*: null
+      T2e: null
       X90:
         pulse:
-          - channel: Q1.qdrv
-            env: 'cosine_square'
-            length: 2.4e-8
-            kwargs:
-              amp: 0.1
-              phase: 0.0
-              ramp_fraction: 0.25
+        - channel: Q1.qdrv
+          env: cosine_square
+          length: 2.4e-08
+          kwargs:
+            amp: 0.1
+            phase: 0.0
+            ramp_fraction: 0.25
       X:
         pulse:
-          - channel: Q1.qdrv
-            env: 'cosine_square'
-            length: 4.8e-8
-            kwargs:
-              amp: 0.1
-              phase: 0.0
-              ramp_fraction: 0.25
+        - channel: Q1.qdrv
+          env: cosine_square
+          length: 4.8e-08
+          kwargs:
+            amp: 0.1
+            phase: 0.0
+            ramp_fraction: 0.25
   2:
     GE:
       freq: 4944461837.827577
-      T1:
-      T2*:
-      T2e:
+      T1: null
+      T2*: null
+      T2e: null
       X90:
         pulse:
-          - channel: Q2.qdrv
-            env: 'DRAG'
-            length: 2.4e-8
-            kwargs:
-              alpha: 0.0 
-              amp: 0.1
-              anh: -270.e+6
-              df: 0.0
-              phase: 0.0
+        - channel: Q2.qdrv
+          env: DRAG
+          length: 2.4e-08
+          kwargs:
+            alpha: 0.0
+            amp: 0.1
+            anh: -270000000.0
+            df: 0.0
+            phase: 0.0
       X:
         pulse:
-          - channel: Q2.qdrv
-            env: 'cosine_square'
-            length: 4.8e-8
-            kwargs:
-              amp: 0.1
-              phase: 0.0
-              ramp_fraction: 0.25
+        - channel: Q2.qdrv
+          env: cosine_square
+          length: 4.8e-08
+          kwargs:
+            amp: 0.1
+            phase: 0.0
+            ramp_fraction: 0.25
     EF:
       freq: 4672600000.0
-      T1:
-      T2*:
-      T2e:
+      T1: null
+      T2*: null
+      T2e: null
       X90:
         pulse:
-          - channel: Q2.qdrv
-            env: 'cosine_square'
-            length: 2.4e-8
-            kwargs:
-              amp: 0.1
-              phase: 0.0
-              ramp_fraction: 0.25
+        - channel: Q2.qdrv
+          env: cosine_square
+          length: 2.4e-08
+          kwargs:
+            amp: 0.1
+            phase: 0.0
+            ramp_fraction: 0.25
       X:
         pulse:
-          - channel: Q2.qdrv
-            env: 'cosine_square'
-            length: 4.8e-8
-            kwargs:
-              amp: 0.1
-              phase: 0.0
-              ramp_fraction: 0.25
+        - channel: Q2.qdrv
+          env: cosine_square
+          length: 4.8e-08
+          kwargs:
+            amp: 0.1
+            phase: 0.0
+            ramp_fraction: 0.25
   3:
     GE:
       freq: 5114911040.024481
-      T1:
-      T2*:
-      T2e:
+      T1: null
+      T2*: null
+      T2e: null
       X90:
         pulse:
-          - channel: Q3.qdrv
-            env: 'DRAG'
-            length: 2.4e-8
-            kwargs:
-              alpha: 0.0 
-              amp: 0.1
-              anh: -270.e+6
-              df: 0.0
-              phase: 0.0
+        - channel: Q3.qdrv
+          env: DRAG
+          length: 2.4e-08
+          kwargs:
+            alpha: 0.0
+            amp: 0.1
+            anh: -270000000.0
+            df: 0.0
+            phase: 0.0
       X:
         pulse:
-          - channel: Q3.qdrv
-            env: 'cosine_square'
-            length: 4.8e-8
-            kwargs:
-              amp: 0.1
-              phase: 0.0
-              ramp_fraction: 0.25
+        - channel: Q3.qdrv
+          env: cosine_square
+          length: 4.8e-08
+          kwargs:
+            amp: 0.1
+            phase: 0.0
+            ramp_fraction: 0.25
     EF:
       freq: 4849300000.0
-      T1:
-      T2*:
-      T2e:
+      T1: null
+      T2*: null
+      T2e: null
       X90:
         pulse:
-          - channel: Q3.qdrv
-            env: 'cosine_square'
-            length: 2.4e-8
-            kwargs:
-              amp: 0.1
-              phase: 0.0
-              ramp_fraction: 0.25
+        - channel: Q3.qdrv
+          env: cosine_square
+          length: 2.4e-08
+          kwargs:
+            amp: 0.1
+            phase: 0.0
+            ramp_fraction: 0.25
       X:
         pulse:
-          - channel: Q3.qdrv
-            env: 'cosine_square'
-            length: 4.8e-8
-            kwargs:
-              amp: 0.1
-              phase: 0.0
-              ramp_fraction: 0.25
+        - channel: Q3.qdrv
+          env: cosine_square
+          length: 4.8e-08
+          kwargs:
+            amp: 0.1
+            phase: 0.0
+            ramp_fraction: 0.25
   4:
     GE:
       freq: 5350927547.979777
-      T1:
-      T2*:
-      T2e:
+      T1: null
+      T2*: null
+      T2e: null
       X90:
         pulse:
-          - channel: Q4.qdrv
-            env: 'DRAG'
-            length: 2.4e-8
-            kwargs:
-              alpha: 0.0 
-              amp: 0.1
-              anh: -270.e+6
-              df: 0.0
-              phase: 0.0
+        - channel: Q4.qdrv
+          env: DRAG
+          length: 2.4e-08
+          kwargs:
+            alpha: 0.0
+            amp: 0.1
+            anh: -270000000.0
+            df: 0.0
+            phase: 0.0
       X:
         pulse:
-          - channel: Q4.qdrv
-            env: 'cosine_square'
-            length: 4.8e-8
-            kwargs:
-              amp: 0.1
-              phase: 0.0
-              ramp_fraction: 0.25
+        - channel: Q4.qdrv
+          env: cosine_square
+          length: 4.8e-08
+          kwargs:
+            amp: 0.1
+            phase: 0.0
+            ramp_fraction: 0.25
     EF:
       freq: 5089500000.0
-      T1:
-      T2*:
-      T2e:
+      T1: null
+      T2*: null
+      T2e: null
       X90:
         pulse:
-          - channel: Q4.qdrv
-            env: 'cosine_square'
-            length: 2.4e-8
-            kwargs:
-              amp: 0.1
-              phase: 0.0
-              ramp_fraction: 0.25
+        - channel: Q4.qdrv
+          env: cosine_square
+          length: 2.4e-08
+          kwargs:
+            amp: 0.1
+            phase: 0.0
+            ramp_fraction: 0.25
       X:
         pulse:
-          - channel: Q4.qdrv
-            env: 'cosine_square'
-            length: 4.8e-8
-            kwargs:
-              amp: 0.1
-              phase: 0.0
-              ramp_fraction: 0.25
+        - channel: Q4.qdrv
+          env: cosine_square
+          length: 4.8e-08
+          kwargs:
+            amp: 0.1
+            phase: 0.0
+            ramp_fraction: 0.25
   5:
     GE:
-      freq: 5581471962.572675
-      T1:
-      T2*:
-      T2e:
+      freq: 5577471962.572675
+      T1: null
+      T2*: null
+      T2e: null
       X90:
         pulse:
-          - channel: Q5.qdrv
-            env: 'DRAG'
-            length: 2.4e-8
-            kwargs:
-              alpha: 0.0 
-              amp: 0.1
-              anh: -270.e+6
-              df: 0.0
-              phase: 0.0
+        - channel: Q5.qdrv
+          env: DRAG
+          length: 2.4e-08
+          kwargs:
+            alpha: 0.0
+            amp: 0.1
+            anh: -270000000.0
+            df: 0.0
+            phase: 0.0
       X:
         pulse:
-          - channel: Q5.qdrv
-            env: 'cosine_square'
-            length: 4.8e-8
-            kwargs:
-              amp: 0.1
-              phase: 0.0
-              ramp_fraction: 0.25
+        - channel: Q5.qdrv
+          env: cosine_square
+          length: 4.8e-08
+          kwargs:
+            amp: 0.1
+            phase: 0.0
+            ramp_fraction: 0.25
     EF:
       freq: 5263900000.0
-      T1:
-      T2*:
-      T2e:
+      T1: null
+      T2*: null
+      T2e: null
       X90:
         pulse:
-          - channel: Q5.qdrv
-            env: 'cosine_square'
-            length: 2.4e-8
-            kwargs:
-              amp: 0.1
-              phase: 0.0
-              ramp_fraction: 0.25
+        - channel: Q5.qdrv
+          env: cosine_square
+          length: 2.4e-08
+          kwargs:
+            amp: 0.1
+            phase: 0.0
+            ramp_fraction: 0.25
       X:
         pulse:
-          - channel: Q5.qdrv
-            env: 'cosine_square'
-            length: 4.8e-8
-            kwargs:
-              amp: 0.1
-              phase: 0.0
-              ramp_fraction: 0.25
+        - channel: Q5.qdrv
+          env: cosine_square
+          length: 4.8e-08
+          kwargs:
+            amp: 0.1
+            phase: 0.0
+            ramp_fraction: 0.25
   6:
     GE:
       freq: 5880552778.000434
-      T1:
-      T2*:
-      T2e:
+      T1: null
+      T2*: null
+      T2e: null
       X90:
         pulse:
-          - channel: Q6.qdrv
-            env: 'DRAG'
-            length: 2.4e-8
-            kwargs:
-              alpha: 0.0 
-              amp: 0.1
-              anh: -270.e+6
-              df: 0.0
-              phase: 0.0
+        - channel: Q6.qdrv
+          env: DRAG
+          length: 2.4e-08
+          kwargs:
+            alpha: 0.0
+            amp: 0.1
+            anh: -270000000.0
+            df: 0.0
+            phase: 0.0
       X:
         pulse:
-          - channel: Q6.qdrv
-            env: 'cosine_square'
-            length: 4.8e-8
-            kwargs:
-              amp: 0.1
-              phase: 0.0
-              ramp_fraction: 0.25
+        - channel: Q6.qdrv
+          env: cosine_square
+          length: 4.8e-08
+          kwargs:
+            amp: 0.1
+            phase: 0.0
+            ramp_fraction: 0.25
     EF:
       freq: 5615900000.0
-      T1:
-      T2*:
-      T2e:
+      T1: null
+      T2*: null
+      T2e: null
       X90:
         pulse:
-          - channel: Q6.qdrv
-            env: 'cosine_square'
-            length: 2.4e-8
-            kwargs:
-              amp: 0.1
-              phase: 0.0
-              ramp_fraction: 0.25
+        - channel: Q6.qdrv
+          env: cosine_square
+          length: 2.4e-08
+          kwargs:
+            amp: 0.1
+            phase: 0.0
+            ramp_fraction: 0.25
       X:
         pulse:
-          - channel: Q6.qdrv
-            env: 'cosine_square'
-            length: 4.8e-8
-            kwargs:
-              amp: 0.1
-              phase: 0.0
-              ramp_fraction: 0.25
+        - channel: Q6.qdrv
+          env: cosine_square
+          length: 4.8e-08
+          kwargs:
+            amp: 0.1
+            phase: 0.0
+            ramp_fraction: 0.25
   7:
     GE:
       freq: 5621010772.789028
-      T1:
-      T2*:
-      T2e:
+      T1: null
+      T2*: null
+      T2e: null
       X90:
         pulse:
-          - channel: Q7.qdrv
-            env: 'DRAG'
-            length: 2.4e-8
-            kwargs:
-              alpha: 0.0 
-              amp: 0.1
-              anh: -270.e+6
-              df: 0.0
-              phase: 0.0
+        - channel: Q7.qdrv
+          env: DRAG
+          length: 2.4e-08
+          kwargs:
+            alpha: 0.0
+            amp: 0.1
+            anh: -270000000.0
+            df: 0.0
+            phase: 0.0
       X:
         pulse:
-          - channel: Q7.qdrv
-            env: 'cosine_square'
-            length: 4.8e-8
-            kwargs:
-              amp: 0.1
-              phase: 0.0
-              ramp_fraction: 0.25
+        - channel: Q7.qdrv
+          env: cosine_square
+          length: 4.8e-08
+          kwargs:
+            amp: 0.1
+            phase: 0.0
+            ramp_fraction: 0.25
     EF:
       freq: 5356000000.0
-      T1:
-      T2*:
-      T2e:
+      T1: null
+      T2*: null
+      T2e: null
       X90:
         pulse:
-          - channel: Q7.qdrv
-            env: 'cosine_square'
-            length: 2.4e-8
-            kwargs:
-              amp: 0.1
-              phase: 0.0
-              ramp_fraction: 0.25
+        - channel: Q7.qdrv
+          env: cosine_square
+          length: 2.4e-08
+          kwargs:
+            amp: 0.1
+            phase: 0.0
+            ramp_fraction: 0.25
       X:
         pulse:
-          - channel: Q7.qdrv
-            env: 'cosine_square'
-            length: 4.8e-8
-            kwargs:
-              amp: 0.1
-              phase: 0.0
-              ramp_fraction: 0.25
+        - channel: Q7.qdrv
+          env: cosine_square
+          length: 4.8e-08
+          kwargs:
+            amp: 0.1
+            phase: 0.0
+            ramp_fraction: 0.25
 two_qubit:
   (0, 1):
     CZ:
-      freq: 4.43e+9
+      freq: 4430000000.0
       pulse:
-        - channel: Q0.qdrv
-          env: cosine_square
-          length: 2.0e-07
-          kwargs:
-            amp: 0.288
-            phase: 0.0
-            ramp_fraction: 0.25
-        - channel: Q1.qdrv
-          env: cosine_square
-          length: 2.0e-07
-          kwargs:
-            amp: 0.288
-            phase: 0.0
-            ramp_fraction: 0.25
-        - channel: Q0.qdrv
-          env: virtualz
-          length: 0.0
-          kwargs:
-            phase: 0.0
-        - channel: Q1.qdrv
-          env: virtualz
-          length: 0.0
-          kwargs:
-            phase: 0.0
+      - channel: Q0.qdrv
+        env: cosine_square
+        length: 2.0e-07
+        kwargs:
+          amp: 0.288
+          phase: 0.0
+          ramp_fraction: 0.25
+      - channel: Q1.qdrv
+        env: cosine_square
+        length: 2.0e-07
+        kwargs:
+          amp: 0.288
+          phase: 0.0
+          ramp_fraction: 0.25
+      - channel: Q0.qdrv
+        env: virtualz
+        length: 0.0
+        kwargs:
+          phase: 0.0
+      - channel: Q1.qdrv
+        env: virtualz
+        length: 0.0
+        kwargs:
+          phase: 0.0
   (1, 2):
     CZ:
-      freq: 4.63e+9
+      freq: 4630000000.0
       pulse:
-        - channel: Q1.qdrv
-          env: cosine_square
-          length: 2.0e-07
-          kwargs:
-            amp: 0.288
-            phase: 0.0
-            ramp_fraction: 0.25
-        - channel: Q2.qdrv
-          env: cosine_square
-          length: 2.0e-07
-          kwargs:
-            amp: 0.288
-            phase: 0.0
-            ramp_fraction: 0.25
-        - channel: Q1.qdrv
-          env: virtualz
-          length: 0.0
-          kwargs:
-            phase: 0.0
-        - channel: Q2.qdrv
-          env: virtualz
-          length: 0.0
-          kwargs:
-            phase: 0.0
+      - channel: Q1.qdrv
+        env: cosine_square
+        length: 2.0e-07
+        kwargs:
+          amp: 0.288
+          phase: 0.0
+          ramp_fraction: 0.25
+      - channel: Q2.qdrv
+        env: cosine_square
+        length: 2.0e-07
+        kwargs:
+          amp: 0.288
+          phase: 0.0
+          ramp_fraction: 0.25
+      - channel: Q1.qdrv
+        env: virtualz
+        length: 0.0
+        kwargs:
+          phase: 0.0
+      - channel: Q2.qdrv
+        env: virtualz
+        length: 0.0
+        kwargs:
+          phase: 0.0
   (2, 3):
     CZ:
-      freq: 4.9e+9
+      freq: 4900000000.0
       pulse:
-        - channel: Q2.qdrv
-          env: cosine_square
-          length: 2.0e-07
-          kwargs:
-            amp: 0.288
-            phase: 0.0
-            ramp_fraction: 0.25
-        - channel: Q3.qdrv
-          env: cosine_square
-          length: 2.0e-07
-          kwargs:
-            amp: 0.288
-            phase: 0.0
-            ramp_fraction: 0.25
-        - channel: Q2.qdrv
-          env: virtualz
-          length: 0.0
-          kwargs:
-            phase: 0.0
-        - channel: Q3.qdrv
-          env: virtualz
-          length: 0.0
-          kwargs:
-            phase: 0.0
+      - channel: Q2.qdrv
+        env: cosine_square
+        length: 2.0e-07
+        kwargs:
+          amp: 0.288
+          phase: 0.0
+          ramp_fraction: 0.25
+      - channel: Q3.qdrv
+        env: cosine_square
+        length: 2.0e-07
+        kwargs:
+          amp: 0.288
+          phase: 0.0
+          ramp_fraction: 0.25
+      - channel: Q2.qdrv
+        env: virtualz
+        length: 0.0
+        kwargs:
+          phase: 0.0
+      - channel: Q3.qdrv
+        env: virtualz
+        length: 0.0
+        kwargs:
+          phase: 0.0
   (3, 4):
     CZ:
-      freq: 5.03e+9
+      freq: 5030000000.0
       pulse:
-        - channel: Q3.qdrv
-          env: cosine_square
-          length: 2.0e-07
-          kwargs:
-            amp: 0.288
-            phase: 0.0
-            ramp_fraction: 0.25
-        - channel: Q4.qdrv
-          env: cosine_square
-          length: 2.0e-07
-          kwargs:
-            amp: 0.288
-            phase: 0.0
-            ramp_fraction: 0.25
-        - channel: Q3.qdrv
-          env: virtualz
-          length: 0.0
-          kwargs:
-            phase: 0.0
-        - channel: Q4.qdrv
-          env: virtualz
-          length: 0.0
-          kwargs:
-            phase: 0.0
+      - channel: Q3.qdrv
+        env: cosine_square
+        length: 2.0e-07
+        kwargs:
+          amp: 0.288
+          phase: 0.0
+          ramp_fraction: 0.25
+      - channel: Q4.qdrv
+        env: cosine_square
+        length: 2.0e-07
+        kwargs:
+          amp: 0.288
+          phase: 0.0
+          ramp_fraction: 0.25
+      - channel: Q3.qdrv
+        env: virtualz
+        length: 0.0
+        kwargs:
+          phase: 0.0
+      - channel: Q4.qdrv
+        env: virtualz
+        length: 0.0
+        kwargs:
+          phase: 0.0
   (4, 5):
     CZ:
-      freq: 5.3e+9
+      freq: 5300000000.0
       pulse:
-        - channel: Q4.qdrv
-          env: cosine_square
-          length: 2.0e-07
-          kwargs:
-            amp: 0.288
-            phase: 0.0
-            ramp_fraction: 0.25
-        - channel: Q5.qdrv
-          env: cosine_square
-          length: 2.0e-07
-          kwargs:
-            amp: 0.288
-            phase: 0.0
-            ramp_fraction: 0.25
-        - channel: Q4.qdrv
-          env: virtualz
-          length: 0.0
-          kwargs:
-            phase: 0.0
-        - channel: Q5.qdrv
-          env: virtualz
-          length: 0.0
-          kwargs:
-            phase: 0.0
+      - channel: Q4.qdrv
+        env: cosine_square
+        length: 2.0e-07
+        kwargs:
+          amp: 0.288
+          phase: 0.0
+          ramp_fraction: 0.25
+      - channel: Q5.qdrv
+        env: cosine_square
+        length: 2.0e-07
+        kwargs:
+          amp: 0.288
+          phase: 0.0
+          ramp_fraction: 0.25
+      - channel: Q4.qdrv
+        env: virtualz
+        length: 0.0
+        kwargs:
+          phase: 0.0
+      - channel: Q5.qdrv
+        env: virtualz
+        length: 0.0
+        kwargs:
+          phase: 0.0
   (5, 6):
     CZ:
-      freq: 5.5e+9
+      freq: 5500000000.0
       pulse:
-        - channel: Q5.qdrv
-          env: cosine_square
-          length: 2.0e-07
-          kwargs:
-            amp: 0.288
-            phase: 0.0
-            ramp_fraction: 0.25
-        - channel: Q6.qdrv
-          env: cosine_square
-          length: 2.0e-07
-          kwargs:
-            amp: 0.288
-            phase: 0.0
-            ramp_fraction: 0.25
-        - channel: Q5.qdrv
-          env: virtualz
-          length: 0.0
-          kwargs:
-            phase: 0.0
-        - channel: Q6.qdrv
-          env: virtualz
-          length: 0.0
-          kwargs:
-            phase: 0.0
+      - channel: Q5.qdrv
+        env: cosine_square
+        length: 2.0e-07
+        kwargs:
+          amp: 0.288
+          phase: 0.0
+          ramp_fraction: 0.25
+      - channel: Q6.qdrv
+        env: cosine_square
+        length: 2.0e-07
+        kwargs:
+          amp: 0.288
+          phase: 0.0
+          ramp_fraction: 0.25
+      - channel: Q5.qdrv
+        env: virtualz
+        length: 0.0
+        kwargs:
+          phase: 0.0
+      - channel: Q6.qdrv
+        env: virtualz
+        length: 0.0
+        kwargs:
+          phase: 0.0
   (6, 7):
     CZ:
-      freq: 5.55e+9
+      freq: 5550000000.0
       pulse:
-        - channel: Q6.qdrv
-          env: cosine_square
-          length: 2.0e-07
-          kwargs:
-            amp: 0.288
-            phase: 0.0
-            ramp_fraction: 0.25
-        - channel: Q7.qdrv
-          env: cosine_square
-          length: 2.0e-07
-          kwargs:
-            amp: 0.288
-            phase: 0.0
-            ramp_fraction: 0.25
-        - channel: Q6.qdrv
-          env: virtualz
-          length: 0.0
-          kwargs:
-            phase: 0.0
-        - channel: Q7.qdrv
-          env: virtualz
-          length: 0.0
-          kwargs:
-            phase: 0.0
+      - channel: Q6.qdrv
+        env: cosine_square
+        length: 2.0e-07
+        kwargs:
+          amp: 0.288
+          phase: 0.0
+          ramp_fraction: 0.25
+      - channel: Q7.qdrv
+        env: cosine_square
+        length: 2.0e-07
+        kwargs:
+          amp: 0.288
+          phase: 0.0
+          ramp_fraction: 0.25
+      - channel: Q6.qdrv
+        env: virtualz
+        length: 0.0
+        kwargs:
+          phase: 0.0
+      - channel: Q7.qdrv
+        env: virtualz
+        length: 0.0
+        kwargs:
+          phase: 0.0
   (7, 0):
     CZ:
-      freq: 4.9e+9
+      freq: 4900000000.0
       pulse:
-        - channel: Q7.qdrv
-          env: cosine_square
-          length: 2.0e-07
-          kwargs:
-            amp: 0.288
-            phase: 0.0
-            ramp_fraction: 0.25
-        - channel: Q0.qdrv
-          env: cosine_square
-          length: 2.0e-07
-          kwargs:
-            amp: 0.288
-            phase: 0.0
-            ramp_fraction: 0.25
-        - channel: Q7.qdrv
-          env: virtualz
-          length: 0.0
-          kwargs:
-            phase: 0.0
-        - channel: Q0.qdrv
-          env: virtualz
-          length: 0.0
-          kwargs:
-            phase: 0.0
+      - channel: Q7.qdrv
+        env: cosine_square
+        length: 2.0e-07
+        kwargs:
+          amp: 0.288
+          phase: 0.0
+          ramp_fraction: 0.25
+      - channel: Q0.qdrv
+        env: cosine_square
+        length: 2.0e-07
+        kwargs:
+          amp: 0.288
+          phase: 0.0
+          ramp_fraction: 0.25
+      - channel: Q7.qdrv
+        env: virtualz
+        length: 0.0
+        kwargs:
+          phase: 0.0
+      - channel: Q0.qdrv
+        env: virtualz
+        length: 0.0
+        kwargs:
+          phase: 0.0
 readout:
   0:
     channel: 7
     amp: 0.019724226371142798
     freq: 6554368952.374638
-    phase: 1.4806632895920675
+    phase: 1.0471975511965976
   1:
     channel: 4
     amp: 0.01829905189877411
     freq: 6558439922.632911
-    phase: 0.0
+    phase: 3.400421796562137
   2:
     channel: 1
     amp: 0.016645073053349783
     freq: 6658008967.32158
-    phase: 0.0
+    phase: -1.1667773522863918
   3:
     channel: 3
     amp: 0.017906057102356918
@@ -668,34 +668,34 @@ readout:
     freq: 6835470849.262068
     phase: 4.256638268772688
   esp:
-    enable: False
+    enable: false
     qubits:
-      - 0
-      - 1
-      - 2
-      - 3
-      - 4
-      - 5
-      - 6
-      - 7
-  delay: 6.e-07
-  herald: False
-  length: 4.0e-6
-  reset: 1.e+5
-  sample_rate: 5.e+8
+    - 0
+    - 1
+    - 2
+    - 3
+    - 4
+    - 5
+    - 6
+    - 7
+  delay: 6.0e-07
+  herald: false
+  length: 4.0e-06
+  reset: 100000.0
+  sample_rate: 500000000.0
   env: cosine_square
   kwargs:
     phase: 0.0
     ramp_fraction: 0.25
 reset:
   active:
-    enable: False
+    enable: false
     n_resets: 1
-    feedback_delay: 2.e-7
+    feedback_delay: 2.0e-07
   passive:
-    delay: 5.e-4 
+    delay: 0.0005
 hardware:
-  ADC_sample_rate: 
-  DAC_sample_rate: 8.e+9
-  readout_LO:
-  qubit_LO:
+  ADC_sample_rate: null
+  DAC_sample_rate: 8000000000.0
+  readout_LO: null
+  qubit_LO: null
