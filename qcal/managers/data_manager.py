@@ -23,10 +23,17 @@ class DataMananger:
     )
 
     def __init__(self) -> None:
-        
+        """Initialize a DataManager.
+        """
         self._date = datetime.today().strftime('%Y-%m-%d')
         self._exp_id = datetime.now().strftime('%H%M%S')
         self._save_path = None
+
+    def __repr__(self) -> str:
+        string = f'Date: {self._date}\n'
+        string += f'Exp id: {self._exp_id}\n'
+        string += f'Save path: {self._save_path}'
+        return string
 
     @property
     def date(self) -> str:

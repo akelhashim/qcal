@@ -29,7 +29,7 @@ import plotly.io as pio
 pio.renderers.default = 'colab'  # TODO: replace with settings
 
 
-__all__ = ['Barrier', 'Cycle', 'Layer', 'Circuit', 'CircuitSet']
+__all__ = ('Barrier', 'Cycle', 'Layer', 'Circuit', 'CircuitSet')
 
 
 class Barrier:

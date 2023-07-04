@@ -95,6 +95,31 @@ class QubicQPU(QPU):
         QPU: main QPU class.
     """
 
+    __slots__ = (
+        '_config',
+        '_compiler',
+        '_transpiler',
+        '_n_shots',
+        '_n_batches',
+        '_n_circs_per_seq',
+        '_n_levels',
+        '_circuits',
+        '_compiled_circuits',
+        '_transpiled_circuits',
+        '__exp_circuits',
+        '_sequence',
+        '_measurements',
+        '_runtime',
+        '_data_manager',
+        '_delay_per_shot',
+        '_reload_cmd',
+        '_reload_freq',
+        '_reload_env',
+        '_zero_between_reload',
+        '_gmm_manager',
+        '_rpc_ip_address'
+    )
+
     def __init__(
                 self,
                 config:              Config,
@@ -152,7 +177,6 @@ class QubicQPU(QPU):
         self._channel_config = load_channel_configs(
             os.path.join(os.path.dirname(__file__), 'channel_config.json')
         )
-        # self._qchip = qubitconfig.qchip.QChip(
         self._qchip = QChip(
             os.path.join(os.path.dirname(__file__), 'qubic_cfg.json')
         )
@@ -263,12 +287,12 @@ class QubicQPU(QPU):
         # post-processing for ESP (readout and herald)
         # post-processing for heralding
 
-    def save(self) -> None:
-        """Save all circuits and data."""
-        # save(self._measurement['s11'], 'iq_data')
-        # save(self._measurement['s11'], 'iq_data')
-        # save(self._measurement['s11'], 'iq_data')
-        pass
+    # def save(self) -> None:
+    #     """Save all circuits and data."""
+    #     # save(self._measurement['s11'], 'iq_data')
+    #     # save(self._measurement['s11'], 'iq_data')
+    #     # save(self._measurement['s11'], 'iq_data')
+    #     pass
 
     def run(self,
             circuits:  Any | List[Any],

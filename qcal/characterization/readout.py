@@ -77,6 +77,7 @@ def ReadoutFidelity(
             '_circuits',
             '_compiled_circuits',
             '_translated_ciruits',
+            '__exp_circuits',
             '_sequence',
             '_measurement',
             '_runtime',
@@ -211,7 +212,9 @@ def ReadoutFidelity(
             def save(self):
                 """Save all circuits and data."""
                 super().save()
-                # TODO: save confusion matrices
+                self._data_manager.save(
+                    self._confusion_mat, 'confusion_matrix'
+                )
 
             def run(self):
                 """Run all experimental methods and analyze results."""
