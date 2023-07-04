@@ -129,6 +129,32 @@ class Config:
             return copy.deepycopy(self._parameters)
         else:
             return self._parameters.copy()
+        
+    def __getitem__(self, param: str) -> Any:
+        """Subscript the config object with a string.
+
+        Args:
+            param (str): parameter of interest. This should be a string with
+                nested keys separate by '/' (e.g. 'single_qubit/0/GE/freq').
+
+        Returns:
+            Any: the string or value returned by config[param].
+        """
+        param = param.split('/')
+        param = [eval(p) if p.isdigit() else p for p in param]
+        return self.get(param)
+
+    def __setitem__(self, param: str, newvalue: Any):
+        """Assign a new value to a parameter in the config.
+
+        Args:
+            param (str): parameter of interest. This should be a string with
+                nested keys separate by '/' (e.g. 'single_qubit/0/GE/freq').
+            newvalue (Any): new value to assign to the parameter.
+        """
+        param = param.split('/')
+        param = [eval(p) if p.isdigit() else p for p in param]
+        self.set(param, newvalue)
 
     # def __iter__(self):
     #     return self._parameters.__iter__()
@@ -333,8 +359,8 @@ class Config:
         """Get the parameter from the config (if it exists).
 
         Args:
-            param (Union[List[Any]]): parameter of interest. This should be a
-                list of entries used to index the parameters dictionary (e.g.
+            param (List[Any]): parameter of interest. This should be a
+                list of entries used to index the parameters dictionary (e.g. 
                 ['single_qubit', 0, 'GE', 'freq']).
 
         Returns:
@@ -350,27 +376,24 @@ class Config:
             logger.warning(f"Parameter '{param}' not found in the config!")
             return None
         
-    def set(self, param: List[str] | str, value) -> None:
+    def set(self, param: List[str] | str, newvalue: Any) -> None:
         """Set the parameter in the config to the given value.
 
         Args:
-            param (Union[List[str], str]): parameter of interest. This can be a
-                str (e.g. 'single_qubit/Q0/GE/freq') or a list of strings (e.g.
-                ['single_qubit', 'Q0', 'GE', 'freq']).
-
-        Returns:
-            Any: the string or value returned by config[param]. This defaults
-                to None if the parameter cannot be found in the config.
+            param (Union[List[str], str]): parameter of interest.  This should 
+                be a list of entries used to index the parameters dictionary 
+                (e.g. ['single_qubit', 0, 'GE', 'freq']).
+            newvalue (Any): new value to assign to the parameter.
         """
         cfg_param = self.get(param[:-1])
-        cfg_param[param[-1]] = value
-        logger.info(f'Param {param} set to {value}.')
+        cfg_param[param[-1]] = newvalue
+        logger.info(f'Param {param} set to {newvalue}.')
         
     def items(self) -> tuple:
         return self._parameters.items()
 
     def load(self, filename: str | None = None):
-        """(Re)load the yaml file."""
+        """Load the yaml file."""
         if filename is None:
             filename = self._filename
 
@@ -379,6 +402,10 @@ class Config:
                 self._parameters = yaml.load(config, Loader=yaml.FullLoader)
             except yaml.YAMLError as exc:
                 logger.error(exc)
+
+    def reload(self):
+        """Reload from the yaml file."""
+        self.load()
 
     def draw_processor(self):
         """Plot a graph displaying the connectivity of the quantum processor.
@@ -423,12 +450,15 @@ class Config:
             plot_two_qubit=False
         )
 
-    def save(self, filename: str = None):
+    def save(self, filename: str | None = None):
+        """Save the config to a YAML file
 
-        # assert self._yaml_file is not None, ""
-
+        Args:
+            filename (str | None, optional): filename for the YAML file.
+                Defaults to None.
+        """
         with io.open(
-                filename if filename is not None else self._yaml_file, 'w', 
+                filename if filename is not None else self._filename, 'w', 
                 encoding='utf8'
             ) as yaml_file:
                 yaml.dump(
