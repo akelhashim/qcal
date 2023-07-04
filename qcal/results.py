@@ -6,6 +6,7 @@ import pandas as pd
 
 from typing import Dict, Tuple
 
+__all__ = ('Results')
 
 # TODO: add fidelity and TVD
 class Results:

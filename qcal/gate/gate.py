@@ -187,6 +187,15 @@ class Gate:
         return self._properties
     
     @property
+    def subspace(self) -> str:
+        """Subspace (GE or EF) within which the gate acts.
+
+        Returns:
+            str: GE or EF.
+        """
+        return self._properties['subspace']
+    
+    @property
     def qubits(self) -> tuple:
         """The qubit(s) that the gate acts on.
 

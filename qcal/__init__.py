@@ -8,4 +8,6 @@ from qcal.circuit import *
 
 from qcal.config import Config
 
+from qcal.results import Results
+
 # from qcal import interface

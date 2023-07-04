@@ -36,8 +36,11 @@ def format_gate_text(gate: Gate):
     )
     if gate.locally_equivalent is not None:
         text += f'Locally Equivalent: {gate.locally_equivalent}<br>'
+    text += f'Subspace: {gate.subspace}<br>'
     if bool(gate.properties['params']):
         for key, value in gate.properties['params'].items():
+            if isinstance(value, float):
+                value = round(value, 5)
             text += f'{key}: {value}<br>'
 
     return text

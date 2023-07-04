@@ -393,6 +393,7 @@ class Circuit:
         Args:
             results (Dict): dictionary of bitstring and counts.
         """
+        self._results = Results(results)
     
     def _update_qubits(self) -> None:
         """Updates the qubits after mutating the cycles."""
@@ -639,19 +640,33 @@ class CircuitSet:
             index (List[int] | None, optional): Indices for the circuits in the 
                 DataFrame. Defaults to None.
         """
-        self._df = pd.DataFrame(columns=['circuits'])
+        self._df = pd.DataFrame(columns=['circuit'], dtype='object')
 
-        # TODO: how to handle circuits that already have results
         if circuits is not None:
             if isinstance(circuits, Iterable):
-                self._df['circuits'] = circuits
+                self._df['circuit'] = circuits
                 # self._df['Results'] = [dict()] * len(circuits)
             else:
-                self._df['circuits'] = [circuits]
+                self._df['circuit'] = [circuits]
                 # self._df['Results'] = [dict()] * len([circuits])
         
         if index is not None:
             self._df = self._df.set_index(pd.Index(index))
+
+    def __getitem__(self, idx_or_label: int | str) -> Circuit | pd.Series:
+        """Index the CircuitSet dataframe.
+
+        Args:
+            idx_or_label (int | str): argument to index by.
+
+        Returns:
+            Circuit | pd.Series: circuit or data series for the given index.
+        """
+        if isinstance(idx_or_label, int):
+            return self._df.iloc[idx_or_label].circuit
+        else:
+            return self._df[idx_or_label]
+        
 
     def __call__(self) -> pd.DataFrame:
         return self._df
@@ -666,8 +681,8 @@ class CircuitSet:
     def __len__(self) -> int:
         return len(self._df)
 
-    # def __iter__(self):
-    #     return iter(self._df)
+    def __iter__(self):
+        return iter(self._df.circuit)
 
     def __repr__(self) -> str:
         return repr(self._df)
@@ -685,17 +700,26 @@ class CircuitSet:
         return self.__len__()
 
     @property
-    def circuits(self) -> pd.Series:
+    def circuit(self) -> pd.Series:
         """The circuits in the CircuitSet.
 
         Returns:
             pd.Series: circuits
         """
-        return self._df['circuits']
-
+        return self._df['circuit']
+    
     @property
-    def results(self) -> pd.Series:
-        return self._df['Results']
+    def circuits(self) -> List[Circuit]:
+        """A list of the circuits in the CircuitSet.
+
+        Returns:
+            List[Circuit]: list of circuits.
+        """
+        return self.circuit.to_list()
+
+    # @property
+    # def results(self) -> pd.Series:
+    #     return self._df['Results']
     
     def append(self, circuits, index=None):
         """Appends circuit(s) to the circuit collection."""
@@ -716,7 +740,7 @@ class CircuitSet:
         """
         for i in range(0, len(self), batch_size):
             yield CircuitSet(
-                self._df.iloc[i:i + batch_size]['circuits'].tolist()
+                self._df.iloc[i:i + batch_size]['circuit'].tolist()
             )
 
     def save(self, path: str):
@@ -729,37 +753,37 @@ class CircuitSet:
         """
         self._df.to_pickle(path)
 
-    def subset(self, **kwargs) -> pd.DataFrame:
-        """Subset of the full CircuitSet.
+    # def subset(self, **kwargs) -> pd.DataFrame:
+    #     """Subset of the full CircuitSet.
 
-        Returns a subset of the full CircuitSet given by the keyword argument.
+    #     Returns a subset of the full CircuitSet given by the keyword argument.
 
-        Returns:
-            pd.DataFrame: subset of the full CircuitSet
-        """
-        df = self._df.copy()  # TODO: deep copy here?
-        for key in kwargs:
-            assert key in self._df.columns, f'{key} is not a valid column name.'
-            df = df.loc[self._df[key] == kwargs[key]]
-        return df
+    #     Returns:
+    #         pd.DataFrame: subset of the full CircuitSet
+    #     """
+    #     df = self._df.copy()  # TODO: deep copy here?
+    #     for key in kwargs:
+    #         assert key in self._df.columns, f'{key} is not a valid column name.'
+    #         df = df.loc[self._df[key] == kwargs[key]]
+    #     return df
 
-    def union_results(self, idx: int = None) -> Dict:
-        """Compute the union of all of the results.
+    # def union_results(self, idx: int = None) -> Dict:
+    #     """Compute the union of all of the results.
 
-        This can take in an optional index, for which the results will only
-        be unioned for columns of matching indices.
+    #     This can take in an optional index, for which the results will only
+    #     be unioned for columns of matching indices.
 
-        Args:
-            idx (int, optional): index over which to union the results.
-                Defaults to None.
+    #     Args:
+    #         idx (int, optional): index over which to union the results.
+    #             Defaults to None.
 
-        Returns:
-            Dict: unioned bit string results.
-        """
-        if idx is None:
-            results_list = self._df['results'].to_list()
+    #     Returns:
+    #         Dict: unioned bit string results.
+    #     """
+    #     if idx is None:
+    #         results_list = self._df['results'].to_list()
 
-        # TODO: finish
+    #     # TODO: finish
 
     @staticmethod
     def load(path: str) -> pd.DataFrame:
