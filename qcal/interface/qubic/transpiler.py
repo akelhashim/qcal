@@ -396,22 +396,32 @@ class Transpiler:
         """
         return self._gate_mapper
 
-    def transpile(self, circuits: CircuitSet | List[Circuit]) -> List[Dict]:
+    def transpile(self, circuits: CircuitSet) -> List[Dict]:
         """Transpile all circuits.
 
         Args:
-            circuits (CircuitSet | List[Circuit]): circuits to transpile.
+            circuits (CircuitSet): circuits to transpile.
 
         Returns:
             List[Dict]: transpiled circuits.
         """
-        if isinstance(circuits, CircuitSet):
-            circuits = circuits.circuits
+        # Check for a param sweep
+        params = [col for col in circuits._df.columns if 'param' in col]
+        if params:
+            transpiled_circuits = []
+            for i, circuit in enumerate(self._circuits):
+                for param in params:  # [7:] removes the string 'param: '
+                    self._config[param[7:]] = self._circuits[param][i]
+                    transpiled_circuits.append(
+                        to_qubic(self._config, circuit, self._gate_mapper)
+                    )
+            self._config.reload()  # Reload after making all the changes
 
-        tranpiled_circuits = [
-            to_qubic(
-                self._config, circuit, self._gate_mapper
-            ) for circuit in circuits
-        ]
+        else:
+            transpiled_circuits = [
+                to_qubic(
+                    self._config, circuit, self._gate_mapper
+                ) for circuit in circuits.circuits
+            ]
 
-        return tranpiled_circuits
+        return transpiled_circuits

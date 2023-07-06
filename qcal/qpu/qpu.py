@@ -313,24 +313,23 @@ class QPU:
     def save(self) -> None:
         """Save all circuits."""
         self._data_manager.create_data_save_path()
-        self._data_manager.save(self._circuits, 'circuits')
+        self._data_manager.save_to_pickle(self._circuits, 'circuits')
 
         if not self._compiled_circuits.is_empty:
-            self._data_manager.save(
+            self._data_manager.save_to_pickle(
                 self._compiled_circuits, 'compiled_circuits'
             )
 
         if not self._transpiled_circuits.is_empty: 
-            self._data_manager.save(
+            self._data_manager.save_to_pickle(
                 self._transpiled_circuits, 'transpiled_circuits'
             )
 
-        self._data_manager.save(self._measurements, 'measurements')
-        self._runtime.to_csv(
-            f'{self._data_manager.save_path}_runtime.csv'
-        )
+        self._data_manager.save_to_pickle(self._measurements, 'measurements')
+        self._data_manager.save_to_csv(self._runtime, 'runtime')
+        self._config.save(self._data_manager._save_path + 'config.yaml')
 
-        logger.info(f" Data save location: {self._data_manager.save_path}*\n")
+        logger.info(f" Data save location: {self._data_manager._save_path}\n")
 
     def run(self,
             circuits:  Any | List[Any],

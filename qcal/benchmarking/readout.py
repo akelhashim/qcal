@@ -1,8 +1,9 @@
 """Submodule for readout benchmarking routines.
 
 """
-import qcal.settings as settings
+from __future__ import annotations
 
+import qcal.settings as settings
 from qcal.circuit import Barrier, Cycle, Circuit, CircuitSet
 from qcal.compilation.compiler import Compiler
 from qcal.config import Config
@@ -28,23 +29,23 @@ def ReadoutFidelity(
         n_batches:       int = 1, 
         n_circs_per_seq: int = 1, 
         n_levels:        int = 2
-    ):
+    ) -> ReadoutFidelity:
     """Function which passes a custom QPU to the ReadoutFidelity class.
 
     Basic example useage:
 
-        ro = ReadoutFidelity(CustomQPU, cfg, [0, 1, 2])
+        ro = ReadoutFidelity(CustomQPU, config, [0, 1, 2])
         ro.run()
 
     Args:
-        qpu (QPU): custom QPU class.
-        config (Config): qcal config object.
+        qpu (QPU): custom QPU object.
+        config (Config): qcal Config object.
         qubits (List | Tuple): qubits to measure.
         gate (str, optional): native gate used for state preparation. Defaults 
             to 'X90'.
-        compiler (Any | Compiler | None, optional): a custom compiler to
+        compiler (Any | Compiler | None, optional): custom compiler to
             compile the experimental circuits. Defaults to None.
-        transpiler (Any | None, optional): a custom transpiler to 
+        transpiler (Any | None, optional): custom transpiler to 
             transpile the experimental circuits. Defaults to None.
         n_shots (int, optional): number of measurements per circuit. 
             Defaults to 1024.
@@ -57,7 +58,7 @@ def ReadoutFidelity(
             measurement supports qutrit classification.
 
     Returns:
-        class: ReadoutFidelity class.
+        ReadoutFidelity: ReadoutFidelity class.
     """
 
     class ReadoutFidelity(qpu):
@@ -108,9 +109,7 @@ def ReadoutFidelity(
                 n_levels
             )
             self._qubits = qubits
-            assert gate in ('X90', 'X'), (
-                'gate must be an X90 or X!'
-            )
+            assert gate in ('X90', 'X'), 'gate must be an X90 or X!'
             self._gate = gate
             self._confusion_mat = None
 
@@ -140,11 +139,11 @@ def ReadoutFidelity(
                             Cycle(
                               [X90(q, subspace=level[n]) for q in self._qubits]
                             ),
-                            Barrier(),
+                            Barrier(self._qubits),
                             Cycle(
                               [X90(q, subspace=level[n]) for q in self._qubits]
                             ),
-                            Barrier(),
+                            Barrier(self._qubits),
                             Cycle([Meas(q) for q in qubits])
                         ])
                     )
@@ -155,7 +154,7 @@ def ReadoutFidelity(
                             Cycle(
                                 [X(q, subspace=level[n]) for q in self._qubits]
                             ),
-                            Barrier(),
+                            Barrier(self._qubits),
                             Cycle([Meas(q) for q in qubits])
                         ])
                     )
@@ -193,7 +192,7 @@ def ReadoutFidelity(
         def save(self):
             """Save all circuits and data."""
             super().save()
-            self._data_manager.save(
+            self._data_manager.save_to_csv(
                 self._confusion_mat, 'confusion_matrix'
             )
 
@@ -203,6 +202,7 @@ def ReadoutFidelity(
             super().run(self._circuits)
             self.analyze()
             if settings.Settings.save_data:
+                self._data_manager._exp_id += '_readout_fidelity'
                 self.save()
 
 

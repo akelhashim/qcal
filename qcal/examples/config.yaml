@@ -67,6 +67,11 @@ single_qubit:
       X90:
         pulse:
         - channel: Q1.qdrv
+          env: virtualz
+          length: 0.0
+          kwargs:
+            phase: 0.0
+        - channel: Q1.qdrv
           env: DRAG
           length: 2.4e-08
           kwargs:
@@ -74,6 +79,11 @@ single_qubit:
             amp: 0.1
             anh: -270000000.0
             df: 0.0
+            phase: 0.0
+        - channel: Q1.qdrv
+          env: virtualz
+          length: 0.0
+          kwargs:
             phase: 0.0
       X:
         pulse:
@@ -116,6 +126,11 @@ single_qubit:
       X90:
         pulse:
         - channel: Q2.qdrv
+          env: virtualz
+          length: 0.0
+          kwargs:
+            phase: 0.0
+        - channel: Q2.qdrv
           env: DRAG
           length: 2.4e-08
           kwargs:
@@ -123,6 +138,11 @@ single_qubit:
             amp: 0.1
             anh: -270000000.0
             df: 0.0
+            phase: 0.0
+        - channel: Q2.qdrv
+          env: virtualz
+          length: 0.0
+          kwargs:
             phase: 0.0
       X:
         pulse:
@@ -165,6 +185,11 @@ single_qubit:
       X90:
         pulse:
         - channel: Q3.qdrv
+          env: virtualz
+          length: 0.0
+          kwargs:
+            phase: 0.0
+        - channel: Q3.qdrv
           env: DRAG
           length: 2.4e-08
           kwargs:
@@ -172,6 +197,11 @@ single_qubit:
             amp: 0.1
             anh: -270000000.0
             df: 0.0
+            phase: 0.0
+        - channel: Q3.qdrv
+          env: virtualz
+          length: 0.0
+          kwargs:
             phase: 0.0
       X:
         pulse:
@@ -214,6 +244,11 @@ single_qubit:
       X90:
         pulse:
         - channel: Q4.qdrv
+          env: virtualz
+          length: 0.0
+          kwargs:
+            phase: 0.0
+        - channel: Q4.qdrv
           env: DRAG
           length: 2.4e-08
           kwargs:
@@ -221,6 +256,11 @@ single_qubit:
             amp: 0.1
             anh: -270000000.0
             df: 0.0
+            phase: 0.0
+        - channel: Q4.qdrv
+          env: virtualz
+          length: 0.0
+          kwargs:
             phase: 0.0
       X:
         pulse:
@@ -263,6 +303,11 @@ single_qubit:
       X90:
         pulse:
         - channel: Q5.qdrv
+          env: virtualz
+          length: 0.0
+          kwargs:
+            phase: 0.0
+        - channel: Q5.qdrv
           env: DRAG
           length: 2.4e-08
           kwargs:
@@ -270,6 +315,11 @@ single_qubit:
             amp: 0.1
             anh: -270000000.0
             df: 0.0
+            phase: 0.0
+        - channel: Q5.qdrv
+          env: virtualz
+          length: 0.0
+          kwargs:
             phase: 0.0
       X:
         pulse:
@@ -312,6 +362,11 @@ single_qubit:
       X90:
         pulse:
         - channel: Q6.qdrv
+          env: virtualz
+          length: 0.0
+          kwargs:
+            phase: 0.0
+        - channel: Q6.qdrv
           env: DRAG
           length: 2.4e-08
           kwargs:
@@ -319,6 +374,11 @@ single_qubit:
             amp: 0.1
             anh: -270000000.0
             df: 0.0
+            phase: 0.0
+        - channel: Q6.qdrv
+          env: virtualz
+          length: 0.0
+          kwargs:
             phase: 0.0
       X:
         pulse:
@@ -361,6 +421,11 @@ single_qubit:
       X90:
         pulse:
         - channel: Q7.qdrv
+          env: virtualz
+          length: 0.0
+          kwargs:
+            phase: 0.0
+        - channel: Q7.qdrv
           env: DRAG
           length: 2.4e-08
           kwargs:
@@ -368,6 +433,11 @@ single_qubit:
             amp: 0.1
             anh: -270000000.0
             df: 0.0
+            phase: 0.0
+        - channel: Q7.qdrv
+          env: virtualz
+          length: 0.0
+          kwargs:
             phase: 0.0
       X:
         pulse:

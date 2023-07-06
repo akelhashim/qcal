@@ -14,6 +14,8 @@ Basic example useage:
 
     cs = CircuitSet([list of circuits])
 """
+from __future__ import annotations
+
 from qcal.gate.gate import Gate
 from qcal.gate.single_qubit import basis_rotation, Meas
 from qcal.results import Results
@@ -48,7 +50,10 @@ class Barrier:
             qubits (Tuple[int], optional): qubits to enforce a barrier between.
                 Defaults to tuple().
         """
-        self._qubits = qubits
+        self._qubits = tuple(qubits)
+
+    def __copy__(self) -> Barrier:
+        return Barrier(copy.deepcopy(self._qubits))
 
     def __repr__(self) -> str:
         """Draw the circuit as a string."""
@@ -84,6 +89,14 @@ class Barrier:
             Tuple: empty tuple.
         """
         return self._qubits
+    
+    def copy(self) -> Barrier:
+        """Deep copy of the Barrier.
+
+        Returns:
+            Barrier: copy of the Barrier.
+        """
+        return self.__copy__()
 
 class Cycle:
     """Class defining a cycle in a circuit."""
@@ -116,7 +129,7 @@ class Cycle:
         return self._gates
     
     def __copy__(self) -> List:
-        return Cycle(copy.deepcopy(self._gates))
+        return Cycle([copy.deepcopy(gate) for gate in self._gates])
     
     def __iter__(self):
         return iter(self._gates)
@@ -213,6 +226,14 @@ class Cycle:
         assert isinstance(gate, Gate), "The gate must be a qcal Gate object!"
         self._gates.append(gate)
 
+    def copy(self) -> Cycle | Layer:
+        """Deep copy of the cycle/layer.
+
+        Returns:
+            Cycle | Layer: copy of the cycle/layer.
+        """
+        return self.__copy__()
+
     def to_matrix_table(self) -> pd.DataFrame:
         """Convert the cycle to a table of matrices acting on gate labels.
 
@@ -246,8 +267,8 @@ class Layer(Cycle):
     def __init__(self, gates: List = []) -> None:
         super().__init__(gates)
 
-    def __copy__(self) -> List:
-        return Layer(copy.deepcopy(self._gates))
+    def __copy__(self) -> Layer:
+        return Layer([copy.deepcopy(gate) for gate in self._gates])
     
     def to_str(self) -> str:
         """Convert the cycle to a string.
@@ -281,6 +302,10 @@ class Circuit:
         self._qubits = tuple(sorted(set(qubits)))
 
         self._results = Results()
+
+    def __copy__(self) -> Circuit:
+        """Make a deep copy of the Circuit."""
+        return Circuit([cycle.copy() for cycle in self._cycles])
 
     def __getitem__(self, idx: int) -> Cycle | Layer:
         """Index the Circuit object to obtain a given cycle/layer.
@@ -402,7 +427,9 @@ class Circuit:
             qubits += cycle.qubits
         self._qubits = tuple(sorted(set(qubits)))
     
-    def append(self, cycle_or_layer: Union[List, Cycle, Layer]) -> None:
+    def append(
+            self, cycle_or_layer: List[Cycle | Layer] | Cycle | Layer
+        ) -> None:
         """Appends a cycle/layer to the end of the circuit.
 
         Args:
@@ -419,11 +446,19 @@ class Circuit:
         self._cycles.append(cycle_or_layer)
         self._update_qubits()
 
-    def append_circuit(self, circuit) -> None:
+    def copy(self) -> Circuit:
+        """Deep copy of the Circuit.
+
+        Returns:
+            Circuit: copy of the Circuit.
+        """
+        return self.__copy__()
+
+    def extend(self, circuit: Circuit | List[Cycle | Layer]) -> None:
         """Appends another circuit to the end of the current circuit.
 
         Args:
-            circuit (List[Cycle], List[Layer], Circuit): circuit to append.
+            circuit (Circuit | List[Cycle | Layer]): circuit to append.
         """
         if isinstance(circuit, List):
             circuit = Circuit(circuit)
@@ -679,7 +714,7 @@ class CircuitSet:
     def __call__(self) -> pd.DataFrame:
         return self._df
 
-    def __copy__(self):  # -> CircuitSet:
+    def __copy__(self) -> CircuitSet:
         """Make a deep copy of the CircuitSet."""
         cs = CircuitSet()
         for col in self._df.columns:

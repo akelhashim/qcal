@@ -3,9 +3,10 @@
 The saving of data is handled by the DataManager class.
 """
 import qcal.settings as settings
-from qcal.utils import save
+from qcal.utils import save_to_csv, save_to_pickle
 
 import logging
+import pandas as pd
 import pathlib
 
 from datetime import datetime
@@ -65,23 +66,30 @@ class DataMananger:
     
     def generate_exp_id(self) -> None:
         """Generate a new experimental id."""
-        self._exp_id = datetime.now().strftime('%Y%m%d_%H%M%S')
+        # self._exp_id = datetime.now().strftime('%Y%m%d_%H%M%S')
+        self._exp_id = datetime.now().strftime('%H%M%S')
 
     def create_data_save_path(self) -> None:
         """Create a directory for data if none exists."""
         base_dir = settings.Settings.data_save_path
-        self._save_path = (
-            base_dir + f'{self._date}/' + f'{self._exp_id}/' + self._exp_id
-        )
-        
+        self._save_path = base_dir + f'{self._date}/' + f'{self._exp_id}/'
         path = pathlib.Path(self._save_path)
         path.mkdir(parents=True, exist_ok=True)
 
-    def save(self, data: Any, filename: str) -> None:
-        """Save data to the save_path directory.
+    def save_to_csv(self, data: pd.DataFrame, filename: str) -> None:
+        """Save a dataframe to a csv file.
+
+        Args:
+            data (pd.DataFrame): data in a pandas DataFrame.
+            filename (str): filename for the saved data.
+        """
+        save_to_csv(data, self._save_path + filename)
+
+    def save_to_pickle(self, data: Any, filename: str) -> None:
+        """Save data to a pickle file in the save_path directory.
 
         Args:
             data (Any): data to save.
             filename (str): filename for the data.
         """
-        save(data, self._save_path + '_' + filename)
+        save_to_pickle(data, self._save_path + filename)

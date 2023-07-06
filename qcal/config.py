@@ -103,10 +103,10 @@ class Config:
         else:
             try:
                 self.load(
-                    settings.Settings.config_directory + 'config.yaml'
+                    settings.Settings.config_path + 'config.yaml'
                 )
                 self._filename = (
-                    settings.Settings.config_directory + 'config.yaml'
+                    settings.Settings.config_path + 'config.yaml'
                 )
             except Exception:
                 logger.warning('No configuration file was provided.')
@@ -376,7 +376,7 @@ class Config:
             logger.warning(f"Parameter '{param}' not found in the config!")
             return None
         
-    def set(self, param: List[str] | str, newvalue: Any) -> None:
+    def set(self, param: List[str], newvalue: Any) -> None:
         """Set the parameter in the config to the given value.
 
         Args:
