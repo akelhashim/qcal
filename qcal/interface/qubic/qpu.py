@@ -2,15 +2,15 @@
 
 """
 # from qcal.circuit import CircuitSet
-from qcal.config import Config
+from .post_process import post_process
 from .transpiler import Transpiler
+from qcal.config import Config
 from qcal.qpu.qpu import QPU
 
 import logging
 import os
 # import sys
 
-# from collections.abc import Iterable
 from typing import Any, List
 
 logger = logging.getLogger(__name__)
@@ -95,31 +95,6 @@ class QubicQPU(QPU):
         QPU: main QPU class.
     """
 
-    __slots__ = (
-        '_config',
-        '_compiler',
-        '_transpiler',
-        '_n_shots',
-        '_n_batches',
-        '_n_circs_per_seq',
-        '_n_levels',
-        '_circuits',
-        '_compiled_circuits',
-        '_transpiled_circuits',
-        '__exp_circuits',
-        '_sequence',
-        '_measurements',
-        '_runtime',
-        '_data_manager',
-        '_delay_per_shot',
-        '_reload_cmd',
-        '_reload_freq',
-        '_reload_env',
-        '_zero_between_reload',
-        '_gmm_manager',
-        '_rpc_ip_address'
-    )
-
     def __init__(
                 self,
                 config:              Config,
@@ -130,7 +105,7 @@ class QubicQPU(QPU):
                 n_circs_per_seq:     int = 1,
                 n_levels:            int = 2,
                 n_reads_per_shot:    int | None = None,
-                delay_per_shot:      float | None = 0.,
+                delay_per_shot:      float | None = 0,
                 reload_cmd:          bool = True,
                 reload_freq:         bool = True,
                 reload_env:          bool = True,
@@ -138,6 +113,51 @@ class QubicQPU(QPU):
                 gmm_manager               = None,
                 rpc_ip_address:      str = '192.168.1.247'
         ) -> None:
+        """Initialize a instance of a QPU for QubiC.
+
+        Args:
+            config (Config): qcal config object.
+            compiler (Any | Compiler | None, optional): a custom compiler to
+                compile the experimental circuits. Defaults to None.
+            transpiler (Any | None, optional): a custom transpiler to 
+                transpile the experimental circuits. Defaults to None.
+            n_shots (int, optional): number of measurements per circuit. 
+                Defaults to 1024.
+            n_batches (int, optional): number of batches of measurements. 
+                Defaults to 1.
+            n_circs_per_seq (int, optional): maximum number of circuits that
+                can be measured per sequence. Defaults to 1.
+            n_levels (int, optional): number of energy levels to be measured. 
+                Defaults to 2. If n_levels = 3, this assumes that the
+                measurement supports qutrit classification.
+            n_reads_per_shot (int | None, optional): number of reads per shot
+                per circuit. Defaults to None. If None, this will be computed
+                from the number of active resets and whether or not heralding
+                is used.
+            delay_per_shot (float | None, optional): wait time between 
+                measuring and offloading the data. Defaults to 0. If 0, this
+                will be computed automatically. If None, this is computed by
+                the length of the full sequence plus a 1 us buffer.
+            reload_cmd (bool, optional): reload pulse command buffer for each
+                batched circuit. Defaults to True.
+            reload_freq (bool, optional): reload pulse frequencies when loading
+                a new circuit. Defaults to True. If the pulse frequencies do
+                not change for all circuits in a batch, this can be set to
+                False to save execution time.
+            reload_env (bool, optional): reload pulse envelopes when loading a
+                new circuit. Defaults to True. If the pulse envelopes do not
+                change for all circuits in a batch, this can be set to False
+                to save execution time.
+            zero_between_reload (bool, optional): zero out the pulse command
+                buffers before loading a new circuit. Defaults to True. If all
+                of the circuits in a batch use the same qubits, this can be set
+                to False to save execution time.
+            gmm_manager (GMMManager, optional): QubiC GMMManager object.
+                Defaults to None. If None, this is loaded from a previously 
+                saved manager object: 'gmm_manager.pkl'.
+            rpc_ip_address (str, optional): IP address for remote measurements.
+                Defaults to '192.168.1.247'.
+        """
         super().__init__(
             config=config,
             compiler=compiler,
@@ -147,7 +167,6 @@ class QubicQPU(QPU):
             n_circs_per_seq=n_circs_per_seq,
             n_levels=n_levels
         )
-
         # import qubic
         # import qubitconfig
         from qubic import rpc_client, job_manager
@@ -232,7 +251,6 @@ class QubicQPU(QPU):
         """QubiC compiled_program object."""
         return self._compiled_program
         
-    # def generate_sequence(self, circuits: List[Dict]) -> None:
     def generate_sequence(self) -> None:
         """Generate a QubiC sequence.
 
@@ -246,11 +264,8 @@ class QubicQPU(QPU):
             circuits (List): TODO
         """
         from qubic.toolchain import run_compile_stage, run_assemble_stage
-        # self._compiled_program = run_compile_stage(
-        #     circuits, self._fpga_config, self._qchip
-        # )
         self._compiled_program = run_compile_stage(
-            self.__exp_circuits, self._fpga_config, self._qchip
+            self._exp_circuits, self._fpga_config, self._qchip
         )
         self._sequence = run_assemble_stage(
             self._compiled_program, self._channel_config
@@ -258,14 +273,14 @@ class QubicQPU(QPU):
 
     def acquire(self) -> None:
         """Measure all circuits."""
-        # if self._delay_per_shot is None:
-        #     self._delay_per_shot = (
-        #         calculate_delay_per_shot(
-        #             self._config,
-        #             self._compiled_program,
-        #             self._channel_config
-        #         )
-        #     )
+        if self._delay_per_shot is None:
+            self._delay_per_shot = (
+                calculate_delay_per_shot(
+                    self._config,
+                    self._compiled_program,
+                    self._channel_config
+                )
+            )
         
         measurement = self._jobman.build_and_run_circuits(
             self._sequence, 
@@ -282,30 +297,15 @@ class QubicQPU(QPU):
         self._measurements.append(measurement)
 
     def process(self) -> None:
-        pass
+        """Process the measurement data."""
+        post_process(self._config, self._measurements, self._circuits)
 
-        # post-processing for ESP (readout and herald)
-        # post-processing for heralding
+        if not self._compiled_circuits.is_empty:
+            post_process(
+                self._config, self._measurements, self._compiled_circuits
+            )
 
-    # def save(self) -> None:
-    #     """Save all circuits and data."""
-    #     # save(self._measurement['s11'], 'iq_data')
-    #     # save(self._measurement['s11'], 'iq_data')
-    #     # save(self._measurement['s11'], 'iq_data')
-    #     pass
-
-    def run(self,
-            circuits:  Any | List[Any],
-            n_shots:   int | None = None,
-            n_batches: int | None = None
-        ) -> None:
-        """Run all experimental methods.
-
-        Args:
-            circuits (Union[Any, List[Any]]): circuits to measure.
-            n_shots (Union[int, None], optional): number of shots per batch. 
-                Defaults to None.
-            n_batches (Union[int, None], optional): number of batches of shots.
-                Defaults to None.
-        """
-        super().run(circuits, n_shots, n_batches)
+        if not self._transpiled_circuits.is_empty:
+            post_process(
+                self._config, self._measurements, self._transpiled_circuits
+            )

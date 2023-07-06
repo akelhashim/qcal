@@ -679,9 +679,9 @@ readout:
     - 6
     - 7
   delay: 6.0e-07
-  herald: false
+  herald: true
   length: 4.0e-06
-  reset: 100000.0
+  reset: 1.0e-5
   sample_rate: 500000000.0
   env: cosine_square
   kwargs:
@@ -690,7 +690,7 @@ readout:
 reset:
   active:
     enable: false
-    n_resets: 1
+    n_resets: 10
     feedback_delay: 2.0e-07
   passive:
     delay: 0.0005

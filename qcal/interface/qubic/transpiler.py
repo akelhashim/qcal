@@ -207,7 +207,7 @@ def add_virtualz_gate(config: Config, gate: Gate, circuit: List) -> None:
         circuit (List):  qubic circuit.
     """
     circuit.append(
-        {'name': 'virtualz',
+        {'name': 'virtual_z',
          'qubit': [f'Q{gate.qubits[0]}'],
         #  'freq': config.single_qubit[gate.qubits[0]][subspace].freq[0],
          'phase': gate.properties['params']['phase']}
@@ -228,7 +228,7 @@ def add_single_qubit_gate(config: Config, gate: Gate, circuit: List) -> None:
 
         if pulse['env'] == 'virtualz':
             circuit.append(
-                {'name': 'virtualz',
+                {'name': 'virtual_z',
                  'qubit': [pulse['channel'][:2]],
                 # 'freq': config.single_qubit[gate.qubits[0]][subspace].freq[0]
                  'phase': pulse['kwargs']['phase']
@@ -264,7 +264,7 @@ def add_multi_qubit_gate(config: Config, gate: Gate, circuit: List) -> None:
 
         if pulse['env'] == 'virtualz':
             circuit.append(
-                {'name': 'virtualz',
+                {'name': 'virtual_z',
                  'qubit': [pulse['channel'][:2]],
                 # 'freq': config.single_qubit[gate.qubits[0]][subspace].freq[0]
                  'phase': pulse['kwargs']['phase']
