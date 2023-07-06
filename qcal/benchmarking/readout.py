@@ -1,6 +1,8 @@
-"""Submodule for readout characterization routines.
+"""Submodule for readout benchmarking routines.
 
 """
+import qcal.settings as settings
+
 from qcal.circuit import Barrier, Cycle, Circuit, CircuitSet
 from qcal.compilation.compiler import Compiler
 from qcal.config import Config
@@ -31,8 +33,8 @@ def ReadoutFidelity(
 
     Basic example useage:
 
-        rfid = ReadoutFidelity(CustomQPU, cfg, [0, 1, 2])
-        rfid.run()
+        ro = ReadoutFidelity(CustomQPU, cfg, [0, 1, 2])
+        ro.run()
 
     Args:
         qpu (QPU): custom QPU class.
@@ -63,27 +65,6 @@ def ReadoutFidelity(
         
         This class inherits a custom QPU from the ReadoutFidelity function.
         """
-
-        __slots__ = (
-            '_config',
-            '_qubits',
-            '_gate',
-            '_compiler',
-            '_transpiler',
-            '_n_shots',
-            '_n_batches',
-            '_n_circs_per_seq',
-            '_n_levels',
-            '_circuits',
-            '_compiled_circuits',
-            '_translated_ciruits',
-            '__exp_circuits',
-            '_sequence',
-            '_measurement',
-            '_runtime',
-            '_data_manager',
-            '_confusion_mat'
-        )
 
         def __init__(self, 
                 config:          Config,
@@ -140,7 +121,7 @@ def ReadoutFidelity(
 
         def generate_circuits(self):
             """Generate the readout calibration circuits."""
-            logger.info('Generating circuits...')
+            logger.info(' Generating circuits...')
 
             circuits = [
                 Circuit([
@@ -181,46 +162,47 @@ def ReadoutFidelity(
 
                 self._circuits = CircuitSet(circuits)
                 self._circuits._df['Prep state'] = [
-                    n for n in range(len(self._n_levels))
+                    n for n in range(self._n_levels)
                 ]
 
-            def analyze(self):
-                """Analyze the data and generate confusion matrices."""
-                logger.info('Analyzing the data...')
+        def analyze(self):
+            """Analyze the data and generate confusion matrices."""
+            logger.info(' Analyzing the data...')
 
-                index = [
-                    ['Prep State'] * self._n_levels,
-                    [n for n in range(self._n_levels)]
-                ]
-                columns = [[], [], []]
-                for q in self._qubits:
-                    columns[0].extend([f'Q{q}'] * self._n_levels)
-                    columns[1].extend(['Meas State'] * self._n_levels)
-                    columns[2].extend([n for n in range(self._n_levels)])
+            index = [
+                ['Prep State'] * self._n_levels,
+                [n for n in range(self._n_levels)]
+            ]
+            columns = [[], [], []]
+            for q in self._qubits:
+                columns[0].extend([f'Q{q}'] * self._n_levels)
+                columns[1].extend(['Meas State'] * self._n_levels)
+                columns[2].extend([n for n in range(self._n_levels)])
 
-                self._confusion_mat = pd.DataFrame(
-                    columns=columns, index=index
-                )
+            self._confusion_mat = pd.DataFrame(
+                columns=columns, index=index
+            )
 
-                for i, circuit in enumerate(self._circuits):  # i = prep state
-                    for j, q in enumerate(self._qubits):  # j, q = idx, qubit
-                        self._confusion_mat.iloc[i].loc[f'Q{q}'][
-                            'Meas State'] = (
-                            circuit.results.marginalize(j).probabilities
-                        )
+            for i, circuit in enumerate(self._circuits):  # i = prep state
+                for j, q in enumerate(self._qubits):  # j, q = idx, qubit
+                    self._confusion_mat.iloc[i].loc[f'Q{q}'][
+                        'Meas State'] = (
+                        circuit.results.marginalize(j).probabilities
+                    )
 
-            def save(self):
-                """Save all circuits and data."""
-                super().save()
-                self._data_manager.save(
-                    self._confusion_mat, 'confusion_matrix'
-                )
+        def save(self):
+            """Save all circuits and data."""
+            super().save()
+            self._data_manager.save(
+                self._confusion_mat, 'confusion_matrix'
+            )
 
-            def run(self):
-                """Run all experimental methods and analyze results."""
-                self.generate_circuits()
-                super().run(self._circuits)
-                self.analyze()
+        def run(self):
+            """Run all experimental methods and analyze results."""
+            self.generate_circuits()
+            super().run(self._circuits)
+            self.analyze()
+            if settings.Settings.save_data:
                 self.save()
 
 
