@@ -667,6 +667,14 @@ class CircuitSet:
         else:
             return self._df[idx_or_label]
         
+    def __setitem__(self, label: str, value: Any) -> None:
+        """Assign a new column in the dataframe.
+
+        Args:
+            label (str): column header.
+            value (Any): column data.
+        """
+        self._df[label] = value    
 
     def __call__(self) -> pd.DataFrame:
         return self._df
@@ -717,9 +725,14 @@ class CircuitSet:
         """
         return self.circuit.to_list()
 
-    # @property
-    # def results(self) -> pd.Series:
-    #     return self._df['Results']
+    @property
+    def is_empty(self) -> bool:
+        """Whether or not the CircuitSet has circuits.
+
+        Returns:
+            bool: whether or not the dataframe is empty.
+        """
+        return False if self.n_circuits > 0 else True
     
     def append(self, circuits, index=None):
         """Appends circuit(s) to the circuit collection."""

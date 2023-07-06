@@ -71,8 +71,7 @@ class DataMananger:
         """Create a directory for data if none exists."""
         base_dir = settings.Settings.data_save_path
         self._save_path = (
-            base_dir + f'{self._date}/' + self._date.replace('-', '') +
-            f'{self._exp_id}/' + self._exp_id
+            base_dir + f'{self._date}/' + f'{self._exp_id}/' + self._exp_id
         )
         
         path = pathlib.Path(self._save_path)

@@ -31,7 +31,7 @@ def format_gate_text(gate: Gate):
     text += f'Dim: {gate.dim}<br>'
     text += (
         'Matrix: <br>  ' 
-        + np.array_str(gate.matrix).replace("\n ", "<br>" + '   ') 
+        + np.array_str(np.around(gate.matrix, 3)).replace("\n ", "<br>" + '   ') 
         + '<br>'
     )
     if gate.locally_equivalent is not None:
@@ -115,12 +115,13 @@ def draw_circuit(circuit: Circuit, show: bool = True):
     node_trace.text = node_text
 
     edge_traces = []
-    q0 = circuit.qubits[0]
-    for i in range(q0, circuit.circuit_width + q0):
+    # q0 = circuit.qubits[0]
+    # for i in range(q0, circuit.circuit_width + q0):
+    for i, q in enumerate(circuit.qubits):
         edge_x = []
         for j in range(1, circuit.circuit_depth):
             edge_x.extend([j-1, j])
-        edge_y = [i]*(2*(circuit.circuit_depth - 2) + 2)
+        edge_y = [q]*(2*(circuit.circuit_depth - 2) + 2)
         edge_traces.append(
             go.Scatter(
                 x=edge_x, y=edge_y,

@@ -353,7 +353,7 @@ class Config:
         Returns:
             list[tuple]: qubit pairs.
         """
-        return [eval(key) for key in self.get('two_qubit').keys()]
+        return [eval(key) for key in self.parameters['two_qubit'].keys()]
     
     def get(self, param: List[Any]) -> Any:
         """Get the parameter from the config (if it exists).

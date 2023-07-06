@@ -51,7 +51,7 @@ class QPU:
         '_circuits',
         '_compiled_circuits',
         '_transpiled_circuits',
-        '__exp_circuits',
+        '_exp_circuits',
         '_sequence',
         '_measurements',
         '_runtime',
@@ -98,8 +98,8 @@ class QPU:
 
         self._circuits = None
         self._compiled_circuits = None
-        self._transpiled_circuits = CircuitSet()
-        self.__exp_circuits = None
+        self._transpiled_circuits = None
+        self._exp_circuits = None
         self._sequence = None
         self._measurements = []
         self._runtime = None
@@ -124,37 +124,31 @@ class QPU:
         return self._compiler
 
     @property
-    def circuits(self) -> Any | pd.DataFrame:
+    def circuits(self) -> Any:
         """Circuits.
 
         Returns:
-            Any | pd.DataFrame: all loaded circuits.
+            Any: all loaded circuits.
         """
-        if isinstance(self._circuits, CircuitSet):
-            return self._circuits._df
-        else:
-            return self._circuits
+        return self._circuits
 
     @property
-    def compiled_circuits(self) -> Any | pd.DataFrame:
+    def compiled_circuits(self) -> Any:
         """Compiled circuits.
 
         Returns:
-            Any | pd.DataFrame: all compiled circuits.
+            Any: all compiled circuits.
         """
-        if isinstance(self._compiled_circuits, CircuitSet):
-            return self._compiled_circuits._df
-        else:
-            return self._compiled_circuits
+        return self._compiled_circuits
         
     @property
-    def transpiled_circuits(self) -> pd.DataFrame:
+    def transpiled_circuits(self) -> Any:
         """Transpiled circuits.
 
         Returns:
-            pd.DataFrame: all transpiled circuits.
+            Any: all transpiled circuits.
         """
-        self._transpiled_circuits._df
+        return self._transpiled_circuits
 
     @property
     def data_manager(self) -> DataMananger:
@@ -166,7 +160,7 @@ class QPU:
         return self._data_manager
     
     @property
-    def seq(self):
+    def sequence(self):
         """Returns the current sequence.
         
         Returns:
@@ -189,14 +183,15 @@ class QPU:
                 Defaults to None.
         """
         self._data_manager.generate_exp_id()  # Create a new experimental id
-        
         if isinstance(circuits, List):
             self._circuits = CircuitSet(circuits=circuits)
             self._compiled_circuits = CircuitSet()
+            self._transpiled_circuits = CircuitSet()
         else:
             self._circuits = circuits
             self._compiled_circuits = circuits.__class__()
-        self.__exp_circuits = self._circuits
+            self._transpiled_circuits = circuits.__class__() # TODO
+        self._exp_circuits = self._circuits
 
         if n_shots is not None:
             self._n_shots = n_shots
@@ -213,6 +208,43 @@ class QPU:
             'Total':      0.0},
           index=['Time (s)']
         )
+        
+    def compile(self) -> None:
+        """Compile the circuits using a custom compiler."""
+        self._exp_circuits = self._compiler.compile(
+            self._exp_circuits
+        )
+        self._compiled_circuits.append(self._exp_circuits)
+
+    def transpile(self) -> None:
+        """Transpile the circuits from some other format to qcal circuits."""
+        self._exp_circuits = self._transpiler.transpile(
+            self._exp_circuits
+        )
+        self._transpiled_circuits.append(self._exp_circuits)
+        
+    def generate_sequence(self, circuits: Iterable) -> None:
+        """Generate a sequence from circuits."""
+        pass
+
+    def write(self) -> None:
+        """Write the sequence to hardware."""
+        pass
+
+    def acquire(self) -> None:
+        """Measure the sequence.
+
+        The output of this method should be appended to self._measurements.
+        """
+        pass
+
+    def process(self) -> None:
+        """Post-process the data.
+        
+        The method should assign a results dictionary as an attribute to each
+        circuit.
+        """
+        pass
 
     # def measure(self, circuits: Any) -> None:
     def measure(self) -> None:
@@ -224,7 +256,6 @@ class QPU:
         if self._compiler is not None:
             logger.info(' Compiling circuits...')
             t0 = timeit.default_timer()
-            # compiled_circuits = self.compile(circuits)
             self.compile()
             self._runtime['Compile'][0] += round(
                     timeit.default_timer() - t0, 1
@@ -233,7 +264,6 @@ class QPU:
         if self._transpiler is not None:
             logger.info(' Transpiling circuits...')
             t0 = timeit.default_timer()
-            # transpiled_circuits = self.transpile(compiled_circuits)
             self.transpile()
             self._runtime['Transpile'][0] += round(
                     timeit.default_timer() - t0, 1
@@ -241,7 +271,6 @@ class QPU:
         
         logger.info(' Generating sequences...')
         t0 = timeit.default_timer()
-        # self.generate_sequence(transpiled_circuits)
         self.generate_sequence()
         self._runtime['Sequencing'][0] += round(
             timeit.default_timer() - t0, 1
@@ -260,13 +289,6 @@ class QPU:
         self._runtime['Measure'][0] += round(
                 timeit.default_timer() - t0, 1
             )
-
-        logger.info(' Processing...')
-        t0 = timeit.default_timer()
-        self.process()
-        self._runtime['Process'][0] += round(
-                timeit.default_timer() - t0, 1
-            )
         
     def batched_measurement(self) -> None:
         """Measurement batcher."""
@@ -280,101 +302,35 @@ class QPU:
         
         for i, circuits in enumerate(
             self._circuits.batch(self._n_circs_per_seq)):
-            self.__exp_circuits = circuits
+            self._exp_circuits = circuits
             if i > 4:
                 clear_output(wait=True)
             logger.info(
-                f'Batch {i+1}/{n_circ_batches}: {circuits.n_circuits} circuits'
+             f' Batch {i+1}/{n_circ_batches}: {circuits.n_circuits} circuit(s)'
             )
-            # self.measure(circuits)
             self.measure()
-
-    # def compile(self, circuits: Iterable) -> Iterable:
-    #     """Compile all circuits using a custom compiler.
-
-    #     Args:
-    #         circuits (Iterable): circuits to compile.
-
-    #     Returns:
-    #         Iterable: compiled circuits.
-    #     """
-    #     if self._compiler is not None:
-    #         if isinstance(circuits, CircuitSet):
-    #             compiled_circuits = self._compiler.compile(circuits.circuit)
-    #             self._compiled_circuits.append(compiled_circuits)
-    #         else:
-    #             compiled_circuits = self._compiler.compile(self._circuits)
-    #         return compiled_circuits
-    #     else:
-    #         return circuits
-        
-    def compile(self) -> None:
-        """Compile the circuits using a custom compiler."""
-        self.__exp_circuits = self._compiler.compile(
-            self.__exp_circuits
-        )
-        self._compiled_circuits.append(self.__exp_circuits)
-
-    # def transpile(self, circuits: Iterable) -> Iterable:
-    #     """Transpile circuits from some other format to qcal circuits.
-
-    #     Args:
-    #         circuits (Iterable): circuits to transpile.
-
-    #     Returns:
-    #         Iterable: transpiled circuits.
-    #     """
-    #     if self._transpiler is not None:
-    #         if isinstance(circuits, CircuitSet):
-    #             transpiled_circuits = self._transpiler.transpile(
-    #                     circuits.circuit
-    #                 )
-    #             self._transpiled_circuits.append(transpiled_circuits)
-    #         else:
-    #             transpiled_circuits = self._transpiler.transpile(circuits)
-    #         return transpiled_circuits
-    #     else:
-    #         return circuits
-
-    def transpile(self) -> None:
-        """Transpile the circuits from some other format to qcal circuits."""
-        self.__exp_circuits = self._transpiler.transpile(
-            self.__exp_circuits
-        )
-        self._transpiled_circuits.append(self.__exp_circuits)
-        
-    def generate_sequence(self, circuits: Iterable) -> None:
-        """Generate a sequence from circuits."""
-        pass
-
-    def write(self) -> None:
-        """Write the sequence to hardware."""
-        pass
-
-    def acquire(self) -> None:
-        """Measure the sequence.
-
-        The output of this method should be appended to self._measurements.
-        """
-        pass
-
-    def process(self) -> None:
-        """Post-process the data."""
-        pass
 
     def save(self) -> None:
         """Save all circuits."""
+        self._data_manager.create_data_save_path()
         self._data_manager.save(self._circuits, 'circuits')
-        self._data_manager.save(self._compiled_circuits, 'compiled_circuits')
-        self._data_manager.save(
-            self._transpiled_circuits, 'transpiled_circuits'
-        )
+
+        if not self._compiled_circuits.is_empty:
+            self._data_manager.save(
+                self._compiled_circuits, 'compiled_circuits'
+            )
+
+        if not self._transpiled_circuits.is_empty: 
+            self._data_manager.save(
+                self._transpiled_circuits, 'transpiled_circuits'
+            )
+
         self._data_manager.save(self._measurements, 'measurements')
         self._runtime.to_csv(
             f'{self._data_manager.save_path}_runtime.csv'
         )
 
-        logger.info(f"Data save location: {self._data_manager.save_path}*\n")
+        logger.info(f" Data save location: {self._data_manager.save_path}*\n")
 
     def run(self,
             circuits:  Any | List[Any],
@@ -393,11 +349,18 @@ class QPU:
         t_start = timeit.default_timer()
         self.initialize(circuits, n_shots, n_batches)
         
-        if self._circuits.n_circuits >= self._n_circs_per_seq:
-            logger.info('No batching...')
-            self.measure(self._circuits)
+        if self._circuits.n_circuits <= self._n_circs_per_seq:
+            logger.info(' No batching...')
+            self.measure()
         else:
             self.batched_measurement()
+
+        logger.info(' Processing...')
+        t0 = timeit.default_timer()
+        self.process()
+        self._runtime['Process'][0] += round(
+                timeit.default_timer() - t0, 1
+            )
 
         self._runtime['Total'][0] += round(timeit.default_timer() - t_start, 1)
 
