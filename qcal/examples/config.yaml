@@ -14,10 +14,10 @@ single_qubit:
             phase: 0.0
         - channel: Q0.qdrv
           env: DRAG
-          length: 2.4e-08
+          length: 3.0e-08
           kwargs:
             alpha: 0.0
-            amp: 0.1
+            amp: 0.15873
             anh: -270000000.0
             df: 0.0
             phase: 0.0
@@ -30,9 +30,9 @@ single_qubit:
         pulse:
         - channel: Q0.qdrv
           env: cosine_square
-          length: 4.8e-08
+          length: 6.0e-08
           kwargs:
-            amp: 0.1
+            amp: 0.15
             phase: 0.0
             ramp_fraction: 0.25
     EF:
@@ -44,18 +44,18 @@ single_qubit:
         pulse:
         - channel: Q0.qdrv
           env: cosine_square
-          length: 2.4e-08
+          length: 3.0e-08
           kwargs:
-            amp: 0.1
+            amp: 0.4
             phase: 0.0
             ramp_fraction: 0.25
       X:
         pulse:
         - channel: Q0.qdrv
           env: cosine_square
-          length: 4.8e-08
+          length: 6.0e-08
           kwargs:
-            amp: 0.1
+            amp: 0.4
             phase: 0.0
             ramp_fraction: 0.25
   1:
@@ -73,10 +73,10 @@ single_qubit:
             phase: 0.0
         - channel: Q1.qdrv
           env: DRAG
-          length: 2.4e-08
+          length: 3.0e-08
           kwargs:
             alpha: 0.0
-            amp: 0.1
+            amp: 0.72102
             anh: -270000000.0
             df: 0.0
             phase: 0.0
@@ -89,9 +89,9 @@ single_qubit:
         pulse:
         - channel: Q1.qdrv
           env: cosine_square
-          length: 4.8e-08
+          length: 6.0e-08
           kwargs:
-            amp: 0.1
+            amp: 0.45
             phase: 0.0
             ramp_fraction: 0.25
     EF:
@@ -103,18 +103,18 @@ single_qubit:
         pulse:
         - channel: Q1.qdrv
           env: cosine_square
-          length: 2.4e-08
+          length: 3.0e-08
           kwargs:
-            amp: 0.1
+            amp: 0.57
             phase: 0.0
             ramp_fraction: 0.25
       X:
         pulse:
         - channel: Q1.qdrv
           env: cosine_square
-          length: 4.8e-08
+          length: 6.0e-08
           kwargs:
-            amp: 0.1
+            amp: 0.57
             phase: 0.0
             ramp_fraction: 0.25
   2:
@@ -132,10 +132,10 @@ single_qubit:
             phase: 0.0
         - channel: Q2.qdrv
           env: DRAG
-          length: 2.4e-08
+          length: 3.0e-08
           kwargs:
             alpha: 0.0
-            amp: 0.1
+            amp: 0.49616
             anh: -270000000.0
             df: 0.0
             phase: 0.0
@@ -148,9 +148,9 @@ single_qubit:
         pulse:
         - channel: Q2.qdrv
           env: cosine_square
-          length: 4.8e-08
+          length: 6.0e-08
           kwargs:
-            amp: 0.1
+            amp: 0.38
             phase: 0.0
             ramp_fraction: 0.25
     EF:
@@ -162,18 +162,18 @@ single_qubit:
         pulse:
         - channel: Q2.qdrv
           env: cosine_square
-          length: 2.4e-08
+          length: 3.0e-08
           kwargs:
-            amp: 0.1
+            amp: 0.2
             phase: 0.0
             ramp_fraction: 0.25
       X:
         pulse:
         - channel: Q2.qdrv
           env: cosine_square
-          length: 4.8e-08
+          length: 6.0e-08
           kwargs:
-            amp: 0.1
+            amp: 0.2
             phase: 0.0
             ramp_fraction: 0.25
   3:
@@ -191,10 +191,10 @@ single_qubit:
             phase: 0.0
         - channel: Q3.qdrv
           env: DRAG
-          length: 2.4e-08
+          length: 3.0e-08
           kwargs:
             alpha: 0.0
-            amp: 0.1
+            amp: 0.2729
             anh: -270000000.0
             df: 0.0
             phase: 0.0
@@ -207,9 +207,9 @@ single_qubit:
         pulse:
         - channel: Q3.qdrv
           env: cosine_square
-          length: 4.8e-08
+          length: 6.0e-08
           kwargs:
-            amp: 0.1
+            amp: 0.17
             phase: 0.0
             ramp_fraction: 0.25
     EF:
@@ -221,18 +221,18 @@ single_qubit:
         pulse:
         - channel: Q3.qdrv
           env: cosine_square
-          length: 2.4e-08
+          length: 3.0e-08
           kwargs:
-            amp: 0.1
+            amp: 0.22
             phase: 0.0
             ramp_fraction: 0.25
       X:
         pulse:
         - channel: Q3.qdrv
           env: cosine_square
-          length: 4.8e-08
+          length: 6.0e-08
           kwargs:
-            amp: 0.1
+            amp: 0.22
             phase: 0.0
             ramp_fraction: 0.25
   4:
@@ -250,10 +250,10 @@ single_qubit:
             phase: 0.0
         - channel: Q4.qdrv
           env: DRAG
-          length: 2.4e-08
+          length: 3.0e-08
           kwargs:
             alpha: 0.0
-            amp: 0.1
+            amp: 0.66027
             anh: -270000000.0
             df: 0.0
             phase: 0.0
@@ -266,9 +266,9 @@ single_qubit:
         pulse:
         - channel: Q4.qdrv
           env: cosine_square
-          length: 4.8e-08
+          length: 6.0e-08
           kwargs:
-            amp: 0.1
+            amp: 0.11
             phase: 0.0
             ramp_fraction: 0.25
     EF:
@@ -280,18 +280,18 @@ single_qubit:
         pulse:
         - channel: Q4.qdrv
           env: cosine_square
-          length: 2.4e-08
+          length: 3.0e-08
           kwargs:
-            amp: 0.1
+            amp: 0.29
             phase: 0.0
             ramp_fraction: 0.25
       X:
         pulse:
         - channel: Q4.qdrv
           env: cosine_square
-          length: 4.8e-08
+          length: 6.0e-08
           kwargs:
-            amp: 0.1
+            amp: 0.29
             phase: 0.0
             ramp_fraction: 0.25
   5:
@@ -309,10 +309,10 @@ single_qubit:
             phase: 0.0
         - channel: Q5.qdrv
           env: DRAG
-          length: 2.4e-08
+          length: 3.0e-08
           kwargs:
             alpha: 0.0
-            amp: 0.1
+            amp: 0.13
             anh: -270000000.0
             df: 0.0
             phase: 0.0
@@ -325,9 +325,9 @@ single_qubit:
         pulse:
         - channel: Q5.qdrv
           env: cosine_square
-          length: 4.8e-08
+          length: 6.0e-08
           kwargs:
-            amp: 0.1
+            amp: 0.13
             phase: 0.0
             ramp_fraction: 0.25
     EF:
@@ -339,18 +339,18 @@ single_qubit:
         pulse:
         - channel: Q5.qdrv
           env: cosine_square
-          length: 2.4e-08
+          length: 3.0e-08
           kwargs:
-            amp: 0.1
+            amp: 0.2
             phase: 0.0
             ramp_fraction: 0.25
       X:
         pulse:
         - channel: Q5.qdrv
           env: cosine_square
-          length: 4.8e-08
+          length: 6.0e-08
           kwargs:
-            amp: 0.1
+            amp: 0.2
             phase: 0.0
             ramp_fraction: 0.25
   6:
@@ -368,10 +368,10 @@ single_qubit:
             phase: 0.0
         - channel: Q6.qdrv
           env: DRAG
-          length: 2.4e-08
+          length: 3.0e-08
           kwargs:
             alpha: 0.0
-            amp: 0.1
+            amp: 0.52
             anh: -270000000.0
             df: 0.0
             phase: 0.0
@@ -384,9 +384,9 @@ single_qubit:
         pulse:
         - channel: Q6.qdrv
           env: cosine_square
-          length: 4.8e-08
+          length: 6.0e-08
           kwargs:
-            amp: 0.1
+            amp: 0.52
             phase: 0.0
             ramp_fraction: 0.25
     EF:
@@ -398,18 +398,18 @@ single_qubit:
         pulse:
         - channel: Q6.qdrv
           env: cosine_square
-          length: 2.4e-08
+          length: 3.0e-08
           kwargs:
-            amp: 0.1
+            amp: 0.72
             phase: 0.0
             ramp_fraction: 0.25
       X:
         pulse:
         - channel: Q6.qdrv
           env: cosine_square
-          length: 4.8e-08
+          length: 6.0e-08
           kwargs:
-            amp: 0.1
+            amp: 0.72
             phase: 0.0
             ramp_fraction: 0.25
   7:
@@ -427,10 +427,10 @@ single_qubit:
             phase: 0.0
         - channel: Q7.qdrv
           env: DRAG
-          length: 2.4e-08
+          length: 3.0e-08
           kwargs:
             alpha: 0.0
-            amp: 0.1
+            amp: 0.4
             anh: -270000000.0
             df: 0.0
             phase: 0.0
@@ -443,9 +443,9 @@ single_qubit:
         pulse:
         - channel: Q7.qdrv
           env: cosine_square
-          length: 4.8e-08
+          length: 6.0e-08
           kwargs:
-            amp: 0.1
+            amp: 0.4
             phase: 0.0
             ramp_fraction: 0.25
     EF:
@@ -457,18 +457,18 @@ single_qubit:
         pulse:
         - channel: Q7.qdrv
           env: cosine_square
-          length: 2.4e-08
+          length: 3.0e-08
           kwargs:
-            amp: 0.1
+            amp: 0.15
             phase: 0.0
             ramp_fraction: 0.25
       X:
         pulse:
         - channel: Q7.qdrv
           env: cosine_square
-          length: 4.8e-08
+          length: 6.0e-08
           kwargs:
-            amp: 0.1
+            amp: 0.15
             phase: 0.0
             ramp_fraction: 0.25
 two_qubit:
@@ -751,7 +751,7 @@ readout:
   delay: 6.0e-07
   herald: true
   length: 4.0e-06
-  reset: 1.0e-5
+  reset: 1.0e-05
   sample_rate: 500000000.0
   env: cosine_square
   kwargs:

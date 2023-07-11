@@ -290,29 +290,41 @@ class QPU:
                 timeit.default_timer() - t0, 1
             )
         
-    def batched_measurement(self) -> None:
+    def batch_measurements(self) -> None:
         """Measurement batcher."""
-        n_circ_batches = int(
-                np.ceil(self._circuits.n_circuits / self._n_circs_per_seq)
-            )
-        logger.info(
-            f' Dividing {self._circuits.n_circuits} circuits into '
-            f'{n_circ_batches} batches of size {self._n_circs_per_seq}...'
-        )
-        
-        for i, circuits in enumerate(
-            self._circuits.batch(self._n_circs_per_seq)):
-            self._exp_circuits = circuits
-            if i > 4:
-                clear_output(wait=True)
-            logger.info(
-             f' Batch {i+1}/{n_circ_batches}: {circuits.n_circuits} circuit(s)'
-            )
+        if self._circuits.n_circuits <= self._n_circs_per_seq:
+            logger.info(' No batching...')
             self.measure()
+        
+        else: 
+            n_circ_batches = int(
+                    np.ceil(self._circuits.n_circuits / self._n_circs_per_seq)
+                )
+            logger.info(
+                f' Dividing {self._circuits.n_circuits} circuits into '
+                f'{n_circ_batches} batches of size {self._n_circs_per_seq}...'
+            )
+            
+            for i, circuits in enumerate(
+                self._circuits.batch(self._n_circs_per_seq)):
+                self._exp_circuits = circuits
+                if i > 4:
+                    clear_output(wait=True)
+                logger.info(
+             f' Batch {i+1}/{n_circ_batches}: {circuits.n_circuits} circuit(s)'
+                )
+                self.measure()
+
+        logger.info(' Processing...')
+        t0 = timeit.default_timer()
+        self.process()
+        self._runtime['Process'][0] += round(
+                timeit.default_timer() - t0, 1
+            )
 
     def save(self) -> None:
         """Save all circuits."""
-        self._data_manager.create_data_save_path()
+        self._data_manager.create_data_path()
         self._data_manager.save_to_pickle(self._circuits, 'circuits')
 
         if not self._compiled_circuits.is_empty:
@@ -334,7 +346,8 @@ class QPU:
     def run(self,
             circuits:  Any | List[Any],
             n_shots:   int | None = None,
-            n_batches: int | None = None
+            n_batches: int | None = None,
+            save:      bool = True
         ) -> None:
         """Run all experimental methods.
 
@@ -344,27 +357,18 @@ class QPU:
                 Defaults to None.
             n_batches (Union[int, None], optional): number of batches of shots.
                 Defaults to None.
+            save (bool): whether or not to save data at the end of the run
+                method. Defaults to True. This should be used for determining
+                when the data is saved for custom QPUs which inherit this 
+                class.
         """
         t_start = timeit.default_timer()
         self.initialize(circuits, n_shots, n_batches)
-        
-        if self._circuits.n_circuits <= self._n_circs_per_seq:
-            logger.info(' No batching...')
-            self.measure()
-        else:
-            self.batched_measurement()
-
-        logger.info(' Processing...')
-        t0 = timeit.default_timer()
-        self.process()
-        self._runtime['Process'][0] += round(
-                timeit.default_timer() - t0, 1
-            )
-
+        self.batch_measurements()
         self._runtime['Total'][0] += round(timeit.default_timer() - t_start, 1)
 
         clear_output(wait=True)
-        logger.info(" Done!")
-        if settings.Settings.save_data:
+        if settings.Settings.save_data and save:
             self.save()
+        
         print(f"Runtime: {repr(self._runtime)[8:]}\n")

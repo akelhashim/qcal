@@ -27,7 +27,7 @@ class DataMananger:
         """Initialize a DataManager.
         """
         self._date = datetime.today().strftime('%Y-%m-%d')
-        self._exp_id = datetime.now().strftime('%H%M%S')
+        self._exp_id = datetime.now().strftime('%Y%m%d_%H%M%S')
         self._save_path = None
 
     def __repr__(self) -> str:
@@ -63,18 +63,22 @@ class DataMananger:
         Returns:
             str: path where data is saved.
         """
+        return self._save_path
     
     def generate_exp_id(self) -> None:
         """Generate a new experimental id."""
-        # self._exp_id = datetime.now().strftime('%Y%m%d_%H%M%S')
-        self._exp_id = datetime.now().strftime('%H%M%S')
+        self._exp_id = datetime.now().strftime('%Y%m%d_%H%M%S')
+        # self._exp_id = datetime.now().strftime('%H%M%S')
 
-    def create_data_save_path(self) -> None:
+    def create_data_path(self) -> None:
         """Create a directory for data if none exists."""
-        base_dir = settings.Settings.data_save_path
+        base_dir = settings.Settings.data_path
         self._save_path = base_dir + f'{self._date}/' + f'{self._exp_id}/'
-        path = pathlib.Path(self._save_path)
-        path.mkdir(parents=True, exist_ok=True)
+        try:
+            path = pathlib.Path(self._save_path)
+            path.mkdir(parents=True, exist_ok=True)
+        except Exception as e:
+            logger.warning(f' {e.message}')
 
     def save_to_csv(self, data: pd.DataFrame, filename: str) -> None:
         """Save a dataframe to a csv file.

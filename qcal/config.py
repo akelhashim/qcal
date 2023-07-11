@@ -373,7 +373,7 @@ class Config:
                 cfg_param =  cfg_param[p]
             return cfg_param
         except Exception:
-            logger.warning(f"Parameter '{param}' not found in the config!")
+            logger.warning(f' Parameter {param} not found in the config!')
             return None
         
     def set(self, param: List[str], newvalue: Any) -> None:
@@ -385,9 +385,12 @@ class Config:
                 (e.g. ['single_qubit', 0, 'GE', 'freq']).
             newvalue (Any): new value to assign to the parameter.
         """
+        newvalue = (round(float(newvalue), 5) if isinstance(newvalue, float) 
+            else newvalue
+        )
         cfg_param = self.get(param[:-1])
         cfg_param[param[-1]] = newvalue
-        logger.info(f'Param {param} set to {newvalue}.')
+        logger.info(f' Param {param} set to {newvalue}.')
         
     def items(self) -> tuple:
         return self._parameters.items()
