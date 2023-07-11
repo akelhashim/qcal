@@ -49,6 +49,7 @@ def post_process(config: Config, measurements: List, circuits: Any) -> None:
     meas_qubits = set()
     for meas in measurements:
         meas_qubits |= set(meas['shots'].keys())
+    meas_qubits = sorted(meas_qubits)
 
     meas = {
         q: np.vstack([
@@ -59,7 +60,6 @@ def post_process(config: Config, measurements: List, circuits: Any) -> None:
 
     all_results = []
     for i, circuit in enumerate(circuits):
-        print
         # This assumes that the measurement results are at the very end
         results = pd.DataFrame(
             {q: meas[q][i][:,-1] for q in meas_qubits}

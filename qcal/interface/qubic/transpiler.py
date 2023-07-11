@@ -148,7 +148,7 @@ def add_measurement(
                 }
             )
         
-        circuit.append({'name': 'barrier', 'qubit': [f'Q{qubit}']})
+    circuit.append({'name': 'barrier', 'qubit': [f'Q{qubit}']})
 
     circuit.extend((
             {'name': 'pulse',
@@ -409,12 +409,12 @@ class Transpiler:
         params = [col for col in circuits._df.columns if 'param' in col]
         if params:
             transpiled_circuits = []
-            for i, circuit in enumerate(self._circuits):
+            for i, circuit in enumerate(circuits):
                 for param in params:  # [7:] removes the string 'param: '
-                    self._config[param[7:]] = self._circuits[param][i]
-                    transpiled_circuits.append(
-                        to_qubic(self._config, circuit, self._gate_mapper)
-                    )
+                    self._config[param[7:]] = circuits[param][i]
+                transpiled_circuits.append(
+                    to_qubic(self._config, circuit, self._gate_mapper)
+                )
             self._config.reload()  # Reload after making all the changes
 
         else:

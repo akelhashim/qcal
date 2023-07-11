@@ -99,12 +99,13 @@ class QubicQPU(QPU):
                 self,
                 config:              Config,
                 compiler:            Any | None = None,
-                transpiler:          Any | None = Transpiler,
+                transpiler:          Any | None = None,
                 n_shots:             int = 1024, 
                 n_batches:           int = 1, 
                 n_circs_per_seq:     int = 1,
                 n_levels:            int = 2,
                 n_reads_per_shot:    int | None = None,
+                outputs:             list[str] = ['s11', 'shots', 'counts'],
                 delay_per_shot:      float | None = 0,
                 reload_cmd:          bool = True,
                 reload_freq:         bool = True,
@@ -134,6 +135,11 @@ class QubicQPU(QPU):
                 per circuit. Defaults to None. If None, this will be computed
                 from the number of active resets and whether or not heralding
                 is used.
+            outputs (list[str]): what output data is desired for each
+                measurement. Defaults to ['s11', 'shots', 'counts']. 's11'
+                is to the integrated IQ data; 'shots' is the classified data
+                for each read; and 'counts' is the accumulated statistics
+                for each read. 
             delay_per_shot (float | None, optional): wait time between 
                 measuring and offloading the data. Defaults to 0. If 0, this
                 will be computed automatically. If None, this is computed by
@@ -158,7 +164,9 @@ class QubicQPU(QPU):
             rpc_ip_address (str, optional): IP address for remote measurements.
                 Defaults to '192.168.1.247'.
         """
-        super().__init__(
+        if transpiler is None:
+            transpiler = Transpiler(config)
+        QPU.__init__(self,
             config=config,
             compiler=compiler,
             transpiler=transpiler, 
@@ -177,6 +185,7 @@ class QubicQPU(QPU):
         self._n_reads_per_shot = (calculate_n_reads(config) 
             if n_reads_per_shot is None else n_reads_per_shot
         )
+        self._outputs = outputs
         self._delay_per_shot = delay_per_shot
         self._reload_cmd = reload_cmd
         self._reload_freq = reload_freq
@@ -285,7 +294,7 @@ class QubicQPU(QPU):
         measurement = self._jobman.build_and_run_circuits(
             self._sequence, 
             self._n_shots, 
-            ['s11', 'shots', 'counts'], 
+            self._outputs, 
             fit_gmm=False,
             reads_per_shot=self._n_reads_per_shot,
             delay_per_shot=self._delay_per_shot,
