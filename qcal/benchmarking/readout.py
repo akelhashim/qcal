@@ -13,7 +13,8 @@ from qcal.qpu.qpu import QPU
 import logging
 import pandas as pd
 
-from typing import Any, List, Tuple
+from IPython.display import clear_output
+from typing import Any, Callable, List, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -28,8 +29,9 @@ def ReadoutFidelity(
         n_shots:         int = 1024, 
         n_batches:       int = 1, 
         n_circs_per_seq: int = 1, 
-        n_levels:        int = 2
-    ) -> ReadoutFidelity:
+        n_levels:        int = 2,
+        **kwargs
+    ) -> Callable:
     """Function which passes a custom QPU to the ReadoutFidelity class.
 
     Basic example useage:
@@ -58,8 +60,9 @@ def ReadoutFidelity(
             measurement supports qutrit classification.
 
     Returns:
-        ReadoutFidelity: ReadoutFidelity class.
+        Callable: ReadoutFidelity class.
     """
+
 
     class ReadoutFidelity(qpu):
         """ReadoutFidelity class.
@@ -76,37 +79,21 @@ def ReadoutFidelity(
                 n_shots:         int = 1024, 
                 n_batches:       int = 1, 
                 n_circs_per_seq: int = 1, 
-                n_levels:        int = 2
+                n_levels:        int = 2,
+                **kwargs
             ) -> None:
             """Initialize the ReadoutFidelity class within the function.
 
-            Args:
-                config (Config): qcal config object.
-                qubits (List | Tuple): qubits to measure.
-                gate (str, optional): native gate used for state preparation.  
-                    Defaults to 'X90'.
-                compiler (Any | Compiler | None, optional): a custom compiler 
-                    to compile the experimental circuits. Defaults to None.
-                transpiler (Any | None, optional): a custom transpiler to 
-                    transpile the experimental circuits. Defaults to None.
-                n_shots (int, optional): number of measurements per circuit. 
-                    Defaults to 1024.
-                n_batches (int, optional): number of batches of measurements. 
-                    Defaults to 1.
-                n_circs_per_seq (int, optional): maximum number of circuits 
-                    that can be measured per sequence. Defaults to 1.
-                n_levels (int, optional): number of energy levels to be 
-                    measured. Defaults to 2. If n_levels = 3, this assumes 
-                    that the measurement supports qutrit classification.
             """
-            super().__init__(
+            qpu.__init__(self,
                 config, 
                 compiler, 
                 transpiler, 
                 n_shots, 
                 n_batches, 
                 n_circs_per_seq, 
-                n_levels
+                n_levels,
+                **kwargs
             )
             self._qubits = qubits
             assert gate in ('X90', 'X'), 'gate must be an X90 or X!'
@@ -125,17 +112,18 @@ def ReadoutFidelity(
             circuits = [
                 Circuit([
                     Cycle([Id(q) for q in self._qubits]),
-                    Barrier(),
-                    Cycle([Meas(q) for q in qubits])
+                    Barrier(self._qubits),
+                    Cycle([Meas(q) for q in self._qubits])
                 ])
             ]
             
             level = {1: 'GE', 2: 'EF'}
-            for n in range(1, self._n_levels):
+            for m in range(1, self._n_levels):
+                circuit = Circuit()
+                for n in range(1, m+1):
 
-                if self._gate == 'X90':
-                    circuits.append(
-                        Circuit([
+                    if self._gate == 'X90':
+                        circuit.extend([
                             Cycle(
                               [X90(q, subspace=level[n]) for q in self._qubits]
                             ),
@@ -143,26 +131,23 @@ def ReadoutFidelity(
                             Cycle(
                               [X90(q, subspace=level[n]) for q in self._qubits]
                             ),
-                            Barrier(self._qubits),
-                            Cycle([Meas(q) for q in qubits])
+                            Barrier(self._qubits)
                         ])
-                    )
 
-                elif self._gate == 'X':
-                    circuits.append(
-                        Circuit([
+                    elif self._gate == 'X':
+                        circuit.extend([
                             Cycle(
                                 [X(q, subspace=level[n]) for q in self._qubits]
                             ),
-                            Barrier(self._qubits),
-                            Cycle([Meas(q) for q in qubits])
+                            Barrier(self._qubits)
+                            
                         ])
-                    )
 
-                self._circuits = CircuitSet(circuits)
-                self._circuits._df['Prep state'] = [
-                    n for n in range(self._n_levels)
-                ]
+                circuit.measure()
+                circuits.append(circuit)
+
+            self._circuits = CircuitSet(circuits)
+            self._circuits['Prep state'] = [n for n in range(self._n_levels)]
 
         def analyze(self):
             """Analyze the data and generate confusion matrices."""
@@ -191,7 +176,7 @@ def ReadoutFidelity(
 
         def save(self):
             """Save all circuits and data."""
-            super().save()
+            qpu.save(self)
             self._data_manager.save_to_csv(
                 self._confusion_mat, 'confusion_matrix'
             )
@@ -199,11 +184,13 @@ def ReadoutFidelity(
         def run(self):
             """Run all experimental methods and analyze results."""
             self.generate_circuits()
-            super().run(self._circuits)
+            qpu.run(self, self._circuits, save=False)
             self.analyze()
+            clear_output(wait=True)
             if settings.Settings.save_data:
                 self._data_manager._exp_id += '_readout_fidelity'
                 self.save()
+            print(f"Runtime: {repr(self._runtime)[8:]}\n")
 
 
     return ReadoutFidelity(
