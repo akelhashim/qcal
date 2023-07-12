@@ -140,7 +140,6 @@ def ReadoutFidelity(
                                 [X(q, subspace=level[n]) for q in self._qubits]
                             ),
                             Barrier(self._qubits)
-                            
                         ])
 
                 circuit.measure()

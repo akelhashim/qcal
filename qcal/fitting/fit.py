@@ -13,7 +13,9 @@ logger = logging.getLogger(__name__)
 
 
 __all__ = (
-    'CosineFit'
+    'CosineFit',
+    'ExponentialFit',
+    'ParabolaFit',
 )
 
 
@@ -95,7 +97,7 @@ class Fit:
                 self._fit_function, x, y, **kwargs
             )
             self._fit_success = True
-        except FitError:
+        except Exception:
             logger.warning(f' Failed to fit data to {self._fit_function}!')
 
     def predict(self, x: ArrayLike) -> ArrayLike:
@@ -115,6 +117,14 @@ class CosineFit(Fit):
 
     def __init__(self, fit_function: Callable = cosine) -> None:
         """Initialize a cosine fitter using the cosine function."""
+        super().__init__(fit_function)
+
+
+class ExponentialFit(Fit):
+    """Exponential fit class."""
+
+    def __init__(self, fit_function: Callable = exponential) -> None:
+        """Initialize an exponential fitter using the exponential function."""
         super().__init__(fit_function)
 
 

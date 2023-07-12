@@ -6,7 +6,7 @@ from __future__ import annotations
 import qcal.settings as settings
 
 from .calibration import Calibration
-from .utils import find_pulse_index
+from .utils import find_pulse_index, in_range
 from qcal.circuit import Barrier, Cycle, Circuit, CircuitSet
 from qcal.compilation.compiler import Compiler
 from qcal.config import Config
@@ -36,7 +36,7 @@ def Amplitude(
         n_shots:           int = 1024, 
         n_batches:         int = 1, 
         n_circs_per_seq:   int = 1, 
-        n_levels:          int = 2,
+        # n_levels:          int = 2,
         n_gates:           int = 1,
         relative_amp:      bool = False,
         disable_esp:       bool = True,
@@ -76,9 +76,9 @@ def Amplitude(
             Defaults to 1.
         n_circs_per_seq (int, optional): maximum number of circuits that
             can be measured per sequence. Defaults to 1.
-        n_levels (int, optional): number of energy levels to be measured. 
-            Defaults to 2. If n_levels = 3, this assumes that the
-            measurement supports qutrit classification.
+        # n_levels (int, optional): number of energy levels to be measured. 
+        #     Defaults to 2. If n_levels = 3, this assumes that the
+        #     measurement supports qutrit classification.
         n_gates (int, optional): number of gates for pulse repetition.
             Defaults to 1.
         relative_amp (bool, optional): whether or not the amplitudes argument
@@ -112,7 +112,7 @@ def Amplitude(
                 n_shots:           int = 1024, 
                 n_batches:         int = 1, 
                 n_circs_per_seq:   int = 1, 
-                n_levels:          int = 2,
+                # n_levels:          int = 2,
                 n_gates:           int = 1,
                 relative_amp:      bool = False,
                 disable_esp:       bool = True,
@@ -122,9 +122,9 @@ def Amplitude(
             """Initialize the Amplitude calibration class within the function.
 
             """
-            if subspace == 'EF':
-                assert n_levels == 3, 'n_levels must be 3 for EF calibration!'
-            
+            # if subspace == 'EF':
+            #     assert n_levels == 3, 'n_levels must be 3 for EF calibration!'
+            n_levels = 3 if subspace == 'EF' else 2
             qpu.__init__(self,
                 config, 
                 compiler, 
@@ -269,13 +269,18 @@ def Amplitude(
 
                     elif self._n_gates > 1:  # Quadratic fit
                         a, b, _ = self._fit[q].fit_params
+                        newvalue = -b / (2*a)  # Assume c = 0
                         if a > 0:
                             logger.warning(
                               f'Fit failed for qubit {q} (positive curvature)!'
                             )
                             self._fit[q]._fit_success = False
+                        elif not in_range(newvalue, self._amplitudes[q]):
+                            logger.warning(
+                              f'Fit failed for qubit {q} (out of range)!'
+                            )
+                            self._fit[q]._fit_success = False
                         else:
-                            newvalue = -b / (2*a)  # Assume c = 0
                             self._cal_values[q] = newvalue
 
         def save(self):
@@ -319,7 +324,6 @@ def Amplitude(
         n_shots, 
         n_batches, 
         n_circs_per_seq, 
-        n_levels,
         n_gates,
         relative_amp,
         disable_esp,

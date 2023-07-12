@@ -1,0 +1,522 @@
+""""Submodule for qubit coherence experiments.
+
+"""
+import qcal.settings as settings
+
+from qcal.characterization.characterize import Characterize
+from qcal.circuit import Barrier, Cycle, Circuit, CircuitSet
+from qcal.compilation.compiler import Compiler
+from qcal.config import Config
+from qcal.fitting.fit import ExponentialFit
+from qcal.gate.single_qubit import Idle, X90, X
+from qcal.qpu.qpu import QPU
+from qcal.units import *
+
+import logging
+import numpy as np
+import pandas as pd
+
+from IPython.display import clear_output
+from typing import Any, Callable, Dict, List, Tuple
+
+logger = logging.getLogger(__name__)
+
+
+def T1(qpu:               QPU,
+       config:            Config,
+       qubits:            List | Tuple,
+       t_max:             float = 500*us,
+       gate:              str = 'X90',
+       subspace:          str = 'GE',
+       compiler:          Any | Compiler | None = None, 
+       transpiler:        Any | None = None,
+       n_elements:        int = 50,
+       n_shots:           int = 1024, 
+       n_batches:         int = 1, 
+       n_circs_per_seq:   int = 1, 
+       disable_esp:       bool = True,
+       disable_heralding: bool = False,
+       **kwargs
+    ) -> Callable:
+    """Function which passes a custom QPU to the Amplitude class.
+
+    Basic example useage for initial calibration:
+
+        exp = T1(
+            CustomQPU, 
+            config, 
+            qubits=[0, 1, 2],
+            t_max=5e-4)
+        cal.run()
+
+    Args:
+        qpu (QPU): custom QPU object.
+        config (Config): qcal Config object.
+        qubits (List | Tuple): qubits to measure.
+        t_max (float, option): maximum wait time. Defaults to 500 us.
+        gate (str, optional): native gate used for state preparation. Defaults 
+            to 'X90'.
+        subspace (str, optional): qubit subspace for T1 measurement.
+            Defaults to 'GE'.
+        compiler (Any | Compiler | None, optional): custom compiler to
+            compile the experimental circuits. Defaults to None.
+        transpiler (Any | None, optional): custom transpiler to 
+            transpile the experimental circuits. Defaults to None.
+        n_elements (int, optional): number of delays starting from 0 to t_max.
+            Defaults to 50.
+        n_shots (int, optional): number of measurements per circuit. 
+            Defaults to 1024.
+        n_batches (int, optional): number of batches of measurements. 
+            Defaults to 1.
+        n_circs_per_seq (int, optional): maximum number of circuits that
+            can be measured per sequence. Defaults to 1.
+        disable_esp (bool, optional): whether to disable excited state
+                promotion for the calibration. Defaults to True.
+        disable_heralding (bool, optional): whether to disable heralding
+            for the calibraion. Defaults to False.
+
+    Returns:
+        Callable: T1 class.
+    """
+
+    class T1(qpu, Characterize):
+        """T1 characterization class.
+        
+        This class inherits a custom QPU from the T1 characterization
+        function.
+        """
+
+        def __init__(self, 
+                config:            Config,
+                qubits:            List | Tuple,
+                t_max:             float = 500*us,
+                gate:              str = 'X90',
+                subspace:          str = 'GE',
+                compiler:          Any | Compiler | None = None, 
+                transpiler:        Any | None = None,
+                n_elements:        int = 50,
+                n_shots:           int = 1024, 
+                n_batches:         int = 1, 
+                n_circs_per_seq:   int = 1, 
+                disable_esp:       bool = True,
+                disable_heralding: bool = False,
+                **kwargs
+            ) -> None:
+            """Initialize the T1 experiment class within the function."""
+
+            n_levels = 3 if subspace == 'EF' else 2
+            qpu.__init__(self,
+                config, 
+                compiler, 
+                transpiler, 
+                n_shots, 
+                n_batches, 
+                n_circs_per_seq, 
+                n_levels,
+                **kwargs
+            )
+            Characterize.__init__(self, 
+                config, 
+                disable_esp=disable_esp,
+                disable_heralding=disable_heralding
+            )
+
+            self._qubits = qubits
+            
+            assert gate in ('X90', 'X'), 'gate must be an X90 or X!'
+            self._gate = gate
+
+            assert subspace in ('GE', 'EF'), 'subspace must be GE or EF!'
+            self._subspace = subspace
+
+            self._times = {
+                q: np.linspace(0., t_max, n_elements) for q in qubits
+            }
+            self._param_sweep = self._times
+
+            self._params = {
+                q: f'single_qubit/{q}/{subspace}/T1' for q in qubits
+            }
+            self._fit = {q: ExponentialFit() for q in qubits}
+
+        @property
+        def times(self) -> Dict:
+            """Time sweep for each qubit.
+
+            Returns:
+                Dict: qubit to time array map.
+            """
+            return self._times
+
+        def generate_circuits(self):
+            """Generate all amplitude calibration circuits."""
+            logger.info(' Generating circuits...')
+
+            circuits = []
+            for t in self._times[self._qubits[0]]:
+                circuit = Circuit()
+
+                # State prepration
+                if self._gate == 'X90':
+                    circuit.extend([
+                        Cycle([X90(q, subspace='GE') for q in self._qubits]),
+                        Barrier(self._qubits),
+                        Cycle([X90(q, subspace='GE') for q in self._qubits]),
+                        Barrier(self._qubits)
+                    ])
+
+                    if self._subspace == 'EF':
+                        circuit.extend([
+                            Cycle(
+                                [X90(q, subspace='EF') for q in self._qubits]
+                            ),
+                            Barrier(self._qubits),
+                            Cycle(
+                                [X90(q, subspace='EF') for q in self._qubits]
+                            ),
+                            Barrier(self._qubits)
+                        ])
+
+                elif self._gate == 'X':
+                    circuit.extend([
+                        Cycle([X(q, subspace='GE') for q in self._qubits]),
+                        Barrier(self._qubits)
+                    ])
+
+                    if self._subspace == 'EF':
+                        circuit.extend([
+                            Cycle([X(q, subspace='EF') for q in self._qubits]),
+                            Barrier(self._qubits),
+                        ])
+
+                # T1 delay
+                circuit.extend([
+                    Cycle([Idle(q, duration=t) for q in self._qubits]),
+                ])
+                circuit.measure()
+
+                circuits.append(circuit)
+            
+            self._circuits = CircuitSet(circuits=circuits)
+            self._circuits['time (s)'] = self._times[self._qubits[0]]
+                
+        def analyze(self) -> None:
+            """Analyze the data."""
+            logger.info(' Analyzing the data...')
+
+            # Fit the probability of being in 1 from the time sweep to an 
+            # exponential
+            for i, q in enumerate(self._qubits):
+                prob1 = []
+                for circuit in self._circuits:
+                    prob1.append(
+                        1 - circuit.results.marginalize(i).populations['0']
+                    )
+                self._results[q] = prob1
+
+                # Add initial guesses to fit
+                c = prob1[-1]
+                a = prob1[0] - c
+                b = -np.mean( np.diff(prob1) / np.diff(self._times[q]) ) / a
+                self._fit[q].fit(self._times[q], prob1, p0=(a, b, c))
+
+                # If the fit was successful, write to the config
+                if self._fit[q].fit_success:
+                    self._char_values[q] = 1 / self._fit[q].fit_params[1]
+
+        def save(self):
+            """Save all circuits and data."""
+            qpu.save(self)
+            self._data_manager.save_to_csv(
+                 pd.DataFrame([self._param_sweep]), 'param_sweep'
+            )
+            self._data_manager.save_to_csv(
+                 pd.DataFrame([self._results]), 'sweep_results'
+            )
+            self._data_manager.save_to_csv(
+                 pd.DataFrame([self._char_values]), 'T1_values'
+            )
+
+        def run(self):
+            """Run all experimental methods and analyze results."""
+            self.generate_circuits()
+            qpu.run(self, self._circuits, save=False)
+            self.analyze()
+            clear_output(wait=True)
+            if settings.Settings.save_data:
+                self._data_manager._exp_id += '_T1'
+                self.save()
+                self.plot(
+                    xlabel='Time (s)',
+                    ylabel=(r'$|1\rangle$ Population'),
+                    flabel='T1',
+                    save_path=self._data_manager._save_path
+                )
+            self.final()
+            print(f"\nRuntime: {repr(self._runtime)[8:]}\n")
+
+    return T1(
+        config,
+        qubits,
+        t_max,
+        gate,
+        subspace,
+        compiler, 
+        transpiler,
+        n_elements, 
+        n_shots, 
+        n_batches, 
+        n_circs_per_seq, 
+        disable_esp,
+        disable_heralding
+    )
+
+
+# def T2(qpu:               QPU,
+#        config:            Config,
+#        qubits:            List | Tuple,
+#        t_max:             float = 500*us,
+#        gate:              str = 'X90',
+#        subspace:          str = 'GE',
+#        compiler:          Any | Compiler | None = None, 
+#        transpiler:        Any | None = None,
+#        n_elements:        int = 50,
+#        n_shots:           int = 1024, 
+#        n_batches:         int = 1, 
+#        n_circs_per_seq:   int = 1, 
+#        disable_esp:       bool = True,
+#        disable_heralding: bool = False,
+#        **kwargs
+#     ) -> Callable:
+#     """Function which passes a custom QPU to the Amplitude class.
+
+#     Basic example useage for initial calibration:
+
+#         exp = T1(
+#             CustomQPU, 
+#             config, 
+#             qubits=[0, 1, 2],
+#             t_max=5e-4)
+#         cal.run()
+
+#     Args:
+#         qpu (QPU): custom QPU object.
+#         config (Config): qcal Config object.
+#         qubits (List | Tuple): qubits to measure.
+#         t_max (float, option): maximum wait time. Defaults to 500 us.
+#         gate (str, optional): native gate used for state preparation. Defaults 
+#             to 'X90'.
+#         subspace (str, optional): qubit subspace for T1 measurement.
+#             Defaults to 'GE'.
+#         compiler (Any | Compiler | None, optional): custom compiler to
+#             compile the experimental circuits. Defaults to None.
+#         transpiler (Any | None, optional): custom transpiler to 
+#             transpile the experimental circuits. Defaults to None.
+#         n_elements (int, optional): number of delays starting from 0 to t_max.
+#             Defaults to 50.
+#         n_shots (int, optional): number of measurements per circuit. 
+#             Defaults to 1024.
+#         n_batches (int, optional): number of batches of measurements. 
+#             Defaults to 1.
+#         n_circs_per_seq (int, optional): maximum number of circuits that
+#             can be measured per sequence. Defaults to 1.
+#         disable_esp (bool, optional): whether to disable excited state
+#                 promotion for the calibration. Defaults to True.
+#         disable_heralding (bool, optional): whether to disable heralding
+#             for the calibraion. Defaults to False.
+
+#     Returns:
+#         Callable: T1 class.
+#     """
+
+#     class T2(qpu, Characterize):
+#         """T1 characterization class.
+        
+#         This class inherits a custom QPU from the T1 characterization
+#         function.
+#         """
+
+#         def __init__(self, 
+#                 config:            Config,
+#                 qubits:            List | Tuple,
+#                 t_max:             float = 500*us,
+#                 gate:              str = 'X90',
+#                 subspace:          str = 'GE',
+#                 compiler:          Any | Compiler | None = None, 
+#                 transpiler:        Any | None = None,
+#                 n_elements:        int = 50,
+#                 n_shots:           int = 1024, 
+#                 n_batches:         int = 1, 
+#                 n_circs_per_seq:   int = 1, 
+#                 disable_esp:       bool = True,
+#                 disable_heralding: bool = False,
+#                 **kwargs
+#             ) -> None:
+#             """Initialize the T1 experiment class within the function."""
+
+#             n_levels = 3 if subspace == 'EF' else 2
+#             qpu.__init__(self,
+#                 config, 
+#                 compiler, 
+#                 transpiler, 
+#                 n_shots, 
+#                 n_batches, 
+#                 n_circs_per_seq, 
+#                 n_levels,
+#                 **kwargs
+#             )
+#             Characterize.__init__(self, 
+#                 config, 
+#                 disable_esp=disable_esp,
+#                 disable_heralding=disable_heralding
+#             )
+
+#             self._qubits = qubits
+            
+#             assert gate in ('X90', 'X'), 'gate must be an X90 or X!'
+#             self._gate = gate
+
+#             assert subspace in ('GE', 'EF'), 'subspace must be GE or EF!'
+#             self._subspace = subspace
+
+#             self._times = {
+#                 q: np.linspace(0., t_max, n_elements) for q in qubits
+#             }
+#             self._param_sweep = self._times
+
+#             self._params = {
+#                 q: f'single_qubit/{q}/{subspace}/T1' for q in qubits
+#             }
+#             self._fit = {q: ExponentialFit() for q in qubits}
+
+#         @property
+#         def times(self) -> Dict:
+#             """Time sweep for each qubit.
+
+#             Returns:
+#                 Dict: qubit to time array map.
+#             """
+#             return self._times
+
+#         def generate_circuits(self):
+#             """Generate all amplitude calibration circuits."""
+#             logger.info(' Generating circuits...')
+
+#             circuits = []
+#             for t in self._times[self._qubits[0]]:
+#                 circuit = Circuit()
+
+#                 # State prepration
+#                 if self._gate == 'X90':
+#                     circuit.extend([
+#                         Cycle([X90(q, subspace='GE') for q in self._qubits]),
+#                         Barrier(self._qubits),
+#                         Cycle([X90(q, subspace='GE') for q in self._qubits]),
+#                         Barrier(self._qubits)
+#                     ])
+
+#                     if self._subspace == 'EF':
+#                         circuit.extend([
+#                             Cycle(
+#                                 [X90(q, subspace='EF') for q in self._qubits]
+#                             ),
+#                             Barrier(self._qubits),
+#                             Cycle(
+#                                 [X90(q, subspace='EF') for q in self._qubits]
+#                             ),
+#                             Barrier(self._qubits)
+#                         ])
+
+#                 elif self._gate == 'X':
+#                     circuit.extend([
+#                         Cycle([X(q, subspace='GE') for q in self._qubits]),
+#                         Barrier(self._qubits)
+#                     ])
+
+#                     if self._subspace == 'EF':
+#                         circuit.extend([
+#                             Cycle([X(q, subspace='EF') for q in self._qubits]),
+#                             Barrier(self._qubits),
+#                         ])
+
+#                 # T1 delay
+#                 circuit.extend([
+#                     Cycle([Idle(q, duration=t) for q in self._qubits]),
+#                 ])
+#                 circuit.measure()
+
+#                 circuits.append(circuit)
+            
+#             self._circuits = CircuitSet(circuits=circuits)
+#             self._circuits['time (s)'] = self._times[self._qubits[0]]
+                
+#         def analyze(self) -> None:
+#             """Analyze the data."""
+#             logger.info(' Analyzing the data...')
+
+#             # Fit the probability of being in 1 from the time sweep to an 
+#             # exponential
+#             for i, q in enumerate(self._qubits):
+#                 prob1 = []
+#                 for circuit in self._circuits:
+#                     prob1.append(
+#                         1 - circuit.results.marginalize(i).populations['0']
+#                     )
+#                 self._results[q] = prob1
+
+#                 # Add initial guesses to fit
+#                 c = prob1[-1]
+#                 a = prob1[0] - c
+#                 b = -np.mean( np.diff(prob1) / np.diff(self._times[q]) ) / a
+#                 self._fit[q].fit(self._times[q], prob1, p0=(a, b, c))
+
+#                 # If the fit was successful, write to the config
+#                 if self._fit[q].fit_success:
+#                     self._char_values[q] = 1 / self._fit[q].fit_params[1]
+
+#         def save(self):
+#             """Save all circuits and data."""
+#             qpu.save(self)
+#             self._data_manager.save_to_csv(
+#                  pd.DataFrame([self._param_sweep]), 'param_sweep'
+#             )
+#             self._data_manager.save_to_csv(
+#                  pd.DataFrame([self._results]), 'sweep_results'
+#             )
+#             self._data_manager.save_to_csv(
+#                  pd.DataFrame([self._char_values]), 'T1_values'
+#             )
+
+#         def run(self):
+#             """Run all experimental methods and analyze results."""
+#             self.generate_circuits()
+#             qpu.run(self, self._circuits, save=False)
+#             self.analyze()
+#             clear_output(wait=True)
+#             if settings.Settings.save_data:
+#                 self._data_manager._exp_id += '_T1'
+#                 self.save()
+#                 self.plot(
+#                     xlabel='Time (s)',
+#                     ylabel=(r'$|1\rangle$ Population'),
+#                     flabel='T1',
+#                     save_path=self._data_manager._save_path
+#                 )
+#             self.final()
+#             print(f"\nRuntime: {repr(self._runtime)[8:]}\n")
+
+#     return T2(
+#         config,
+#         qubits,
+#         t_max,
+#         gate,
+#         subspace,
+#         compiler, 
+#         transpiler,
+#         n_elements, 
+#         n_shots, 
+#         n_batches, 
+#         n_circs_per_seq, 
+#         disable_esp,
+#         disable_heralding
+#     )

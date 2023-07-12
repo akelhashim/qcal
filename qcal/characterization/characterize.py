@@ -1,4 +1,4 @@
-"""Submodule handling the main calibration class.
+"""Submodule handling the main characterization class.
 
 """
 import qcal.settings as settings
@@ -15,10 +15,10 @@ from typing import Any, Dict, List, Tuple
 logger = logging.getLogger(__name__)
 
 
-class Calibration:
-    """Main calibration class.
+class Characterize:
+    """Main characterization class.
     
-    This class will handle basic calibration methods.
+    This class will handle basic characterization methods.
     """
 
     def __init__(self, 
@@ -43,7 +43,7 @@ class Calibration:
         self._param_sweep = {}
         self._results = {}
         self._fit = {}
-        self._cal_values = {}
+        self._char_values = {}
 
         if disable_esp and self._config['readout/esp/enable']:
             self.set_param('readout/esp/enable', False)
@@ -58,13 +58,13 @@ class Calibration:
             self._enable_heralding = False
 
     @property
-    def calibrated_values(self) -> Dict:
-        """New values fit by the calibration.
+    def characterized_values(self) -> Dict:
+        """Characterized values determined by the fit.
 
         Returns:
             Dict: qubit to value map.
         """
-        return self._cal_values
+        return self._char_values
     
     @property
     def gate(self) -> str:
@@ -146,7 +146,7 @@ class Calibration:
         """Save and load the config after changing parameters."""
         for q in self._qubits:
             if self._fit[q].fit_success:
-                self.set_param(self._params[q], self._cal_values[q])
+                self.set_param(self._params[q], self._char_values[q])
 
         if self._enable_esp:
             self.set_param('readout/esp/enable', True)
@@ -158,7 +158,8 @@ class Calibration:
         self._config.load()
 
     def plot(
-            self, xlabel='Value Sweep', ylabel='Results', save_path=''
+            self, xlabel='Value Sweep', ylabel='Results', flabel='Fit', 
+            save_path=''
         ) -> None:
         """Plot the sweep and fit results.
 
@@ -204,11 +205,9 @@ class Calibration:
                         )
                         ax.plot(
                             x, self._fit[q].predict(x),
-                            '-', c='orange', label='Fit'
-                        )
-                        ax.axvline(
-                            self._cal_values[q],  
-                            ls='--', c='k', label='Fit value'
+                            '-', c='orange', 
+                            label=f'{flabel} = '\
+                                f'{round(self._char_values[q] / 1.e-6, 1)} us'
                         )
 
                     ax.legend(loc=0, fontsize=12)
@@ -218,7 +217,7 @@ class Calibration:
             
         fig.set_tight_layout(True)
         if settings.Settings.save_data:
-            fig.savefig(save_path + 'calibration_results.png', dpi=300)
+            fig.savefig(save_path + 'characterization_results.png', dpi=300)
         plt.show()
     
     def set_param(self, param: str, newvalue: Any) -> None:

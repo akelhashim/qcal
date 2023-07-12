@@ -385,7 +385,7 @@ class Config:
                 (e.g. ['single_qubit', 0, 'GE', 'freq']).
             newvalue (Any): new value to assign to the parameter.
         """
-        newvalue = (round(float(newvalue), 5) if isinstance(newvalue, float) 
+        newvalue = (round(float(newvalue), 6) if isinstance(newvalue, float) 
             else newvalue
         )
         cfg_param = self.get(param[:-1])
