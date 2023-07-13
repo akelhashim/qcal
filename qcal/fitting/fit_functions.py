@@ -9,6 +9,14 @@ from numpy.typing import ArrayLike, NDArray
 logger = logging.getLogger(__name__)
 
 
+__all__ = (
+    'cosine',
+    'decaying_cosine',
+    'exponential',
+    'parabola'
+)
+
+
 def cosine(
         x: ArrayLike, amp: float, freq: float, phase: float, offset: float
     ) -> NDArray:
@@ -26,6 +34,24 @@ def cosine(
     """
     return amp * np.cos(2 * np.pi * freq * x + phase) + offset
 
+def decaying_cosine(
+        x: ArrayLike, a: float, b: float, c: float, d: float, e: float
+    ) -> NDArray:
+    """Decaying cosine function.
+
+    Args:
+        x (ArrayLike): data.
+        a (float): amplitude.
+        b (float): exponential constant.
+        c (float): cosine frequency.
+        d (float): cosine phase.
+        e (float): y-offset.
+
+    Returns:
+        NDArray: decaying cosine curve.
+    """
+    return a * np.exp(-b * x) * np.cos(2 * np.pi * c * x + d) + e
+
 
 def exponential(x: ArrayLike, a: float, b: float, c: float) -> NDArray:
     """Exponential function.
@@ -33,7 +59,7 @@ def exponential(x: ArrayLike, a: float, b: float, c: float) -> NDArray:
     Args:
         x (ArrayLike): data.
         a (float): amplitude.
-        b (float): x-offset.
+        b (float): exponential constant.
         c (float): y-offset
 
     Returns:

@@ -4,6 +4,7 @@
 from qcal.fitting.fit_functions import *
 
 import logging
+import numpy as np
 
 from numpy.typing import ArrayLike, NDArray
 from scipy.optimize import curve_fit
@@ -14,6 +15,7 @@ logger = logging.getLogger(__name__)
 
 __all__ = (
     'CosineFit',
+    'DecayingCosineFit',
     'ExponentialFit',
     'ParabolaFit',
 )
@@ -117,6 +119,16 @@ class CosineFit(Fit):
 
     def __init__(self, fit_function: Callable = cosine) -> None:
         """Initialize a cosine fitter using the cosine function."""
+        super().__init__(fit_function)
+
+
+class DecayingCosineFit(Fit):
+    """Decaying cosine fit class."""
+
+    def __init__(self, fit_function: Callable = decaying_cosine) -> None:
+        """Initialize a decaying cosine fitter using the decaying cosine 
+        function.
+        """
         super().__init__(fit_function)
 
 

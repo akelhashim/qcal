@@ -44,6 +44,7 @@ class Characterize:
         self._results = {}
         self._fit = {}
         self._char_values = {}
+        self._errors = {}
 
         if disable_esp and self._config['readout/esp/enable']:
             self.set_param('readout/esp/enable', False)
@@ -207,7 +208,8 @@ class Characterize:
                             x, self._fit[q].predict(x),
                             '-', c='orange', 
                             label=f'{flabel} = '\
-                                f'{round(self._char_values[q] / 1.e-6, 1)} us'
+                                f'{round(self._char_values[q] / 1.e-6, 1)} '\
+                                f'({round(self._errors[q] / 1.e-6, 2)}) us'
                         )
 
                     ax.legend(loc=0, fontsize=12)
