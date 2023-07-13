@@ -4,6 +4,7 @@ All results are stored in a Results object.
 """
 import pandas as pd
 
+from collections import defaultdict
 from typing import Dict, Tuple
 
 __all__ = ('Results')
@@ -84,11 +85,11 @@ class Results:
         return self._df
 
     @property
-    def dict(self) -> Dict:
+    def dict(self) -> defaultdict:
         """Dictionary of bitstrings and counts.
 
         Returns:
-            Dict: dictionary of results.
+            defaultdict: dictionary of results.
         """
         return self._dict
 
@@ -108,7 +109,7 @@ class Results:
         Returns:
             Dict: populations.
         """
-        pop = {}
+        pop = defaultdict(lambda: 0.)
         for state in self.states:
             pop[state] = self._dict[state]/self.n_shots
         return pop

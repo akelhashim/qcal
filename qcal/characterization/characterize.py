@@ -209,10 +209,13 @@ class Characterize:
                             '-', c='orange', 
                             label=f'{flabel} = '\
                                 f'{round(self._char_values[q] / 1.e-6, 1)} '\
-                                f'({round(self._errors[q] / 1.e-6, 2)}) us'
+                                rf'({round(self._errors[q] / 1.e-6, 2)}) $\mu$s'
                         )
 
                     ax.legend(loc=0, fontsize=12)
+                    ax.xaxis.set_major_formatter(
+                        lambda x, pos: round(x / 1e-6, 1)
+                    )
 
                 else:
                     ax.axis('off')

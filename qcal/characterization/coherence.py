@@ -9,6 +9,7 @@ from qcal.compilation.compiler import Compiler
 from qcal.config import Config
 from qcal.fitting.fit import DecayingCosineFit, ExponentialFit
 from qcal.gate.single_qubit import Idle, X90, X, VirtualZ
+from qcal.math.utils import reciprocal_uncertainty, round_to_order_error
 from qcal.qpu.qpu import QPU
 from qcal.units import MHz, us
 
@@ -202,22 +203,22 @@ def T1(qpu:               QPU,
             """Analyze the data."""
             logger.info(' Analyzing the data...')
 
-            pop = {'GE': '0', 'EF': '1'}
+            pop = {'GE': '1', 'EF': '2'}
             # Fit the probability of being in 1 from the time sweep to an 
             # exponential
             for i, q in enumerate(self._qubits):
                 prob1 = []
                 for circuit in self._circuits:
                     prob1.append(
-                        1 - circuit.results.marginalize(i).populations[
+                        circuit.results.marginalize(i).populations[
                             pop[self._subspace]
                         ]
                     )
                 self._results[q] = prob1
 
                 # Add initial guesses to fit
-                c = prob1[-1]
-                a = prob1[0] - c
+                c = np.array(prob1).min()
+                a = np.array(prob1).max() - c
                 b = -np.mean( np.diff(prob1) / np.diff(self._times[q]) ) / a
                 self._fit[q].fit(self._times[q], prob1, p0=(a, b, c))
 
@@ -252,7 +253,7 @@ def T1(qpu:               QPU,
                 self._data_manager._exp_id += '_T1'
                 self.save()
                 self.plot(
-                    xlabel='Time (s)',
+                    xlabel=r'Time ($\mu$s)',
                     ylabel=(
                        r'$|2\rangle$ Population' if self._subspace == 'EF' else
                        r'$|1\rangle$ Population'
@@ -402,12 +403,13 @@ def T2(qpu:               QPU,
                 self._params = {
                     q: f'single_qubit/{q}/{subspace}/T2*' for q in qubits
                 }
+                self._fit = {q: DecayingCosineFit() for q in qubits}
             elif echo:
                 self._params = {
                     q: f'single_qubit/{q}/{subspace}/T2e' for q in qubits
                 }
-            self._fit = {q: DecayingCosineFit() for q in qubits}
-
+                self._fit = {q: ExponentialFit() for q in qubits}
+            
         @property
         def times(self) -> Dict:
             """Time sweep for each qubit.
@@ -484,31 +486,42 @@ def T2(qpu:               QPU,
             """Analyze the data."""
             logger.info(' Analyzing the data...')
 
-            pop = {'GE': '0', 'EF': '1'}
+            pop = {'GE': '1', 'EF': '2'}
             # Fit the probability of being in 1 from the time sweep to an 
             # exponential
             for i, q in enumerate(self._qubits):
                 prob1 = []
                 for circuit in self._circuits:
                     prob1.append(
-                        1 - circuit.results.marginalize(i).populations[
+                        circuit.results.marginalize(i).populations[
                             pop[self._subspace]
                         ]
                     )
                 self._results[q] = prob1
 
                 # Add initial guesses to fit
-                e = np.array(prob1).min()
-                a = np.array(prob1).max() - e
-                b = -np.mean( np.diff(prob1) / np.diff(self._times[q]) ) / a
-                c = self._detuning
-                d = 0.
-                self._fit[q].fit(self._times[q], prob1, p0=(a, b, c, d, e))
+                if self._echo:
+                    c = np.array(prob1).min()
+                    a = np.array(prob1).max() - c
+                    b = np.mean( np.diff(prob1) / np.diff(self._times[q]) ) / a
+                    self._fit[q].fit(self._times[q], prob1, p0=(-a, b, c))
+                else:
+                    e = np.array(prob1).min()
+                    a = np.array(prob1).max() - e
+                    b = -np.mean( np.diff(prob1) / np.diff(self._times[q]) )/a
+                    c = self._detuning
+                    d = 0.
+                    self._fit[q].fit(self._times[q], prob1, p0=(a, b, c, d, e))
 
                 # If the fit was successful, write to the config
                 if self._fit[q].fit_success:
-                    self._char_values[q] = 1 / self._fit[q].fit_params[1]
-                    self._errors[q] = 1 / self._fit[q].error[1]
+                    val, err = round_to_order_error(
+                        *reciprocal_uncertainty(
+                            self._fit[q].fit_params[1], self._fit[q].error[1]
+                        )
+                    )
+                    self._char_values[q] = val
+                    self._errors[q] = err
 
         def save(self):
             """Save all circuits and data."""
@@ -536,12 +549,12 @@ def T2(qpu:               QPU,
                 self._data_manager._exp_id += '_T2'
                 self.save()
                 self.plot(
-                    xlabel='Time (s)',
+                    xlabel=r'Time ($\mu$s)',
                     ylabel=(
                     r'$|2\rangle$ Population' if self._subspace == 'EF' else
                     r'$|1\rangle$ Population'
                     ),
-                    flabel='T2',
+                    flabel='T2e' if self._echo else 'T2*',
                     save_path=self._data_manager._save_path
                 )
             self.final()
