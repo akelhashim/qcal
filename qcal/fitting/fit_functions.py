@@ -10,11 +10,27 @@ logger = logging.getLogger(__name__)
 
 
 __all__ = (
+    'absolute_value',
     'cosine',
     'decaying_cosine',
     'exponential',
     'parabola'
 )
+
+
+def absolute_value(x: ArrayLike, a: float, b: float, c: float) -> NDArray:
+    """Absolute value function.
+
+    Args:
+        x (ArrayLike): data.
+        a (float): amplitude.
+        b (float): x-offset.
+        c (float): y-offset
+
+    Returns:
+        NDArray: absolute value curve.
+    """
+    return a * np.abs(x - b)  + c
 
 
 def cosine(

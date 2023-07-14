@@ -44,6 +44,7 @@ class Calibration:
         self._results = {}
         self._fit = {}
         self._cal_values = {}
+        self._errors = {}
 
         if disable_esp and self._config['readout/esp/enable']:
             self.set_param('readout/esp/enable', False)
