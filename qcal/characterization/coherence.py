@@ -224,8 +224,15 @@ def T1(qpu:               QPU,
 
                 # If the fit was successful, write to the config
                 if self._fit[q].fit_success:
-                    self._char_values[q] = 1 / self._fit[q].fit_params[1]
-                    self._errors[q] = 1 / self._fit[q].error[1]
+                    val, err = round_to_order_error(
+                        *reciprocal_uncertainty(
+                            self._fit[q].fit_params[1], self._fit[q].error[1]
+                        )
+                    )
+                    self._char_values[q] = val
+                    self._errors[q] = err
+                    # self._char_values[q] = 1 / self._fit[q].fit_params[1]
+                    # self._errors[q] = 1 / self._fit[q].error[1]
 
         def save(self):
             """Save all circuits and data."""

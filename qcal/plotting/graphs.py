@@ -4,6 +4,7 @@ from qcal.circuit import Circuit
 from qcal.config import Config
 from qcal.gate.gate import Gate
 
+import logging
 import networkx as nx
 import numpy as np
 
@@ -11,8 +12,9 @@ from collections import defaultdict
 from typing import Dict
 
 import plotly.graph_objects as go
-# import plotly.io as pio
-# pio.renderers.default = 'colab'  # TODO: replace with settings
+from plotly.graph_objs.scatter import Marker
+
+logger = logging.getLogger(__name__)
 
 
 def format_gate_text(gate: Gate):
@@ -385,7 +387,7 @@ def draw_processor(config: Config):
         text=middle_node_text,
         mode='markers',
         hoverinfo='text',
-        marker=go.Marker(
+        marker=Marker(
             opacity=0
         )
     )
