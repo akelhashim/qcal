@@ -7,7 +7,7 @@ from qcal.characterization.characterize import Characterize
 from qcal.circuit import Barrier, Cycle, Circuit, CircuitSet
 from qcal.compilation.compiler import Compiler
 from qcal.config import Config
-from qcal.fitting.fit import DecayingCosineFit, ExponentialFit
+from qcal.fitting.fit import FitDecayingCosine, FitExponential
 from qcal.gate.single_qubit import Idle, X90, X, VirtualZ
 from qcal.math.utils import reciprocal_uncertainty, round_to_order_error
 from qcal.qpu.qpu import QPU
@@ -138,7 +138,7 @@ def T1(qpu:               QPU,
             self._params = {
                 q: f'single_qubit/{q}/{subspace}/T1' for q in qubits
             }
-            self._fit = {q: ExponentialFit() for q in qubits}
+            self._fit = {q: FitExponential() for q in qubits}
 
         @property
         def times(self) -> Dict:
@@ -197,7 +197,7 @@ def T1(qpu:               QPU,
                 circuits.append(circuit)
             
             self._circuits = CircuitSet(circuits=circuits)
-            self._circuits['time (s)'] = self._times[self._qubits[0]]
+            self._circuits['time'] = self._times[self._qubits[0]]
                 
         def analyze(self) -> None:
             """Analyze the data."""
@@ -403,12 +403,12 @@ def T2(qpu:               QPU,
                 self._params = {
                     q: f'single_qubit/{q}/{subspace}/T2*' for q in qubits
                 }
-                self._fit = {q: DecayingCosineFit() for q in qubits}
+                self._fit = {q: FitDecayingCosine() for q in qubits}
             elif echo:
                 self._params = {
                     q: f'single_qubit/{q}/{subspace}/T2e' for q in qubits
                 }
-                self._fit = {q: ExponentialFit() for q in qubits}
+                self._fit = {q: FitExponential() for q in qubits}
             
         @property
         def times(self) -> Dict:
@@ -480,7 +480,7 @@ def T2(qpu:               QPU,
                 circuits.append(circuit)
             
             self._circuits = CircuitSet(circuits=circuits)
-            self._circuits['time (s)'] = self._times[self._qubits[0]]
+            self._circuits['time'] = self._times[self._qubits[0]]
                 
         def analyze(self) -> None:
             """Analyze the data."""

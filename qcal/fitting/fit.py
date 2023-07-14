@@ -14,10 +14,11 @@ logger = logging.getLogger(__name__)
 
 
 __all__ = (
-    'CosineFit',
-    'DecayingCosineFit',
-    'ExponentialFit',
-    'ParabolaFit',
+    'FitAbsoluteValue',
+    'FitCosine',
+    'FitDecayingCosine',
+    'FitExponential',
+    'FitParabola',
 )
 
 
@@ -114,7 +115,17 @@ class Fit:
         return self._fit_function(x, *self._popt)
     
 
-class CosineFit(Fit):
+class FitAbsoluteValue(Fit):
+    """Absolute value fit class."""
+
+    def __init__(self, fit_function: Callable = absolute_value) -> None:
+        """Initialize an absolute value fitter using the absolute value 
+        function.
+        """
+        super().__init__(fit_function)
+    
+
+class FitCosine(Fit):
     """Cosine fit class."""
 
     def __init__(self, fit_function: Callable = cosine) -> None:
@@ -122,7 +133,7 @@ class CosineFit(Fit):
         super().__init__(fit_function)
 
 
-class DecayingCosineFit(Fit):
+class FitDecayingCosine(Fit):
     """Decaying cosine fit class."""
 
     def __init__(self, fit_function: Callable = decaying_cosine) -> None:
@@ -132,7 +143,7 @@ class DecayingCosineFit(Fit):
         super().__init__(fit_function)
 
 
-class ExponentialFit(Fit):
+class FitExponential(Fit):
     """Exponential fit class."""
 
     def __init__(self, fit_function: Callable = exponential) -> None:
@@ -140,7 +151,7 @@ class ExponentialFit(Fit):
         super().__init__(fit_function)
 
 
-class ParabolaFit(Fit):
+class FitParabola(Fit):
     """Parabola fit class."""
 
     def __init__(self, fit_function: Callable = parabola) -> None:
