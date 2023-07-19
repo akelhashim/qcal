@@ -261,7 +261,7 @@ def Amplitude(
                     prob0.append(
                         circuit.results.marginalize(i)['0']['probabilities']
                     )
-                self._results[q] = prob0
+                self._sweep_results[q] = prob0
                 self._fit[q].fit(self._amplitudes[q], prob0)
 
                 # If the fit was successful, write find the new amp
@@ -296,7 +296,7 @@ def Amplitude(
                  pd.DataFrame([self._param_sweep]), 'param_sweep'
             )
             self._data_manager.save_to_csv(
-                 pd.DataFrame([self._results]), 'sweep_results'
+                 pd.DataFrame([self._sweep_results]), 'sweep_results'
             )
             self._data_manager.save_to_csv(
                  pd.DataFrame([self._cal_values]), 'calibrated_values'
@@ -346,7 +346,7 @@ def Frequency(
         subspace:          str = 'GE',
         compiler:          Any | Compiler | None = None, 
         transpiler:        Any | None = None,
-        n_elements:        int = 20,
+        n_elements:        int = 30,
         n_shots:           int = 1024, 
         n_batches:         int = 1, 
         n_circs_per_seq:   int = 1, 
@@ -379,7 +379,7 @@ def Frequency(
         transpiler (Any | None, optional): custom transpiler to 
             transpile the experimental circuits. Defaults to None.
         n_elements (int, optional): number of delays starting from 0 to t_max.
-            Defaults to 50.
+            Defaults to 30.
         n_shots (int, optional): number of measurements per circuit. 
             Defaults to 1024.
         n_batches (int, optional): number of batches of measurements. 
@@ -410,7 +410,7 @@ def Frequency(
                 subspace:          str = 'GE',
                 compiler:          Any | Compiler | None = None, 
                 transpiler:        Any | None = None,
-                n_elements:        int = 50,
+                n_elements:        int = 30,
                 n_shots:           int = 1024, 
                 n_batches:         int = 1, 
                 n_circs_per_seq:   int = 1, 
@@ -451,16 +451,21 @@ def Frequency(
             self._param_sweep = self._times
 
             self._params = {
-                q: f'single_qubit/{q}/{subspace}/Freq' for q in qubits
+                q: f'single_qubit/{q}/{subspace}/freq' for q in qubits
+            }
+            self._sweep_results = {
+                q: list() for q in qubits
             }
             self._fit = {
-                q: FitAbsoluteValue()  for q in qubits
+                q: FitAbsoluteValue() for q in qubits
             }
             self._freq_fit = {
-                q: [FitDecayingCosine()] * detunings.size  for q in qubits
+                # q: [FitDecayingCosine() for _ in range(detunings.size)]
+                 q: [FitCosine() for _ in range(detunings.size)] 
+                for q in qubits
             }
 
-            self._freqs = {q: [] for q in qubits}
+            self._freqs = {q: list() for q in qubits}
             
         @property
         def detunings(self) -> NDArray:
@@ -508,6 +513,7 @@ def Frequency(
                           Barrier(self._qubits)
                         ])
                     
+                    # Ramsey experiment
                     circuit.extend([
                         Cycle([Idle(q, duration=t) for q in self._qubits]),
                         Barrier(self._qubits),
@@ -539,29 +545,34 @@ def Frequency(
                 for j, q in enumerate(self._qubits):
                     pop = []
                     for circuit in self._circuits[
-                        self._circuits['detuning'] == detuning]:
+                        self._circuits['detuning'] == detuning].circuit:
                         pop.append(
                             circuit.results.marginalize(j).populations[
                                 level[self._subspace]
                             ]
                         )
-                    # self._results[q] = pop
-                    self._circuits[self._circuits['detuning'] == detuning][
-                        f'Q{q} pop'] = pop
+                    self._sweep_results[q].append(pop)
 
-                    e = np.array(pop).min()
-                    a = np.array(pop).max() - e
-                    b = -np.mean( np.diff(pop) / np.diff(self._times[q]) ) / a
-                    c = detuning
-                    d = 0.
+                    # e = np.array(pop).min()
+                    # a = np.array(pop).max() - e
+                    # b = -np.mean( np.diff(pop) / np.diff(self._times[q]) ) / a
+                    # c = detuning
+                    # d = 0.
+                    # self._freq_fit[q][i].fit(
+                    #     self._times[q], pop, p0=(a, b, c, d, e)
+                    # )
+                    d = np.array(pop).min()
+                    a = np.array(pop).max() - d
+                    b = np.abs(detuning)
+                    c = 0.
                     self._freq_fit[q][i].fit(
-                        self._times[q], pop, p0=(a, b, c, d, e)
+                        self._times[q], pop, p0=(a, b, c, d)
                     )
 
                     # If the fit was successful, grab the frequency
                     if self._freq_fit[q][i].fit_success:
                         self._freqs[q].append(
-                            self._freq_fit[q][i].fit_params[2]
+                            self._freq_fit[q][i].fit_params[1] ## 2 for FtiDecaying
                         )
             
             # Fit the characterized frequencies to an absolute value curve
@@ -573,7 +584,7 @@ def Frequency(
                         self._fit[q].fit_params[1],
                         self._fit[q].error[1]
                     )
-                    self._cal_values[q] = val
+                    self._cal_values[q] = self._config[self._params[q]] + val
                     self._errors[q] = err
 
         def save(self) -> None:
@@ -583,7 +594,7 @@ def Frequency(
             #      pd.DataFrame([self._param_sweep]), 'param_sweep'
             # )
             # self._data_manager.save_to_csv(
-            #      pd.DataFrame([self._results]), 'sweep_results'
+            #      pd.DataFrame([self._sweep_results]), 'sweep_results'
             # )
             self._data_manager.save_to_csv(
                  pd.DataFrame([self._cal_values]), 'freq_values'
@@ -599,64 +610,87 @@ def Frequency(
             fig, ax = plt.subplots(
                 nrows, 2, figsize=figsize, layout='constrained'
             )
+            colors = plt.get_cmap('viridis', self._detunings.size)
 
             for i, q in enumerate(self._qubits):
+                if len(self._qubits) == 1:
+                    ax = ax
+                else:
+                    ax = ax[i]
 
-                ax[i,0].set_xlabel(r'Time ($\mu$s)', fontsize=15)
-                ax[i,1].set_xlabel('Detuning (MHz)', fontsize=15)
-                ax[i,0].set_ylabel('Ramsey', fontsize=15)
-                ax[i,1].set_ylabel('Frequency (MHz)', fontsize=15)
-                ax[i,0].tick_params(axis='both', which='major', labelsize=12)
-                ax[i,1].tick_params(axis='both', which='major', labelsize=12)
-                ax[i,0].grid(True)
-                ax[i,1].grid(True)
+                ax[0].set_xlabel(r'Time ($\mu$s)', fontsize=15)
+                ax[1].set_xlabel('Detuning (MHz)', fontsize=15)
+                ax[0].set_ylabel('Ramsey', fontsize=15)
+                ax[1].set_ylabel('Measured Detuning (MHz)', fontsize=15)
+                ax[0].tick_params(axis='both', which='major', labelsize=12)
+                ax[1].tick_params(axis='both', which='major', labelsize=12)
+                ax[0].grid(True)
+                ax[1].grid(True)
 
                 # Plot the Ramsey sweeps
-                for j, det in self._detunings:
-                    ax[i,0].plot(
-                        self._times,
-                        self._circuits[
-                           self._circuits['detuning'] == det][f'Q{q} pop'] + j,
-                        ls='o', label=f'{round(det, 1)} MHz'
+                for j, det in enumerate(self._detunings):
+                    ax[0].plot(
+                        self._times[q],
+                        np.array(self._sweep_results[q][j]) + j,
+                        'o', 
+                        c=colors(j), 
+                        label=f'{round(det / MHz, 1)} MHz'
                     )
 
                     if self._freq_fit[q][j].fit_success:
-                        x = np.linspace(self._times[0], self._times[-1], 100)
-                        ax[i,0].plot(x, 
-                            self._freq_fit[q][j].predict(x),
+                        x = np.linspace(
+                            self._times[q][0], self._times[q][-1], 100
+                        )
+                        ax[0].plot(x, 
+                            self._freq_fit[q][j].predict(x) + j,
                             ls='-', 
-                            c=ax[i,0].get_lines()[-1].get_c()
+                            c=colors(j)
                         )
 
                 # Plot the frequency fit
-                ax[i, 1].plot(self._detunings, self._freqs[q], f'Meas, Q{q}')
+                ax[1].plot(
+                    self._detunings, 
+                    self._freqs[q],
+                    'o',
+                    c='blue', 
+                    label=f'Meas, Q{q}'
+                )
                 if self._fit[q].fit_success:
                     x = np.linspace(
                             self._detunings[0], 
                             self._detunings[-1], 
                             100
                         )
-                    ax[i, 1].plot(x, 
+                    ax[1].plot(x,
                         self._fit[q].predict(x),
                         ls='-',
-                        c=ax[i,0].get_lines()[-1].get_c(), 
+                        c='orange',
                         label='Fit'
                     )
-                    df = self._cal_values[q] - self._config[self._params[q]]
-                    ax[i, 1].axvline(
-                        self._cal_values[q],  
-                        ls='--', c='k', label=rf'$\Delta f$ = {df}'
+                    df = round(self._fit[q].fit_params[1] / MHz, 2)
+                    ax[1].axvline(
+                        round(self._fit[q].fit_params[1], 2),  
+                        ls='--', c='k', label=rf'$\Delta f$ = {df} MHz'
                     )
 
-                ax[i,0].legend(loc=0, fontsize=12)
-                ax[i,1].legend(loc=0, fontsize=12)
+                ax[0].legend(loc=0, fontsize=12)
+                ax[1].legend(loc=0, fontsize=12)
+                ax[0].xaxis.set_major_formatter(
+                        lambda x, pos: round(x / 1e-6, 1)
+                    )
+                ax[1].xaxis.set_major_formatter(
+                        lambda x, pos: round(x / MHz, 1)
+                    )
+                ax[1].yaxis.set_major_formatter(
+                        lambda x, pos: round(x / MHz, 1)
+                    )
 
             fig.set_tight_layout(True)
-            if settings.Settings.save_data:
-                fig.savefig(
-                    self._data_manager._save_path + 'freq_calibration.png', 
-                    dpi=300
-                )
+            # if settings.Settings.save_data:
+            #     fig.savefig(
+            #         self._data_manager._save_path + 'freq_calibration.png', 
+            #         dpi=300
+            #     )
             plt.show()
 
         def run(self):
@@ -666,10 +700,10 @@ def Frequency(
             self.analyze()
             clear_output(wait=True)
             self._data_manager._exp_id += '_freq_calibration'
-            if settings.Settings.save_data:
-                self.save()
+            # if settings.Settings.save_data:
+            #     self.save()
             self.plot()
-            self.final()
+            # self.final()
             print(f"\nRuntime: {repr(self._runtime)[8:]}\n")
 
     return Frequency(

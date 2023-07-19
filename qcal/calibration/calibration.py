@@ -41,7 +41,7 @@ class Calibration:
         self._subspace = None
         self._qubits = None
         self._param_sweep = {}
-        self._results = {}
+        self._sweep_results = {}
         self._fit = {}
         self._cal_values = {}
         self._errors = {}
@@ -95,13 +95,13 @@ class Calibration:
         return self._params
     
     @property
-    def results(self) -> Dict:
+    def sweep_results(self) -> Dict:
         """Results from the calibration.
         
         Returns:
             Dict: calibration results for each qubit.
         """
-        return self._results
+        return self._sweep_results
     
     @property
     def subspace(self) -> str:
@@ -194,7 +194,7 @@ class Calibration:
                     ax.grid(True)
 
                     ax.plot(
-                        self._param_sweep[q], self._results[q],
+                        self._param_sweep[q], self._sweep_results[q],
                         'o', c='blue', label=f'Meas, Q{q}'
                     )
                     if self._fit[q].fit_success:

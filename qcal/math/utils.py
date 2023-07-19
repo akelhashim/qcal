@@ -41,7 +41,7 @@ def round_to_order_error(
         
 
     if abs(err) >= abs(val):
-        logger.wanring("Uncertainty greater than value!")
+        logger.warning("Uncertainty greater than value!")
         val_precision = 0
     else:
         order_val = np.log10(abs(val))  # exponent of order

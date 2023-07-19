@@ -2,9 +2,9 @@ single_qubit:
   0:
     GE:
       freq: 4461736318.073627
-      T1: 9.4e-05
-      T2*: null
-      T2e: null
+      T1: 8.1e-05
+      T2*: 2.0e-05
+      T2e: 6.0e-05
       X90:
         pulse:
         - channel: Q0.qdrv
@@ -17,7 +17,7 @@ single_qubit:
           length: 3.0e-08
           kwargs:
             alpha: 0.0
-            amp: 0.16033
+            amp: 0.158792
             anh: -270000000.0
             df: 0.0
             phase: 0.0
@@ -61,9 +61,9 @@ single_qubit:
   1:
     GE:
       freq: 4675260858.059634
-      T1: 0.000128
-      T2*: null
-      T2e: null
+      T1: 6.2e-05
+      T2*: 3.5e-05
+      T2e: 3.2e-05
       X90:
         pulse:
         - channel: Q1.qdrv
@@ -76,7 +76,7 @@ single_qubit:
           length: 3.0e-08
           kwargs:
             alpha: 1.0
-            amp: 0.69274
+            amp: 0.695065
             anh: -270000000.0
             df: 0.0
             phase: 0.0
@@ -120,9 +120,9 @@ single_qubit:
   2:
     GE:
       freq: 4944461837.827577
-      T1: 7.0e-05
-      T2*: null
-      T2e: null
+      T1: 6.9e-05
+      T2*: 1.7e-05
+      T2e: 2.1e-05
       X90:
         pulse:
         - channel: Q2.qdrv
@@ -135,7 +135,7 @@ single_qubit:
           length: 3.0e-08
           kwargs:
             alpha: 0.0
-            amp: 0.46002
+            amp: 0.489048
             anh: -270000000.0
             df: 0.0
             phase: 0.0
@@ -179,9 +179,9 @@ single_qubit:
   3:
     GE:
       freq: 5114911040.024481
-      T1: 5.3e-05
-      T2*: null
-      T2e: null
+      T1: 0.00014
+      T2*: 1.0e-05
+      T2e: 1.0e-05
       X90:
         pulse:
         - channel: Q3.qdrv
@@ -194,7 +194,7 @@ single_qubit:
           length: 3.0e-08
           kwargs:
             alpha: 0.0
-            amp: 0.27503
+            amp: 0.276665
             anh: -270000000.0
             df: 0.0
             phase: 0.0
@@ -238,9 +238,9 @@ single_qubit:
   4:
     GE:
       freq: 5350927547.979777
-      T1: 9.6e-05
-      T2*: null
-      T2e: null
+      T1: 5.0e-05
+      T2*: 6.0e-06
+      T2e: 7.0e-06
       X90:
         pulse:
         - channel: Q4.qdrv
@@ -253,7 +253,7 @@ single_qubit:
           length: 3.0e-08
           kwargs:
             alpha: 0.0
-            amp: 0.66065
+            amp: 0.66394
             anh: -270000000.0
             df: 0.0
             phase: 0.0
@@ -704,7 +704,7 @@ readout:
     phase: 1.0471975511965976
   1:
     channel: 4
-    amp: 0.035
+    amp: 0.02
     freq: 6558439922.632911
     phase: 3.400421796562137
   2:
@@ -719,7 +719,7 @@ readout:
     phase: 2.0
   4:
     channel: 6
-    amp: 0.05
+    amp: 0.055
     freq: 6711440184.690463
     phase: 3.624878768638384
   5:
