@@ -177,6 +177,8 @@ def draw_circuit(circuit: Circuit, show: bool = True):
         fig.add_vline(x=loc, line_width=3,
                       line_dash="dash", line_color="black")
 
+    fig.update_xaxes(range=[-0.75, circuit.circuit_depth + 0.75])
+    # fig.update_yaxes(range=[-2, circuit.circuit_width + 2])
     fig.update_layout(
         autosize=False,
         width=75 * (circuit.circuit_depth + 0.5) if circuit.circuit_depth > 1 

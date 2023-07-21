@@ -8,21 +8,48 @@ from qcal.gate.single_qubit import id, x, y, z
 import numpy as np
 import scipy
 
+from collections import defaultdict
 from numpy.typing import NDArray
 from typing import List, Tuple, Union
 
 
 __all__ = (
-    'CNOT', 'CX', 'CY', 'CZ', 'CH', 'M', 'MS',
-    'DCNOT', 'fSWAP', 'iSWAP', 
+    'AGate',
+    'Barenco',
+    'BGate',
+    'CH',
+    'CNOT',
+    'CPhase',
+    'CRot',
+    'CS',
+    'CSdag',
+    'CT',
+    'CTdag',
+    'CV',
+    'CX',
+    'CY',
+    'CZ',
+    'DB',
+    'DCNOT',
+    'ECP',
+    'FSim',
+    'fSWAP',
+    'Givens',
+    'iSWAP',
+    'M',
+    'MS',
+    'pSWAP',
+    'QFT2',
+    'SqrtSWAP',
+    'SqrtSWAPdag',
+    'SWAPAlpha',
     'SWAP',
-    'XX', 'YY', 'ZZ',
-    'CPhase', 'CS', 'CSdag', 'CT', 'CTdag', 'CRot', 'Barenco', 'CV',
-    'XY', 'Givens', 'DB',
-    'SWAPAlpha', 'SqrtSWAP', 'SqrtSWAPdag',
-    'pSWAP', 'QFT2',
-    'BGate', 'ECP', 'WGate', 'AGate',
-    'FSim', 'Syc'
+    'Syc',
+    'WGate',
+    'XX',
+    'XY',
+    'YY',
+    'ZZ'
 )
 
 paulis = (
@@ -1015,3 +1042,43 @@ class ZZ(Gate):
         self._properties['params'] = {
             'phase factor': t
         }
+
+
+two_qubit_gates = defaultdict(lambda: 'Gate not currently supported!', {
+    'AGate':        AGate,
+    'Barenco':      Barenco,
+    'BGate':        BGate,
+    'CH':           CH,
+    'CNOT':         CNOT,
+    'CPhase':       CPhase,
+    'CRot':         CRot,
+    'CS':           CS,
+    'CSdag':        CSdag,
+    'CT':           CT,
+    'CTdag':        CTdag,
+    'CV':           CV,
+    'CX':           CX,
+    'CY':           CY,
+    'CZ':           CZ,
+    'DB':           DB,
+    'DCNOT':        DCNOT,
+    'ECP':          ECP,
+    'FSim':         FSim,
+    'fSWAP':        fSWAP,
+    'Givens':       Givens,
+    'iSWAP':        iSWAP,
+    'M':            M,
+    'MS':           MS,
+    'pSWAP':        pSWAP,
+    'QFT2':         QFT2,
+    'SqrtSWAP':     SqrtSWAP,
+    'SqrtSWAPdag':  SqrtSWAPdag,
+    'SWAPAlpha':    SWAPAlpha,
+    'SWAP':         SWAP,
+    'Syc':          Syc,
+    'WGate':        WGate,
+    'XX':           XX,
+    'XY':           XY,
+    'YY':           YY,
+    'ZZ':           ZZ
+})

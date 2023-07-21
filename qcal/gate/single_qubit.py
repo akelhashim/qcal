@@ -27,7 +27,11 @@ __all__ = (
     'Ry',
     'Rz',
     'S',
+    'SX',
+    'SY',
     'Sdag',
+    'SXdag',
+    'SYdag',
     'T',
     'Tdag',
     'U3',
@@ -405,6 +409,42 @@ class S(Gate):
             'phase': np.pi/2,
             'axis':  'z',
         }
+
+
+class SX(Gate):
+    """Class for the SX = X90 gate."""
+
+    def __init__(self, qubit: int = 0) -> None:
+        """Initialize using the rx gate.
+        
+        Args:
+            qubit (int): qubit label. Defaults to 0.
+        """
+        super().__init__(rx(np.pi/2), qubit)
+        self._properties['alias'] = 'V, X90'
+        self._properties['name'] = 'SX'
+        self._properties['params'] = {
+            'angle': np.pi/2,
+            'axis':  'x',
+        }
+
+
+class SY(Gate):
+    """Class for the SY = Y90 gate."""
+
+    def __init__(self, qubit: int = 0) -> None:
+        """Initialize using the ry gate.
+        
+        Args:
+            qubit (int): qubit label. Defaults to 0.
+        """
+        super().__init__(ry(np.pi/2), qubit)
+        self._properties['alias'] = 'Y90'
+        self._properties['name'] = 'SY'
+        self._properties['params'] = {
+            'angle': np.pi/2,
+            'axis':  'y',
+        }
     
 
 class Sdag(Gate):
@@ -422,6 +462,42 @@ class Sdag(Gate):
         self._properties['params'] = {
             'phase': -np.pi/2,
             'axis':  'z',
+        }
+
+
+class SXdag(Gate):
+    """Class for the SXdag = X-90 gate."""
+
+    def __init__(self, qubit: int = 0) -> None:
+        """Initialize using the rx gate.
+        
+        Args:
+            qubit (int): qubit label. Defaults to 0.
+        """
+        super().__init__(rx(-np.pi/2), qubit)
+        self._properties['alias'] = 'Vdag, X-90'
+        self._properties['name'] = 'SXdag'
+        self._properties['params'] = {
+            'angle': -np.pi/2,
+            'axis':  'x',
+        }
+
+
+class SYdag(Gate):
+    """Class for the SYdag = Y-90 gate."""
+
+    def __init__(self, qubit: int = 0) -> None:
+        """Initialize using the ry gate.
+        
+        Args:
+            qubit (int): qubit label. Defaults to 0.
+        """
+        super().__init__(ry(-np.pi/2), qubit)
+        self._properties['alias'] = 'Y-90'
+        self._properties['name'] = 'SYdag'
+        self._properties['params'] = {
+            'angle': -np.pi/2,
+            'axis':  'y',
         }
     
 
@@ -497,7 +573,7 @@ class V(Gate):
             qubit (int): qubit label. Defaults to 0.
         """
         super().__init__(rx(np.pi/2), qubit)
-        self._properties['alias'] = 'X90'
+        self._properties['alias'] = 'SX, X90'
         self._properties['name'] = 'V'
         self._properties['params'] = {
             'angle': np.pi/2,
@@ -515,7 +591,7 @@ class Vdag(Gate):
             qubit (int): qubit label. Defaults to 0.
         """
         super().__init__(rx(-np.pi/2), qubit)
-        self._properties['alias'] = 'X-90'
+        self._properties['alias'] = 'SXdag, X-90'
         self._properties['name'] = 'Vdag'
         self._properties['params'] = {
             'angle': -np.pi/2,
@@ -606,7 +682,7 @@ class Y90(Gate):
             qubit (int): qubit label. Defaults to 0.
         """
         super().__init__(ry(np.pi/2), qubit)
-        self._properties['name'] = 'Y90'
+        self._properties['name'] = 'SY, Y90'
         self._properties['params'] = {
             'angle': np.pi/2,
             'axis':  'y',
@@ -630,28 +706,32 @@ class Z(Gate):
         }
 
 
-single_qubit_gates = defaultdict(lambda: 'Single-qubit gate not available!', {
-    'C': C,
-    'H': H,
-    'Id': Id,
-    'Idle': Idle,
-    'Meas': Meas,
-    'RandSU2': RandSU2,
-    'Rn': Rn,
-    'Rx': Rx, 
-    'Ry': Ry,
-    'Rz': Rz,
-    'S': S,
-    'Sdag': Sdag,
-    'T': T,
-    'Tdag': Tdag,
-    'U3': U3,
-    'V': V,
-    'Vdag': Vdag,
+single_qubit_gates = defaultdict(lambda: 'Gate not currently supported!', {
+    'C':        C,
+    'H':        H,
+    'Id':       Id,
+    'Idle':     Idle,
+    'Meas':     Meas,
+    'RandSU2':  RandSU2,
+    'Rn':       Rn,
+    'Rx':       Rx, 
+    'Ry':       Ry,
+    'Rz':       Rz,
+    'S':        S,
+    'SX':       SX,
+    'SY':       SY,
+    'Sdag':     Sdag,
+    'SXdag':    SXdag,
+    'SYdag':    SYdag,
+    'T':        T,
+    'Tdag':     Tdag,
+    'U3':       U3,
+    'V':        V,
+    'Vdag':     Vdag,
     'VirtualZ': VirtualZ,
-    'X': X,
-    'X90': X90,
-    'Y': Y, 
-    'Y90': Y90,
-    'Z': Z
+    'X':        X,
+    'X90':      X90,
+    'Y':        Y, 
+    'Y90':      Y90,
+    'Z':        Z
 })

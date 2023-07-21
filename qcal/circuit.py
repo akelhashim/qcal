@@ -442,7 +442,7 @@ class Circuit:
                 isinstance(cycle_or_layer, Cycle) or 
                 isinstance(cycle_or_layer, Layer) or
                 isinstance(cycle_or_layer, Barrier)
-            ), "cycle_or_layer must be a Cycle or Layer object!"
+            ), "cycle_or_layer must be a Cycle, Layer or Barrier object!"
         self._cycles.append(cycle_or_layer)
         self._update_qubits()
 

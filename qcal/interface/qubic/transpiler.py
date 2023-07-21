@@ -338,19 +338,19 @@ def to_qubic(
 
 
 class Transpiler:
-    """Generic qubic Transpiler."""
+    """qcal to QubiC Transpiler."""
 
     __slots__ = ('_config', '_gate_mapper')
 
     def __init__(
             self, config: Config, gate_mapper: defaultdict | None = None
         ) -> None:
-        """Initialize with a qcal config object.
+        """Initialize with a qcal Config object.
 
         Args:
             config (Config): qcal config object.
-            gate_mapper (defaultdict | None, optional): dictionar which maps
-                circuit gates to Qubic gates. Defaults to None.
+            gate_mapper (defaultdict | None, optional): dictionary which maps
+                circuit gates to QubiC gates. Defaults to None.
         """
         self._config = config
         
