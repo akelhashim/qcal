@@ -378,12 +378,16 @@ class Rz(Gate):
         rz.matrix  # Numpy array of the matrix
     """
 
-    def __init__(self, theta: float, qubit: int = 0) -> None:
+    def __init__(
+            self, theta: float, qubit: int = 0, subspace: str = 'GE'
+        ) -> None:
         """Initialize using the rz function.
 
         Args:
             theta (float): angle of rotation.
             qubit (int):   qubit label. Defaults to 0.
+            subspace (str): subspace within which the gate acts. Defaults to
+                GE.
         """
         super().__init__(rz(theta), qubit)
         self._properties['name'] = 'Rz'
@@ -602,12 +606,16 @@ class Vdag(Gate):
 class VirtualZ(Gate):
     """Class for virtual Z gate."""
 
-    def __init__(self, theta: float, qubit: int = 0, subspace='GE') -> None:
+    def __init__(
+            self, theta: float, qubit: int = 0, subspace: str = 'GE'
+        ) -> None:
         """Initialize using the rz function.
 
         Args:
             theta (float): angle of rotation.
             qubit (int):   qubit label. Defaults to 0.
+            subspace (str): subspace within which the gate acts. Defaults to
+                GE.
         """
         super().__init__(rz(theta), qubit)
         self._properties['name'] = 'VirtualZ'
@@ -621,11 +629,13 @@ class VirtualZ(Gate):
 class X(Gate):
     """Class for the Pauli X gate."""
 
-    def __init__(self, qubit: int = 0, subspace='GE') -> None:
+    def __init__(self, qubit: int = 0, subspace: str = 'GE') -> None:
         """Initialize using the x gate.
         
         Args:
             qubit (int): qubit label. Defaults to 0.
+            subspace (str): subspace within which the gate acts. Defaults to
+                GE.
         """
         super().__init__(x, qubit)
         self._properties['name'] = 'X'
@@ -639,11 +649,13 @@ class X(Gate):
 class X90(Gate):
     """Class for the X90 = sqrt(X) gate."""
 
-    def __init__(self, qubit: int = 0, subspace='GE') -> None:
+    def __init__(self, qubit: int = 0, subspace: str = 'GE') -> None:
         """Initialize using the rx gate.
         
         Args:
             qubit (int): qubit label. Defaults to 0.
+            subspace (str): subspace within which the gate acts. Defaults to
+                GE.
         """
         super().__init__(rx(np.pi/2), qubit)
         self._properties['alias'] = 'V'
@@ -658,11 +670,13 @@ class X90(Gate):
 class Y(Gate):
     """Class for the Pauli Y gate."""
 
-    def __init__(self, qubit: int = 0) -> None:
+    def __init__(self, qubit: int = 0, subspace: str = 'GE') -> None:
         """Initialize using the Y gate.
         
         Args:
             qubit (int): qubit label. Defaults to 0.
+            subspace (str): subspace within which the gate acts. Defaults to
+                GE.
         """
         super().__init__(y, qubit)
         self._properties['name'] = 'Y'
@@ -675,14 +689,16 @@ class Y(Gate):
 class Y90(Gate):
     """Class for the Y90 = sqrt(Y) gate."""
 
-    def __init__(self, qubit: int = 0) -> None:
+    def __init__(self, qubit: int = 0, subspace: str = 'GE') -> None:
         """Initialize using the ry gate.
         
         Args:
             qubit (int): qubit label. Defaults to 0.
+            subspace (str): subspace within which the gate acts. Defaults to
+                GE.
         """
         super().__init__(ry(np.pi/2), qubit)
-        self._properties['name'] = 'SY, Y90'
+        self._properties['name'] = 'Y90'
         self._properties['params'] = {
             'angle': np.pi/2,
             'axis':  'y',
@@ -692,11 +708,13 @@ class Y90(Gate):
 class Z(Gate):
     """Class for the Pauli Z gate."""
 
-    def __init__(self, qubit: int = 0) -> None:
+    def __init__(self, qubit: int = 0, subspace: str = 'GE') -> None:
         """Initialize using the z gate.
         
         Args:
             qubit (int): qubit label. Defaults to 0.
+            subspace (str): subspace within which the gate acts. Defaults to
+                GE.
         """
         super().__init__(z, qubit)
         self._properties['name'] = 'Z'

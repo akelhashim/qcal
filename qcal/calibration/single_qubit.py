@@ -11,10 +11,11 @@ from qcal.circuit import Barrier, Cycle, Circuit, CircuitSet
 from qcal.compilation.compiler import Compiler
 from qcal.config import Config
 from qcal.fitting.fit import (
-    FitAbsoluteValue, FitCosine, FitDecayingCosine, FitParabola
+    FitAbsoluteValue, FitCosine, FitParabola
 )
 from qcal.math.utils import reciprocal_uncertainty, round_to_order_error
-from qcal.gate.single_qubit import Idle, VirtualZ, X90, X
+from qcal.gate.single_qubit import Idle, VirtualZ, X, X90, Y90
+from qcal.plotting.utils import calculate_nrows_ncols
 from qcal.qpu.qpu import QPU
 from qcal.units import MHz, us
 
@@ -31,43 +32,43 @@ logger = logging.getLogger(__name__)
 
 
 def Amplitude(
-        qpu:               QPU,
-        config:            Config,
-        qubits:            List | Tuple,
-        amplitudes:        ArrayLike | NDArray | Dict,
-        gate:              str = 'X90',
-        subspace:          str = 'GE',
-        compiler:          Any | Compiler | None = None, 
-        transpiler:        Any | None = None, 
-        n_shots:           int = 1024, 
-        n_batches:         int = 1, 
-        n_circs_per_seq:   int = 1, 
-        # n_levels:          int = 2,
-        n_gates:           int = 1,
-        relative_amp:      bool = False,
-        disable_esp:       bool = True,
-        disable_heralding: bool = False,
+        qpu:             QPU,
+        config:          Config,
+        qubits:          List | Tuple,
+        amplitudes:      ArrayLike | NDArray | Dict[ArrayLike | NDArray],
+        gate:            str = 'X90',
+        subspace:        str = 'GE',
+        compiler:        Any | Compiler | None = None, 
+        transpiler:      Any | None = None, 
+        n_shots:         int = 1024, 
+        n_batches:       int = 1, 
+        n_circs_per_seq: int = 1, 
+        n_gates:         int = 1,
+        relative_amp:    bool = False,
+        esp:             bool = False,
+        heralding:       bool = True,
         **kwargs
     ) -> Callable:
-    """Function which passes a custom QPU to the Amplitude class.
+    """Amplitude calibration for single-qubit gates.
 
     Basic example useage for initial calibration:
 
+        amps = np.linspace(0, 1.0, 21)
         cal = Amplitude(
             CustomQPU, 
             config, 
             qubits=[0, 1, 2],
-            amps)
+            amps=amps)
         cal.run()
 
     Args:
         qpu (QPU): custom QPU object.
         config (Config): qcal Config object.
         qubits (List | Tuple): qubits to calibrate.
-        amplitudes (ArrayLike | NDArray | Dict): array of gate amplitudes to 
-            sweep over for calibrating the single-qubit gate amplitude. If
-            calibrating multiple qubits at the same time, this should be a
-            dictionary mapping an array to a qubit label.
+        amplitudes (ArrayLike | NDArray | Dict[ArrayLike | NDArray]): array of 
+            gate amplitudes to sweep over for calibrating the single-qubit gate 
+            amplitude. If calibrating multiple qubits at the same time, this 
+            should be a dictionary mapping an array to a qubit label.
         gate (str, optional): native gate to calibrate. Defaults 
             to 'X90'.
         subspace (str, optional): qubit subspace for the defined gate.
@@ -82,19 +83,16 @@ def Amplitude(
             Defaults to 1.
         n_circs_per_seq (int, optional): maximum number of circuits that
             can be measured per sequence. Defaults to 1.
-        # n_levels (int, optional): number of energy levels to be measured. 
-        #     Defaults to 2. If n_levels = 3, this assumes that the
-        #     measurement supports qutrit classification.
         n_gates (int, optional): number of gates for pulse repetition.
             Defaults to 1.
         relative_amp (bool, optional): whether or not the amplitudes argument
             is defined relative to the existing pulse amplitude. Defaults to
             False. If true, the amplitudes are swept over the current amplitude
             times the amplitudes argument.
-        disable_esp (bool, optional): whether to disable excited state
-                promotion for the calibration. Defaults to True.
-        disable_heralding (bool, optional): whether to disable heralding
-            for the calibraion. Defaults to False.
+        esp (bool, optional): whether to enable excited state promotion for 
+            the calibration. Defaults to False.
+        heralding (bool, optional): whether to enable heralding for the 
+            calibraion. Defaults to True.
 
     Returns:
         Callable: Amplitude calibration class.
@@ -108,28 +106,24 @@ def Amplitude(
         """
 
         def __init__(self, 
-                config:            Config,
-                qubits:            List | Tuple,
-                amplitudes:        ArrayLike | NDArray | Dict,
-                gate:              str = 'X90',
-                subspace:          str = 'GE',
-                compiler:          Any | Compiler | None = None, 
-                transpiler:        Any | None = None, 
-                n_shots:           int = 1024, 
-                n_batches:         int = 1, 
-                n_circs_per_seq:   int = 1, 
-                # n_levels:          int = 2,
-                n_gates:           int = 1,
-                relative_amp:      bool = False,
-                disable_esp:       bool = True,
-                disable_heralding: bool = False,
+                config:          Config,
+                qubits:          List | Tuple,
+                amplitudes:      ArrayLike | NDArray | Dict,
+                gate:            str = 'X90',
+                subspace:        str = 'GE',
+                compiler:        Any | Compiler | None = None, 
+                transpiler:      Any | None = None, 
+                n_shots:         int = 1024, 
+                n_batches:       int = 1, 
+                n_circs_per_seq: int = 1, 
+                n_gates:         int = 1,
+                relative_amp:    bool = False,
+                esp:             bool = False,
+                heralding:       bool = True,
                 **kwargs
             ) -> None:
             """Initialize the Amplitude calibration class within the function.
-
             """
-            # if subspace == 'EF':
-            #     assert n_levels == 3, 'n_levels must be 3 for EF calibration!'
             n_levels = 3 if subspace == 'EF' else 2
             qpu.__init__(self,
                 config, 
@@ -143,8 +137,8 @@ def Amplitude(
             )
             Calibration.__init__(self, 
                 config, 
-                disable_esp=disable_esp,
-                disable_heralding=disable_heralding
+                esp=esp,
+                heralding=heralding
             )
 
             self._qubits = qubits
@@ -275,7 +269,7 @@ def Amplitude(
 
                     elif self._n_gates > 1:  # Quadratic fit
                         a, b, _ = self._fit[q].fit_params
-                        newvalue = -b / (2*a)  # Assume c = 0
+                        newvalue = -b / (2 * a)  # Assume c = 0
                         if a > 0:
                             logger.warning(
                               f'Fit failed for qubit {q} (positive curvature)!'
@@ -308,7 +302,9 @@ def Amplitude(
             qpu.run(self, self._circuits, save=False)
             self.analyze()
             clear_output(wait=True)
-            self._data_manager._exp_id += '_amp_calibration'
+            self._data_manager._exp_id += (
+                f'_amp_cal_Q{"".join(str(q) for q in self._qubits)}'
+            )
             if settings.Settings.save_data:
                 self.save()
             self.plot(
@@ -332,29 +328,30 @@ def Amplitude(
         n_circs_per_seq, 
         n_gates,
         relative_amp,
-        disable_esp,
-        disable_heralding
+        esp,
+        heralding,
+        **kwargs
     )
 
 
 def Frequency(
-        qpu:               QPU,
-        config:            Config,
-        qubits:            List | Tuple,
-        t_max:             float = 2*us,
-        detunings:         NDArray = np.array([-2, -1, 1, 2])*MHz,
-        subspace:          str = 'GE',
-        compiler:          Any | Compiler | None = None, 
-        transpiler:        Any | None = None,
-        n_elements:        int = 30,
-        n_shots:           int = 1024, 
-        n_batches:         int = 1, 
-        n_circs_per_seq:   int = 1, 
-        disable_esp:       bool = True,
-        disable_heralding: bool = False,
+        qpu:             QPU,
+        config:          Config,
+        qubits:          List | Tuple,
+        t_max:           float = 2*us,
+        detunings:       NDArray = np.array([-2, -1, 1, 2])*MHz,
+        subspace:        str = 'GE',
+        compiler:        Any | Compiler | None = None, 
+        transpiler:      Any | None = None,
+        n_elements:      int = 30,
+        n_shots:         int = 1024, 
+        n_batches:       int = 1, 
+        n_circs_per_seq: int = 1, 
+        esp:             bool = False,
+        heralding:       bool = True,
         **kwargs
     ) -> Callable:
-    """Function which passes a custom QPU to the Frequency class.
+    """Frequency calibration for single qubits.
 
     Basic example useage:
 
@@ -386,10 +383,10 @@ def Frequency(
             Defaults to 1.
         n_circs_per_seq (int, optional): maximum number of circuits that
             can be measured per sequence. Defaults to 1.
-        disable_esp (bool, optional): whether to disable excited state
-                promotion for the calibration. Defaults to True.
-        disable_heralding (bool, optional): whether to disable heralding
-            for the calibraion. Defaults to False.
+        esp (bool, optional): whether to enable excited state promotion for 
+            the calibration. Defaults to False.
+        heralding (bool, optional): whether to enable heralding for the 
+            calibraion. Defaults to True.
 
     Returns:
         Callable: Frequency calibration class.
@@ -403,24 +400,23 @@ def Frequency(
         """
 
         def __init__(self, 
-                config:            Config,
-                qubits:            List | Tuple,
-                t_max:             float = 2*us,
-                detunings:         NDArray = np.array([-2, -1, 1, 2])*MHz,
-                subspace:          str = 'GE',
-                compiler:          Any | Compiler | None = None, 
-                transpiler:        Any | None = None,
-                n_elements:        int = 30,
-                n_shots:           int = 1024, 
-                n_batches:         int = 1, 
-                n_circs_per_seq:   int = 1, 
-                disable_esp:       bool = True,
-                disable_heralding: bool = False,
+                config:          Config,
+                qubits:          List | Tuple,
+                t_max:           float = 2*us,
+                detunings:       NDArray = np.array([-2, -1, 1, 2])*MHz,
+                subspace:        str = 'GE',
+                compiler:        Any | Compiler | None = None, 
+                transpiler:      Any | None = None,
+                n_elements:      int = 30,
+                n_shots:         int = 1024, 
+                n_batches:       int = 1, 
+                n_circs_per_seq: int = 1, 
+                esp:             bool = False,
+                heralding:       bool = True,
                 **kwargs
             ) -> None:
             """Initialize the Frequency experiment class within the function.
             """
-
             n_levels = 3 if subspace == 'EF' else 2
             qpu.__init__(self,
                 config, 
@@ -434,8 +430,8 @@ def Frequency(
             )
             Calibration.__init__(self, 
                 config, 
-                disable_esp=disable_esp,
-                disable_heralding=disable_heralding
+                esp=esp,
+                heralding=heralding
             )
 
             self._qubits = qubits
@@ -699,7 +695,9 @@ def Frequency(
             qpu.run(self, self._circuits, save=False)
             self.analyze()
             clear_output(wait=True)
-            self._data_manager._exp_id += '_freq_calibration'
+            self._data_manager._exp_id += (
+                f'_freq_cal_Q{"".join(str(q) for q in self._qubits)}'
+            )
             # if settings.Settings.save_data:
             #     self.save()
             self.plot()
@@ -718,6 +716,414 @@ def Frequency(
         n_shots, 
         n_batches, 
         n_circs_per_seq, 
-        disable_esp,
-        disable_heralding
+        esp,
+        heralding,
+        **kwargs
+    )
+
+
+def Phase(
+        qpu:             QPU,
+        config:          Config,
+        qubits:          List | Tuple,
+        phases:          ArrayLike | NDArray | Dict[ArrayLike | NDArray],
+        subspace:        str = 'GE',
+        compiler:        Any | Compiler | None = None, 
+        transpiler:      Any | None = None, 
+        n_shots:         int = 1024, 
+        n_batches:       int = 1, 
+        n_circs_per_seq: int = 1, 
+        esp:             bool = False,
+        heralding:       bool = True,
+        **kwargs
+    ) -> Callable:
+    """Phase calibration for single-qubit gates.
+
+    This calibration corrects for phases errors that occur due to stark shifts
+    during single-qubit gates.
+
+    Basic example useage for initial calibration:
+
+        phases = np.pi * np.linspace(-1, 1, 21)
+        cal = Phase(
+            CustomQPU, 
+            config, 
+            qubits=[0, 1, 2],
+            phases=phases)
+        cal.run()
+
+    Args:
+        qpu (QPU): custom QPU object.
+        config (Config): qcal Config object.
+        qubits (List | Tuple): qubits to calibrate.
+        phases (ArrayLike | NDArray | Dict[ArrayLike | NDArray]): array of
+            phases to sweep over for calibrating the single-qubit gate 
+            phases. If calibrating multiple qubits at the same time, this 
+            should be a dictionary mapping an array to a qubit label.
+        subspace (str, optional): qubit subspace for the defined gate.
+            Defaults to 'GE'.
+        compiler (Any | Compiler | None, optional): custom compiler to
+            compile the experimental circuits. Defaults to None.
+        transpiler (Any | None, optional): custom transpiler to 
+            transpile the experimental circuits. Defaults to None.
+        n_shots (int, optional): number of measurements per circuit. 
+            Defaults to 1024.
+        n_batches (int, optional): number of batches of measurements. 
+            Defaults to 1.
+        n_circs_per_seq (int, optional): maximum number of circuits that
+            can be measured per sequence. Defaults to 1.
+        esp (bool, optional): whether to enable excited state promotion for 
+            the calibration. Defaults to False.
+        heralding (bool, optional): whether to enable heralding for the 
+            calibraion. Defaults to True.
+
+    Returns:
+        Callable: Phases calibration class.
+    """
+
+    class Phase(qpu, Calibration):
+        """Phase calibration class.
+        
+        This class inherits a custom QPU from the Phase calibration
+        function.
+        """
+
+        def __init__(self, 
+                config:          Config,
+                qubits:          List | Tuple,
+                phases:          ArrayLike | NDArray | Dict,
+                subspace:        str = 'GE',
+                compiler:        Any | Compiler | None = None, 
+                transpiler:      Any | None = None, 
+                n_shots:         int = 1024, 
+                n_batches:       int = 1, 
+                n_circs_per_seq: int = 1, 
+                esp:             bool = False,
+                heralding:       bool = True,
+                **kwargs
+            ) -> None:
+            """Initialize the Phase calibration class within the function."""
+            n_levels = 3 if subspace == 'EF' else 2
+            qpu.__init__(self,
+                config, 
+                compiler, 
+                transpiler, 
+                n_shots, 
+                n_batches, 
+                n_circs_per_seq, 
+                n_levels,
+                **kwargs
+            )
+            Calibration.__init__(self, 
+                config, 
+                esp=esp,
+                heralding=heralding
+            )
+
+            self._qubits = qubits
+
+            assert subspace in ('GE', 'EF'), 'subspace must be GE or EF!'
+            self._subspace = subspace
+
+            if not isinstance(phases, dict):
+                self._phases = {q: phases for q in qubits}
+            else:
+                self._phases = phases
+            self._param_sweep = self._phases
+
+            self._params = {}
+            for q in qubits:
+                self._params[q] = [
+                    f'single_qubit/{q}/{subspace}/X90/pulse/0/kwargs/phase',
+                    f'single_qubit/{q}/{subspace}/X90/pulse/-1/kwargs/phase'
+                ]
+
+            self._fit = {q: FitParabola() for q in qubits}
+
+        @property
+        def phases(self) -> Dict:
+            """Phase sweep for each qubit.
+
+            Returns:
+                Dict: qubit to array map.
+            """
+            return self._phases
+
+        def generate_circuits(self):
+            """Generate all amplitude calibration circuits."""
+            logger.info(' Generating circuits...')
+
+            level = {2: 'GE', 3: 'EF'}
+            circuit0 = Circuit()
+            circuit1 = Circuit()
+
+            # Prepulse for EF calibration
+            if self._subspace == 'EF':
+                
+                circuit0.extend([
+                    Cycle([
+                        X90(q, subspace='GE') for q in self._qubits
+                    ]),
+                    # Barrier(self._qubits),
+                    Cycle([
+                        X90(q, subspace='GE') for q in self._qubits
+                    ]),
+                    # Barrier(self._qubits)
+                ])
+
+                circuit1.extend([
+                    Cycle([
+                        X90(q, subspace='GE') for q in self._qubits
+                    ]),
+                    # Barrier(self._qubits),
+                    Cycle([
+                        X90(q, subspace='GE') for q in self._qubits
+                    ]),
+                    # Barrier(self._qubits)
+                ])
+
+            # Y180_X90
+            circuit0.extend([
+                Cycle([
+                    VirtualZ(np.pi/2, q, subspace=level[self._n_levels])
+                    for q in self._qubits
+                ]),
+                # Barrier(self._qubits),
+                Cycle([
+                    X90(q, subspace=level[self._n_levels]) 
+                    for q in self._qubits
+                ]),
+                # Barrier(self._qubits),
+                Cycle([
+                    X90(q, subspace=level[self._n_levels]) 
+                    for q in self._qubits
+                ]),
+                # Barrier(self._qubits),
+                Cycle([
+                    VirtualZ(-np.pi/2, q, subspace=level[self._n_levels])
+                    for q in self._qubits
+                ]),
+                # Barrier(self._qubits),
+                Cycle([
+                    X90(q, subspace=level[self._n_levels]) 
+                    for q in self._qubits
+                ])
+            ])
+            circuit0.measure()
+
+            # X180_Y90
+            circuit1.extend([
+                Cycle([
+                    X90(q, subspace=level[self._n_levels]) 
+                    for q in self._qubits
+                ]),
+                # Barrier(self._qubits),
+                Cycle([
+                    X90(q, subspace=level[self._n_levels]) 
+                    for q in self._qubits
+                ]),
+                # Barrier(self._qubits),
+                Cycle([
+                    VirtualZ(np.pi/2, q, subspace=level[self._n_levels])
+                    for q in self._qubits
+                ]),
+                # Barrier(self._qubits),
+                Cycle([
+                    X90(q, subspace=level[self._n_levels]) 
+                    for q in self._qubits
+                ]),
+                # Barrier(self._qubits),
+                Cycle([
+                    VirtualZ(-np.pi/2, q, subspace=level[self._n_levels])
+                    for q in self._qubits
+                ]),
+            ])
+            circuit1.measure()
+            
+            circuits = []
+            for _ in range(self._phases[self._qubits[0]].size):
+                circuits.append(circuit0.copy())
+                circuits.append(circuit1.copy())
+
+            self._circuits = CircuitSet(circuits=circuits)
+            self._circuits['sequence'] = [
+                    'Y180_X90', 'X180_Y90'
+                ] * int(self._circuits.n_circuits / 2)
+            for q in self._qubits:
+                _phases = []
+                for p in phases[q]:
+                    _phases.extend([p, p])
+                self._circuits[
+                        f'param: {self._params[q][0]}'
+                    ] = _phases
+                self._circuits[
+                        f'param: {self._params[q][-1]}'
+                    ] = _phases
+                
+        def analyze(self) -> None:
+            """Analyze the data."""
+            logger.info(' Analyzing the data...')
+
+            level = {'GE': '1', 'EF': '2'}
+            for i, q in enumerate(self._qubits):
+                pop0 = []  # circuit0
+                pop1 = []  # circuit1
+                pops = []
+                for i, circuit in self._circuits:
+                    pop = circuit.results.marginalize(i).populations[
+                        level[self._subspace]
+                    ]
+                    pops.append(pop)
+                    
+                    # 'Y180_X90'
+                    if i % 2 == 0:
+                        pop0.append(pop)
+                    # 'X180_Y90'
+                    elif i % 2 == 1:
+                        pop1.append(pop)
+        
+                self._circuits[f'Q{q}: pop{level[self._subspace]}'] = pops
+                self._sweep_results[q] = (np.array(pop0) - np.array(pop1))**2
+                self._fit[q].fit(self._phases[q], self._sweep_results[q])
+
+                # If the fit was successful, write find the new phase
+                if self._fit[q].fit_success:
+                    a, b, _ = self._fit[q].fit_params
+                    newvalue = -b / (2 * a)  # Assume c = 0
+                    if a < 0:
+                        logger.warning(
+                            f'Fit failed for qubit {q} (negative curvature)!'
+                        )
+                        self._fit[q]._fit_success = False
+                    elif not in_range(newvalue, self._phases[q]):
+                        logger.warning(
+                            f'Fit failed for qubit {q} (out of range)!'
+                        )
+                        self._fit[q]._fit_success = False
+                    else:
+                        self._cal_values[q] = newvalue
+
+        def save(self):
+            """Save all circuits and data."""
+            qpu.save(self)
+            # self._data_manager.save_to_csv(
+            #      pd.DataFrame([self._param_sweep]), 'param_sweep'
+            # )
+            self._data_manager.save_to_csv(
+                 pd.DataFrame([self._sweep_results]), 'sweep_results'
+            )
+            self._data_manager.save_to_csv(
+                 pd.DataFrame([self._cal_values]), 'calibrated_values'
+            )
+
+        def plot(self) -> None:
+            """Plot the phas sweep and fit results."""
+            level = {'GE': '1', 'EF': '2'}
+
+            nrows, ncols = calculate_nrows_ncols(len(self._qubits))
+            figsize = (5 * ncols, 4 * nrows)
+            fig, axes = plt.subplots(
+                nrows, ncols, figsize=figsize, layout='constrained'
+            )
+
+            k = -1
+            for i in range(nrows):
+                for j in range(ncols):
+                    k += 1
+
+                    if len(self._qubits) == 1:
+                        ax = axes
+                    elif axes.ndim == 1:
+                        ax = axes[j]
+                    elif axes.ndim == 2:
+                        ax = axes[i,j]
+
+                    if k < len(self._qubits):
+                        q = self._qubits[k]
+
+                        ax.set_xlabel('Phase (rad.)', fontsize=15)
+                        ax.set_ylabel(
+                            r'$|2\rangle$ Population' if self._subspace == 'EF' 
+                            else r'$|1\rangle$ Population',
+                            fontsize=15
+                        )
+                        ax.tick_params(
+                            axis='both', which='major', labelsize=12
+                        )
+                        ax.grid(True)
+
+                        ax.plot(
+                            self._param_sweep[q], 
+                            self._circuits[
+                                self._circuits['sequence'] == 'Y180_X90'
+                            ][f'Q{q}: pop{level[self._subspace]}'],
+                            '-o', c='blue', label='Y180_X90'
+                        )
+                        ax.plot(
+                            self._param_sweep[q], 
+                            self._circuits[
+                                self._circuits['sequence'] == 'X180_Y90'
+                            ][f'Q{q}: pop{level[self._subspace]}'],
+                            '-o', c='blueviolet', label='X180_Y90'
+                        )
+                        ax.plot(
+                            self._param_sweep[q], self._sweep_results[q],
+                            'o', c='k', label=f'Meas, Q{q}'
+                        )
+                        if self._fit[q].fit_success:
+                            x = np.linspace(
+                                self._param_sweep[q][0],
+                                self._param_sweep[q][-1], 
+                                100
+                            )
+                            ax.plot(
+                                x, self._fit[q].predict(x),
+                                '-', c='orange', label='Fit'
+                            )
+                            ax.axvline(
+                                self._cal_values[q],  
+                                ls='--', c='k', label='Fit value'
+                            )
+
+                        ax.legend(loc=0, fontsize=12)
+
+                    else:
+                        ax.axis('off')
+                
+            fig.set_tight_layout(True)
+            if settings.Settings.save_data:
+                fig.savefig(
+                    self._data_manager._save_path + 'calibration_results.png', 
+                    dpi=300
+                )
+            plt.show()
+
+        def run(self):
+            """Run all experimental methods and analyze results."""
+            self.generate_circuits()
+            qpu.run(self, self._circuits, save=False)
+            self.analyze()
+            clear_output(wait=True)
+            self._data_manager._exp_id += (
+                f'_phase_cal_Q{"".join(str(q) for q in self._qubits)}'
+            )
+            if settings.Settings.save_data:
+                self.save()
+            self.plot()
+            self.final()
+            print(f"\nRuntime: {repr(self._runtime)[8:]}\n")
+
+    return Phase(
+        config,
+        qubits,
+        phases,
+        subspace,
+        compiler, 
+        transpiler, 
+        n_shots, 
+        n_batches, 
+        n_circs_per_seq, 
+        esp,
+        heralding,
+        **kwargs
     )
