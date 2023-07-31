@@ -456,8 +456,7 @@ def Frequency(
                 q: FitAbsoluteValue() for q in qubits
             }
             self._freq_fit = {
-                # q: [FitDecayingCosine() for _ in range(detunings.size)]
-                 q: [FitCosine() for _ in range(detunings.size)] 
+                q: [FitDecayingCosine() for _ in range(detunings.size)]
                 for q in qubits
             }
 
@@ -514,7 +513,7 @@ def Frequency(
                         Cycle([Idle(q, duration=t) for q in self._qubits]),
                         Barrier(self._qubits),
                         Cycle([VirtualZ(phase, q, subspace=self._subspace) 
-                            for q in self._qubits]),
+                              for q in self._qubits]),
                         Barrier(self._qubits),
                     ])
                     
@@ -549,26 +548,19 @@ def Frequency(
                         )
                     self._sweep_results[q].append(pop)
 
-                    # e = np.array(pop).min()
-                    # a = np.array(pop).max() - e
-                    # b = -np.mean( np.diff(pop) / np.diff(self._times[q]) ) / a
-                    # c = detuning
-                    # d = 0.
-                    # self._freq_fit[q][i].fit(
-                    #     self._times[q], pop, p0=(a, b, c, d, e)
-                    # )
-                    d = np.array(pop).min()
-                    a = np.array(pop).max() - d
-                    b = np.abs(detuning)
-                    c = 0.
+                    e = np.array(pop).min()
+                    a = np.array(pop).max() - e
+                    b = -np.mean( np.diff(pop) / np.diff(self._times[q]) ) / a
+                    c = detuning
+                    d = 0.
                     self._freq_fit[q][i].fit(
-                        self._times[q], pop, p0=(a, b, c, d)
+                        self._times[q], pop, p0=(a, b, c, d, e)
                     )
 
                     # If the fit was successful, grab the frequency
                     if self._freq_fit[q][i].fit_success:
                         self._freqs[q].append(
-                            self._freq_fit[q][i].fit_params[1] ## 2 for FtiDecaying
+                            abs(self._freq_fit[q][i].fit_params[2])
                         )
             
             # Fit the characterized frequencies to an absolute value curve
@@ -586,12 +578,9 @@ def Frequency(
         def save(self) -> None:
             """Save all circuits and data."""
             qpu.save(self)
-            # self._data_manager.save_to_csv(
-            #      pd.DataFrame([self._param_sweep]), 'param_sweep'
-            # )
-            # self._data_manager.save_to_csv(
-            #      pd.DataFrame([self._sweep_results]), 'sweep_results'
-            # )
+            self._data_manager.save_to_csv(
+                 pd.DataFrame([self._sweep_results]), 'sweep_results'
+            )
             self._data_manager.save_to_csv(
                  pd.DataFrame([self._cal_values]), 'freq_values'
             )
@@ -682,11 +671,11 @@ def Frequency(
                     )
 
             fig.set_tight_layout(True)
-            # if settings.Settings.save_data:
-            #     fig.savefig(
-            #         self._data_manager._save_path + 'freq_calibration.png', 
-            #         dpi=300
-            #     )
+            if settings.Settings.save_data:
+                fig.savefig(
+                    self._data_manager._save_path + 'freq_calibration.png', 
+                    dpi=300
+                )
             plt.show()
 
         def run(self):
@@ -698,10 +687,10 @@ def Frequency(
             self._data_manager._exp_id += (
                 f'_freq_cal_Q{"".join(str(q) for q in self._qubits)}'
             )
-            # if settings.Settings.save_data:
-            #     self.save()
+            if settings.Settings.save_data:
+                self.save()
             self.plot()
-            # self.final()
+            self.final()
             print(f"\nRuntime: {repr(self._runtime)[8:]}\n")
 
     return Frequency(

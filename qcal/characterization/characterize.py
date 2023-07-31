@@ -207,7 +207,7 @@ class Characterize:
                         ax.plot(
                             x, self._fit[q].predict(x),
                             '-', c='orange', 
-                            label=f'{flabel} = '\
+                            label=f'Fit: {flabel} = '\
                                f'{round(self._char_values[q] / 1.e-6, 1)} '\
                                rf'({round(self._errors[q] / 1.e-6, 2)}) $\mu$s'
                         )

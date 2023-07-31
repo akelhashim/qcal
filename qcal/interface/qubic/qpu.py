@@ -221,13 +221,13 @@ class QubicQPU(QPU):
         # Overwrite qubit and readout frequencies:
         for q in self._config.qubits:
             self._qchip.qubits[f'Q{q}'].freq = (
-                self._config.single_qubit[0].GE.freq[0]
+                self._config.single_qubit[q].GE.freq[0]
             )
             self._qchip.qubits[f'Q{q}'].freq_ef = (
-                self._config.single_qubit[0].EF.freq[0]
+                self._config.single_qubit[q].EF.freq[0]
             )
             self._qchip.qubits[f'Q{q}'].readfreq = (
-                self._config.single_qubit[0].GE.freq[0]
+                self._config.readout[q].freq
             )
 
     @property
