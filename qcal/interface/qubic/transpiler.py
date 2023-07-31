@@ -26,7 +26,7 @@ def add_reset(
     """Add active or passive reset to the beginning of a circuit.
 
     Args:
-        config (Config):       config object.
+        config (Config):       qcal Config object.
         qubits (List | Tuple): qubits to reset.
         circuit (List):        qubic circuit.
     """
@@ -86,7 +86,7 @@ def add_heralding(
     """Add heralded readout to the beginning of the circuit.
 
     Args:
-        config (Config):       config object.
+        config (Config):       qcal Config object.
         qubits (List | Tuple): qubits to reset.
         circuit (List):        qubic circuit.
     """
@@ -107,7 +107,7 @@ def add_measurement(
     """Add measurement to a circuit.
 
     Args:
-        config (Config):            config object.
+       config (Config):             qcal Config object.
         qubit_or_gate (int | Gate): qubit label or Gate object.
         circuit (List):             qubic circuit.
     """
@@ -187,7 +187,7 @@ def add_delay(config: Config, gate: Gate, circuit: List) -> None:
     """Add a delay for an idle gate.
 
     Args:
-        config (Config): config object.
+        config (Config): qcal Config object.
         gate (Gate):     single-qubit gate.
         circuit (List):  qubic circuit.
     """
@@ -202,7 +202,7 @@ def add_virtualz_gate(config: Config, gate: Gate, circuit: List) -> None:
     """Add a virtual Z gate.
 
     Args:
-        config (Config): config object.
+        config (Config): qcal Config object.
         gate (Gate):     Z-type gate.
         circuit (List):  qubic circuit.
     """
@@ -217,7 +217,7 @@ def add_single_qubit_gate(config: Config, gate: Gate, circuit: List) -> None:
     """Add a single-qubit gate.
 
     Args:
-        config (Config): config object.
+        config (Config): qcal Config object.
         gate (Gate):     single-qubit gate.
         circuit (List):  qubic circuit.
     """
@@ -254,7 +254,7 @@ def add_multi_qubit_gate(config: Config, gate: Gate, circuit: List) -> None:
     """Add a multi-qubit gate.
 
     Args:
-        config (Config): config object.
+        config (Config): qcal Config object.
         gate (Gate):     multi-qubit gate.
         circuit (List):  qubic circuit.
     """

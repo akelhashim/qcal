@@ -22,18 +22,18 @@ class Calibration:
     """
 
     def __init__(self, 
-            config:            Config, 
-            disable_esp:       bool = True,
-            disable_heralding: bool = False
+            config:    Config, 
+            esp:       bool = False,
+            heralding: bool = True
         ) -> None:
         """Initialize the main Calibration class.
         
         Args:
             config (Config): qcal Config object.
-            disable_esp (bool, optional): whether to disable excited state
-                promotion for the calibration. Defaults to True.
-            disable_heralding (bool, optional): whether to disable heralding
-                for the calibraion. Defaults to False.
+            esp (bool, optional): whether to enable excited state
+                promotion for the calibration. Defaults to False.
+            heralding (bool, optional): whether to enable heralding
+                for the calibraion. Defaults to True.
         """
         self._config = config
         self._gate = None
@@ -46,17 +46,17 @@ class Calibration:
         self._cal_values = {}
         self._errors = {}
 
-        if disable_esp and self._config['readout/esp/enable']:
-            self.set_param('readout/esp/enable', False)
-            self._enable_esp = True
+        if esp and not self._config['readout/esp/enable']:
+            self.set_param('readout/esp/enable', True)
+            self._disable_esp = True
         else:
-            self._enable_esp = False
+            self._disable_esp = False
 
-        if disable_heralding and self._config['readout/herald']:
-            self.set_param('readout/herald', False)
-            self._enable_heralding = True
+        if heralding and not self._config['readout/herald']:
+            self.set_param('readout/herald', True)
+            self._disable_heralding = True
         else:
-            self._enable_heralding = False
+            self._disable_heralding = False
 
     @property
     def calibrated_values(self) -> Dict:
@@ -149,11 +149,11 @@ class Calibration:
             if self._fit[q].fit_success:
                 self.set_param(self._params[q], self._cal_values[q])
 
-        if self._enable_esp:
-            self.set_param('readout/esp/enable', True)
+        if self._disable_esp:
+            self.set_param('readout/esp/enable', False)
 
-        if self._enable_heralding:
-            self.set_param('readout/herald', True)
+        if self._disable_heralding:
+            self.set_param('readout/herald', False)
 
         self._config.save()
         self._config.load()

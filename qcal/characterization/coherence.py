@@ -23,20 +23,20 @@ from typing import Any, Callable, Dict, List, Tuple
 logger = logging.getLogger(__name__)
 
 
-def T1(qpu:               QPU,
-       config:            Config,
-       qubits:            List | Tuple,
-       t_max:             float = 500*us,
-       gate:              str = 'X90',
-       subspace:          str = 'GE',
-       compiler:          Any | Compiler | None = None, 
-       transpiler:        Any | None = None,
-       n_elements:        int = 50,
-       n_shots:           int = 1024, 
-       n_batches:         int = 1, 
-       n_circs_per_seq:   int = 1, 
-       disable_esp:       bool = True,
-       disable_heralding: bool = False,
+def T1(qpu:             QPU,
+       config:          Config,
+       qubits:          List | Tuple,
+       t_max:           float = 500*us,
+       gate:            str = 'X90',
+       subspace:        str = 'GE',
+       compiler:        Any | Compiler | None = None, 
+       transpiler:      Any | None = None,
+       n_elements:      int = 50,
+       n_shots:         int = 1024, 
+       n_batches:       int = 1, 
+       n_circs_per_seq: int = 1, 
+       esp:             bool = False,
+       heralding:       bool = True,
        **kwargs
     ) -> Callable:
     """Function which passes a custom QPU to the Amplitude class.
@@ -71,10 +71,10 @@ def T1(qpu:               QPU,
             Defaults to 1.
         n_circs_per_seq (int, optional): maximum number of circuits that
             can be measured per sequence. Defaults to 1.
-        disable_esp (bool, optional): whether to disable excited state
-                promotion for the calibration. Defaults to True.
-        disable_heralding (bool, optional): whether to disable heralding
-            for the calibraion. Defaults to False.
+        esp (bool, optional): whether to enable excited state promotion for 
+            the calibration. Defaults to False.
+        heralding (bool, optional): whether to enable heralding for the 
+            calibraion. Defaults to True.
 
     Returns:
         Callable: T1 class.
@@ -88,19 +88,19 @@ def T1(qpu:               QPU,
         """
 
         def __init__(self, 
-                config:            Config,
-                qubits:            List | Tuple,
-                t_max:             float = 500*us,
-                gate:              str = 'X90',
-                subspace:          str = 'GE',
-                compiler:          Any | Compiler | None = None, 
-                transpiler:        Any | None = None,
-                n_elements:        int = 50,
-                n_shots:           int = 1024, 
-                n_batches:         int = 1, 
-                n_circs_per_seq:   int = 1, 
-                disable_esp:       bool = True,
-                disable_heralding: bool = False,
+                config:          Config,
+                qubits:          List | Tuple,
+                t_max:           float = 500*us,
+                gate:            str = 'X90',
+                subspace:        str = 'GE',
+                compiler:        Any | Compiler | None = None, 
+                transpiler:      Any | None = None,
+                n_elements:      int = 50,
+                n_shots:         int = 1024, 
+                n_batches:       int = 1, 
+                n_circs_per_seq: int = 1, 
+                esp:             bool = False,
+                heralding:       bool = True,
                 **kwargs
             ) -> None:
             """Initialize the T1 experiment class within the function."""
@@ -118,8 +118,8 @@ def T1(qpu:               QPU,
             )
             Characterize.__init__(self, 
                 config, 
-                disable_esp=disable_esp,
-                disable_heralding=disable_heralding
+                esp=esp,
+                heralding=heralding
             )
 
             self._qubits = qubits
@@ -238,9 +238,6 @@ def T1(qpu:               QPU,
             """Save all circuits and data."""
             qpu.save(self)
             self._data_manager.save_to_csv(
-                 pd.DataFrame([self._param_sweep]), 'param_sweep'
-            )
-            self._data_manager.save_to_csv(
                  pd.DataFrame([self._results]), 'sweep_results'
             )
             self._data_manager.save_to_csv(
@@ -285,26 +282,27 @@ def T1(qpu:               QPU,
         n_shots, 
         n_batches, 
         n_circs_per_seq, 
-        disable_esp,
-        disable_heralding
+        esp,
+        heralding,
+        **kwargs
     )
 
 
-def T2(qpu:               QPU,
-       config:            Config,
-       qubits:            List | Tuple,
-       t_max:             float = 250*us,
-       detuning:          float = 0.05 * MHz,
-       echo:              bool = False,
-       subspace:          str = 'GE',
-       compiler:          Any | Compiler | None = None, 
-       transpiler:        Any | None = None,
-       n_elements:        int = 50,
-       n_shots:           int = 1024, 
-       n_batches:         int = 1, 
-       n_circs_per_seq:   int = 1, 
-       disable_esp:       bool = True,
-       disable_heralding: bool = False,
+def T2(qpu:             QPU,
+       config:          Config,
+       qubits:          List | Tuple,
+       t_max:           float = 250*us,
+       detuning:        float = 0.05 * MHz,
+       echo:            bool = False,
+       subspace:        str = 'GE',
+       compiler:        Any | Compiler | None = None, 
+       transpiler:      Any | None = None,
+       n_elements:      int = 50,
+       n_shots:         int = 1024, 
+       n_batches:       int = 1, 
+       n_circs_per_seq: int = 1, 
+       esp:             bool = False,
+       heralding:       bool = True,
        **kwargs
     ) -> Callable:
     """Function which passes a custom QPU to the Amplitude class.
@@ -343,10 +341,10 @@ def T2(qpu:               QPU,
             Defaults to 1.
         n_circs_per_seq (int, optional): maximum number of circuits that
             can be measured per sequence. Defaults to 1.
-        disable_esp (bool, optional): whether to disable excited state
-                promotion for the calibration. Defaults to True.
-        disable_heralding (bool, optional): whether to disable heralding
-            for the calibraion. Defaults to False.
+        esp (bool, optional): whether to enable excited state promotion for 
+            the calibration. Defaults to False.
+        heralding (bool, optional): whether to enable heralding for the 
+            calibraion. Defaults to True.
 
     Returns:
         Callable: T2 class.
@@ -360,20 +358,20 @@ def T2(qpu:               QPU,
         """
 
         def __init__(self, 
-                config:            Config,
-                qubits:            List | Tuple,
-                t_max:             float = 250*us,
-                detuning:          float = 0.05 * MHz,
-                echo:              bool = False,
-                subspace:          str = 'GE',
-                compiler:          Any | Compiler | None = None, 
-                transpiler:        Any | None = None,
-                n_elements:        int = 50,
-                n_shots:           int = 1024, 
-                n_batches:         int = 1, 
-                n_circs_per_seq:   int = 1, 
-                disable_esp:       bool = True,
-                disable_heralding: bool = False,
+                config:          Config,
+                qubits:          List | Tuple,
+                t_max:           float = 250*us,
+                detuning:        float = 0.05 * MHz,
+                echo:            bool = False,
+                subspace:        str = 'GE',
+                compiler:        Any | Compiler | None = None, 
+                transpiler:      Any | None = None,
+                n_elements:      int = 50,
+                n_shots:         int = 1024, 
+                n_batches:       int = 1, 
+                n_circs_per_seq: int = 1, 
+                esp:             bool = False,
+                heralding:       bool = True,
                 **kwargs
             ) -> None:
             """Initialize the T2 experiment class within the function."""
@@ -391,8 +389,8 @@ def T2(qpu:               QPU,
             )
             Characterize.__init__(self, 
                 config, 
-                disable_esp=disable_esp,
-                disable_heralding=disable_heralding
+                esp=esp,
+                heralding=heralding
             )
 
             self._qubits = qubits
@@ -431,7 +429,7 @@ def T2(qpu:               QPU,
         def generate_circuits(self):
             """Generate all amplitude calibration circuits."""
             logger.info(' Generating circuits...')
-
+            
             circuits = []
             for t in self._times[self._qubits[0]]:
                 phase = 2. * np.pi * self._detuning * t  # theta = 2pi*freq*t
@@ -490,6 +488,9 @@ def T2(qpu:               QPU,
             
             self._circuits = CircuitSet(circuits=circuits)
             self._circuits['time'] = self._times[self._qubits[0]]
+            self._circuits['phase'] = (
+                2. * np.pi * self._detuning * np.array(self._times)
+            )
                 
         def analyze(self) -> None:
             """Analyze the data."""
@@ -536,9 +537,6 @@ def T2(qpu:               QPU,
             """Save all circuits and data."""
             qpu.save(self)
             self._data_manager.save_to_csv(
-                 pd.DataFrame([self._param_sweep]), 'param_sweep'
-            )
-            self._data_manager.save_to_csv(
                  pd.DataFrame([self._results]), 'sweep_results'
             )
             self._data_manager.save_to_csv(
@@ -584,6 +582,7 @@ def T2(qpu:               QPU,
         n_shots, 
         n_batches, 
         n_circs_per_seq, 
-        disable_esp,
-        disable_heralding
+        esp,
+        heralding,
+        **kwargs
     )
