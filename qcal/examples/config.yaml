@@ -1,9 +1,9 @@
 single_qubit:
   0:
     GE:
-      freq: 4461736318.073627
+      freq: 4461960789.062685
       T1: 8.1e-05
-      T2*: 2.0e-05
+      T2*: 1.7e-05
       T2e: 6.0e-05
       X90:
         pulse:
@@ -17,7 +17,7 @@ single_qubit:
           length: 3.0e-08
           kwargs:
             alpha: 0.0
-            amp: 0.158792
+            amp: 0.162153
             anh: -270000000.0
             df: 0.0
             phase: 0.0
@@ -60,9 +60,9 @@ single_qubit:
             ramp_fraction: 0.25
   1:
     GE:
-      freq: 4675260858.059634
+      freq: 4670765001.204112
       T1: 6.2e-05
-      T2*: 3.5e-05
+      T2*: 2.1e-05
       T2e: 3.2e-05
       X90:
         pulse:
@@ -76,7 +76,7 @@ single_qubit:
           length: 3.0e-08
           kwargs:
             alpha: 1.0
-            amp: 0.695065
+            amp: 0.77991
             anh: -270000000.0
             df: 0.0
             phase: 0.0
@@ -119,9 +119,9 @@ single_qubit:
             ramp_fraction: 0.25
   2:
     GE:
-      freq: 4944461837.827577
-      T1: 6.9e-05
-      T2*: 1.7e-05
+      freq: 4944200665.306334
+      T1: 0.00011
+      T2*: 6.0e-06
       T2e: 2.1e-05
       X90:
         pulse:
@@ -135,7 +135,7 @@ single_qubit:
           length: 3.0e-08
           kwargs:
             alpha: 0.0
-            amp: 0.489048
+            amp: 0.490501
             anh: -270000000.0
             df: 0.0
             phase: 0.0
@@ -178,7 +178,7 @@ single_qubit:
             ramp_fraction: 0.25
   3:
     GE:
-      freq: 5114911040.024481
+      freq: 5115708552.907667
       T1: 0.00014
       T2*: 1.0e-05
       T2e: 1.0e-05
@@ -194,7 +194,7 @@ single_qubit:
           length: 3.0e-08
           kwargs:
             alpha: 0.0
-            amp: 0.276665
+            amp: 0.253243
             anh: -270000000.0
             df: 0.0
             phase: 0.0
@@ -237,7 +237,7 @@ single_qubit:
             ramp_fraction: 0.25
   4:
     GE:
-      freq: 5350927547.979777
+      freq: 5348160270.067185
       T1: 5.0e-05
       T2*: 6.0e-06
       T2e: 7.0e-06
@@ -253,7 +253,7 @@ single_qubit:
           length: 3.0e-08
           kwargs:
             alpha: 0.0
-            amp: 0.66394
+            amp: 0.618334
             anh: -270000000.0
             df: 0.0
             phase: 0.0
@@ -296,7 +296,7 @@ single_qubit:
             ramp_fraction: 0.25
   5:
     GE:
-      freq: 5577471962.572675
+      freq: 5900771962.572675
       T1: null
       T2*: null
       T2e: null
@@ -312,7 +312,7 @@ single_qubit:
           length: 3.0e-08
           kwargs:
             alpha: 0.0
-            amp: 0.5
+            amp: 0.2
             anh: -270000000.0
             df: 0.0
             phase: 0.0
@@ -430,7 +430,7 @@ single_qubit:
           length: 3.0e-08
           kwargs:
             alpha: 0.0
-            amp: 0.4
+            amp: 0.502918
             anh: -270000000.0
             df: 0.0
             phase: 0.0
@@ -699,37 +699,37 @@ two_qubit:
 readout:
   0:
     channel: 7
-    amp: 0.04
+    amp: 0.021
     freq: 6554368952.374638
     phase: 1.0471975511965976
   1:
     channel: 4
-    amp: 0.02
+    amp: 0.0183
     freq: 6558439922.632911
     phase: 3.400421796562137
   2:
     channel: 1
-    amp: 0.035
+    amp: 0.01664
     freq: 6658008967.32158
     phase: -1.1667773522863918
   3:
     channel: 3
-    amp: 0.035
+    amp: 0.0179
     freq: 6700134795.120309
     phase: 2.0
   4:
     channel: 6
-    amp: 0.055
+    amp: 0.02
     freq: 6711440184.690463
     phase: 3.624878768638384
   5:
     channel: 6
-    amp: 0.04
+    amp: 0.0183
     freq: 6709360370.806432
     phase: 6.275011358862511
   6:
     channel: 2
-    amp: 0.04
+    amp: 0.0305
     freq: 6785153568.914835
     phase: 0.9312892237695153
   7:
@@ -750,7 +750,7 @@ readout:
     - 7
   delay: 6.0e-07
   herald: true
-  length: 1.0e-06
+  length: 4.0e-06
   reset: 1.0e-05
   sample_rate: 500000000.0
   env: cosine_square

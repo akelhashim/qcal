@@ -257,7 +257,9 @@ def T1(qpu:               QPU,
             self.analyze()
             clear_output(wait=True)
             if settings.Settings.save_data:
-                self._data_manager._exp_id += '_T1'
+                self._data_manager._exp_id += (
+                    f'_T1_Q{"".join(str(q) for q in self._qubits)}'
+                )
                 self.save()
                 self.plot(
                     xlabel=r'Time ($\mu$s)',
@@ -265,7 +267,7 @@ def T1(qpu:               QPU,
                        r'$|2\rangle$ Population' if self._subspace == 'EF' else
                        r'$|1\rangle$ Population'
                     ),
-                    flabel='T1',
+                    flabel=r'$T_1$',
                     save_path=self._data_manager._save_path
                 )
             self.final()
@@ -553,7 +555,9 @@ def T2(qpu:               QPU,
             self.analyze()
             clear_output(wait=True)
             if settings.Settings.save_data:
-                self._data_manager._exp_id += '_T2'
+                self._data_manager._exp_id += (
+                    f'_T2_Q{"".join(str(q) for q in self._qubits)}'
+                )
                 self.save()
                 self.plot(
                     xlabel=r'Time ($\mu$s)',
@@ -561,7 +565,7 @@ def T2(qpu:               QPU,
                     r'$|2\rangle$ Population' if self._subspace == 'EF' else
                     r'$|1\rangle$ Population'
                     ),
-                    flabel='T2e' if self._echo else 'T2*',
+                    flabel=r'$T_{2E}$' if self._echo else r'$T_2$',
                     save_path=self._data_manager._save_path
                 )
             self.final()
