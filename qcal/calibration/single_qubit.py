@@ -11,7 +11,7 @@ from qcal.circuit import Barrier, Cycle, Circuit, CircuitSet
 from qcal.compilation.compiler import Compiler
 from qcal.config import Config
 from qcal.fitting.fit import (
-    FitAbsoluteValue, FitCosine, FitParabola
+    FitAbsoluteValue, FitCosine, FitDecayingCosine, FitParabola
 )
 from qcal.math.utils import reciprocal_uncertainty, round_to_order_error
 from qcal.gate.single_qubit import Idle, VirtualZ, X, X90, Y90
@@ -570,7 +570,8 @@ def Frequency(
                 if self._fit[q].fit_success:
                     val, err = round_to_order_error(
                         self._fit[q].fit_params[1],
-                        self._fit[q].error[1]
+                        self._fit[q].error[1],
+                        2
                     )
                     self._cal_values[q] = self._config[self._params[q]] + val
                     self._errors[q] = err

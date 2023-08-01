@@ -147,7 +147,11 @@ class Calibration:
         """Save and load the config after changing parameters."""
         for q in self._qubits:
             if self._fit[q].fit_success:
-                self.set_param(self._params[q], self._cal_values[q])
+                if isinstance(self._params[q], list):
+                    for param in self._params[q]:
+                        self.set_param(param, self._cal_values[q])
+                else:
+                    self.set_param(self._params[q], self._cal_values[q])
 
         if self._disable_esp:
             self.set_param('readout/esp/enable', False)
