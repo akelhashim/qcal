@@ -489,7 +489,7 @@ def T2(qpu:             QPU,
             self._circuits = CircuitSet(circuits=circuits)
             self._circuits['time'] = self._times[self._qubits[0]]
             self._circuits['phase'] = (
-                2. * np.pi * self._detuning * np.array(self._times)
+                2. * np.pi * self._detuning * self._times[self._qubits[0]]
             )
                 
         def analyze(self) -> None:

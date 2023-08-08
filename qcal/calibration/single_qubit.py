@@ -461,6 +461,7 @@ def Frequency(
             }
 
             self._freqs = {q: list() for q in qubits}
+            self._fit_detunings = {q: list() for q in self._qubits}
             
         @property
         def detunings(self) -> NDArray:
@@ -562,6 +563,7 @@ def Frequency(
                         self._freqs[q].append(
                             abs(self._freq_fit[q][i].fit_params[2])
                         )
+                        self._fit_detunings[q].append(detuning)
             
             # Fit the characterized frequencies to an absolute value curve
             for i, q in enumerate(self._qubits):
@@ -635,7 +637,7 @@ def Frequency(
 
                 # Plot the frequency fit
                 ax[1].plot(
-                    self._detunings, 
+                    self._fit_detunings[q], 
                     self._freqs[q],
                     'o',
                     c='blue', 
@@ -653,7 +655,7 @@ def Frequency(
                         c='orange',
                         label='Fit'
                     )
-                    df = round(self._fit[q].fit_params[1] / MHz, 2)
+                    df = round(self._fit[q].fit_params[1] / MHz, 3)
                     ax[1].axvline(
                         round(self._fit[q].fit_params[1], 2),  
                         ls='--', c='k', label=rf'$\Delta f$ = {df} MHz'
@@ -825,7 +827,7 @@ def Phase(
             for q in qubits:
                 self._params[q] = [
                     f'single_qubit/{q}/{subspace}/X90/pulse/0/kwargs/phase',
-                    f'single_qubit/{q}/{subspace}/X90/pulse/-1/kwargs/phase'
+                    f'single_qubit/{q}/{subspace}/X90/pulse/2/kwargs/phase'
                 ]
 
             self._fit = {q: FitParabola() for q in qubits}
@@ -854,22 +856,22 @@ def Phase(
                     Cycle([
                         X90(q, subspace='GE') for q in self._qubits
                     ]),
-                    # Barrier(self._qubits),
+                    Barrier(self._qubits),
                     Cycle([
                         X90(q, subspace='GE') for q in self._qubits
                     ]),
-                    # Barrier(self._qubits)
+                    Barrier(self._qubits)
                 ])
 
                 circuit1.extend([
                     Cycle([
                         X90(q, subspace='GE') for q in self._qubits
                     ]),
-                    # Barrier(self._qubits),
+                    Barrier(self._qubits),
                     Cycle([
                         X90(q, subspace='GE') for q in self._qubits
                     ]),
-                    # Barrier(self._qubits)
+                    Barrier(self._qubits)
                 ])
 
             # Y180_X90
@@ -878,22 +880,22 @@ def Phase(
                     VirtualZ(np.pi/2, q, subspace=level[self._n_levels])
                     for q in self._qubits
                 ]),
-                # Barrier(self._qubits),
+                Barrier(self._qubits),
                 Cycle([
                     X90(q, subspace=level[self._n_levels]) 
                     for q in self._qubits
                 ]),
-                # Barrier(self._qubits),
+                Barrier(self._qubits),
                 Cycle([
                     X90(q, subspace=level[self._n_levels]) 
                     for q in self._qubits
                 ]),
-                # Barrier(self._qubits),
+                Barrier(self._qubits),
                 Cycle([
                     VirtualZ(-np.pi/2, q, subspace=level[self._n_levels])
                     for q in self._qubits
                 ]),
-                # Barrier(self._qubits),
+                Barrier(self._qubits),
                 Cycle([
                     X90(q, subspace=level[self._n_levels]) 
                     for q in self._qubits
@@ -907,22 +909,22 @@ def Phase(
                     X90(q, subspace=level[self._n_levels]) 
                     for q in self._qubits
                 ]),
-                # Barrier(self._qubits),
+                Barrier(self._qubits),
                 Cycle([
                     X90(q, subspace=level[self._n_levels]) 
                     for q in self._qubits
                 ]),
-                # Barrier(self._qubits),
+                Barrier(self._qubits),
                 Cycle([
                     VirtualZ(np.pi/2, q, subspace=level[self._n_levels])
                     for q in self._qubits
                 ]),
-                # Barrier(self._qubits),
+                Barrier(self._qubits),
                 Cycle([
                     X90(q, subspace=level[self._n_levels]) 
                     for q in self._qubits
                 ]),
-                # Barrier(self._qubits),
+                Barrier(self._qubits),
                 Cycle([
                     VirtualZ(-np.pi/2, q, subspace=level[self._n_levels])
                     for q in self._qubits
@@ -941,13 +943,13 @@ def Phase(
                 ] * int(self._circuits.n_circuits / 2)
             for q in self._qubits:
                 _phases = []
-                for p in phases[q]:
+                for p in self._phases[q]:
                     _phases.extend([p, p])
                 self._circuits[
                         f'param: {self._params[q][0]}'
                     ] = _phases
                 self._circuits[
-                        f'param: {self._params[q][-1]}'
+                        f'param: {self._params[q][1]}'
                     ] = _phases
                 
         def analyze(self) -> None:
@@ -959,17 +961,17 @@ def Phase(
                 pop0 = []  # circuit0
                 pop1 = []  # circuit1
                 pops = []
-                for i, circuit in self._circuits:
+                for j, circuit in enumerate(self._circuits):
                     pop = circuit.results.marginalize(i).populations[
                         level[self._subspace]
                     ]
                     pops.append(pop)
                     
                     # 'Y180_X90'
-                    if i % 2 == 0:
+                    if j % 2 == 0:
                         pop0.append(pop)
                     # 'X180_Y90'
-                    elif i % 2 == 1:
+                    elif j % 2 == 1:
                         pop1.append(pop)
         
                 self._circuits[f'Q{q}: pop{level[self._subspace]}'] = pops
