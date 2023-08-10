@@ -1,16 +1,22 @@
 """Submodule for RB routines.
 
 """
+import qcal.settings as settings
+
 from qcal.config import Config
 from qcal.qpu.qpu import QPU
+from qcal.plotting.utils import calculate_nrows_ncols
 
 import logging
+import matplotlib.pyplot as plt
 
+from IPython.display import clear_output
 from typing import Any, Callable, List, Tuple, Iterable
 
 logger = logging.getLogger(__name__)
 
 
+# TODO: add leakage
 def SRB(qpu:             QPU,
         config:          Config,
         qubit_labels:    Iterable[int, Iterable[int]],
@@ -27,7 +33,48 @@ def SRB(qpu:             QPU,
         include_rcal:    bool = True,
         **kwargs
     ) -> Callable:
+    """Streamlined Randomized Benchmarking.
 
+    This is a True-Q protocol and requires a valid True-Q license.
+
+    Args:
+        qpu (QPU): custom QPU object.
+        config (Config): qcal Config object.
+        qubit_labels (Iterable[int, Iterable[int]]): a list specifying sets of 
+            system labels to be twirled together by Clifford gates in each 
+            circuit. For example, [0, 1, (2, 3)] would perform single-qubit RB
+            on 0 and 1, and two-qubit RB on (2, 3).
+        circuit_depths (List[int] | Tuple[int]): a list of positive integers 
+            specifying how many cycles of random Clifford gates to generate for
+            RB, for example, [4, 64, 256].
+        tq_config (str | Any, optional): True-Q config yaml file or config
+            object. Defaults to None.
+        compiler (Any | Compiler | None, optional): custom compiler to compile
+            the True-Q circuits. Defaults to None.
+        transpiler (Any | None, optional): custom transpiler to transpile
+            the True-Q circuits to experimental circuits. Defaults to None.
+        n_circuits (int, optional): the number of circuits for each circuit 
+            depth. Defaults to 30.
+        n_shots (int, optional): number of measurements per circuit. 
+                Defaults to 1024.
+        n_batches (int, optional): number of batches of measurements. Defaults
+            to 1.
+        n_circs_per_seq (int, optional): maximum number of circuits that can be
+            measured per sequence. Defaults to 1.
+        n_levels (int, optional): number of energy levels to be measured. 
+            Defaults to 2. If n_levels = 3, this assumes that the
+            measurement supports qutrit classification.
+        compiled_pauli (bool, optional): whether or not to compile a random 
+            Pauli gate for each qubit in the cycle preceding a measurement 
+            operation. Defaults to True.
+        include_rcal (bool, optional): whether to measure RCAL circuits in the
+            same circuit collection as the SRB circuit. Defaults to True. If
+            True, readout correction will be apply to the fit results 
+            automatically.
+
+    Returns:
+        Callable: SRB class instance.
+    """
 
     class SRB:
         """True-Q SRB protocol."""
@@ -50,8 +97,8 @@ def SRB(qpu:             QPU,
                 include_rcal:    bool = True,
                 **kwargs
             ) -> None:
-            from qcal.compilation.trueq.compiler import Compiler
-            from qcal.transpilation.trueq.transpiler import Transpiler
+            from qcal.interface.trueq.compiler import Compiler
+            from qcal.interface.trueq.transpiler import Transpiler
             
             self._qubit_labels = qubit_labels
             self._circuit_depths = circuit_depths
@@ -95,10 +142,86 @@ def SRB(qpu:             QPU,
             logger.info(' Analyzing the results...')
             print(self._circuits.fit())
 
-        def plot(self):
-            """Plot the results."""
+        def plot(self) -> None:
+            """Plot the SRB fit results."""
 
-            
+            # Plot the raw curves
+            nrows, ncols = calculate_nrows_ncols(len(self._circuits.labels))
+            figsize = (5 * ncols, 4 * nrows)
+            fig, axes = plt.subplots(
+                nrows, ncols, figsize=figsize, layout='constrained'
+            )
+            self._circuits.plot.raw(axes=axes)
+
+            k = -1
+            for i in range(nrows):
+                for j in range(ncols):
+                    k += 1
+
+                    if len(self._qubits) == 1:
+                        ax = axes
+                    elif axes.ndim == 1:
+                        ax = axes[j]
+                    elif axes.ndim == 2:
+                        ax = axes[i,j]
+
+                    if k < len(self._qubits):
+                        ax.set_title(ax.get_title(), fontsize=18)
+                        ax.xaxis.get_label().set_fontsize(15)
+                        ax.yaxis.get_label().set_fontsize(15)
+                        ax.tick_params(
+                            axis='both', which='major', labelsize=12
+                        )
+                        ax.grid(True)
+
+                    else:
+                        ax.axis('off')
+                
+            fig.set_tight_layout(True)
+            if settings.Settings.save_data:
+                fig.savefig(
+                    self._data_manager._save_path + 'SRB_decays.png', 
+                    dpi=300
+                )
+            plt.show()
+
+            # Plot the RB infidelities
+            figsize = (5, 2 + (2 * self._qubit_labels))
+            fig, ax = plt.subplots(
+                nrows, ncols, figsize=figsize, layout='constrained'
+            )
+
+            self._circuits.plot.compare_rb(axes=ax)
+            ax.set_title(ax.get_title(), fontsize=18)
+            ax.xaxis.get_label().set_fontsize(15)
+            ax.yaxis.get_label().set_fontsize(15)
+            ax.tick_params(
+                axis='both', which='major', labelsize=12
+            )
+            ax.grid(True)
+
+            fig.set_tight_layout(True)
+            if settings.Settings.save_data:
+                fig.savefig(
+                    self._data_manager._save_path + 'SRB_infidelities.png', 
+                    dpi=300
+                )
+            plt.show()
+
+        def run(self):
+            """Run all experimental methods and analyze results."""
+            self.generate_circuits()
+            qpu.run(self, self._circuits, save=False)
+            self.analyze()
+            clear_output(wait=True)
+            self._data_manager._exp_id += (
+                f'_SRB_Q{"".join(str(q) for q in self._circuits.labels)}'
+            )
+            if settings.Settings.save_data:
+                self.save()
+            self.plot()
+            print(f"\nRuntime: {repr(self._runtime)[8:]}\n")
+
 
     return SRB(
         qpu,
