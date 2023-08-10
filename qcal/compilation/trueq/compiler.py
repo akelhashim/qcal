@@ -20,12 +20,14 @@ class Compiler:
     __slots__ = ('_config', '_tq_config', '_compiler')
 
     def __init__(
-            self, config: Config | str, passes: tq.Compiler.passes = None
+            self, 
+            config: Config | tq.Config | str, 
+            passes: tq.Compiler.passes = None
         ) -> None:
         """Initialize a True-Q compiler.
 
         Args:
-            config (Config | str): qcal Config object or True-Q yaml.
+            config (Config | tq.Config | str): qcal Config object or True-Q yaml.
             passes (tq.Compiler.passes, optional): True-Q compiler passes. 
                 Defaults to None. If None, 
         """
@@ -37,6 +39,9 @@ class Compiler:
         if isinstance(config, Config):
             self._config = config
             self._tq_config = self.from_config(config)
+        elif isinstance(config, tq.Config):
+            self._config = None
+            self._tq_config = config
         elif isinstance(config, str):
             self._config = None
             self._tq_config = tq.Config.from_yaml(config)

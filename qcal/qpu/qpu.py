@@ -115,13 +115,22 @@ class QPU:
         return self._config
         
     @property
-    def compiler(self) -> Any:
+    def compiler(self) -> Any | List[Any]:
         """Returns the compiler(s) loaded to the QPU.
 
         Returns:
-            Any: circuit compiler
+            Any | List[Any]: circuit compiler
         """
         return self._compiler
+    
+    @property
+    def transpiler(self) -> Any | List[Any]:
+        """Returns the transpiler(s) loaded to the QPU.
+
+        Returns:
+            Any | List[Any]: circuit transpiler
+        """
+        return self._transpiler
 
     @property
     def circuits(self) -> Any:
@@ -169,9 +178,9 @@ class QPU:
         return self._sequence
     
     def initialize(self, 
-                   circuits:  Any | List[Any],
-                   n_shots:   int | None = None,
-                   n_batches: int | None = None
+            circuits:  Any | List[Any],
+            n_shots:   int | None = None,
+            n_batches: int | None = None
         ) -> None:
         """Initialize the experiment.
 
@@ -186,11 +195,10 @@ class QPU:
         if isinstance(circuits, List):
             self._circuits = CircuitSet(circuits=circuits)
             self._compiled_circuits = CircuitSet()
-            self._transpiled_circuits = CircuitSet()
         else:
             self._circuits = circuits
             self._compiled_circuits = circuits.__class__()
-            self._transpiled_circuits = circuits.__class__() # TODO
+        self._transpiled_circuits = CircuitSet()
         self._exp_circuits = self._circuits
 
         if n_shots is not None:
@@ -218,9 +226,11 @@ class QPU:
 
     def transpile(self) -> None:
         """Transpile the circuits from some other format to qcal circuits."""
-        self._exp_circuits = self._transpiler.transpile(
-            self._exp_circuits
-        )
+        if isinstance(self._transpiler, Iterable):
+            for transpiler in self._transpiler:
+                self._exp_circuits = transpiler.transpile(self._exp_circuits)
+        else:
+            self._exp_circuits = self._transpiler.transpile(self._exp_circuits)
         self._transpiled_circuits.append(self._exp_circuits)
         
     def generate_sequence(self, circuits: Iterable) -> None:

@@ -699,42 +699,42 @@ two_qubit:
 readout:
   0:
     channel: 7
-    amp: 0.021
+    amp: 0.09
     freq: 6555156854.218374
     phase: 1.0471975511965976
   1:
     channel: 4
-    amp: 0.0183
+    amp: 0.09
     freq: 6558657827.371197
     phase: 3.400421796562137
   2:
     channel: 1
-    amp: 0.01664
+    amp: 0.09
     freq: 6658224601.204804
     phase: -1.1667773522863918
   3:
     channel: 3
-    amp: 0.0179
+    amp: 0.09
     freq: 6699517073.864432
     phase: 2.0
   4:
     channel: 6
-    amp: 0.02
+    amp: 0.09
     freq: 6709558215.418671
     phase: 3.624878768638384
   5:
     channel: 6
-    amp: 0.025
+    amp: 0.09
     freq: 6707928573.902684
     phase: 6.275011358862511
   6:
     channel: 2
-    amp: 0.0305
+    amp: 0.09
     freq: 6783491290.240388
     phase: 0.9312892237695153
   7:
     channel: 0
-    amp: 0.04
+    amp: 0.1
     freq: 6835987148.190145
     phase: 4.256638268772688
   esp:
