@@ -304,7 +304,7 @@ def to_qubic(
 
     Args:
         config (Config):           config object.
-        circuit (Circuit):         cal Circuit.
+        circuit (Circuit):         qcal circuit.
         gate_mapper (defaultdict): map between qcal to QubiC gates.
 
     Returns:
