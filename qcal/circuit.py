@@ -287,9 +287,14 @@ class Circuit:
     __slots__ = ('_cycles', '_qubits', '_results')
 
     def __init__(self,
-            cycles_or_layers: List[Union[Cycle, Layer]] = []
+            cycles_or_layers: List[Cycle | Layer] | deque[Cycle | Layer] = []
         ) -> None:
-        
+        """qcal Circuit.
+
+        Args:
+            cycles_or_layers (List[Cycle | Layer] | deque[Cycle | Layer], 
+                optional): list of qcal cycles or layers. Defaults to [].
+        """
         if cycles_or_layers:
             cycles_or_layers = [
                 cycle if isinstance(cycle, (Cycle, Layer, Barrier)) else 
