@@ -774,7 +774,7 @@ class CircuitSet:
         if not isinstance(circuits, CircuitSet):
             circuits = CircuitSet(circuits, index)
         self._df = pd.concat([self._df, circuits._df],
-                            ignore_index=True if index is None else False)
+                             ignore_index=True if index is None else False)
         return self._df
 
     def batch(self, batch_size: int):

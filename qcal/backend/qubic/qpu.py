@@ -15,18 +15,6 @@ from typing import Any, List
 
 logger = logging.getLogger(__name__)
 
-# libraries = [
-#     ('qubic', 'qbc'),
-#     ('qubitconfig', 'qcfg')
-# ]
-# for library, abbrv in libraries:
-#     try:
-#         lib = __import__(library)
-#     except ImportError:
-#         logger.warning(sys.exc_info())  
-#     else:
-#         globals()[abbrv] = lib  
-
 
 __all__ = ('QubicQPU')
 
@@ -309,12 +297,12 @@ class QubicQPU(QPU):
         """Process the measurement data."""
         post_process(self._config, self._measurements, self._circuits)
 
-        if not self._compiled_circuits.is_empty:
+        if len(self._compiled_circuits) > 1:
             post_process(
                 self._config, self._measurements, self._compiled_circuits
             )
 
-        if not self._transpiled_circuits.is_empty:
+        if len(self._transpiled_circuits) > 1:
             post_process(
                 self._config, self._measurements, self._transpiled_circuits
             )

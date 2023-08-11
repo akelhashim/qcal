@@ -337,14 +337,22 @@ class QPU:
         self._data_manager.create_data_path()
         self._data_manager.save_to_pickle(self._circuits, 'circuits')
 
-        if not self._compiled_circuits.is_empty:
-            self._data_manager.save_to_pickle(
-                self._compiled_circuits, 'compiled_circuits'
+        # if not self._compiled_circuits.is_empty:
+        if len(self._compiled_circuits) > 1:
+            # self._data_manager.save_to_pickle(
+            #     self._compiled_circuits, 'compiled_circuits'
+            # )
+            self._compiled_circuits.save(
+                self._data_manager._save_path + 'compiled_circuits.pkl'
             )
 
-        if not self._transpiled_circuits.is_empty: 
-            self._data_manager.save_to_pickle(
-                self._transpiled_circuits, 'transpiled_circuits'
+        # if not self._transpiled_circuits.is_empty:
+        if len(self._transpiled_circuits) > 1: 
+            # self._data_manager.save_to_pickle(
+            #     self._transpiled_circuits, 'transpiled_circuits'
+            # )
+            self._transpiled_circuits.save(
+                self._data_manager._save_path + 'compiled_circuits.pkl'
             )
 
         self._data_manager.save_to_pickle(self._measurements, 'measurements')

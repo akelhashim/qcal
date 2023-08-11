@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 # TODO: add leakage
 def SRB(qpu:             QPU,
         config:          Config,
-        qubit_labels:    Iterable[int, Iterable[int]],
+        qubit_labels:    Iterable[int],
         circuit_depths:  List[int] | Tuple[int],
         tq_config:       str | Any = None,
         compiler:        Any | None = None, 
@@ -76,14 +76,14 @@ def SRB(qpu:             QPU,
         Callable: SRB class instance.
     """
 
-    class SRB:
+    class SRB(qpu):
         """True-Q SRB protocol."""
         import trueq as tq
 
         def __init__(self,
                 qpu:             QPU,
                 config:          Config,
-                qubit_labels:    Iterable[int, Iterable[int]],
+                qubit_labels:    Iterable[int],
                 circuit_depths:  List[int] | Tuple[int],
                 tq_config:       str | tq.Config = None,
                 compiler:        Any | None = None, 
@@ -140,17 +140,19 @@ def SRB(qpu:             QPU,
         def analyze(self):
             """Analyze the SRB results."""
             logger.info(' Analyzing the results...')
+            print('')
             print(self._circuits.fit())
 
         def plot(self) -> None:
             """Plot the SRB fit results."""
 
             # Plot the raw curves
-            nrows, ncols = calculate_nrows_ncols(len(self._circuits.labels))
+            nrows, ncols = calculate_nrows_ncols(len(self._qubit_labels))
             figsize = (5 * ncols, 4 * nrows)
             fig, axes = plt.subplots(
                 nrows, ncols, figsize=figsize, layout='constrained'
             )
+
             self._circuits.plot.raw(axes=axes)
 
             k = -1
@@ -158,20 +160,21 @@ def SRB(qpu:             QPU,
                 for j in range(ncols):
                     k += 1
 
-                    if len(self._qubits) == 1:
+                    if len(self._qubit_labels) == 1:
                         ax = axes
                     elif axes.ndim == 1:
                         ax = axes[j]
                     elif axes.ndim == 2:
                         ax = axes[i,j]
 
-                    if k < len(self._qubits):
-                        ax.set_title(ax.get_title(), fontsize=18)
+                    if k < len(self._qubit_labels):
+                        ax.set_title(ax.get_title(), fontsize=20)
                         ax.xaxis.get_label().set_fontsize(15)
                         ax.yaxis.get_label().set_fontsize(15)
                         ax.tick_params(
                             axis='both', which='major', labelsize=12
                         )
+                        ax.legend(prop=dict(size=12))
                         ax.grid(True)
 
                     else:
@@ -186,10 +189,8 @@ def SRB(qpu:             QPU,
             plt.show()
 
             # Plot the RB infidelities
-            figsize = (5, 2 + (2 * self._qubit_labels))
-            fig, ax = plt.subplots(
-                nrows, ncols, figsize=figsize, layout='constrained'
-            )
+            figsize = (5 * ncols, 4)
+            fig, ax = plt.subplots(figsize=figsize, layout='constrained')
 
             self._circuits.plot.compare_rb(axes=ax)
             ax.set_title(ax.get_title(), fontsize=18)
@@ -198,6 +199,7 @@ def SRB(qpu:             QPU,
             ax.tick_params(
                 axis='both', which='major', labelsize=12
             )
+            ax.legend(prop=dict(size=12))
             ax.grid(True)
 
             fig.set_tight_layout(True)
@@ -212,13 +214,13 @@ def SRB(qpu:             QPU,
             """Run all experimental methods and analyze results."""
             self.generate_circuits()
             qpu.run(self, self._circuits, save=False)
-            self.analyze()
             clear_output(wait=True)
             self._data_manager._exp_id += (
                 f'_SRB_Q{"".join(str(q) for q in self._circuits.labels)}'
             )
             if settings.Settings.save_data:
                 self.save()
+            self.analyze()
             self.plot()
             print(f"\nRuntime: {repr(self._runtime)[8:]}\n")
 

@@ -1,7 +1,7 @@
 """Submodule for handling transpilation from True-Q to qcal circuits.
 
 """
-from qcal.circuit import Barrier, Circuit
+from qcal.circuit import Barrier, Circuit, CircuitSet
 from qcal.gate.single_qubit import single_qubit_gates
 from qcal.gate.two_qubit import two_qubit_gates
 from qcal.transpilation.transpiler import Transpiler
@@ -86,4 +86,4 @@ class Transpiler(Transpiler):
 
             transpiled_circuits.append(tcircuit)
 
-        return transpiled_circuits
+        return CircuitSet(transpiled_circuits)
