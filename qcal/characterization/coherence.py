@@ -39,7 +39,7 @@ def T1(qpu:             QPU,
        heralding:       bool = True,
        **kwargs
     ) -> Callable:
-    """Function which passes a custom QPU to the Amplitude class.
+    """T1 coherence characterization.
 
     Basic example useage:
 
@@ -160,37 +160,37 @@ def T1(qpu:             QPU,
                 # State prepration
                 if self._gate == 'X90':
                     circuit.extend([
-                        Cycle([X90(q, subspace='GE') for q in self._qubits]),
+                        Cycle({X90(q, subspace='GE') for q in self._qubits}),
                         Barrier(self._qubits),
-                        Cycle([X90(q, subspace='GE') for q in self._qubits]),
+                        Cycle({X90(q, subspace='GE') for q in self._qubits}),
                         Barrier(self._qubits)
                     ])
 
                     if self._subspace == 'EF':
                         circuit.extend([
-                            Cycle([X90(q, subspace='EF') 
-                                   for q in self._qubits]),
+                            Cycle({X90(q, subspace='EF') 
+                                   for q in self._qubits}),
                             Barrier(self._qubits),
-                            Cycle([X90(q, subspace='EF') 
-                                   for q in self._qubits]),
+                            Cycle({X90(q, subspace='EF') 
+                                   for q in self._qubits}),
                             Barrier(self._qubits)
                         ])
 
                 elif self._gate == 'X':
                     circuit.extend([
-                        Cycle([X(q, subspace='GE') for q in self._qubits]),
+                        Cycle({X(q, subspace='GE') for q in self._qubits}),
                         Barrier(self._qubits)
                     ])
 
                     if self._subspace == 'EF':
                         circuit.extend([
-                            Cycle([X(q, subspace='EF') for q in self._qubits]),
+                            Cycle({X(q, subspace='EF') for q in self._qubits}),
                             Barrier(self._qubits),
                         ])
 
                 # T1 delay
                 circuit.append(
-                    Cycle([Idle(q, duration=t) for q in self._qubits]),
+                    Cycle({Idle(q, duration=t) for q in self._qubits}),
                 )
                 circuit.measure()
 
@@ -215,6 +215,7 @@ def T1(qpu:             QPU,
                         ]
                     )
                 self._results[q] = prob1
+                self._circuits[f'{q}: prob1'] = (prob1)
 
                 # Add initial guesses to fit
                 c = np.array(prob1).min()
@@ -231,15 +232,10 @@ def T1(qpu:             QPU,
                     )
                     self._char_values[q] = val
                     self._errors[q] = err
-                    # self._char_values[q] = 1 / self._fit[q].fit_params[1]
-                    # self._errors[q] = 1 / self._fit[q].error[1]
 
         def save(self):
             """Save all circuits and data."""
             qpu.save(self)
-            self._data_manager.save_to_csv(
-                 pd.DataFrame([self._results]), 'sweep_results'
-            )
             self._data_manager.save_to_csv(
                  pd.DataFrame([self._char_values]), 'T1_values'
             )
@@ -305,7 +301,7 @@ def T2(qpu:             QPU,
        heralding:       bool = True,
        **kwargs
     ) -> Callable:
-    """Function which passes a custom QPU to the Amplitude class.
+    """T2 coherence characterization.
 
     Basic example useage:
 
@@ -437,50 +433,50 @@ def T2(qpu:             QPU,
 
                 # State prepration
                 circuit.extend([
-                    Cycle([X90(q, subspace='GE') for q in self._qubits]),
+                    Cycle({X90(q, subspace='GE') for q in self._qubits}),
                     Barrier(self._qubits)
                 ])
                 if self._subspace == 'EF':
                     circuit.extend([
-                        Cycle([X90(q, subspace='GE') for q in self._qubits]),
+                        Cycle({X90(q, subspace='GE') for q in self._qubits}),
                         Barrier(self._qubits),
-                        Cycle([X90(q, subspace='EF') for q in self._qubits]),
+                        Cycle({X90(q, subspace='EF') for q in self._qubits}),
                         Barrier(self._qubits)
                     ])
 
                 # T2 experiment
                 if not self._echo:
                     circuit.extend([
-                        Cycle([Idle(q, duration=t) for q in self._qubits]),
+                        Cycle({Idle(q, duration=t) for q in self._qubits}),
                         Barrier(self._qubits),
-                        Cycle([VirtualZ(phase, q, subspace=self._subspace) 
-                               for q in self._qubits]),
+                        Cycle({VirtualZ(phase, q, subspace=self._subspace) 
+                               for q in self._qubits}),
                         Barrier(self._qubits),
                     ])
                 elif self._echo:
                     circuit.extend([
-                        Cycle([Idle(q, duration=t/2) for q in self._qubits]),
+                        Cycle({Idle(q, duration=t/2) for q in self._qubits}),
                         Barrier(self._qubits),
-                        Cycle([VirtualZ(phase/2, q, subspace=self._subspace) 
-                               for q in self._qubits]),
+                        Cycle({VirtualZ(phase/2, q, subspace=self._subspace) 
+                               for q in self._qubits}),
                         Barrier(self._qubits),
-                        Cycle([X90(q, subspace=self._subspace) 
-                               for q in self._qubits]),
+                        Cycle({X90(q, subspace=self._subspace) 
+                               for q in self._qubits}),
                         Barrier(self._qubits),
-                        Cycle([X90(q, subspace=self._subspace) 
-                               for q in self._qubits]),
+                        Cycle({X90(q, subspace=self._subspace) 
+                               for q in self._qubits}),
                         Barrier(self._qubits),
-                        Cycle([Idle(q, duration=t/2) for q in self._qubits]),
+                        Cycle({Idle(q, duration=t/2) for q in self._qubits}),
                         Barrier(self._qubits),
-                        Cycle([VirtualZ(phase/2, q, subspace=self._subspace) 
-                               for q in self._qubits]),
+                        Cycle({VirtualZ(phase/2, q, subspace=self._subspace) 
+                               for q in self._qubits}),
                         Barrier(self._qubits),
                     ])
                 
                 # Basis preparation
                 circuit.append(
-                    Cycle([X90(q, subspace=self._subspace) 
-                           for q in self._qubits])
+                    Cycle({X90(q, subspace=self._subspace) 
+                           for q in self._qubits})
                )
                 
                 circuit.measure()
@@ -508,6 +504,7 @@ def T2(qpu:             QPU,
                         ]
                     )
                 self._results[q] = prob1
+                self._circuits[f'{q}: prob1'] = (prob1)
 
                 # Add initial guesses to fit
                 if self._echo:
@@ -536,9 +533,6 @@ def T2(qpu:             QPU,
         def save(self):
             """Save all circuits and data."""
             qpu.save(self)
-            self._data_manager.save_to_csv(
-                 pd.DataFrame([self._results]), 'sweep_results'
-            )
             self._data_manager.save_to_csv(
                  pd.DataFrame([self._char_values]), 'T2_values'
             )

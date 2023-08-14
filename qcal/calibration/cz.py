@@ -6,26 +6,27 @@ from __future__ import annotations
 import qcal.settings as settings
 
 from .calibration import Calibration
-from .utils import find_pulse_index, in_range
+from .utils import in_range # find_pulse_index
 from qcal.circuit import Barrier, Cycle, Circuit, CircuitSet
 from qcal.compilation.compiler import Compiler
 from qcal.config import Config
 from qcal.fitting.fit import (
-    FitAbsoluteValue, FitCosine, FitDecayingCosine, FitParabola
+    # FitAbsoluteValue, FitCosine, FitDecayingCosine, 
+    FitParabola
 )
-from qcal.math.utils import reciprocal_uncertainty, round_to_order_error
+# from qcal.math.utils import reciprocal_uncertainty, round_to_order_error
 from qcal.gate.single_qubit import Meas, VirtualZ, X90
 from qcal.gate.two_qubit import CZ
-from qcal.plotting.utils import calculate_nrows_ncols
+# from qcal.plotting.utils import calculate_nrows_ncols
 from qcal.qpu.qpu import QPU
-from qcal.units import MHz, us
+# from qcal.units import MHz, us
 
 import logging
-import matplotlib.pyplot as plt
+# import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-from collections.abc import Iterable
+# from collections.abc import Iterable
 from IPython.display import clear_output
 from itertools import chain
 from typing import Any, Callable, Dict, List, Tuple
@@ -50,68 +51,68 @@ def tomography_circuits(
 
     circuit_C0_X = Circuit([
         # Y90 on target qubit
-        Cycle([VirtualZ(np.pi/2, p[1]) for p in qubit_pairs]),
-        Cycle([X90(p[1]) for p in qubit_pairs]),
-        Cycle([VirtualZ(-np.pi/2, p[1]) for p in qubit_pairs]),
+        Cycle({VirtualZ(np.pi/2, p[1]) for p in qubit_pairs}),
+        Cycle({X90(p[1]) for p in qubit_pairs}),
+        Cycle({VirtualZ(-np.pi/2, p[1]) for p in qubit_pairs}),
         # CZ
         Barrier(qubits),
-        Cycle([CZ(pair) for pair in qubit_pairs]),
+        Cycle({CZ(pair) for pair in qubit_pairs}),
         Barrier(qubits),
         # Y90 on target qubit
-        Cycle([VirtualZ(np.pi/2, p[1]) for p in qubit_pairs]),
-        Cycle([X90(p[1]) for p in qubit_pairs]),
-        Cycle([VirtualZ(-np.pi/2, p[1]) for p in qubit_pairs]),
+        Cycle({VirtualZ(np.pi/2, p[1]) for p in qubit_pairs}),
+        Cycle({X90(p[1]) for p in qubit_pairs}),
+        Cycle({VirtualZ(-np.pi/2, p[1]) for p in qubit_pairs}),
         # Measure
         Cycle(Meas(q) for q in qubits)
     ])
 
     circuit_C1_X = Circuit([
         # X on control qubit
-        Cycle([X90(p[0]) for p in qubit_pairs]),
-        Cycle([X90(p[0]) for p in qubit_pairs]),
+        Cycle({X90(p[0]) for p in qubit_pairs}),
+        Cycle({X90(p[0]) for p in qubit_pairs}),
         Barrier(qubits),
         # Y90 on target qubit
-        Cycle([VirtualZ(np.pi/2, p[1]) for p in qubit_pairs]),
-        Cycle([X90(p[1]) for p in qubit_pairs]),
-        Cycle([VirtualZ(-np.pi/2, p[1]) for p in qubit_pairs]),
+        Cycle({VirtualZ(np.pi/2, p[1]) for p in qubit_pairs}),
+        Cycle({X90(p[1]) for p in qubit_pairs}),
+        Cycle({VirtualZ(-np.pi/2, p[1]) for p in qubit_pairs}),
         # CZ
         Barrier(qubits),
-        Cycle([CZ(pair) for pair in qubit_pairs]),
+        Cycle({CZ(pair) for pair in qubit_pairs}),
         Barrier(qubits),
         # Y90 on target qubit
-        Cycle([VirtualZ(np.pi/2, p[1]) for p in qubit_pairs]),
-        Cycle([X90(p[1]) for p in qubit_pairs]),
-        Cycle([VirtualZ(-np.pi/2, p[1]) for p in qubit_pairs]),
+        Cycle({VirtualZ(np.pi/2, p[1]) for p in qubit_pairs}),
+        Cycle({X90(p[1]) for p in qubit_pairs}),
+        Cycle({VirtualZ(-np.pi/2, p[1]) for p in qubit_pairs}),
     ])
 
     circuit_C0_Y = Circuit([
         # Y90 on target qubit
-        Cycle([VirtualZ(np.pi/2, p[1]) for p in qubit_pairs]),
-        Cycle([X90(p[1]) for p in qubit_pairs]),
-        Cycle([VirtualZ(-np.pi/2, p[1]) for p in qubit_pairs]),
+        Cycle({VirtualZ(np.pi/2, p[1]) for p in qubit_pairs}),
+        Cycle({X90(p[1]) for p in qubit_pairs}),
+        Cycle({VirtualZ(-np.pi/2, p[1]) for p in qubit_pairs}),
         # CZ
         Barrier(qubits),
-        Cycle([CZ(pair) for pair in qubit_pairs]),
+        Cycle({CZ(pair) for pair in qubit_pairs}),
         Barrier(qubits),
         # X90 on target qubit
-        Cycle([X90(p[1]) for p in qubit_pairs]),
+        Cycle({X90(p[1]) for p in qubit_pairs}),
     ])
 
     circuit_C1_Y = Circuit([
         # X on control qubit
-        Cycle([X90(p[0]) for p in qubit_pairs]),
-        Cycle([X90(p[0]) for p in qubit_pairs]),
+        Cycle({X90(p[0]) for p in qubit_pairs}),
+        Cycle({X90(p[0]) for p in qubit_pairs}),
         Barrier(qubits),
         # Y90 on target qubit
-        Cycle([VirtualZ(np.pi/2, p[1]) for p in qubit_pairs]),
-        Cycle([X90(p[1]) for p in qubit_pairs]),
-        Cycle([VirtualZ(-np.pi/2, p[1]) for p in qubit_pairs]),
+        Cycle({VirtualZ(np.pi/2, p[1]) for p in qubit_pairs}),
+        Cycle({X90(p[1]) for p in qubit_pairs}),
+        Cycle({VirtualZ(-np.pi/2, p[1]) for p in qubit_pairs}),
         # CZ
         Barrier(qubits),
-        Cycle([CZ(pair) for pair in qubit_pairs]),
+        Cycle({CZ(pair) for pair in qubit_pairs}),
         Barrier(qubits),
         # X90 on target qubit
-        Cycle([X90(p[1]) for p in qubit_pairs]),
+        Cycle({X90(p[1]) for p in qubit_pairs}),
     ])
 
     circuits = list()
@@ -280,7 +281,7 @@ def RelativePhase(
                         circuit.results.marginalize(i).populations['0']
                     )
 
-                self._circuits[f'{pair}: pop{0}'] = (
+                self._circuits[f'{pair}: pop0'] = (
                     prob_C0_X + prob_C1_X + prob_C0_Y + prob_C1_Y
                 )
                 self._R[pair] = np.sqrt(
