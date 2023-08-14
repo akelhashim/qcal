@@ -25,7 +25,7 @@ import pandas as pd
 
 from collections import deque
 from collections.abc import Iterable
-from typing import Any, Dict, List, Tuple, Union
+from typing import Any, Dict, List, Set, Tuple, Union
 
 import plotly.io as pio
 pio.renderers.default = 'colab'  # TODO: replace with settings
@@ -103,10 +103,10 @@ class Cycle:
 
     __slots__ = ('_gates', '_qubits')
 
-    def __init__(self, gates: List[Gate] = []) -> None:
+    def __init__(self, gates: Set[Gate] = {}) -> None:
         """
         Args:
-            gates (List[Gate], optional): list of gates. Defaults to [].
+            gates (Set[Gate], optional): Set of gates. Defaults to {}.
         """
         self._gates = gates
         qubits = tuple()
@@ -125,11 +125,11 @@ class Cycle:
         """
         return self._gates[idx]
     
-    def __call__(self) -> List:
+    def __call__(self) -> Set:
         return self._gates
     
     def __copy__(self) -> List:
-        return Cycle([copy.deepcopy(gate) for gate in self._gates])
+        return Cycle({copy.deepcopy(gate) for gate in self._gates})
     
     def __iter__(self):
         return iter(self._gates)
@@ -206,7 +206,7 @@ class Cycle:
         Returns:
             List: gates in cycle/layer.
         """
-        return [gate for gate in self._gates]
+        return self._gates
     
     @property
     def qubits(self) -> Tuple:
@@ -224,7 +224,7 @@ class Cycle:
             gate (Gate): qcal gate object.
         """
         assert isinstance(gate, Gate), "The gate must be a qcal Gate object!"
-        self._gates.append(gate)
+        self._gates.add(gate)
 
     def copy(self) -> Cycle | Layer:
         """Deep copy of the cycle/layer.
@@ -264,11 +264,11 @@ class Layer(Cycle):
 
     __slots__ = ['_gates', '_qubits']
 
-    def __init__(self, gates: List = []) -> None:
+    def __init__(self, gates: Set[Gate] = {}) -> None:
         super().__init__(gates)
 
     def __copy__(self) -> Layer:
-        return Layer([copy.deepcopy(gate) for gate in self._gates])
+        return Layer({copy.deepcopy(gate) for gate in self._gates})
     
     def to_str(self) -> str:
         """Convert the cycle to a string.
@@ -301,10 +301,7 @@ class Circuit:
                 Cycle(cycle) for cycle in cycles_or_layers
             ]
         self._cycles = deque(cycles_or_layers)
-        qubits = tuple()
-        for cycle in self._cycles:
-            qubits += cycle.qubits
-        self._qubits = tuple(sorted(set(qubits)))
+        self._update_qubits()
 
         self._results = Results()
 
@@ -525,15 +522,15 @@ class Circuit:
         self._update_qubits()
 
     def measure(self,
-            qubits: Union[Tuple, List] = None,
-            basis:  Union[Tuple, List] = None,
+            qubits: List | Tuple = None,
+            basis:  List | Tuple = None,
         ) -> None:
         """Appends a measurement cycle to the end of the circuit.
 
         Args:
-            qubits (Union[Tuple, List], optional): qubits to measure. Defaults
+            qubits (Union[List, Tuple], optional): qubits to measure. Defaults
                 to None.
-            basis (Union[Tuple, List], optional):  measurement basis for each
+            basis (Union[List, Typle], optional):  measurement basis for each
                 qubit. Defaults to None.
         """
         if qubits is None:
@@ -541,14 +538,14 @@ class Circuit:
         if basis is None:
             basis = ('Z',) * len(qubits)
 
-        meas_cycle = Cycle([Meas(q, b) for q, b in zip(qubits, basis)])
+        meas_cycle = Cycle({Meas(q, b) for q, b in zip(qubits, basis)})
         if all([meas.properties['params']['basis'].upper() == 'Z' for meas in 
                 meas_cycle]):
             self.append(Barrier(tuple(q for q in self.qubits)))
             self.append(meas_cycle)
         else:
             self.append(
-                Cycle([basis_rotation(meas) for meas in meas_cycle])
+                Cycle({basis_rotation(meas) for meas in meas_cycle})
             )
             self.append(Barrier(tuple(q for q in self.qubits)))
             self.append(meas_cycle)
@@ -669,14 +666,14 @@ class CircuitSet:
     __slots__ = '_df'
     
     def __init__(self, 
-                 circuits: List[Any] | None = None, 
+                 circuits: List[Any] | deque[Any] | None = None, 
                  index: List[int] | None = None
         ) -> None:
         """Initialize a CircuitSet.
 
         Args:
-            circuits (List[Any] | None, optional): circuits to store in a 
-                CircuitSet. Defaults to None.
+            circuits (List[Any] | deque[Any] | None, optional): circuits to 
+                store in a CircuitSet. Defaults to None.
             index (List[int] | None, optional): Indices for the circuits in the 
                 DataFrame. Defaults to None.
         """

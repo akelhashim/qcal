@@ -202,33 +202,33 @@ def Amplitude(
                 
                 if self._gate == 'X90':
                     circuit.extend([
-                        Cycle([
+                        Cycle({
                             gate[self._gate](q, subspace='GE') 
                             for q in self._qubits
-                        ]),
+                        }),
                         Barrier(self._qubits),
-                        Cycle([
+                        Cycle({
                             gate[self._gate](q, subspace='GE') 
                             for q in self._qubits
-                        ]),
+                        }),
                         Barrier(self._qubits)
                     ])
 
                 elif self._gate == 'X':
                     circuit.extend([
-                        Cycle([
+                        Cycle({
                             gate[self._gate](q, subspace='GE') 
                             for q in self._qubits
-                        ]),
+                        }),
                         Barrier(self._qubits)
                     ])
 
             for _ in range(self._n_gates):
                 circuit.extend([
-                    Cycle([
+                    Cycle({
                         gate[self._gate](q, subspace=level[self._n_levels]) 
                         for q in self._qubits
-                    ]),
+                    }),
                     Barrier(self._qubits)
                 ])
             circuit.measure()
@@ -498,30 +498,30 @@ def Frequency(
 
                     # State prepration
                     circuit.extend([
-                        Cycle([X90(q, subspace='GE') for q in self._qubits]),
+                        Cycle({X90(q, subspace='GE') for q in self._qubits}),
                         Barrier(self._qubits)
                     ])
                     if self._subspace == 'EF':
                         circuit.extend([
-                          Cycle([X90(q, subspace='GE') for q in self._qubits]),
+                          Cycle({X90(q, subspace='GE') for q in self._qubits}),
                           Barrier(self._qubits),
-                          Cycle([X90(q, subspace='EF') for q in self._qubits]),
+                          Cycle({X90(q, subspace='EF') for q in self._qubits}),
                           Barrier(self._qubits)
                         ])
                     
                     # Ramsey experiment
                     circuit.extend([
-                        Cycle([Idle(q, duration=t) for q in self._qubits]),
+                        Cycle({Idle(q, duration=t) for q in self._qubits}),
                         Barrier(self._qubits),
-                        Cycle([VirtualZ(phase, q, subspace=self._subspace) 
-                              for q in self._qubits]),
+                        Cycle({VirtualZ(phase, q, subspace=self._subspace) 
+                              for q in self._qubits}),
                         Barrier(self._qubits),
                     ])
                     
                     # Basis preparation
                     circuit.append(
-                        Cycle([X90(q, subspace=self._subspace) 
-                            for q in self._qubits])
+                        Cycle({X90(q, subspace=self._subspace) 
+                            for q in self._qubits})
                     )
                     
                     circuit.measure()
@@ -846,96 +846,84 @@ def Phase(
             logger.info(' Generating circuits...')
 
             level = {2: 'GE', 3: 'EF'}
-            circuit0 = Circuit()
-            circuit1 = Circuit()
+            circuit_Y180_X90 = Circuit()
+            circuit_X180_Y90 = Circuit()
 
             # Prepulse for EF calibration
             if self._subspace == 'EF':
                 
-                circuit0.extend([
-                    Cycle([
-                        X90(q, subspace='GE') for q in self._qubits
-                    ]),
+                circuit_Y180_X90.extend([
+                    Cycle({X90(q, subspace='GE') for q in self._qubits}),
                     Barrier(self._qubits),
-                    Cycle([
-                        X90(q, subspace='GE') for q in self._qubits
-                    ]),
+                    Cycle({X90(q, subspace='GE') for q in self._qubits}),
                     Barrier(self._qubits)
                 ])
 
-                circuit1.extend([
-                    Cycle([
-                        X90(q, subspace='GE') for q in self._qubits
-                    ]),
+                circuit_X180_Y90.extend([
+                    Cycle({X90(q, subspace='GE') for q in self._qubits}),
                     Barrier(self._qubits),
-                    Cycle([
-                        X90(q, subspace='GE') for q in self._qubits
-                    ]),
+                    Cycle({X90(q, subspace='GE') for q in self._qubits}),
                     Barrier(self._qubits)
                 ])
 
             # Y180_X90
-            circuit0.extend([
-                Cycle([
+            circuit_Y180_X90.extend([
+                Cycle({
                     VirtualZ(np.pi/2, q, subspace=level[self._n_levels])
                     for q in self._qubits
-                ]),
-                Barrier(self._qubits),
-                Cycle([
+                }),
+                Cycle({
                     X90(q, subspace=level[self._n_levels]) 
                     for q in self._qubits
-                ]),
+                }),
                 Barrier(self._qubits),
-                Cycle([
+                Cycle({
                     X90(q, subspace=level[self._n_levels]) 
                     for q in self._qubits
-                ]),
-                Barrier(self._qubits),
-                Cycle([
+                }),
+                Cycle({
                     VirtualZ(-np.pi/2, q, subspace=level[self._n_levels])
                     for q in self._qubits
-                ]),
+                }),
                 Barrier(self._qubits),
-                Cycle([
+                Cycle({
                     X90(q, subspace=level[self._n_levels]) 
                     for q in self._qubits
-                ])
+                })
             ])
-            circuit0.measure()
+            circuit_Y180_X90.measure()
 
             # X180_Y90
-            circuit1.extend([
-                Cycle([
+            circuit_X180_Y90.extend([
+                Cycle({
                     X90(q, subspace=level[self._n_levels]) 
                     for q in self._qubits
-                ]),
+                }),
                 Barrier(self._qubits),
-                Cycle([
+                Cycle({
                     X90(q, subspace=level[self._n_levels]) 
                     for q in self._qubits
-                ]),
+                }),
                 Barrier(self._qubits),
-                Cycle([
+                Cycle({
                     VirtualZ(np.pi/2, q, subspace=level[self._n_levels])
                     for q in self._qubits
-                ]),
-                Barrier(self._qubits),
-                Cycle([
+                }),
+                Cycle({
                     X90(q, subspace=level[self._n_levels]) 
                     for q in self._qubits
-                ]),
-                Barrier(self._qubits),
-                Cycle([
+                }),
+                Cycle({
                     VirtualZ(-np.pi/2, q, subspace=level[self._n_levels])
                     for q in self._qubits
-                ]),
+                }),
             ])
-            circuit1.measure()
+            circuit_X180_Y90.measure()
             
             circuits = []
             for _ in range(self._phases[self._qubits[0]].size):
-                circuits.append(circuit0.copy())
-                circuits.append(circuit1.copy())
+                circuits.append(circuit_Y180_X90.copy())
+                circuits.append(circuit_X180_Y90.copy())
 
             self._circuits = CircuitSet(circuits=circuits)
             self._circuits['sequence'] = [
@@ -958,8 +946,8 @@ def Phase(
 
             level = {'GE': '1', 'EF': '2'}
             for i, q in enumerate(self._qubits):
-                pop0 = []  # circuit0
-                pop1 = []  # circuit1
+                pop0 = []  # circuit_Y180_X90
+                pop1 = []  # circuit_X180_Y90
                 pops = []
                 for j, circuit in enumerate(self._circuits):
                     pop = circuit.results.marginalize(i).populations[

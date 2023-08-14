@@ -38,8 +38,6 @@ def round_to_order_error(
     Returns:
         Tuple[float]: rounded value, rounded error
     """
-        
-
     if abs(err) >= abs(val):
         logger.warning("Uncertainty greater than value!")
         val_precision = 0
@@ -48,6 +46,22 @@ def round_to_order_error(
         order_err = np.log10(err)
         val_precision = int(np.around(order_val - order_err))
 
-    val_rounded = float(np.format_float_scientific(val, precision=val_precision))
-    err_rounded = float(np.format_float_scientific(err, precision=error_precision))
+    val_rounded = float(
+        np.format_float_scientific(val, precision=val_precision)
+    )
+    err_rounded = float(
+        np.format_float_scientific(err, precision=error_precision)
+    )
     return val_rounded, err_rounded
+
+
+def wrap_phase(phase: float) -> float:
+    """Wrap a phase to be bounded by [-pi, pi].
+
+    Args:
+        phase (float): phase to wrap.
+
+    Returns:
+        float: phase wrapped between [-pi, pi].
+    """
+    return (phase + np.pi) % (2 * np.pi) - np.pi
