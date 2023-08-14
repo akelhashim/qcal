@@ -185,8 +185,8 @@ def RelativePhase(
                 heralding=heralding
             )
 
-            self._qubit_pairs = qubit_pairs
-            self._qubits = list(set(chain.from_iterable(qubit_pairs)))
+            self._qubits = qubit_pairs
+            # self._qubits = list(set(chain.from_iterable(qubit_pairs)))
 
             if not isinstance(phases, dict):
                 self._phases = {pair: phases for pair in qubit_pairs}
@@ -220,7 +220,7 @@ def RelativePhase(
             Returns:
                 List[Tuple]: qubit pairs.
             """
-            return self._qubit_pairs
+            return self._qubits
         
         @property
         def conditionality(self) -> Dict[Tuple]:
@@ -236,11 +236,11 @@ def RelativePhase(
             logger.info(' Generating circuits...')
 
             self._circuits = tomography_circuits(
-                self._qubit_pairs,
-                self._phases[self._qubit_pairs[0]].size
+                self._qubits,
+                self._phases[self._qubits[0]].size
             )
 
-            for pair in self._qubit_pairs:
+            for pair in self._qubits:
                 self._circuits[f'param: {self._params[pair]}'] = list(
                     self._phases[pair]
                 ) * 4
@@ -250,8 +250,9 @@ def RelativePhase(
             logger.info(' Analyzing the data...')
 
             # Compute the conditionality and fit to a parabola
-            for pair in self._qubit_pairs:
-                i = self._qubits.index(pair[1])
+            qubits = list(set(chain.from_iterable(self._qubits)))
+            for pair in self._qubits:
+                i = qubits.index(pair[1])
 
                 prob_C0_X = []
                 for circuit in self._circuits[
@@ -331,7 +332,7 @@ def RelativePhase(
                 self.save()
             self.plot(
                 xlabel='Phase (rad.)',
-                ylabel=(r'$|0\rangle$ Population'),
+                ylabel=(r'Conditionality'),
                 save_path=self._data_manager._save_path
             )
             self.final()
