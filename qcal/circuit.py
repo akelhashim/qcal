@@ -669,14 +669,14 @@ class CircuitSet:
     __slots__ = '_df'
     
     def __init__(self, 
-                 circuits: List[Any] | None = None, 
+                 circuits: List[Any] | deque[Any] | None = None, 
                  index: List[int] | None = None
         ) -> None:
         """Initialize a CircuitSet.
 
         Args:
-            circuits (List[Any] | None, optional): circuits to store in a 
-                CircuitSet. Defaults to None.
+            circuits (List[Any] | deque[Any] | None, optional): circuits to 
+                store in a CircuitSet. Defaults to None.
             index (List[int] | None, optional): Indices for the circuits in the 
                 DataFrame. Defaults to None.
         """
