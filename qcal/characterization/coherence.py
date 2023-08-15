@@ -215,7 +215,7 @@ def T1(qpu:             QPU,
                         ]
                     )
                 self._results[q] = prob1
-                self._circuits[f'{q}: prob1'] = (prob1)
+                self._circuits[f'Q{q}: Prob(1)'] = prob1
 
                 # Add initial guesses to fit
                 c = np.array(prob1).min()
@@ -504,7 +504,7 @@ def T2(qpu:             QPU,
                         ]
                     )
                 self._results[q] = prob1
-                self._circuits[f'{q}: prob1'] = (prob1)
+                self._circuits[f'Q{q}: Prob(1)'] = prob1
 
                 # Add initial guesses to fit
                 if self._echo:

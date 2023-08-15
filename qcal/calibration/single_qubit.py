@@ -13,8 +13,8 @@ from qcal.config import Config
 from qcal.fitting.fit import (
     FitAbsoluteValue, FitCosine, FitDecayingCosine, FitParabola
 )
-from qcal.math.utils import reciprocal_uncertainty, round_to_order_error
-from qcal.gate.single_qubit import Idle, VirtualZ, X, X90, Y90
+from qcal.math.utils import round_to_order_error
+from qcal.gate.single_qubit import Idle, VirtualZ, X, X90
 from qcal.plotting.utils import calculate_nrows_ncols
 from qcal.qpu.qpu import QPU
 from qcal.units import MHz, us
@@ -256,6 +256,8 @@ def Amplitude(
                         circuit.results.marginalize(i)['0']['probabilities']
                     )
                 self._sweep_results[q] = prob0
+                self._circuits[f'Q{q}: Prob(0)'] = prob0
+
                 self._fit[q].fit(self._amplitudes[q], prob0)
 
                 # If the fit was successful, write find the new amp
@@ -286,12 +288,6 @@ def Amplitude(
         def save(self):
             """Save all circuits and data."""
             qpu.save(self)
-            self._data_manager.save_to_csv(
-                 pd.DataFrame([self._param_sweep]), 'param_sweep'
-            )
-            self._data_manager.save_to_csv(
-                 pd.DataFrame([self._sweep_results]), 'sweep_results'
-            )
             self._data_manager.save_to_csv(
                  pd.DataFrame([self._cal_values]), 'calibrated_values'
             )
@@ -548,6 +544,7 @@ def Frequency(
                             ]
                         )
                     self._sweep_results[q].append(pop)
+                    self._circuits[f'Q{q}: Pop'] = pop
 
                     e = np.array(pop).min()
                     a = np.array(pop).max() - e
@@ -581,9 +578,6 @@ def Frequency(
         def save(self) -> None:
             """Save all circuits and data."""
             qpu.save(self)
-            self._data_manager.save_to_csv(
-                 pd.DataFrame([self._sweep_results]), 'sweep_results'
-            )
             self._data_manager.save_to_csv(
                  pd.DataFrame([self._cal_values]), 'freq_values'
             )
@@ -964,6 +958,8 @@ def Phase(
         
                 self._circuits[f'Q{q}: pop{level[self._subspace]}'] = pops
                 self._sweep_results[q] = (np.array(pop0) - np.array(pop1))**2
+                self._circuits[f'Q{q}: diff'] = self._sweep_results[q]
+                
                 self._fit[q].fit(self._phases[q], self._sweep_results[q])
 
                 # If the fit was successful, write find the new phase
