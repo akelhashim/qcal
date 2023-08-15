@@ -478,14 +478,14 @@ two_qubit:
       pulse:
       - channel: Q0.qdrv
         env: cosine_square
-        length: 2.0e-07
+        length: 4.0e-07
         kwargs:
           amp: 0.288
           phase: 0.0
           ramp_fraction: 0.25
       - channel: Q1.qdrv
         env: cosine_square
-        length: 2.0e-07
+        length: 4.0e-07
         kwargs:
           amp: 0.288
           phase: 0.0
@@ -506,14 +506,14 @@ two_qubit:
       pulse:
       - channel: Q1.qdrv
         env: cosine_square
-        length: 2.0e-07
+        length: 4.0e-07
         kwargs:
           amp: 0.288
           phase: 0.0
           ramp_fraction: 0.25
       - channel: Q2.qdrv
         env: cosine_square
-        length: 2.0e-07
+        length: 4.0e-07
         kwargs:
           amp: 0.288
           phase: 0.0
@@ -534,14 +534,14 @@ two_qubit:
       pulse:
       - channel: Q2.qdrv
         env: cosine_square
-        length: 2.0e-07
+        length: 4.0e-07
         kwargs:
           amp: 0.288
           phase: 0.0
           ramp_fraction: 0.25
       - channel: Q3.qdrv
         env: cosine_square
-        length: 2.0e-07
+        length: 4.0e-07
         kwargs:
           amp: 0.288
           phase: 0.0
@@ -562,14 +562,14 @@ two_qubit:
       pulse:
       - channel: Q3.qdrv
         env: cosine_square
-        length: 2.0e-07
+        length: 5.0e-07
         kwargs:
           amp: 0.288
           phase: 0.0
           ramp_fraction: 0.25
       - channel: Q4.qdrv
         env: cosine_square
-        length: 2.0e-07
+        length: 5.0e-07
         kwargs:
           amp: 0.288
           phase: 0.0
@@ -590,14 +590,14 @@ two_qubit:
       pulse:
       - channel: Q4.qdrv
         env: cosine_square
-        length: 2.0e-07
+        length: 4.0e-07
         kwargs:
           amp: 0.288
           phase: 0.0
           ramp_fraction: 0.25
       - channel: Q5.qdrv
         env: cosine_square
-        length: 2.0e-07
+        length: 4.0e-07
         kwargs:
           amp: 0.288
           phase: 0.0
@@ -618,14 +618,14 @@ two_qubit:
       pulse:
       - channel: Q5.qdrv
         env: cosine_square
-        length: 2.0e-07
+        length: 4.0e-07
         kwargs:
           amp: 0.288
           phase: 0.0
           ramp_fraction: 0.25
       - channel: Q6.qdrv
         env: cosine_square
-        length: 2.0e-07
+        length: 4.0e-07
         kwargs:
           amp: 0.288
           phase: 0.0
@@ -646,14 +646,14 @@ two_qubit:
       pulse:
       - channel: Q6.qdrv
         env: cosine_square
-        length: 2.0e-07
+        length: 4.0e-07
         kwargs:
           amp: 0.288
           phase: 0.0
           ramp_fraction: 0.25
       - channel: Q7.qdrv
         env: cosine_square
-        length: 2.0e-07
+        length: 4.0e-07
         kwargs:
           amp: 0.288
           phase: 0.0
@@ -674,14 +674,14 @@ two_qubit:
       pulse:
       - channel: Q7.qdrv
         env: cosine_square
-        length: 2.0e-07
+        length: 4.0e-07
         kwargs:
           amp: 0.288
           phase: 0.0
           ramp_fraction: 0.25
       - channel: Q0.qdrv
         env: cosine_square
-        length: 2.0e-07
+        length: 4.0e-07
         kwargs:
           amp: 0.288
           phase: 0.0
