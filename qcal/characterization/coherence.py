@@ -43,12 +43,14 @@ def T1(qpu:             QPU,
 
     Basic example useage:
 
-        exp = T1(
-            CustomQPU, 
-            config, 
-            qubits=[0, 1, 2],
-            t_max=5e-4)
-        exp.run()
+    ```
+    exp = T1(
+        CustomQPU, 
+        config, 
+        qubits=[0, 1, 2],
+        t_max=5e-4)
+    exp.run()
+    ```
 
     Args:
         qpu (QPU): custom QPU object.
@@ -124,10 +126,14 @@ def T1(qpu:             QPU,
 
             self._qubits = qubits
             
-            assert gate in ('X90', 'X'), 'gate must be an X90 or X!'
+            assert gate in ('X90', 'X'), (
+                "'gate' must be one of 'X90' or 'X'!"
+            )
             self._gate = gate
 
-            assert subspace in ('GE', 'EF'), 'subspace must be GE or EF!'
+            assert subspace in ('GE', 'EF'), (
+                "'subspace' must be one of 'GE' or 'EF'!"
+            )
             self._subspace = subspace
 
             self._times = {
@@ -305,14 +311,16 @@ def T2(qpu:             QPU,
 
     Basic example useage:
 
-        exp = T2(
-            CustomQPU, 
-            config, 
-            qubits=[0, 1, 2],
-            t_max=250e-4,
-            detuning=0.05e6,
-            echo=True)
-        exp.run()
+    ```
+    exp = T2(
+        CustomQPU, 
+        config, 
+        qubits=[0, 1, 2],
+        t_max=250e-4,
+        detuning=0.05e6,
+        echo=True)
+    exp.run()
+    ```
 
     Args:
         qpu (QPU): custom QPU object.
@@ -394,7 +402,9 @@ def T2(qpu:             QPU,
             self._detuning = detuning
             self._gate = 'X90'
 
-            assert subspace in ('GE', 'EF'), 'subspace must be GE or EF!'
+            assert subspace in ('GE', 'EF'), (
+                "'subspace' must be one of 'GE' or 'EF'!"
+            )
             self._subspace = subspace
 
             self._times = {

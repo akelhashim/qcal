@@ -147,7 +147,12 @@ class Calibration:
         """Save and load the config after changing parameters."""
         for q in self._qubits:
             if self._fit[q].fit_success:
-                if isinstance(self._params[q], list):
+                if (isinstance(self._params[q], (list, tuple)) and
+                    isinstance(self._cal_values[q], (list, tuple))):
+                    for param, val in zip(self._params[q],self._cal_values[q]):
+                        self.set_param(param, val)
+                elif (isinstance(self._params[q], (list, tuple)) and not
+                      isinstance(self._cal_values[q], (list, tuple))):
                     for param in self._params[q]:
                         self.set_param(param, self._cal_values[q])
                 else:

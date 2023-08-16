@@ -616,6 +616,7 @@ two_qubit:
     CZ:
       freq: 5500000000.0
       pulse:
+      - 'single_qubit/6/EF/X/pulse'
       - channel: Q5.qdrv
         env: cosine_square
         length: 4.0e-07
@@ -640,10 +641,12 @@ two_qubit:
         length: 0.0
         kwargs:
           phase: 0.0
+      - 'single_qubit/6/EF/X/pulse'
   (6, 7):
     CZ:
       freq: 5550000000.0
       pulse:
+      - 'single_qubit/6/EF/X/pulse'
       - channel: Q6.qdrv
         env: cosine_square
         length: 4.0e-07
@@ -668,6 +671,7 @@ two_qubit:
         length: 0.0
         kwargs:
           phase: 0.0
+      - 'single_qubit/6/EF/X/pulse'
   (7, 0):
     CZ:
       freq: 4900000000.0

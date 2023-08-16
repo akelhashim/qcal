@@ -53,13 +53,15 @@ def Amplitude(
 
     Basic example useage for initial calibration:
 
-        amps = np.linspace(0, 1.0, 21)
-        cal = Amplitude(
-            CustomQPU, 
-            config, 
-            qubits=[0, 1, 2],
-            amps=amps)
-        cal.run()
+    ```
+    amps = np.linspace(0, 1.0, 21)
+    cal = Amplitude(
+        CustomQPU, 
+        config, 
+        qubits=[0, 1, 2],
+        amplitudes=amps)
+    cal.run()
+    ```
 
     Args:
         qpu (QPU): custom QPU object.
@@ -87,7 +89,7 @@ def Amplitude(
             Defaults to 1.
         relative_amp (bool, optional): whether or not the amplitudes argument
             is defined relative to the existing pulse amplitude. Defaults to
-            False. If true, the amplitudes are swept over the current amplitude
+            False. If True, the amplitudes are swept over the current amplitude
             times the amplitudes argument.
         esp (bool, optional): whether to enable excited state promotion for 
             the calibration. Defaults to False.
@@ -143,10 +145,14 @@ def Amplitude(
 
             self._qubits = qubits
             
-            assert gate in ('X90', 'X'), 'gate must be an X90 or X!'
+            assert gate in ('X90', 'X'), (
+                "'gate' must be one of 'X90' or 'X'!"
+            )
             self._gate = gate
 
-            assert subspace in ('GE', 'EF'), 'subspace must be GE or EF!'
+            assert subspace in ('GE', 'EF'), (
+                "'subspace' must be one of 'GE' or 'EF'!"
+            )
             self._subspace = subspace
 
             if not isinstance(amplitudes, dict):
@@ -351,12 +357,14 @@ def Frequency(
 
     Basic example useage:
 
-        freq = Frequency(
-            CustomQPU, 
-            config, 
-            qubits=[0],
-            np.array([-2, -1, 1, 2])*MHz)
-        freq.run()
+    ```
+    cal = Frequency(
+        CustomQPU, 
+        config, 
+        qubits=[0],
+        detunings=np.array([-2, -1, 1, 2])*MHz)
+    cal.run()
+    ```
 
     Args:
         qpu (QPU): custom QPU object.
@@ -432,9 +440,10 @@ def Frequency(
 
             self._qubits = qubits
             self._detunings = detunings
-            self._gate = 'X90'
 
-            assert subspace in ('GE', 'EF'), 'subspace must be GE or EF!'
+            assert subspace in ('GE', 'EF'), (
+                "'subspace' must be one of 'GE' or 'EF'!"
+            )
             self._subspace = subspace
 
             self._times = {
@@ -730,13 +739,15 @@ def Phase(
 
     Basic example useage for initial calibration:
 
-        phases = np.pi * np.linspace(-1, 1, 21)
-        cal = Phase(
-            CustomQPU, 
-            config, 
-            qubits=[0, 1, 2],
-            phases=phases)
-        cal.run()
+    ```
+    phases = np.pi * np.linspace(-1, 1, 21)
+    cal = Phase(
+        CustomQPU, 
+        config, 
+        qubits=[0, 1, 2],
+        phases=phases)
+    cal.run()
+    ```
 
     Args:
         qpu (QPU): custom QPU object.
@@ -808,7 +819,9 @@ def Phase(
 
             self._qubits = qubits
 
-            assert subspace in ('GE', 'EF'), 'subspace must be GE or EF!'
+            assert subspace in ('GE', 'EF'), (
+                "'subspace' must be one of 'GE' or 'EF'!"
+            )
             self._subspace = subspace
 
             if not isinstance(phases, dict):
@@ -993,7 +1006,7 @@ def Phase(
             )
 
         def plot(self) -> None:
-            """Plot the phas sweep and fit results."""
+            """Plot the phase sweep and fit results."""
             level = {'GE': '1', 'EF': '2'}
 
             nrows, ncols = calculate_nrows_ncols(len(self._qubits))
