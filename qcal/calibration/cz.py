@@ -1220,10 +1220,10 @@ def LocalPhases(
                 Barrier(qubits),
                 Cycle({CZ(pair) for pair in qubit_pairs}),
                 Barrier(qubits),
-                # Y90 on target qubit
-                Cycle({VirtualZ(np.pi/2, p[1]) for p in qubit_pairs}),
-                Cycle({X90(p[1]) for p in qubit_pairs}),
+                # Y-90 on target qubit
                 Cycle({VirtualZ(-np.pi/2, p[1]) for p in qubit_pairs}),
+                Cycle({X90(p[1]) for p in qubit_pairs}),
+                Cycle({VirtualZ(np.pi/2, p[1]) for p in qubit_pairs}),
                 # Measure
                 Cycle(Meas(q) for q in qubits)
             ])
@@ -1241,10 +1241,10 @@ def LocalPhases(
                 Barrier(qubits),
                 Cycle({CZ(pair) for pair in qubit_pairs}),
                 Barrier(qubits),
-                # Y90 on target qubit
-                Cycle({VirtualZ(np.pi/2, p[1]) for p in qubit_pairs}),
-                Cycle({X90(p[1]) for p in qubit_pairs}),
+                # Y-90 on target qubit
                 Cycle({VirtualZ(-np.pi/2, p[1]) for p in qubit_pairs}),
+                Cycle({X90(p[1]) for p in qubit_pairs}),
+                Cycle({VirtualZ(np.pi/2, p[1]) for p in qubit_pairs}),
             ])
 
             circuit_T0_X = Circuit([
@@ -1256,10 +1256,10 @@ def LocalPhases(
                 Barrier(qubits),
                 Cycle({CZ(pair) for pair in qubit_pairs}),
                 Barrier(qubits),
-                # Y90 on control qubit
-                Cycle({VirtualZ(np.pi/2, p[0]) for p in qubit_pairs}),
-                Cycle({X90(p[0]) for p in qubit_pairs}),
+                # Y-90 on control qubit
                 Cycle({VirtualZ(-np.pi/2, p[0]) for p in qubit_pairs}),
+                Cycle({X90(p[0]) for p in qubit_pairs}),
+                Cycle({VirtualZ(np.pi/2, p[0]) for p in qubit_pairs}),
                 # Measure
                 Cycle(Meas(q) for q in qubits)
             ])
@@ -1277,10 +1277,10 @@ def LocalPhases(
                 Barrier(qubits),
                 Cycle({CZ(pair) for pair in qubit_pairs}),
                 Barrier(qubits),
-                # Y90 on control qubit
-                Cycle({VirtualZ(np.pi/2, p[0]) for p in qubit_pairs}),
-                Cycle({X90(p[0]) for p in qubit_pairs}),
+                # Y-90 on control qubit
                 Cycle({VirtualZ(-np.pi/2, p[0]) for p in qubit_pairs}),
+                Cycle({X90(p[0]) for p in qubit_pairs}),
+                Cycle({VirtualZ(np.pi/2, p[0]) for p in qubit_pairs}),
             ])
 
             n_elements = self._phases[self._qubits[0]].size
@@ -1314,31 +1314,31 @@ def LocalPhases(
                 for circuit in self._circuits[
                     self._circuits['sequence'] == 'C0_X'].circuit:
                     prob_C0_X.append(
-                        circuit.results.marginalize(i+1).populations['1']
+                        circuit.results.marginalize(i+1).populations['0']
                     )
 
                 prob_C1_X = []
                 for circuit in self._circuits[
                     self._circuits['sequence'] == 'C1_X'].circuit:
                     prob_C1_X.append(
-                        circuit.results.marginalize(i+1).populations['1']
+                        circuit.results.marginalize(i+1).populations['0']
                     )
 
                 prob_T0_X = []
                 for circuit in self._circuits[
                     self._circuits['sequence'] == 'T0_X'].circuit:
                     prob_T0_X.append(
-                        circuit.results.marginalize(i).populations['1']
+                        circuit.results.marginalize(i).populations['0']
                     )
 
                 prob_T1_X = []
                 for circuit in self._circuits[
                     self._circuits['sequence'] == 'T1_X'].circuit:
                     prob_T1_X.append(
-                        circuit.results.marginalize(i).populations['1']
+                        circuit.results.marginalize(i).populations['0']
                     )
 
-                self._circuits[f'{pair}: Prob(1)'] = (
+                self._circuits[f'{pair}: Prob(0)'] = (
                     prob_C0_X + prob_C1_X + prob_T0_X + prob_T1_X
                 )
                 
