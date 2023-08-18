@@ -11,10 +11,10 @@ from qcal.circuit import Barrier, Cycle, Circuit, CircuitSet
 from qcal.compilation.compiler import Compiler
 from qcal.config import Config
 from qcal.fitting.fit import (
-    # FitAbsoluteValue, FitCosine, FitDecayingCosine, 
-    FitParabola
+    # FitAbsoluteValue, FitDecayingCosine, 
+    FitCosine, FitParabola
 )
-# from qcal.math.utils import reciprocal_uncertainty, round_to_order_error
+from qcal.math.utils import wrap_phase
 from qcal.gate.single_qubit import Meas, VirtualZ, X90
 from qcal.gate.two_qubit import CZ
 from qcal.plotting.utils import calculate_nrows_ncols
@@ -350,7 +350,7 @@ def Amplitude(
                         circuit.results.marginalize(i).populations['0']
                     )
 
-                self._circuits[f'{pair}: pop0'] = (
+                self._circuits[f'{pair}: Prob(0)'] = (
                     prob_C0_X + prob_C1_X + prob_C0_Y + prob_C1_Y
                 )
                 self._R[pair] = np.sqrt(
@@ -707,7 +707,7 @@ def RelativeAmp(
                         circuit.results.marginalize(i).populations['0']
                     )
 
-                self._circuits[f'{pair}: pop0'] = (
+                self._circuits[f'{pair}: Prob(0)'] = (
                     prob_C0_X + prob_C1_X + prob_C0_Y + prob_C1_Y
                 )
                 self._R[pair] = np.sqrt(
@@ -977,7 +977,7 @@ def RelativePhase(
                         circuit.results.marginalize(i).populations['0']
                     )
 
-                self._circuits[f'{pair}: pop0'] = (
+                self._circuits[f'{pair}: Prob(0)'] = (
                     prob_C0_X + prob_C1_X + prob_C0_Y + prob_C1_Y
                 )
                 self._R[pair] = np.sqrt(
@@ -1034,6 +1034,471 @@ def RelativePhase(
             print(f"\nRuntime: {repr(self._runtime)[8:]}\n")
 
     return RelativePhase(
+        config,
+        qubit_pairs,
+        phases,
+        compiler, 
+        transpiler, 
+        n_shots, 
+        n_batches, 
+        n_circs_per_seq,
+        n_levels, 
+        esp,
+        heralding,
+        **kwargs
+    )
+
+
+def LocalPhases(
+        qpu:             QPU,
+        config:          Config,
+        qubit_pairs:     List[Tuple],
+        phases:          NDArray | Dict = np.pi * np.linspace(-1, 1, 21),
+        compiler:        Any | Compiler | None = None, 
+        transpiler:      Any | None = None, 
+        n_shots:         int = 1024, 
+        n_batches:       int = 1, 
+        n_circs_per_seq: int = 1,
+        n_levels:        int = 2,
+        esp:             bool = False,
+        heralding:       bool = True,
+        **kwargs
+    ) -> Callable:
+    """Relative phase calibration for CZ gate.
+
+    This calibration finds a relative phase between the drive lines where the
+    conditionality is a maximum.
+
+    Basic example useage for initial calibration:
+
+    ```
+    cal = LocalPhases(
+        CustomQPU, 
+        config, 
+        qubit_pairs=[(0, 1), (2, 3)])
+    cal.run()
+    ```
+
+    Args:
+        qpu (QPU): custom QPU object.
+        config (Config): qcal Config object.
+        qubit_pairs (List[Tuple]): pairs of qubit labels for the two-qubit gate
+            calibration.
+        phases (NDArray | Dict, optional): array of phases to sweep over for 
+            calibrating the local phases of the gate. If calibrating multiple 
+            gates at the same time, this should be a dictionary mapping an 
+            array to a qubit pair label.
+        compiler (Any | Compiler | None, optional): custom compiler to
+            compile the experimental circuits. Defaults to None.
+        transpiler (Any | None, optional): custom transpiler to 
+            transpile the experimental circuits. Defaults to None.
+        n_shots (int, optional): number of measurements per circuit. 
+            Defaults to 1024.
+        n_batches (int, optional): number of batches of measurements. 
+            Defaults to 1.
+        n_circs_per_seq (int, optional): maximum number of circuits that
+            can be measured per sequence. Defaults to 1.
+        n_levels (int, optional): number of energy levels to be measured. 
+            Defaults to 2. If n_levels = 3, this assumes that the
+            measurement supports qutrit classification.
+        esp (bool, optional): whether to enable excited state promotion for 
+            the calibration. Defaults to False.
+        heralding (bool, optional): whether to enable heralding for the 
+            calibraion. Defaults to True.
+
+    Returns:
+        Callable: LocalPhases calibration calss.
+    """
+
+    class LocalPhases(qpu, Calibration):
+        """Local phase calibration class.
+        
+        This class inherits a custom QPU from the LocalPhase calibration
+        function.
+        """
+
+        def __init__(self, 
+                config:          Config,
+                qubit_pairs:     List[Tuple],
+                phases:          NDArray | Dict = np.pi*np.linspace(-1, 1, 21),
+                compiler:        Any | Compiler | None = None, 
+                transpiler:      Any | None = None, 
+                n_shots:         int = 1024, 
+                n_batches:       int = 1, 
+                n_circs_per_seq: int = 1,
+                n_levels:        int = 2, 
+                esp:             bool = False,
+                heralding:       bool = True,
+                **kwargs
+            ) -> None:
+            """Initialize the RelativePhase class within the function."""
+            qpu.__init__(self,
+                config, 
+                compiler, 
+                transpiler, 
+                n_shots, 
+                n_batches, 
+                n_circs_per_seq, 
+                n_levels,
+                **kwargs
+            )
+            Calibration.__init__(self, 
+                config, 
+                esp=esp,
+                heralding=heralding
+            )
+
+            self._qubits = qubit_pairs
+
+            if not isinstance(phases, dict):
+                self._phases = {pair: phases for pair in qubit_pairs}
+            else:
+                self._phases = phases
+            self._param_sweep = self._phases
+
+            self._params = {}
+            for pair in qubit_pairs:
+                idx = find_pulse_index(config, f'two_qubit/{pair}/CZ/pulse')
+                self._params[pair] = (
+                    f'two_qubit/{pair}/CZ/pulse/{idx+2}/kwargs/phase',
+                    f'two_qubit/{pair}/CZ/pulse/{idx+3}/kwargs/phase'
+                )
+                
+            self._fit = {
+                pair: {
+                    'X_C0': FitCosine(), 
+                    'X_C1': FitCosine(), 
+                    'X_T0': FitCosine(), 
+                    'X_T1': FitCosine()
+                } for pair in qubit_pairs
+            }
+            
+            self._phase_C0 = None
+            self._phase_C1 = None
+            self._phase_T0 = None
+            self._phase_T1 = None
+            self._cal_values = {pair: tuple() for pair in qubit_pairs}
+
+        @property
+        def phases(self) -> Dict:
+            """Phase sweep for each qubit.
+
+            Returns:
+                Dict: qubit to array map.
+            """
+            return self._phases
+        
+        @property
+        def qubit_pairs(self) -> List[Tuple]:
+            """Qubit pair labels.
+
+            Returns:
+                List[Tuple]: qubit pairs.
+            """
+            return self._qubits
+        
+        @property
+        def conditionality(self) -> Dict[Tuple]:
+            """Conditionality computed at each phase value.
+
+            Returns:
+                Dict[Tuple]: conditionality for each pair.
+            """
+            return self._R
+
+        def generate_circuits(self) -> None:
+            """Generate all amplitude calibration circuits."""
+            logger.info(' Generating circuits...')
+            qubits = list(set(chain.from_iterable(self._qubits)))
+
+            circuit_C0_X = Circuit([
+                # Y90 on target qubit
+                Cycle({VirtualZ(np.pi/2, p[1]) for p in qubit_pairs}),
+                Cycle({X90(p[1]) for p in qubit_pairs}),
+                Cycle({VirtualZ(-np.pi/2, p[1]) for p in qubit_pairs}),
+                # CZ
+                Barrier(qubits),
+                Cycle({CZ(pair) for pair in qubit_pairs}),
+                Barrier(qubits),
+                # Y90 on target qubit
+                Cycle({VirtualZ(np.pi/2, p[1]) for p in qubit_pairs}),
+                Cycle({X90(p[1]) for p in qubit_pairs}),
+                Cycle({VirtualZ(-np.pi/2, p[1]) for p in qubit_pairs}),
+                # Measure
+                Cycle(Meas(q) for q in qubits)
+            ])
+
+            circuit_C1_X = Circuit([
+                # X on control qubit
+                Cycle({X90(p[0]) for p in qubit_pairs}),
+                Cycle({X90(p[0]) for p in qubit_pairs}),
+                Barrier(qubits),
+                # Y90 on target qubit
+                Cycle({VirtualZ(np.pi/2, p[1]) for p in qubit_pairs}),
+                Cycle({X90(p[1]) for p in qubit_pairs}),
+                Cycle({VirtualZ(-np.pi/2, p[1]) for p in qubit_pairs}),
+                # CZ
+                Barrier(qubits),
+                Cycle({CZ(pair) for pair in qubit_pairs}),
+                Barrier(qubits),
+                # Y90 on target qubit
+                Cycle({VirtualZ(np.pi/2, p[1]) for p in qubit_pairs}),
+                Cycle({X90(p[1]) for p in qubit_pairs}),
+                Cycle({VirtualZ(-np.pi/2, p[1]) for p in qubit_pairs}),
+            ])
+
+            circuit_T0_X = Circuit([
+                # Y90 on control qubit
+                Cycle({VirtualZ(np.pi/2, p[0]) for p in qubit_pairs}),
+                Cycle({X90(p[0]) for p in qubit_pairs}),
+                Cycle({VirtualZ(-np.pi/2, p[0]) for p in qubit_pairs}),
+                # CZ
+                Barrier(qubits),
+                Cycle({CZ(pair) for pair in qubit_pairs}),
+                Barrier(qubits),
+                # Y90 on control qubit
+                Cycle({VirtualZ(np.pi/2, p[0]) for p in qubit_pairs}),
+                Cycle({X90(p[0]) for p in qubit_pairs}),
+                Cycle({VirtualZ(-np.pi/2, p[0]) for p in qubit_pairs}),
+                # Measure
+                Cycle(Meas(q) for q in qubits)
+            ])
+
+            circuit_T1_X = Circuit([
+                # X on target qubit
+                Cycle({X90(p[1]) for p in qubit_pairs}),
+                Cycle({X90(p[1]) for p in qubit_pairs}),
+                Barrier(qubits),
+                # Y90 on control qubit
+                Cycle({VirtualZ(np.pi/2, p[0]) for p in qubit_pairs}),
+                Cycle({X90(p[0]) for p in qubit_pairs}),
+                Cycle({VirtualZ(-np.pi/2, p[0]) for p in qubit_pairs}),
+                # CZ
+                Barrier(qubits),
+                Cycle({CZ(pair) for pair in qubit_pairs}),
+                Barrier(qubits),
+                # Y90 on control qubit
+                Cycle({VirtualZ(np.pi/2, p[0]) for p in qubit_pairs}),
+                Cycle({X90(p[0]) for p in qubit_pairs}),
+                Cycle({VirtualZ(-np.pi/2, p[0]) for p in qubit_pairs}),
+            ])
+
+            n_elements = self._phases[self._qubits[0]].size
+            circuits = list()
+            circuits.extend([circuit_C0_X.copy() for _ in range(n_elements)])
+            circuits.extend([circuit_C1_X.copy() for _ in range(n_elements)])
+            circuits.extend([circuit_T0_X.copy() for _ in range(n_elements)])
+            circuits.extend([circuit_T1_X.copy() for _ in range(n_elements)])
+            
+            self._circuits = CircuitSet(circuits=circuits)
+            self._circuits['sequence'] = (
+                ['C0_X'] * n_elements + ['C1_X'] * n_elements +
+                ['T0_X'] * n_elements + ['T1_X'] * n_elements 
+            )
+
+            for pair in self._qubits:
+                self._circuits[f'param: {self._params[pair]}'] = list(
+                    self._phases[pair]
+                ) * 4
+
+        def analyze(self) -> None:
+            """Analyze the data."""
+            logger.info(' Analyzing the data...')
+
+            # Compute the conditionality and fit to a parabola
+            qubits = list(set(chain.from_iterable(self._qubits)))
+            for pair in self._qubits:
+                i = qubits.index(pair[0])
+
+                prob_C0_X = []
+                for circuit in self._circuits[
+                    self._circuits['sequence'] == 'C0_X'].circuit:
+                    prob_C0_X.append(
+                        circuit.results.marginalize(i+1).populations['1']
+                    )
+
+                prob_C1_X = []
+                for circuit in self._circuits[
+                    self._circuits['sequence'] == 'C1_X'].circuit:
+                    prob_C1_X.append(
+                        circuit.results.marginalize(i+1).populations['1']
+                    )
+
+                prob_T0_X = []
+                for circuit in self._circuits[
+                    self._circuits['sequence'] == 'T0_X'].circuit:
+                    prob_T0_X.append(
+                        circuit.results.marginalize(i).populations['1']
+                    )
+
+                prob_T1_X = []
+                for circuit in self._circuits[
+                    self._circuits['sequence'] == 'T1_X'].circuit:
+                    prob_T1_X.append(
+                        circuit.results.marginalize(i).populations['1']
+                    )
+
+                self._circuits[f'{pair}: Prob(1)'] = (
+                    prob_C0_X + prob_C1_X + prob_T0_X + prob_T1_X
+                )
+                
+                contrast_C0 = max(prob_C0_X) - min(prob_C0_X)
+                contrast_C1 = max(prob_C1_X) - min(prob_C1_X)
+                contrast_T0 = max(prob_T0_X) - min(prob_T0_X)
+                contrast_T1 = max(prob_T1_X) - min(prob_T1_X)
+
+                X_C0 = 2 * (prob_C0_X - min(prob_C0_X)) / contrast_C0 - 1
+                X_C1 = 2 * (prob_C1_X - min(prob_C1_X)) / contrast_C1 - 1
+                X_T0 = 2 * (prob_T0_X - min(prob_T0_X)) / contrast_T0 - 1
+                X_T1 = 2 * (prob_T1_X - min(prob_T1_X)) / contrast_T1 - 1
+
+                self._sweep_results[pair] = {
+                    'X_C0': X_C0, 'X_C1': X_C1, 'X_T0': X_T0, 'X_T1': X_T1, 
+                }
+
+                self._fit[pair]['X_C0'].fit(self._phases[pair], X_C0)
+                self._fit[pair]['X_C1'].fit(self._phases[pair], -X_C1)
+                self._fit[pair]['X_T0'].fit(self._phases[pair], X_T0)
+                self._fit[pair]['X_T1'].fit(self._phases[pair], -X_T1)
+
+                if (self._fit[pair]['X_C0'].fit_success and
+                    self._fit[pair]['X_C1'].fit_success):
+                    _, freq, phase, _ = self._fit[pair]['X_C0'].fit_params
+                    self._phase_C0 = wrap_phase(-phase / (2 * np.pi * freq))
+
+                    _, freq, phase, _ = self._fit[pair]['X_C1'].fit_params
+                    self._phase_C1 = wrap_phase(-phase / (2 * np.pi * freq))
+
+                    newvalue = np.mean([self._phase_C0, self._phase_C1])
+                    self._cal_values[pair][1] = newvalue  # Target qubit phase
+
+                if (self._fit[pair]['X_T0'].fit_success and
+                    self._fit[pair]['X_T1'].fit_success):
+                    _, freq, phase, _ = self._fit[pair]['X_T0'].fit_params
+                    self._phase_T0 = wrap_phase(-phase / (2 * np.pi * freq))
+
+                    _, freq, phase, _ = self._fit[pair]['X_T1'].fit_params
+                    self._phase_T1 = wrap_phase(-phase / (2 * np.pi * freq))
+
+                    newvalue = np.mean([self._phase_T0, self._phase_T1])
+                    self._cal_values[pair][0] = newvalue  # Control qubit phase
+
+        def save(self):
+            """Save all circuits and data."""
+            qpu.save(self)
+            self._data_manager.save_to_csv(
+                 pd.DataFrame([self._sweep_results]), 'sweep_results'
+            )
+            self._data_manager.save_to_csv(
+                 pd.DataFrame([self._cal_values]), 'calibrated_values'
+            )
+
+        def plot(self) -> None:
+            """Plot the frequency sweep and fit results."""
+            nrows = len(self._qubits)
+            figsize = (12, 4 * nrows)
+            fig, ax = plt.subplots(
+                nrows, 2, figsize=figsize, layout='constrained'
+            )
+
+            for i, pair in enumerate(self._qubits):
+                if len(self._qubits) == 1:
+                    ax = ax
+                else:
+                    ax = ax[i]
+
+                ax[0].set_xlabel(f'Phase Q{pair[0]} (rad.)', fontsize=15)
+                ax[1].set_xlabel(f'Phase Q{pair[1]} (rad.)', fontsize=15)
+                ax[0].set_ylabel(r'$\langle X \rangle$', fontsize=15)
+                ax[1].set_ylabel(r'$\langle X \rangle$', fontsize=15)
+                ax[0].tick_params(axis='both', which='major', labelsize=12)
+                ax[1].tick_params(axis='both', which='major', labelsize=12)
+                ax[0].grid(True)
+                ax[1].grid(True)
+
+                # Control phase sweep
+                ax[0].plot(
+                    self._phases[pair], self._sweep_results['X_T0'], 'bo'
+                )
+                ax[0].plot(
+                    self._phases[pair], self._sweep_results['X_T1'], 'ro'
+                )
+                if self._fit[pair]['X_T0'].fit_success:
+                    x = np.linspace(
+                        self._phases[pair][0], self._phases[pair][-1], 100
+                    )
+                    ax[0].plot(x, self._fit[pair]['X_T0'].predict(x), 'b-')
+                    ax[0].axvline(self._phase_T0, ls='-', c='b',
+                        label=(
+                         rf'Q{pair[1]} $|0\rangle$: {round(self._phase_T0, 2)}'
+                        )
+                    )
+                if self._fit[pair]['X_T1'].fit_success:
+                    x = np.linspace(
+                        self._phases[pair][0], self._phases[pair][-1], 100
+                    )
+                    ax[0].plot(x, -self._fit[pair]['X_T1'].predict(x), 'r-')
+                    ax[0].axvline(self._phase_T1, ls='-', c='b',
+                        label=(
+                         rf'Q{pair[1]} $|1\rangle$: {round(self._phase_T1, 2)}'
+                        )
+                    )
+
+                # Target phase sweep
+                ax[1].plot(
+                    self._phases[pair], self._sweep_results['X_C0'], 'bo'
+                )
+                ax[1].plot(
+                    self._phases[pair], self._sweep_results['X_C1'], 'ro'
+                )
+                if self._fit[pair]['X_C0'].fit_success:
+                    x = np.linspace(
+                        self._phases[pair][0], self._phases[pair][-1], 100
+                    )
+                    ax[1].plot(x, self._fit[pair]['X_C0'].predict(x), 'b-')
+                    ax[1].axvline(self._phase_C0, ls='-', c='b',
+                        label=(
+                         rf'Q{pair[0]} $|0\rangle$: {round(self._phase_C0, 2)}'
+                        )
+                    )
+                if self._fit[pair]['X_C1'].fit_success:
+                    x = np.linspace(
+                        self._phases[pair][0], self._phases[pair][-1], 100
+                    )
+                    ax[1].plot(x, -self._fit[pair]['X_C1'].predict(x), 'r-')
+                    ax[1].axvline(self._phase_C1, ls='-', c='r', 
+                        label=(
+                         rf'Q{pair[0]} $|1\rangle$: {round(self._phase_C1, 2)}'
+                        )
+                    )
+
+                ax[0].legend(loc=0, fontsize=12)
+                ax[1].legend(loc=0, fontsize=12)
+
+            fig.set_tight_layout(True)
+            if settings.Settings.save_data:
+                fig.savefig(
+                    self._data_manager._save_path + 'freq_calibration.png', 
+                    dpi=300
+                )
+            plt.show()
+
+        def run(self):
+            """Run all experimental methods and analyze results."""
+            self.generate_circuits()
+            qpu.run(self, self._circuits, save=False)
+            self.analyze()
+            clear_output(wait=True)
+            self._data_manager._exp_id += (
+                f'_CZ_LocalPhases_cal_Q{"".join(str(q) for q in self._qubits)}'
+            )
+            if settings.Settings.save_data:
+                self.save()
+            self.plot()
+            self.final()
+            print(f"\nRuntime: {repr(self._runtime)[8:]}\n")
+
+    return LocalPhases(
         config,
         qubit_pairs,
         phases,

@@ -602,6 +602,7 @@ def Frequency(
                 nrows, 2, figsize=figsize, layout='constrained'
             )
             colors = plt.get_cmap('viridis', self._detunings.size)
+            level = {'GE': '1', 'EF': '2'}
 
             for i, q in enumerate(self._qubits):
                 if len(self._qubits) == 1:
@@ -611,7 +612,10 @@ def Frequency(
 
                 ax[0].set_xlabel(r'Time ($\mu$s)', fontsize=15)
                 ax[1].set_xlabel('Detuning (MHz)', fontsize=15)
-                ax[0].set_ylabel('Ramsey', fontsize=15)
+                ax[0].set_ylabel(
+                    rf'$|{level[self._subspace]}\rangle$ Population', 
+                    fontsize=15
+                )
                 ax[1].set_ylabel('Measured Detuning (MHz)', fontsize=15)
                 ax[0].tick_params(axis='both', which='major', labelsize=12)
                 ax[1].tick_params(axis='both', which='major', labelsize=12)
@@ -969,7 +973,7 @@ def Phase(
                     elif j % 2 == 1:
                         pop1.append(pop)
         
-                self._circuits[f'Q{q}: pop{level[self._subspace]}'] = pops
+                self._circuits[f'Q{q}: Prob({level[self._subspace]})'] = pops
                 self._sweep_results[q] = (np.array(pop0) - np.array(pop1))**2
                 self._circuits[f'Q{q}: diff'] = self._sweep_results[q]
                 
