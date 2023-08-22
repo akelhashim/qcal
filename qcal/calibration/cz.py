@@ -36,13 +36,15 @@ logger = logging.getLogger(__name__)
 
 
 def tomography_circuits(
-        qubit_pairs: List[Tuple], n_elements: int
+        qubit_pairs: List[Tuple], n_elements: int, n_gates: int = 1
     ) -> CircuitSet:
     """Partial tomography circuits for CZ sweeps.
 
     Args:
         qubit_pairs (List[Tuple]): list of qubit pairs.
         n_elements (int):          size of parameter sweep.
+        n_gates (int, optional): number of gates for pulse repetition.
+            Defaults to 1.
 
     Returns:
         CircuitSet: partial tomography CZ circuits.
@@ -54,17 +56,20 @@ def tomography_circuits(
         Cycle({VirtualZ(np.pi/2, p[1]) for p in qubit_pairs}),
         Cycle({X90(p[1]) for p in qubit_pairs}),
         Cycle({VirtualZ(-np.pi/2, p[1]) for p in qubit_pairs}),
-        # CZ
-        Barrier(qubits),
-        Cycle({CZ(pair) for pair in qubit_pairs}),
-        Barrier(qubits),
+        Barrier(qubits)
+    ])
+    for _ in range(n_gates):
+        circuit_C0_X.extend([
+            Cycle({CZ(pair) for pair in qubit_pairs}),
+            Barrier(qubits),
+        ])
+    circuit_C0_X.extend([  
         # Y90 on target qubit
         Cycle({VirtualZ(np.pi/2, p[1]) for p in qubit_pairs}),
         Cycle({X90(p[1]) for p in qubit_pairs}),
         Cycle({VirtualZ(-np.pi/2, p[1]) for p in qubit_pairs}),
-        # Measure
-        Cycle(Meas(q) for q in qubits)
     ])
+    circuit_C0_X.measure()
 
     circuit_C1_X = Circuit([
         # X on control qubit
@@ -75,28 +80,38 @@ def tomography_circuits(
         Cycle({VirtualZ(np.pi/2, p[1]) for p in qubit_pairs}),
         Cycle({X90(p[1]) for p in qubit_pairs}),
         Cycle({VirtualZ(-np.pi/2, p[1]) for p in qubit_pairs}),
-        # CZ
-        Barrier(qubits),
-        Cycle({CZ(pair) for pair in qubit_pairs}),
-        Barrier(qubits),
+        Barrier(qubits)
+    ])
+    for _ in range(n_gates):
+        circuit_C1_X.extend([
+            Cycle({CZ(pair) for pair in qubit_pairs}),
+            Barrier(qubits),
+        ])
+    circuit_C1_X.extend([
         # Y90 on target qubit
         Cycle({VirtualZ(np.pi/2, p[1]) for p in qubit_pairs}),
         Cycle({X90(p[1]) for p in qubit_pairs}),
         Cycle({VirtualZ(-np.pi/2, p[1]) for p in qubit_pairs}),
     ])
+    circuit_C1_X.measure()
 
     circuit_C0_Y = Circuit([
         # Y90 on target qubit
         Cycle({VirtualZ(np.pi/2, p[1]) for p in qubit_pairs}),
         Cycle({X90(p[1]) for p in qubit_pairs}),
         Cycle({VirtualZ(-np.pi/2, p[1]) for p in qubit_pairs}),
-        # CZ
-        Barrier(qubits),
-        Cycle({CZ(pair) for pair in qubit_pairs}),
-        Barrier(qubits),
+        Barrier(qubits)
+    ])
+    for _ in range(n_gates):
+        circuit_C0_Y.extend([
+            Cycle({CZ(pair) for pair in qubit_pairs}),
+            Barrier(qubits),
+        ])
+    circuit_C0_Y.extend([
         # X90 on target qubit
         Cycle({X90(p[1]) for p in qubit_pairs}),
     ])
+    circuit_C0_Y.measure()
 
     circuit_C1_Y = Circuit([
         # X on control qubit
@@ -107,13 +122,18 @@ def tomography_circuits(
         Cycle({VirtualZ(np.pi/2, p[1]) for p in qubit_pairs}),
         Cycle({X90(p[1]) for p in qubit_pairs}),
         Cycle({VirtualZ(-np.pi/2, p[1]) for p in qubit_pairs}),
-        # CZ
-        Barrier(qubits),
-        Cycle({CZ(pair) for pair in qubit_pairs}),
-        Barrier(qubits),
+        Barrier(qubits)
+    ])
+    for _ in range(n_gates):
+        circuit_C1_Y.extend([
+            Cycle({CZ(pair) for pair in qubit_pairs}),
+            Barrier(qubits),
+        ])
+    circuit_C1_Y.extend([
         # X90 on target qubit
         Cycle({X90(p[1]) for p in qubit_pairs}),
     ])
+    circuit_C1_Y.measure()
 
     circuits = list()
     circuits.extend([circuit_C0_X.copy() for _ in range(n_elements)])
@@ -141,6 +161,7 @@ def Amplitude(
         n_batches:       int = 1, 
         n_circs_per_seq: int = 1,
         n_levels:        int = 2,
+        n_gates:         int = 1,
         relative_amp:    bool = False,
         esp:             bool = False,
         heralding:       bool = True,
@@ -186,6 +207,8 @@ def Amplitude(
         n_levels (int, optional): number of energy levels to be measured. 
             Defaults to 2. If n_levels = 3, this assumes that the
             measurement supports qutrit classification.
+        n_gates (int, optional): number of gates for pulse repetition.
+            Defaults to 1.
         relative_amp (bool, optional): whether or not the amplitudes argument
             is defined relative to the existing pulse amplitude. Defaults to
             False. If True, the amplitudes are swept over the current amplitude
@@ -216,6 +239,7 @@ def Amplitude(
                 n_batches:       int = 1, 
                 n_circs_per_seq: int = 1,
                 n_levels:        int = 2,
+                n_gates:         int = 1,
                 relative_amp:    bool = False,
                 esp:             bool = False,
                 heralding:       bool = True,
@@ -239,6 +263,7 @@ def Amplitude(
             )
 
             self._qubits = qubit_pairs
+            self._n_gates = n_gates
 
             self._params = {}
             for pair in qubit_pairs:
@@ -382,7 +407,7 @@ def Amplitude(
                             )
                             self._fit[pair][j]._fit_success = False
                         else:
-                            self._cal_values[pair][j] = newvalue
+                            self._cal_values[pair].append(newvalue)
 
         def save(self):
             """Save all circuits and data."""
@@ -447,13 +472,16 @@ def Amplitude(
                         ax.legend(loc=0, fontsize=12)
 
                         # Add a second x-axis on top of plot
-                        ax2 = ax.twiny()
-                        ax2.set_xlabel('Control Amplitude (a.u.)', fontsize=15)
-                        ax.plot(
-                            self._param_sweep[q][0], self._sweep_results[q],
-                            'o', c='blue'
-                        )
-                        ax2.cla()
+                        # ax2 = ax.twiny()
+                        # ax2.set_xlabel('Control Amplitude (a.u.)', fontsize=15)
+                        # ax.plot(
+                        #     self._param_sweep[q][0], self._sweep_results[q],
+                        #     'o', c='blue'
+                        # )
+                        # ax2.tick_params(
+                        #     axis='x', which='major', labelsize=12
+                        # )
+                        # # ax2.cla()
 
                     else:
                         ax.axis('off')
@@ -491,6 +519,7 @@ def Amplitude(
         n_batches, 
         n_circs_per_seq,
         n_levels,
+        n_gates,
         relative_amp,
         esp,
         heralding,
