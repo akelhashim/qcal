@@ -279,7 +279,13 @@ def Amplitude(
                     if self._n_gates == 1:  # Cosine fit
                         _, freq, _, _ = self._fit[q].fit_params
                         newvalue = 1 / freq * period_frac[self._gate] 
-                        self._cal_values[q] = newvalue
+                        if not in_range(newvalue, self._amplitudes[q]):
+                            logger.warning(
+                              f'Fit failed for qubit {q} (out of range)!'
+                            )
+                            self._fit[q]._fit_success = False
+                        else:
+                            self._cal_values[q] = newvalue
 
                     elif self._n_gates > 1:  # Quadratic fit
                         a, b, _ = self._fit[q].fit_params
@@ -554,26 +560,27 @@ def Frequency(
 
             level = {'GE': '1', 'EF': '2'}
             # Fit the measured frequency for each detuning
+            probs = {q: list() for q in self._qubits}
             for i, detuning in enumerate(self._detunings):
                 for j, q in enumerate(self._qubits):
-                    pop = []
+                    prob = []
                     for circuit in self._circuits[
                         self._circuits['detuning'] == detuning].circuit:
-                        pop.append(
+                        prob.append(
                             circuit.results.marginalize(j).populations[
                                 level[self._subspace]
                             ]
                         )
-                    self._sweep_results[q].append(pop)
-                    self._circuits[f'Q{q}: Pop'] = pop
+                    probs[q] += prob
+                    self._sweep_results[q].append(prob)
 
-                    e = np.array(pop).min()
-                    a = np.array(pop).max() - e
-                    b = -np.mean( np.diff(pop) / np.diff(self._times[q]) ) / a
+                    e = np.array(prob).min()
+                    a = np.array(prob).max() - e
+                    b = -np.mean( np.diff(prob) / np.diff(self._times[q]) ) / a
                     c = detuning
                     d = 0.
                     self._freq_fit[q][i].fit(
-                        self._times[q], pop, p0=(a, b, c, d, e)
+                        self._times[q], prob, p0=(a, b, c, d, e)
                     )
 
                     # If the fit was successful, grab the frequency
@@ -582,19 +589,37 @@ def Frequency(
                             abs(self._freq_fit[q][i].fit_params[2])
                         )
                         self._fit_detunings[q].append(detuning)
+                
+            for q in self._qubits:
+                self._circuits[f'Q{q}: Prob{level[self._subspace]}'] = probs[q]
             
             # Fit the characterized frequencies to an absolute value curve
             for i, q in enumerate(self._qubits):
-                self._fit[q].fit(self._detunings, self._freqs[q], p0=(1, 0, 0))
+                self._fit[q].fit(self._detunings, self._freqs[q], p0=(1, 0, 0)) 
 
                 if self._fit[q].fit_success:
-                    val, err = round_to_order_error(
+                    a, _, _ = self._fit[q].fit_params
+                    newval, err = round_to_order_error(
                         self._fit[q].fit_params[1],
                         self._fit[q].error[1],
                         2
                     )
-                    self._cal_values[q] = self._config[self._params[q]] + val
-                    self._errors[q] = err
+
+                    if a < 0:
+                        logger.warning(
+                            f'Fit failed for qubit {q} (negative curvature)!'
+                        )
+                        self._fit[q]._fit_success = False
+                    elif not in_range(newval, self._detunings[q]):
+                        logger.warning(
+                            f'Fit failed for qubit {q} (out of range)!'
+                        )
+                        self._fit[q]._fit_success = False
+                    else:
+                        self._cal_values[q] = (
+                            self._config[self._params[q]] + newval
+                        )
+                        self._errors[q] = err
 
         def save(self) -> None:
             """Save all circuits and data."""
@@ -993,7 +1018,6 @@ def Phase(
         
                 self._circuits[f'Q{q}: Prob({level[self._subspace]})'] = pops
                 self._sweep_results[q] = (np.array(pop0) - np.array(pop1))**2
-                self._circuits[f'Q{q}: diff'] = self._sweep_results[q]
                 
                 self._fit[q].fit(self._phases[q], self._sweep_results[q])
 
@@ -1067,14 +1091,14 @@ def Phase(
                             self._param_sweep[q], 
                             self._circuits[
                                 self._circuits['sequence'] == 'Y180_X90'
-                            ][f'Q{q}: pop{level[self._subspace]}'],
+                            ][f'Q{q}: Prob({level[self._subspace]})'],
                             '-o', c='blue', label='Y180_X90'
                         )
                         ax.plot(
                             self._param_sweep[q], 
                             self._circuits[
                                 self._circuits['sequence'] == 'X180_Y90'
-                            ][f'Q{q}: pop{level[self._subspace]}'],
+                            ][f'Q{q}: Prob({level[self._subspace]})'],
                             '-o', c='blueviolet', label='X180_Y90'
                         )
                         ax.plot(

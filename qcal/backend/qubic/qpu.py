@@ -103,7 +103,8 @@ class QubicQPU(QPU):
                 reload_env:          bool = True,
                 zero_between_reload: bool = True,
                 gmm_manager:         GMMManager = None,
-                rpc_ip_address:      str = '192.168.1.247'
+                rpc_ip_address:      str = '192.168.1.25',
+                port:                int = 9096
         ) -> None:
         """Initialize a instance of a QPU for QubiC.
 
@@ -154,8 +155,9 @@ class QubicQPU(QPU):
             gmm_manager (GMMManager, optional): QubiC GMMManager object.
                 Defaults to None. If None, this is loaded from a previously 
                 saved manager object: 'gmm_manager.pkl'.
-            rpc_ip_address (str, optional): IP address for remote measurements.
-                Defaults to '192.168.1.247'.
+            rpc_ip_address (str, optional): IP address for RPC server.
+                Defaults to '192.168.1.25'.
+            port (int, option): port for RPC server. Defaults to 9096.
         """
         if transpiler is None:
             transpiler = Transpiler(config)
@@ -202,7 +204,9 @@ class QubicQPU(QPU):
         self._qchip = QChip(
             os.path.join(os.path.dirname(__file__), 'qubic_cfg.json')
         )
-        self._runner = rpc_client.CircuitRunnerClient(ip=rpc_ip_address)
+        self._runner = rpc_client.CircuitRunnerClient(
+            ip=rpc_ip_address, port=port
+        )
         self._jobman = job_manager.JobManager(
             self._fpga_config,
             self._channel_config,
