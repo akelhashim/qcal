@@ -9,6 +9,7 @@ from qcal.compilation.compiler import Compiler
 from qcal.config import Config
 from qcal.fitting.fit import FitDecayingCosine, FitExponential
 from qcal.gate.single_qubit import Idle, X90, X, VirtualZ
+from qcal.managers.classification_manager import ClassificationManager
 from qcal.math.utils import reciprocal_uncertainty, round_to_order_error
 from qcal.qpu.qpu import QPU
 from qcal.units import MHz, us
@@ -31,6 +32,7 @@ def T1(qpu:             QPU,
        subspace:        str = 'GE',
        compiler:        Any | Compiler | None = None, 
        transpiler:      Any | None = None,
+       classifier:      ClassificationManager = None,
        n_elements:      int = 50,
        n_shots:         int = 1024, 
        n_batches:       int = 1, 
@@ -65,6 +67,8 @@ def T1(qpu:             QPU,
             compile the experimental circuits. Defaults to None.
         transpiler (Any | None, optional): custom transpiler to 
             transpile the experimental circuits. Defaults to None.
+        classifier (ClassificationManager, optional): manager used for 
+            classifying raw data. Defaults to None.
         n_elements (int, optional): number of delays starting from 0 to t_max.
             Defaults to 50.
         n_shots (int, optional): number of measurements per circuit. 
@@ -97,6 +101,7 @@ def T1(qpu:             QPU,
                 subspace:        str = 'GE',
                 compiler:        Any | Compiler | None = None, 
                 transpiler:      Any | None = None,
+                classifier:      ClassificationManager = None,
                 n_elements:      int = 50,
                 n_shots:         int = 1024, 
                 n_batches:       int = 1, 
@@ -111,7 +116,8 @@ def T1(qpu:             QPU,
             qpu.__init__(self,
                 config, 
                 compiler, 
-                transpiler, 
+                transpiler,
+                classifier,
                 n_shots, 
                 n_batches, 
                 n_circs_per_seq, 
@@ -280,6 +286,7 @@ def T1(qpu:             QPU,
         subspace,
         compiler, 
         transpiler,
+        classifier,
         n_elements, 
         n_shots, 
         n_batches, 
@@ -299,6 +306,7 @@ def T2(qpu:             QPU,
        subspace:        str = 'GE',
        compiler:        Any | Compiler | None = None, 
        transpiler:      Any | None = None,
+       classifier:      ClassificationManager = None,
        n_elements:      int = 50,
        n_shots:         int = 1024, 
        n_batches:       int = 1, 
@@ -337,6 +345,8 @@ def T2(qpu:             QPU,
             compile the experimental circuits. Defaults to None.
         transpiler (Any | None, optional): custom transpiler to 
             transpile the experimental circuits. Defaults to None.
+        classifier (ClassificationManager, optional): manager used for
+            classifying raw data. Defaults to None.
         n_elements (int, optional): number of delays starting from 0 to t_max.
             Defaults to 50.
         n_shots (int, optional): number of measurements per circuit. 
@@ -370,6 +380,7 @@ def T2(qpu:             QPU,
                 subspace:        str = 'GE',
                 compiler:        Any | Compiler | None = None, 
                 transpiler:      Any | None = None,
+                classifier:      ClassificationManager = None,
                 n_elements:      int = 50,
                 n_shots:         int = 1024, 
                 n_batches:       int = 1, 
@@ -384,7 +395,8 @@ def T2(qpu:             QPU,
             qpu.__init__(self,
                 config, 
                 compiler, 
-                transpiler, 
+                transpiler,
+                classifier,
                 n_shots, 
                 n_batches, 
                 n_circs_per_seq, 
@@ -582,6 +594,7 @@ def T2(qpu:             QPU,
         subspace,
         compiler, 
         transpiler,
+        classifier,
         n_elements, 
         n_shots, 
         n_batches, 

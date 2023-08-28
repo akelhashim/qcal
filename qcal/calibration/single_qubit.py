@@ -13,6 +13,7 @@ from qcal.config import Config
 from qcal.fitting.fit import (
     FitAbsoluteValue, FitCosine, FitDecayingCosine, FitParabola
 )
+from qcal.managers.classification_manager import ClassificationManager
 from qcal.math.utils import round_to_order_error
 from qcal.gate.single_qubit import Idle, VirtualZ, X, X90
 from qcal.plotting.utils import calculate_nrows_ncols
@@ -39,7 +40,8 @@ def Amplitude(
         gate:            str = 'X90',
         subspace:        str = 'GE',
         compiler:        Any | Compiler | None = None, 
-        transpiler:      Any | None = None, 
+        transpiler:      Any | None = None,
+        classifier:      ClassificationManager = None,
         n_shots:         int = 1024, 
         n_batches:       int = 1, 
         n_circs_per_seq: int = 1, 
@@ -79,6 +81,8 @@ def Amplitude(
             compile the experimental circuits. Defaults to None.
         transpiler (Any | None, optional): custom transpiler to 
             transpile the experimental circuits. Defaults to None.
+        classifier (ClassificationManager, optional): manager used for 
+            classifying raw data. Defaults to None.
         n_shots (int, optional): number of measurements per circuit. 
             Defaults to 1024.
         n_batches (int, optional): number of batches of measurements. 
@@ -114,7 +118,8 @@ def Amplitude(
                 gate:            str = 'X90',
                 subspace:        str = 'GE',
                 compiler:        Any | Compiler | None = None, 
-                transpiler:      Any | None = None, 
+                transpiler:      Any | None = None,
+                classifier:      ClassificationManager = None,
                 n_shots:         int = 1024, 
                 n_batches:       int = 1, 
                 n_circs_per_seq: int = 1, 
@@ -130,7 +135,8 @@ def Amplitude(
             qpu.__init__(self,
                 config, 
                 compiler, 
-                transpiler, 
+                transpiler,
+                classifier,
                 n_shots, 
                 n_batches, 
                 n_circs_per_seq, 
@@ -324,7 +330,8 @@ def Amplitude(
         gate,
         subspace,
         compiler, 
-        transpiler, 
+        transpiler,
+        classifier,
         n_shots, 
         n_batches, 
         n_circs_per_seq, 
@@ -345,6 +352,7 @@ def Frequency(
         subspace:        str = 'GE',
         compiler:        Any | Compiler | None = None, 
         transpiler:      Any | None = None,
+        classifier:      ClassificationManager = None,
         n_elements:      int = 30,
         n_shots:         int = 1024, 
         n_batches:       int = 1, 
@@ -379,6 +387,8 @@ def Frequency(
             compile the experimental circuits. Defaults to None.
         transpiler (Any | None, optional): custom transpiler to 
             transpile the experimental circuits. Defaults to None.
+        classifier (ClassificationManager, optional): manager used for 
+            classifying raw data. Defaults to None.
         n_elements (int, optional): number of delays starting from 0 to t_max.
             Defaults to 30.
         n_shots (int, optional): number of measurements per circuit. 
@@ -411,6 +421,7 @@ def Frequency(
                 subspace:        str = 'GE',
                 compiler:        Any | Compiler | None = None, 
                 transpiler:      Any | None = None,
+                classifier:      ClassificationManager = None,
                 n_elements:      int = 30,
                 n_shots:         int = 1024, 
                 n_batches:       int = 1, 
@@ -425,7 +436,8 @@ def Frequency(
             qpu.__init__(self,
                 config, 
                 compiler, 
-                transpiler, 
+                transpiler,
+                classifier,
                 n_shots, 
                 n_batches, 
                 n_circs_per_seq, 
@@ -711,6 +723,7 @@ def Frequency(
         subspace,
         compiler, 
         transpiler,
+        classifier,
         n_elements, 
         n_shots, 
         n_batches, 
@@ -728,7 +741,8 @@ def Phase(
         phases:          ArrayLike | NDArray | Dict[ArrayLike | NDArray],
         subspace:        str = 'GE',
         compiler:        Any | Compiler | None = None, 
-        transpiler:      Any | None = None, 
+        transpiler:      Any | None = None,
+        classifier:      ClassificationManager = None,
         n_shots:         int = 1024, 
         n_batches:       int = 1, 
         n_circs_per_seq: int = 1, 
@@ -767,6 +781,8 @@ def Phase(
             compile the experimental circuits. Defaults to None.
         transpiler (Any | None, optional): custom transpiler to 
             transpile the experimental circuits. Defaults to None.
+        classifier (ClassificationManager, optional): manager used for 
+            classifying raw data. Defaults to None.
         n_shots (int, optional): number of measurements per circuit. 
             Defaults to 1024.
         n_batches (int, optional): number of batches of measurements. 
@@ -795,7 +811,8 @@ def Phase(
                 phases:          ArrayLike | NDArray | Dict,
                 subspace:        str = 'GE',
                 compiler:        Any | Compiler | None = None, 
-                transpiler:      Any | None = None, 
+                transpiler:      Any | None = None,
+                classifier:      ClassificationManager = None,
                 n_shots:         int = 1024, 
                 n_batches:       int = 1, 
                 n_circs_per_seq: int = 1, 
@@ -808,7 +825,8 @@ def Phase(
             qpu.__init__(self,
                 config, 
                 compiler, 
-                transpiler, 
+                transpiler,
+                classifier,
                 n_shots, 
                 n_batches, 
                 n_circs_per_seq, 
@@ -1112,7 +1130,8 @@ def Phase(
         phases,
         subspace,
         compiler, 
-        transpiler, 
+        transpiler,
+        classifier,
         n_shots, 
         n_batches, 
         n_circs_per_seq, 

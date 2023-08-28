@@ -7,9 +7,10 @@ Basic example useage:
     qpu = QPU(config)
     qpu.run(circuit)
 """
-from qcal.compilation.compiler import Compiler#, DEFAULT_COMPILER
+from qcal.compilation.compiler import Compiler
 from qcal.config import Config
 from qcal.circuit import CircuitSet
+from qcal.managers.classification_manager import ClassificationManager
 from qcal.managers.data_manager import DataMananger
 
 import qcal.settings as settings
@@ -55,6 +56,7 @@ class QPU:
         '_sequence',
         '_measurements',
         '_runtime',
+        '_classifier',
         '_data_manager'
     )
 
@@ -63,10 +65,11 @@ class QPU:
             config:          Config,
             compiler:        Any | Compiler | None = None,
             transpiler:      Any | None = None,
+            classifier:      ClassificationManager = None,
             n_shots:         int = 1024,
             n_batches:       int = 1,
             n_circs_per_seq: int = 1,
-            n_levels:        int = 2
+            n_levels:        int = 2,
         ) -> None:
         """Initialize an instance of the Quantum Processing Unit.
 
@@ -76,6 +79,8 @@ class QPU:
                 compile the experimental circuits. Defaults to None.
             transpiler (Any | None, optional): a custom transpiler to 
                 transpile the experimental circuits. Defaults to None.
+            classifier (ClassificationManager, optional): manager used for
+                classifying raw data. Defaults to None.
             n_shots (int, optional): number of measurements per circuit. 
                 Defaults to 1024.
             n_batches (int, optional): number of batches of measurements. 
@@ -89,6 +94,7 @@ class QPU:
         self._config = config
         self._compiler = compiler
         self._transpiler = transpiler
+        self._classifier = classifier
         self._n_shots = n_shots
         self._n_batches = n_batches
         self._n_circs_per_seq = n_circs_per_seq
@@ -158,6 +164,15 @@ class QPU:
             Any: all transpiled circuits.
         """
         return self._transpiled_circuits
+    
+    @property
+    def classifier(self) -> ClassificationManager:
+        """Classification manager.
+
+        Returns:
+            ClassificationManager: current ClassificationManager instance.
+        """
+        return self._classifier
 
     @property
     def data_manager(self) -> DataMananger:

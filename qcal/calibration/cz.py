@@ -14,6 +14,7 @@ from qcal.fitting.fit import (
     # FitAbsoluteValue, FitDecayingCosine, 
     FitCosine, FitParabola
 )
+from qcal.managers.classification_manager import ClassificationManager
 from qcal.math.utils import wrap_phase
 from qcal.gate.single_qubit import Meas, VirtualZ, X90
 from qcal.gate.two_qubit import CZ
@@ -136,7 +137,8 @@ def Amplitude(
         qubit_pairs:     List[Tuple],
         amplitudes:      ArrayLike | NDArray | Dict[ArrayLike | NDArray],
         compiler:        Any | Compiler | None = None, 
-        transpiler:      Any | None = None, 
+        transpiler:      Any | None = None,
+        classifier:      ClassificationManager = None,
         n_shots:         int = 1024, 
         n_batches:       int = 1, 
         n_circs_per_seq: int = 1,
@@ -177,6 +179,8 @@ def Amplitude(
             compile the experimental circuits. Defaults to None.
         transpiler (Any | None, optional): custom transpiler to 
             transpile the experimental circuits. Defaults to None.
+        classifier (ClassificationManager, optional): manager used for 
+            classifying raw data. Defaults to None.
         n_shots (int, optional): number of measurements per circuit. 
             Defaults to 1024.
         n_batches (int, optional): number of batches of measurements. 
@@ -211,7 +215,8 @@ def Amplitude(
                 qubit_pairs:     List[Tuple],
                 amplitudes:      ArrayLike | Dict[ArrayLike],
                 compiler:        Any | Compiler | None = None, 
-                transpiler:      Any | None = None, 
+                transpiler:      Any | None = None,
+                classifier:      ClassificationManager = None,
                 n_shots:         int = 1024, 
                 n_batches:       int = 1, 
                 n_circs_per_seq: int = 1,
@@ -225,7 +230,8 @@ def Amplitude(
             qpu.__init__(self,
                 config, 
                 compiler, 
-                transpiler, 
+                transpiler,
+                classifier,
                 n_shots, 
                 n_batches, 
                 n_circs_per_seq, 
@@ -486,7 +492,8 @@ def Amplitude(
         qubit_pairs,
         amplitudes,
         compiler, 
-        transpiler, 
+        transpiler,
+        classifier,
         n_shots, 
         n_batches, 
         n_circs_per_seq,
@@ -504,7 +511,8 @@ def RelativeAmp(
         qubit_pairs:     List[Tuple],
         amplitudes:      ArrayLike | NDArray | Dict[ArrayLike | NDArray],
         compiler:        Any | Compiler | None = None, 
-        transpiler:      Any | None = None, 
+        transpiler:      Any | None = None,
+        classifier:      ClassificationManager = None,
         n_shots:         int = 1024, 
         n_batches:       int = 1, 
         n_circs_per_seq: int = 1,
@@ -545,6 +553,8 @@ def RelativeAmp(
             compile the experimental circuits. Defaults to None.
         transpiler (Any | None, optional): custom transpiler to 
             transpile the experimental circuits. Defaults to None.
+        classifier (ClassificationManager, optional): manager used for 
+            classifying raw data. Defaults to None.
         n_shots (int, optional): number of measurements per circuit. 
             Defaults to 1024.
         n_batches (int, optional): number of batches of measurements. 
@@ -575,7 +585,8 @@ def RelativeAmp(
                 qubit_pairs:     List[Tuple],
                 amplitudes:      ArrayLike | Dict[ArrayLike],
                 compiler:        Any | Compiler | None = None, 
-                transpiler:      Any | None = None, 
+                transpiler:      Any | None = None,
+                classifier:      ClassificationManager = None,
                 n_shots:         int = 1024, 
                 n_batches:       int = 1, 
                 n_circs_per_seq: int = 1,
@@ -588,7 +599,8 @@ def RelativeAmp(
             qpu.__init__(self,
                 config, 
                 compiler, 
-                transpiler, 
+                transpiler,
+                classifier,
                 n_shots, 
                 n_batches, 
                 n_circs_per_seq, 
@@ -768,7 +780,8 @@ def RelativeAmp(
         qubit_pairs,
         amplitudes,
         compiler, 
-        transpiler, 
+        transpiler,
+        classifier,
         n_shots, 
         n_batches, 
         n_circs_per_seq,
@@ -785,7 +798,8 @@ def RelativePhase(
         qubit_pairs:     List[Tuple],
         phases:          ArrayLike | NDArray | Dict[ArrayLike | NDArray],
         compiler:        Any | Compiler | None = None, 
-        transpiler:      Any | None = None, 
+        transpiler:      Any | None = None,
+        classifier:      ClassificationManager = None,
         n_shots:         int = 1024, 
         n_batches:       int = 1, 
         n_circs_per_seq: int = 1,
@@ -824,6 +838,8 @@ def RelativePhase(
             compile the experimental circuits. Defaults to None.
         transpiler (Any | None, optional): custom transpiler to 
             transpile the experimental circuits. Defaults to None.
+        classifier (ClassificationManager, optional): manager used for 
+            classifying raw data. Defaults to None.
         n_shots (int, optional): number of measurements per circuit. 
             Defaults to 1024.
         n_batches (int, optional): number of batches of measurements. 
@@ -854,7 +870,8 @@ def RelativePhase(
                 qubit_pairs:     List[Tuple],
                 phases:          ArrayLike | Dict[ArrayLike],
                 compiler:        Any | Compiler | None = None, 
-                transpiler:      Any | None = None, 
+                transpiler:      Any | None = None,
+                classifier:      ClassificationManager = None,
                 n_shots:         int = 1024, 
                 n_batches:       int = 1, 
                 n_circs_per_seq: int = 1,
@@ -867,7 +884,8 @@ def RelativePhase(
             qpu.__init__(self,
                 config, 
                 compiler, 
-                transpiler, 
+                transpiler,
+                classifier,
                 n_shots, 
                 n_batches, 
                 n_circs_per_seq, 
@@ -1038,7 +1056,8 @@ def RelativePhase(
         qubit_pairs,
         phases,
         compiler, 
-        transpiler, 
+        transpiler,
+        classifier,
         n_shots, 
         n_batches, 
         n_circs_per_seq,
@@ -1055,7 +1074,8 @@ def LocalPhases(
         qubit_pairs:     List[Tuple],
         phases:          NDArray | Dict = np.pi * np.linspace(-1, 1, 21),
         compiler:        Any | Compiler | None = None, 
-        transpiler:      Any | None = None, 
+        transpiler:      Any | None = None,
+        classifier:      ClassificationManager = None,
         n_shots:         int = 1024, 
         n_batches:       int = 1, 
         n_circs_per_seq: int = 1,
@@ -1092,6 +1112,8 @@ def LocalPhases(
             compile the experimental circuits. Defaults to None.
         transpiler (Any | None, optional): custom transpiler to 
             transpile the experimental circuits. Defaults to None.
+        classifier (ClassificationManager, optional): manager used for 
+            classifying raw data. Defaults to None.
         n_shots (int, optional): number of measurements per circuit. 
             Defaults to 1024.
         n_batches (int, optional): number of batches of measurements. 
@@ -1122,7 +1144,8 @@ def LocalPhases(
                 qubit_pairs:     List[Tuple],
                 phases:          NDArray | Dict = np.pi*np.linspace(-1, 1, 21),
                 compiler:        Any | Compiler | None = None, 
-                transpiler:      Any | None = None, 
+                transpiler:      Any | None = None,
+                classifier:      ClassificationManager = None,
                 n_shots:         int = 1024, 
                 n_batches:       int = 1, 
                 n_circs_per_seq: int = 1,
@@ -1135,7 +1158,8 @@ def LocalPhases(
             qpu.__init__(self,
                 config, 
                 compiler, 
-                transpiler, 
+                transpiler,
+                classifier,
                 n_shots, 
                 n_batches, 
                 n_circs_per_seq, 
@@ -1503,7 +1527,8 @@ def LocalPhases(
         qubit_pairs,
         phases,
         compiler, 
-        transpiler, 
+        transpiler,
+        classifier,
         n_shots, 
         n_batches, 
         n_circs_per_seq,

@@ -4,10 +4,14 @@
 """
 from __future__ import annotations
 
+from .utils import find_mapping
+
 import logging
 import numpy as np
 
+from numpy.typing import ArrayLike
 from sklearn.mixture import GaussianMixture
+from typing import Dict, List
 
 logger = logging.getLogger(__name__)
 
@@ -35,6 +39,77 @@ class GMM(GaussianMixture):
             covariance_type=covariance_type,
             **kwargs
         )
+        self._X = None
+        self._y = None
+        self._snr = {}
+
+    @property
+    def snr(self) -> Dict:
+        """Signal to noise ratio.
+
+        Returns:
+            Dict: SNR for each pair of states..
+        """
+        return self._snr
+
+    @property
+    def X(self) -> ArrayLike:
+        """Data used for fitting.
+
+        Returns:
+            ArrayLike: input data.
+        """
+        return self._X
+    
+    @property
+    def y(self) -> ArrayLike:
+        """Classification labels.
+
+        Returns:
+            ArrayLike: labels for data.
+        """
+        return self._y
+
+    def fit(self, X: ArrayLike, y: ArrayLike = None) -> None:
+        """Fit a Guassian Mixture Model to the input data.
+
+        Args:
+            X (ArrayLike): array-like of shape (n_samples, n_features). List of 
+                n_features-dimensional data points. Each row corresponds to a 
+                single data point.
+            y (ArrayLike): fit labels for each data point. Defaults to None.
+        """
+        super().fit(X)
+        self._X = X
+        self._y = y
+
+        if y is not None and not np.all(self.predict(X) == y):
+            mapping = find_mapping(self.predict(X), y)
+            permutation = np.zeros(self.n_components).astype(int)
+            for i, j in mapping.items():
+                permutation[j] = i
+            
+            self.relabel(permutation)
+
+        self.calculate_snr()
+
+    def relabel(self, permutation: List[int]) -> None:
+        """Relable the clusters.
+
+        Args:
+            permutation (List[int]): list of index labels specifying the new
+                order.
+        """
+        self.covariances_ = self.covariances_[permutation]
+        self.means_ = self.means_[permutation]
+        self.weights_ = self.weights_[permutation]
+
+    def calculate_snr(self) -> None:
+        """Calculate the signal-to-noise between each pair of clusters."""
+        for clusters in np.array(np.triu_indices(self.n_components, 1)).T:
+            dist = np.sqrt(np.sum(np.diff(self.means_[clusters], axis=1) ** 2))
+            err = np.sum(np.sqrt(self.covariances_[clusters]) * 2)
+            self._snr["{0}{1}".format(*clusters)] = dist / err
         
     def save(self, filepath: str) -> None:
         """Save the parameters of the GMM.

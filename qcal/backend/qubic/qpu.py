@@ -5,13 +5,14 @@
 from .post_process import post_process
 from .transpiler import Transpiler
 from qcal.config import Config
+from qcal.managers.classification_manager import ClassificationManager
 from qcal.qpu.qpu import QPU
 
 import logging
 import os
 # import sys
 
-from typing import Any, List
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -82,12 +83,14 @@ class QubicQPU(QPU):
     Args:
         QPU: main QPU class.
     """
+    from qubic.state_disc import GMMManager
 
     def __init__(
                 self,
                 config:              Config,
                 compiler:            Any | None = None,
                 transpiler:          Any | None = None,
+                classifier:          ClassificationManager = None,
                 n_shots:             int = 1024, 
                 n_batches:           int = 1, 
                 n_circs_per_seq:     int = 1,
@@ -99,7 +102,7 @@ class QubicQPU(QPU):
                 reload_freq:         bool = True,
                 reload_env:          bool = True,
                 zero_between_reload: bool = True,
-                gmm_manager               = None,
+                gmm_manager:         GMMManager = None,
                 rpc_ip_address:      str = '192.168.1.247'
         ) -> None:
         """Initialize a instance of a QPU for QubiC.
@@ -110,6 +113,8 @@ class QubicQPU(QPU):
                 compile the experimental circuits. Defaults to None.
             transpiler (Any | None, optional): a custom transpiler to 
                 transpile the experimental circuits. Defaults to None.
+            classifier (ClassificationManager, optional): manager used for 
+                classifying raw data. Defaults to None.
             n_shots (int, optional): number of measurements per circuit. 
                 Defaults to 1024.
             n_batches (int, optional): number of batches of measurements. 
@@ -157,7 +162,8 @@ class QubicQPU(QPU):
         QPU.__init__(self,
             config=config,
             compiler=compiler,
-            transpiler=transpiler, 
+            transpiler=transpiler,
+            classifier=classifier,
             n_shots=n_shots, 
             n_batches=n_batches,
             n_circs_per_seq=n_circs_per_seq,
@@ -295,14 +301,18 @@ class QubicQPU(QPU):
 
     def process(self) -> None:
         """Process the measurement data."""
-        post_process(self._config, self._measurements, self._circuits)
+        post_process(
+            self._config, self._measurements, self._classifier, self._circuits
+        )
 
         if len(self._compiled_circuits) > 1:
             post_process(
-                self._config, self._measurements, self._compiled_circuits
+                self._config, self._measurements, self._classifier, 
+                self._compiled_circuits
             )
 
         if len(self._transpiled_circuits) > 1:
             post_process(
-                self._config, self._measurements, self._transpiled_circuits
+                self._config, self._measurements, self._classifier, 
+                self._transpiled_circuits
             )
