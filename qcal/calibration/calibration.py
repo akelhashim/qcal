@@ -145,26 +145,30 @@ class Calibration:
 
     def final(self) -> None:
         """Save and load the config after changing parameters."""
-        for q in self._qubits:
-            if isinstance(self._fit[q], (list, tuple)):
-                for i, fit in enumerate(self._fit[q]):
-                    if fit.fit_success:
-                        self.set_param(
-                            self._params[q][i], self._cal_values[q][i]
-                        )
-            else:            
-                if self._fit[q].fit_success:
-                    if (isinstance(self._params[q], (list, tuple)) and
-                        isinstance(self._cal_values[q], (list, tuple))):
-                        for param, val in zip(
-                            self._params[q],self._cal_values[q]):
-                            self.set_param(param, val)
-                    elif (isinstance(self._params[q], (list, tuple)) and not
-                        isinstance(self._cal_values[q], (list, tuple))):
-                        for param in self._params[q]:
-                            self.set_param(param, self._cal_values[q])
-                    else:
-                        self.set_param(self._params[q], self._cal_values[q])
+        if self._fit:
+            for q in self._qubits:
+                if isinstance(self._fit[q], (list, tuple)):
+                    for i, fit in enumerate(self._fit[q]):
+                        if fit.fit_success:
+                            self.set_param(
+                                self._params[q][i], self._cal_values[q][i]
+                            )
+                else:            
+                    if self._fit[q].fit_success:
+                        if (isinstance(self._params[q], (list, tuple)) and
+                            isinstance(self._cal_values[q], (list, tuple))):
+                            for param, val in zip(
+                                self._params[q],self._cal_values[q]):
+                                self.set_param(param, val)
+                        elif (
+                            isinstance(self._params[q], (list, tuple)) and not
+                            isinstance(self._cal_values[q], (list, tuple))):
+                            for param in self._params[q]:
+                                self.set_param(param, self._cal_values[q])
+                        else:
+                            self.set_param(
+                                self._params[q], self._cal_values[q]
+                            )
 
         if self._disable_esp:
             self.set_param('readout/esp/enable', False)

@@ -4,6 +4,7 @@
 import qcal.settings as settings
 
 from qcal.config import Config
+from qcal.managers.classification_manager import ClassificationManager
 from qcal.qpu.qpu import QPU
 from qcal.plotting.utils import calculate_nrows_ncols
 
@@ -24,6 +25,7 @@ def SRB(qpu:             QPU,
         tq_config:       str | Any = None,
         compiler:        Any | None = None, 
         transpiler:      Any | None = None,
+        classifier:      ClassificationManager = None,
         n_circuits:      int = 30,
         n_shots:         int = 1024, 
         n_batches:       int = 1, 
@@ -53,6 +55,8 @@ def SRB(qpu:             QPU,
             the True-Q circuits. Defaults to None.
         transpiler (Any | None, optional): custom transpiler to transpile
             the True-Q circuits to experimental circuits. Defaults to None.
+        classifier (ClassificationManager, optional): manager used for 
+            classifying raw data. Defaults to None.
         n_circuits (int, optional): the number of circuits for each circuit 
             depth. Defaults to 30.
         n_shots (int, optional): number of measurements per circuit. 
@@ -88,6 +92,7 @@ def SRB(qpu:             QPU,
                 tq_config:       str | tq.Config = None,
                 compiler:        Any | None = None, 
                 transpiler:      Any | None = None,
+                classifier:      ClassificationManager = None,
                 n_circuits:      int = 30,
                 n_shots:         int = 1024,
                 n_batches:       int = 1, 
@@ -112,13 +117,14 @@ def SRB(qpu:             QPU,
                 transpiler = Transpiler()
                 
             qpu.__init__(self,
-                config, 
-                compiler, 
-                transpiler, 
-                n_shots, 
-                n_batches, 
-                n_circs_per_seq, 
-                n_levels,
+                config=config, 
+                compiler=compiler, 
+                transpiler=transpiler,
+                classifier=classifier,
+                n_shots=n_shots, 
+                n_batches=n_batches, 
+                n_circs_per_seq=n_circs_per_seq, 
+                n_levels=n_levels,
                 **kwargs
             )
 
@@ -219,10 +225,10 @@ def SRB(qpu:             QPU,
                 f'_SRB_Q{"".join(str(q) for q in self._circuits.labels)}'
             )
             if settings.Settings.save_data:
-                self.save()
+                self.save() 
             self.analyze()
-            self.plot()
             print(f"\nRuntime: {repr(self._runtime)[8:]}\n")
+            self.plot()
 
 
     return SRB(
@@ -233,6 +239,7 @@ def SRB(qpu:             QPU,
         tq_config,
         compiler,
         transpiler,
+        classifier,
         n_circuits,
         n_shots,
         n_batches,

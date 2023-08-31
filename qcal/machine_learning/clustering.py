@@ -42,7 +42,17 @@ class GMM(GaussianMixture):
         self._X = None
         self._y = None
         self._snr = {}
+        self._is_fitted = False
 
+    @property
+    def is_fitted(self) -> bool:
+        """Whether or not the model has been fitted.
+
+        Returns:
+            bool: fitted or not.
+        """
+        return self._is_fitted
+    
     @property
     def snr(self) -> Dict:
         """Signal to noise ratio.
@@ -83,14 +93,15 @@ class GMM(GaussianMixture):
         self._X = X
         self._y = y
 
-        if y is not None and not np.all(self.predict(X) == y):
-            mapping = find_mapping(self.predict(X), y)
-            permutation = np.zeros(self.n_components).astype(int)
-            for i, j in mapping.items():
-                permutation[j] = i
+        # if y is not None and not np.all(self.predict(X) == y):
+        #     mapping = find_mapping(self.predict(X), y)
+        #     permutation = np.zeros(self.n_components).astype(int)
+        #     for i, j in mapping.items():
+        #         permutation[j] = i
             
-            self.relabel(permutation)
+        #     self.relabel(permutation)
 
+        self._is_fitted = True
         self.calculate_snr()
 
     def relabel(self, permutation: List[int]) -> None:
@@ -103,6 +114,8 @@ class GMM(GaussianMixture):
         self.covariances_ = self.covariances_[permutation]
         self.means_ = self.means_[permutation]
         self.weights_ = self.weights_[permutation]
+        self.precisions_ = self.precisions_[permutation]
+        self.precisions_cholesky_ = self.precisions_cholesky_[permutation]
 
     def calculate_snr(self) -> None:
         """Calculate the signal-to-noise between each pair of clusters."""

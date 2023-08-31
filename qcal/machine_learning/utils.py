@@ -24,6 +24,7 @@ def find_mapping(array1: ArrayLike, array2: ArrayLike) -> Dict:
     mapping = {}  # Initialize an empty dictionary to store the mapping
 
     for num1, num2 in zip(array1, array2):
-        mapping[num1] = num2
+        if num1 != num2:
+            mapping[num1] = num2
 
     return mapping

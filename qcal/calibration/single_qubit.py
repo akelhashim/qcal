@@ -591,7 +591,9 @@ def Frequency(
                         self._fit_detunings[q].append(detuning)
                 
             for q in self._qubits:
-                self._circuits[f'Q{q}: Prob{level[self._subspace]}'] = probs[q]
+                self._circuits[f'Q{q}: Prob({level[self._subspace]})'] = (
+                    probs[q]
+                )
             
             # Fit the characterized frequencies to an absolute value curve
             for i, q in enumerate(self._qubits):
@@ -610,7 +612,7 @@ def Frequency(
                             f'Fit failed for qubit {q} (negative curvature)!'
                         )
                         self._fit[q]._fit_success = False
-                    elif not in_range(newval, self._detunings[q]):
+                    if not in_range(newval, self._detunings):
                         logger.warning(
                             f'Fit failed for qubit {q} (out of range)!'
                         )

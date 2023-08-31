@@ -4,7 +4,6 @@
 import qcal.settings as settings
 
 from .calibration import Calibration
-from .utils import find_pulse_index, in_range
 from qcal.circuit import Barrier, Cycle, Circuit, CircuitSet
 from qcal.compilation.compiler import Compiler
 from qcal.config import Config
@@ -14,6 +13,7 @@ from qcal.managers.classification_manager import ClassificationManager
 from qcal.gate.single_qubit import Id, X, X90
 from qcal.plotting.utils import calculate_nrows_ncols
 from qcal.qpu.qpu import QPU
+from qcal.utils import save_to_pickle
 
 import inspect
 import logging
@@ -40,7 +40,7 @@ def ReadoutCalibration(
         qubits:          List | Tuple,
         method:          str = 'pi_pulse',
         gate:            str = 'X90',
-        classifier:      str = 'gmm',
+        model:           str = 'gmm',
         compiler:        Any | Compiler | None = None, 
         transpiler:      Any | None = None, 
         n_shots:         int = 1024, 
@@ -53,44 +53,41 @@ def ReadoutCalibration(
     ) -> Callable:
     """Readout calibration
 
-    # Basic example useage for initial calibration:
+    Basic example useage for initial calibration:
         
-        # ```
-    #     amps = np.linspace(0, 1.0, 21)
-    #     cal = Amplitude(
-    #         CustomQPU, 
-    #         config, 
-    #         qubits=[0, 1, 2],
-    #         amps=amps)
-    #     cal.run()
-        # ```
+        ```
+        cal = ReadoutCalibration(
+            CustomQPU, 
+            config, 
+            qubits=[0, 1, 2])
+        cal.run()
+        ```
 
-    # Args:
-    #     qpu (QPU): custom QPU object.
-    #     config (Config): qcal Config object.
-    #     qubits (List | Tuple): qubits to calibrate.
-        # method (str, optional): calibration method. Must be one of ('pi_pulse',
-        #     'rabi').
-    #     gate (str, optional): native gate to calibrate. Defaults 
-    #         to 'X90'.
-    #     subspace (str, optional): qubit subspace for the defined gate.
-    #         Defaults to 'GE'.
-    #     compiler (Any | Compiler | None, optional): custom compiler to
-    #         compile the experimental circuits. Defaults to None.
-    #     transpiler (Any | None, optional): custom transpiler to 
-    #         transpile the experimental circuits. Defaults to None.
-    #     n_shots (int, optional): number of measurements per circuit. 
-    #         Defaults to 1024.
-    #     n_batches (int, optional): number of batches of measurements. 
-    #         Defaults to 1.
-    #     n_circs_per_seq (int, optional): maximum number of circuits that
-    #         can be measured per sequence. Defaults to 1.
-        #  n_levels (int, optional): number of energy levels to classify. 
-        #     Defaults to 2.
-    #     esp (bool, optional): whether to enable excited state promotion for 
-    #         the calibration. Defaults to False.
-    #     heralding (bool, optional): whether to enable heralding for the 
-    #         calibraion. Defaults to False.
+    Args:
+        qpu (QPU): custom QPU object.
+        config (Config): qcal Config object.
+        qubits (List | Tuple): qubits to calibrate.
+        method (str, optional): calibration method. Must be one of ('pi_pulse',
+            'rabi').
+        gate (str, optional): native gate to calibrate. Defaults 
+            to 'X90'.
+        model (str, optional): classification algorithm. Defaults to 'gmm'.
+        compiler (Any | Compiler | None, optional): custom compiler to
+            compile the experimental circuits. Defaults to None.
+        transpiler (Any | None, optional): custom transpiler to 
+            transpile the experimental circuits. Defaults to None.
+        n_shots (int, optional): number of measurements per circuit. 
+            Defaults to 1024.
+        n_batches (int, optional): number of batches of measurements. 
+            Defaults to 1.
+        n_circs_per_seq (int, optional): maximum number of circuits that
+            can be measured per sequence. Defaults to 1.
+        n_levels (int, optional): number of energy levels to classify. 
+            Defaults to 2.
+        esp (bool, optional): whether to enable excited state promotion for 
+            the calibration. Defaults to False.
+        heralding (bool, optional): whether to enable heralding for the 
+            calibraion. Defaults to False.
 
     Returns:
         Callable: ReadoutCalibration class.
@@ -107,7 +104,7 @@ def ReadoutCalibration(
                 qubits:          List | Tuple,
                 method:          str = 'pi_pulse',
                 gate:            str = 'X90',
-                classifier:      str = 'gmm',
+                model:           str = 'gmm',
                 compiler:        Any | Compiler | None = None, 
                 transpiler:      Any | None = None, 
                 n_shots:         int = 1024, 
@@ -125,7 +122,7 @@ def ReadoutCalibration(
                 k: kwargs.pop(k) for k in dict(kwargs) if k in qpu_args
             }
             cm_args = list(
-                inspect.signature(_classifiers[classifier]).parameters
+                inspect.signature(_classifiers[model]).parameters
             )
             cm_kwargs = {
                 k: kwargs.pop(k) for k in dict(kwargs) if k in cm_args
@@ -136,13 +133,14 @@ def ReadoutCalibration(
             )
             
             qpu.__init__(self,
-                config, 
-                compiler, 
-                transpiler, 
-                n_shots, 
-                n_batches, 
-                n_circs_per_seq, 
-                n_levels,
+                config=config, 
+                compiler=compiler, 
+                transpiler=transpiler,
+                classifier=None,
+                n_shots=n_shots, 
+                n_batches=n_batches, 
+                n_circs_per_seq=n_circs_per_seq, 
+                n_levels=n_levels,
                 **qpu_kwargs
             )
             Calibration.__init__(self, 
@@ -163,7 +161,7 @@ def ReadoutCalibration(
             self._gate = gate
 
             self._classifier = ClassificationManager(
-                qubits=qubits, n_levels=n_levels, classifier=classifier,
+                qubits=qubits, n_levels=n_levels, model=model,
                 **cm_kwargs 
             )
 
@@ -231,27 +229,31 @@ def ReadoutCalibration(
                 iq_0 = self._circuits[f'Q{q}: iq_data'][0]
                 iq_1 = self._circuits[f'Q{q}: iq_data'][1]
 
-                X = np.vstack([
-                        np.hstack([np.real(iq_0), np.imag(iq_0)]),
-                        np.hstack([np.real(iq_1), np.imag(iq_1)]),
+                xy_0 = np.hstack([np.real(iq_0), np.imag(iq_0)])
+                xy_1 = np.hstack([np.real(iq_1), np.imag(iq_1)])
+                means_init = np.vstack([
+                    np.mean(xy_0, axis=0), np.mean(xy_1, axis=0)
                 ])
+                X = np.vstack([xy_0, xy_1])
                 y = [0] * self._n_shots + [1] * self._n_shots
 
                 if self._n_levels == 3:
                     iq_2 = self._circuits[f'Q{q}: iq_data'][2]
-                    X = np.vstack([
-                        X,
-                        np.hstack([np.real(iq_2), np.imag(iq_2)]),
+                    xy_2 = np.hstack([np.real(iq_2), np.imag(iq_2)]),
+                    means_init = np.vstack([
+                        means_init, np.mean(xy_2, axis=0)
                     ])
+                    X = np.vstack([X, xy_2])
                     y += [2] * self._n_shots
                 
                 y = np.array(y)
+                self._classifier[q].means_init = means_init
                 self._classifier.fit(q, X, y)
 
         def save(self) -> None:
             """Save all circuits and data."""
             qpu.save(self)
-            self._data_manager.save_to_pickle(
+            save_to_pickle(
                 self._classifier, 
                 os.path.join(
                     os.path.dirname(self._config.filename), 
@@ -289,16 +291,27 @@ def ReadoutCalibration(
                         )
                         ax.grid(False)
 
+                        # Plot the raw data
+                        sc = ax.scatter(
+                            self._classifier[q].X[:, 0], 
+                            self._classifier[q].X[:, 1], 
+                            c=self._classifier[q].y,
+                            # c=self._classifier[q].predict(
+                            #     self._classifier[q]
+                            # ), 
+                            cmap='viridis', alpha=0.15
+                        )
+
                         # Create a mesh plot
-                        h = 0.01
                         x_min, x_max = (
-                            self._classifier[q].X[:, 0].min() - 1, 
-                            self._classifier[q].X[:, 0].max() + 1
+                            self._classifier[q].X[:, 0].min() - 10, 
+                            self._classifier[q].X[:, 0].max() + 10
                         )
                         y_min, y_max =(
-                            self._classifier[q].X[:, 1].min() - 1, 
-                            self._classifier[q].X[:, 1].max() + 1
+                            self._classifier[q].X[:, 1].min() - 10, 
+                            self._classifier[q].X[:, 1].max() + 10
                         )
+                        h = int(min([abs(x_min), abs(y_min)]) * 0.025)
                         xx, yy = np.meshgrid(
                             np.arange(x_min, x_max, h), 
                             np.arange(y_min, y_max, h)
@@ -312,15 +325,8 @@ def ReadoutCalibration(
                         Z = Z.reshape(xx.shape)
                         ax.contourf(xx, yy, Z, cmap='viridis', alpha=0.1)
                             
-                        # Plot the raw data
-                        sc = ax.scatter(
-                            self._classifier[q].X[:, 0], 
-                            self._classifier[q].X[:, 1], 
-                            c=self._classifier[q].predict(
-                                self._classifier[q].X
-                            ), 
-                            cmap='viridis', alpha=0.15
-                        )
+                        ax.set_xlim([x_min, x_max])
+                        ax.set_ylim([y_min, y_max])
 
                         ax.legend(
                             handles=sc.legend_elements()[0], 
@@ -351,15 +357,16 @@ def ReadoutCalibration(
             )
             if settings.Settings.save_data:
                 self.save()
+            print(f"\nRuntime: {repr(self._runtime)[8:]}\n")
             self.plot()
             self.final()
-            print(f"\nRuntime: {repr(self._runtime)[8:]}\n")
 
     return ReadoutCalibration(
         config,
         qubits,
         method,
         gate,
+        model,
         compiler, 
         transpiler, 
         n_shots, 

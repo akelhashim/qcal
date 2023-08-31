@@ -57,8 +57,10 @@ def post_process(
     outputs = list(measurements[0].keys())
 
     chanmap = {}
+    chanmap_r = {}
     for q, ch in config.readout.loc['channel'].items():
         chanmap[str(int(ch))] = f'Q{q}'
+        chanmap_r[f'Q{q}'] = str(int(ch))
 
     meas_qubits = set()
     for meas in measurements:
@@ -70,11 +72,11 @@ def post_process(
     meas_qubits = sorted(meas_qubits)
 
     if 's11' in outputs:
-        # {'Q0': np.array()} of shape (n circuits, n shots, n reads)}
+        # {'Q0': np.array([[...],...,[..]])} of shape (n circuits, n shots, n reads)}
         raw_iq = { 
-            chanmap[ch]: np.vstack([
-                meas['s11'][ch] for meas in measurements
-            ]) for ch in chanmap.keys()
+            q: np.vstack([
+                meas['s11'][chanmap_r[q]] for meas in measurements
+            ]) for q in meas_qubits
         }
 
         if isinstance(circuits, CircuitSet):
@@ -87,18 +89,22 @@ def post_process(
     if ('s11' in outputs) and (classifier is not None):
         measurement = {}
         for q, meas in raw_iq.items():
+            if classifier[int(q[1:])].is_fitted:
 
-            circ_results = []
-            for circ in meas:
+                circ_results = []
+                for circ in meas:
 
-                circ_reads = []
-                for r in range(circ.shape[-1]):  # n reads
-                    X = np.hstack([np.real(circ[:, r]), np.imag(circ[:, r])])
-                    y = classifier[int(q[1:])].predict(X).reshape(-1, 1)
-                    circ_reads.append(y)
-                circ_results.append(np.hstack(circ_reads))
-            
-            measurement[q] = np.vstack(circ_results)
+                    circ_reads = []
+                    for r in range(circ.shape[-1]):  # n reads
+                        X = np.hstack([
+                            np.real(circ[:, r]).reshape(-1, 1), 
+                            np.imag(circ[:, r]).reshape(-1, 1)
+                        ])
+                        y = classifier[int(q[1:])].predict(X).reshape(-1, 1)
+                        circ_reads.append(y)
+                    circ_results.append(np.hstack(circ_reads))
+                
+                measurement[q] = np.array(circ_results)
     
     elif 'shots' in outputs:
         measurement = {
@@ -107,8 +113,7 @@ def post_process(
             ]) for q in meas_qubits
         }
 
-    if ('s11' in outputs and classifier is not None) or ('shots' in outputs):
-
+    if measurement:
         all_results = []
         for i, circuit in enumerate(circuits):
             # This assumes that the measurement results are at the very end

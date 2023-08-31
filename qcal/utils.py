@@ -42,7 +42,7 @@ def load_from_pickle(filename: str) -> Any:
     Returns:
         Any: loaded data.
     """
-    with open(f'{filename}.pkl', 'rb') as handle:
+    with open(f'{filename}', 'rb') as handle:
         data = pickle.load(handle)
     return data
 

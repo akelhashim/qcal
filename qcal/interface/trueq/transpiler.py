@@ -43,8 +43,8 @@ def to_qcal(
         
         for q, gate in cycle:
             if isinstance(gate, tq.Meas):
-                # tcycle.append(gate_mapper['Meas'](q))
-                pass
+                tcycle.append(gate_mapper['Meas'](q))
+                # pass
             elif gate.name == 'Rz':
                 tcycle.append(
                     gate_mapper[gate.name](
@@ -62,7 +62,7 @@ def to_qcal(
             tcircuit.append(Barrier(cycle.labels))
     
     tcircuit = Circuit(tcircuit)
-    tcircuit.measure()
+    # tcircuit.measure()
 
     cs.circuit[element] = tcircuit
 
