@@ -1,8 +1,8 @@
 single_qubit:
   0:
     GE:
-      freq: 4460889789.062685
-      T1: 0.00012
+      freq: 4460822789.062685
+      T1: 0.00013
       T2*: 2.1e-05
       T2e: 6.6e-05
       X90:
@@ -11,13 +11,13 @@ single_qubit:
           env: virtualz
           length: 0.0
           kwargs:
-            phase: 0.007466
+            phase: 0.010477
         - channel: Q0.qdrv
           env: DRAG
           length: 3.0e-08
           kwargs:
             alpha: 0.0
-            amp: 0.163439
+            amp: 0.161645
             anh: -270000000.0
             df: 0.0
             phase: 0.0
@@ -25,7 +25,7 @@ single_qubit:
           env: virtualz
           length: 0.0
           kwargs:
-            phase: 0.007466
+            phase: 0.010477
       X:
         pulse:
         - channel: Q0.qdrv
@@ -60,8 +60,8 @@ single_qubit:
             ramp_fraction: 0.25
   1:
     GE:
-      freq: 4672931401.204112
-      T1: 0.00017
+      freq: 4672891401.204112
+      T1: 0.000125
       T2*: 2.1e-05
       T2e: 3.9e-05
       X90:
@@ -70,13 +70,13 @@ single_qubit:
           env: virtualz
           length: 0.0
           kwargs:
-            phase: 0.096519
+            phase: 0.106424
         - channel: Q1.qdrv
           env: DRAG
           length: 3.0e-08
           kwargs:
             alpha: 1.0
-            amp: 0.697061
+            amp: 0.68794
             anh: -270000000.0
             df: 0.0
             phase: 0.0
@@ -84,7 +84,7 @@ single_qubit:
           env: virtualz
           length: 0.0
           kwargs:
-            phase: 0.096519
+            phase: 0.106424
       X:
         pulse:
         - channel: Q1.qdrv
@@ -119,8 +119,8 @@ single_qubit:
             ramp_fraction: 0.25
   2:
     GE:
-      freq: 4946524765.306334
-      T1: 0.00013
+      freq: 4946524965.306334
+      T1: 8.9e-05
       T2*: 1.9e-05
       T2e: 1.9e-05
       X90:
@@ -129,13 +129,13 @@ single_qubit:
           env: virtualz
           length: 0.0
           kwargs:
-            phase: 0.006016
+            phase: 0.023501
         - channel: Q2.qdrv
           env: DRAG
           length: 3.0e-08
           kwargs:
             alpha: 0.0
-            amp: 0.472485
+            amp: 0.499138
             anh: -270000000.0
             df: 0.0
             phase: 0.0
@@ -143,7 +143,7 @@ single_qubit:
           env: virtualz
           length: 0.0
           kwargs:
-            phase: 0.006016
+            phase: 0.023501
       X:
         pulse:
         - channel: Q2.qdrv
@@ -178,8 +178,8 @@ single_qubit:
             ramp_fraction: 0.25
   3:
     GE:
-      freq: 5110918752.907667
-      T1: 0.00014
+      freq: 5101757552.907667
+      T1: 7.2e-05
       T2*: 1.0e-05
       T2e: 1.0e-05
       X90:
@@ -194,7 +194,7 @@ single_qubit:
           length: 3.0e-08
           kwargs:
             alpha: 0.0
-            amp: 0.203512
+            amp: 0.207114
             anh: -270000000.0
             df: 0.0
             phase: 0.0
@@ -237,7 +237,7 @@ single_qubit:
             ramp_fraction: 0.25
   4:
     GE:
-      freq: 5349096970.067185
+      freq: 5347016970.067185
       T1: 5.0e-05
       T2*: 9.0e-06
       T2e: 7.0e-06
@@ -355,7 +355,7 @@ single_qubit:
             ramp_fraction: 0.25
   6:
     GE:
-      freq: 5878566778.000434
+      freq: 5875406778.000434
       T1: null
       T2*: null
       T2e: null
@@ -488,7 +488,7 @@ two_qubit:
         length: 4.0e-07
         kwargs:
           amp: 0.715672
-          phase: -2.817928
+          phase: -2.846705
           ramp_fraction: 0.25
       - channel: Q0.qdrv
         env: virtualz
@@ -718,13 +718,13 @@ readout:
     freq: 6700134795.120309
     phase: 2.0
   4:
-    channel: 6
+    channel: 5
     amp: 0.05
     freq: 6711440184.690463
     phase: 3.624878768638384
   5:
     channel: 6
-    amp: 0.06
+    amp: 0.045
     freq: 6709360370.806432
     phase: 6.275011358862511
   6:
@@ -750,7 +750,7 @@ readout:
     - 7
   delay: 6.0e-07
   herald: true
-  length: 2.0e-06
+  length: 4.0e-06
   reset: 1.0e-05
   sample_rate: 500000000.0
   env: cosine_square
