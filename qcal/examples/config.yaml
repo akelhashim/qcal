@@ -1,7 +1,7 @@
 single_qubit:
   0:
     GE:
-      freq: 4460822789.062685
+      freq: 4460800789.062685
       T1: 0.00013
       T2*: 2.1e-05
       T2e: 6.6e-05
@@ -11,13 +11,13 @@ single_qubit:
           env: virtualz
           length: 0.0
           kwargs:
-            phase: 0.010477
+            phase: 0.002725
         - channel: Q0.qdrv
           env: DRAG
           length: 3.0e-08
           kwargs:
             alpha: 0.0
-            amp: 0.161645
+            amp: 0.162897
             anh: -270000000.0
             df: 0.0
             phase: 0.0
@@ -25,7 +25,7 @@ single_qubit:
           env: virtualz
           length: 0.0
           kwargs:
-            phase: 0.010477
+            phase: 0.002725
       X:
         pulse:
         - channel: Q0.qdrv
@@ -60,7 +60,7 @@ single_qubit:
             ramp_fraction: 0.25
   1:
     GE:
-      freq: 4672891401.204112
+      freq: 4672885601.204112
       T1: 0.000125
       T2*: 2.1e-05
       T2e: 3.9e-05
@@ -70,13 +70,13 @@ single_qubit:
           env: virtualz
           length: 0.0
           kwargs:
-            phase: 0.106424
+            phase: 0.100152
         - channel: Q1.qdrv
           env: DRAG
           length: 3.0e-08
           kwargs:
             alpha: 1.0
-            amp: 0.68794
+            amp: 0.687145
             anh: -270000000.0
             df: 0.0
             phase: 0.0
@@ -84,7 +84,7 @@ single_qubit:
           env: virtualz
           length: 0.0
           kwargs:
-            phase: 0.106424
+            phase: 0.100152
       X:
         pulse:
         - channel: Q1.qdrv
@@ -119,10 +119,10 @@ single_qubit:
             ramp_fraction: 0.25
   2:
     GE:
-      freq: 4946524965.306334
+      freq: 4946522965.306334
       T1: 8.9e-05
-      T2*: 1.9e-05
-      T2e: 1.9e-05
+      T2*: 1.3e-05
+      T2e: 2.0e-05
       X90:
         pulse:
         - channel: Q2.qdrv
@@ -474,29 +474,31 @@ single_qubit:
 two_qubit:
   (0, 1):
     CZ:
-      freq: 4340000000.0
+      freq: 4360000000.0
       pulse:
       - channel: Q0.qdrv
         env: cosine_square
         length: 4.0e-07
         kwargs:
-          amp: 0.882434
+          amp: 0.560466
           phase: 0.0
           ramp_fraction: 0.25
       - channel: Q1.qdrv
         env: cosine_square
         length: 4.0e-07
         kwargs:
-          amp: 0.715672
-          phase: -2.846705
+          amp: 0.560466
+          phase: -2.575912
           ramp_fraction: 0.25
       - channel: Q0.qdrv
         env: virtualz
+        freq: single_qubit/0/GE/freq
         length: 0.0
         kwargs:
           phase: 0.0
       - channel: Q1.qdrv
         env: virtualz
+        freq: single_qubit/1/GE/freq
         length: 0.0
         kwargs:
           phase: 0.0
@@ -508,26 +510,28 @@ two_qubit:
         env: cosine_square
         length: 4.0e-07
         kwargs:
-          amp: 0.826071
+          amp: 0.815316
           phase: 0.0
           ramp_fraction: 0.25
       - channel: Q2.qdrv
         env: cosine_square
         length: 4.0e-07
         kwargs:
-          amp: 0.826071
-          phase: 0.094104
+          amp: 0.815316
+          phase: 0.264428
           ramp_fraction: 0.25
       - channel: Q1.qdrv
         env: virtualz
+        freq: single_qubit/1/GE/freq
         length: 0.0
         kwargs:
-          phase: 0.0
+          phase: 0.493715
       - channel: Q2.qdrv
         env: virtualz
+        freq: single_qubit/2/GE/freq
         length: 0.0
         kwargs:
-          phase: 0.0
+          phase: 0.703107
   (2, 3):
     CZ:
       freq: 4900000000.0
@@ -536,26 +540,28 @@ two_qubit:
         env: cosine_square
         length: 4.0e-07
         kwargs:
-          amp: 0.288
+          amp: 0.362702
           phase: 0.0
           ramp_fraction: 0.25
       - channel: Q3.qdrv
         env: cosine_square
         length: 4.0e-07
         kwargs:
-          amp: 0.288
-          phase: 0.0
+          amp: 0.397065
+          phase: 0.808814
           ramp_fraction: 0.25
       - channel: Q2.qdrv
         env: virtualz
+        freq: single_qubit/2/GE/freq
         length: 0.0
         kwargs:
-          phase: 0.0
+          phase: -1.669634
       - channel: Q3.qdrv
         env: virtualz
+        freq: single_qubit/3/GE/freq
         length: 0.0
         kwargs:
-          phase: 0.0
+          phase: -1.984034
   (3, 4):
     CZ:
       freq: 5030000000.0
@@ -576,11 +582,13 @@ two_qubit:
           ramp_fraction: 0.25
       - channel: Q3.qdrv
         env: virtualz
+        freq: single_qubit/3/GE/freq
         length: 0.0
         kwargs:
           phase: 0.0
       - channel: Q4.qdrv
         env: virtualz
+        freq: single_qubit/4/GE/freq
         length: 0.0
         kwargs:
           phase: 0.0
@@ -604,11 +612,13 @@ two_qubit:
           ramp_fraction: 0.25
       - channel: Q4.qdrv
         env: virtualz
+        freq: single_qubit/4/GE/freq
         length: 0.0
         kwargs:
           phase: 0.0
       - channel: Q5.qdrv
         env: virtualz
+        freq: single_qubit/5/GE/freq
         length: 0.0
         kwargs:
           phase: 0.0
@@ -632,11 +642,13 @@ two_qubit:
           ramp_fraction: 0.25
       - channel: Q5.qdrv
         env: virtualz
+        freq: single_qubit/5/GE/freq
         length: 0.0
         kwargs:
           phase: 0.0
       - channel: Q6.qdrv
         env: virtualz
+        freq: single_qubit/6/GE/freq
         length: 0.0
         kwargs:
           phase: 0.0
@@ -660,11 +672,13 @@ two_qubit:
           ramp_fraction: 0.25
       - channel: Q6.qdrv
         env: virtualz
+        freq: single_qubit/6/GE/freq
         length: 0.0
         kwargs:
           phase: 0.0
       - channel: Q7.qdrv
         env: virtualz
+        freq: single_qubit/7/GE/freq
         length: 0.0
         kwargs:
           phase: 0.0
@@ -688,11 +702,13 @@ two_qubit:
           ramp_fraction: 0.25
       - channel: Q7.qdrv
         env: virtualz
+        freq: single_qubit/7/GE/freq
         length: 0.0
         kwargs:
           phase: 0.0
       - channel: Q0.qdrv
         env: virtualz
+        freq: single_qubit/0/GE/freq
         length: 0.0
         kwargs:
           phase: 0.0

@@ -133,14 +133,14 @@ def Amplitude(
             """
             n_levels = 3 if subspace == 'EF' else 2
             qpu.__init__(self,
-                config, 
-                compiler, 
-                transpiler,
-                classifier,
-                n_shots, 
-                n_batches, 
-                n_circs_per_seq, 
-                n_levels,
+                config=config, 
+                compiler=compiler, 
+                transpiler=transpiler,
+                classifier=classifier,
+                n_shots=n_shots, 
+                n_batches=n_batches, 
+                n_circs_per_seq=n_circs_per_seq, 
+                n_levels=n_levels,
                 **kwargs
             )
             Calibration.__init__(self, 
@@ -440,14 +440,14 @@ def Frequency(
             """
             n_levels = 3 if subspace == 'EF' else 2
             qpu.__init__(self,
-                config, 
-                compiler, 
-                transpiler,
-                classifier,
-                n_shots, 
-                n_batches, 
-                n_circs_per_seq, 
-                n_levels,
+                config=config, 
+                compiler=compiler, 
+                transpiler=transpiler,
+                classifier=classifier,
+                n_shots=n_shots, 
+                n_batches=n_batches, 
+                n_circs_per_seq=n_circs_per_seq, 
+                n_levels=n_levels,
                 **kwargs
             )
             Calibration.__init__(self, 
@@ -850,14 +850,14 @@ def Phase(
             """Initialize the Phase calibration class within the function."""
             n_levels = 3 if subspace == 'EF' else 2
             qpu.__init__(self,
-                config, 
-                compiler, 
-                transpiler,
-                classifier,
-                n_shots, 
-                n_batches, 
-                n_circs_per_seq, 
-                n_levels,
+                config=config, 
+                compiler=compiler, 
+                transpiler=transpiler,
+                classifier=classifier,
+                n_shots=n_shots, 
+                n_batches=n_batches, 
+                n_circs_per_seq=n_circs_per_seq, 
+                n_levels=n_levels,
                 **kwargs
             )
             Calibration.__init__(self, 

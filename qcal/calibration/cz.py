@@ -252,14 +252,14 @@ def Amplitude(
             ) -> None:
             """Initialize the Amplitude class within the function."""
             qpu.__init__(self,
-                config, 
-                compiler, 
-                transpiler,
-                classifier,
-                n_shots, 
-                n_batches, 
-                n_circs_per_seq, 
-                n_levels,
+                config=config, 
+                compiler=compiler, 
+                transpiler=transpiler,
+                classifier=classifier,
+                n_shots=n_shots, 
+                n_batches=n_batches, 
+                n_circs_per_seq=n_circs_per_seq, 
+                n_levels=n_levels,
                 **kwargs
             )
             Calibration.__init__(self, 
@@ -626,14 +626,14 @@ def RelativeAmp(
             ) -> None:
             """Initialize the RelativePhase class within the function."""
             qpu.__init__(self,
-                config, 
-                compiler, 
-                transpiler,
-                classifier,
-                n_shots, 
-                n_batches, 
-                n_circs_per_seq, 
-                n_levels,
+                config=config, 
+                compiler=compiler, 
+                transpiler=transpiler,
+                classifier=classifier,
+                n_shots=n_shots, 
+                n_batches=n_batches, 
+                n_circs_per_seq=n_circs_per_seq, 
+                n_levels=n_levels,
                 **kwargs
             )
             Calibration.__init__(self, 
@@ -911,14 +911,14 @@ def RelativePhase(
             ) -> None:
             """Initialize the RelativePhase class within the function."""
             qpu.__init__(self,
-                config, 
-                compiler, 
-                transpiler,
-                classifier,
-                n_shots, 
-                n_batches, 
-                n_circs_per_seq, 
-                n_levels,
+                config=config, 
+                compiler=compiler, 
+                transpiler=transpiler,
+                classifier=classifier,
+                n_shots=n_shots, 
+                n_batches=n_batches, 
+                n_circs_per_seq=n_circs_per_seq, 
+                n_levels=n_levels,
                 **kwargs
             )
             Calibration.__init__(self, 
@@ -1185,14 +1185,14 @@ def LocalPhases(
             ) -> None:
             """Initialize the RelativePhase class within the function."""
             qpu.__init__(self,
-                config, 
-                compiler, 
-                transpiler,
-                classifier,
-                n_shots, 
-                n_batches, 
-                n_circs_per_seq, 
-                n_levels,
+                config=config, 
+                compiler=compiler, 
+                transpiler=transpiler,
+                classifier=classifier,
+                n_shots=n_shots, 
+                n_batches=n_batches, 
+                n_circs_per_seq=n_circs_per_seq, 
+                n_levels=n_levels,
                 **kwargs
             )
             Calibration.__init__(self, 
@@ -1230,7 +1230,7 @@ def LocalPhases(
             self._phase_C1 = None
             self._phase_T0 = None
             self._phase_T1 = None
-            self._cal_values = {pair: tuple() for pair in qubit_pairs}
+            self._cal_values = {pair: [0., 0.] for pair in qubit_pairs}
 
         @property
         def phases(self) -> Dict:
@@ -1277,9 +1277,8 @@ def LocalPhases(
                 Cycle({VirtualZ(-np.pi/2, p[1]) for p in qubit_pairs}),
                 Cycle({X90(p[1]) for p in qubit_pairs}),
                 Cycle({VirtualZ(np.pi/2, p[1]) for p in qubit_pairs}),
-                # Measure
-                Cycle(Meas(q) for q in qubits)
             ])
+            circuit_C0_X.measure()
 
             circuit_C1_X = Circuit([
                 # X on control qubit
@@ -1299,6 +1298,7 @@ def LocalPhases(
                 Cycle({X90(p[1]) for p in qubit_pairs}),
                 Cycle({VirtualZ(np.pi/2, p[1]) for p in qubit_pairs}),
             ])
+            circuit_C1_X.measure()
 
             circuit_T0_X = Circuit([
                 # Y90 on control qubit
@@ -1316,6 +1316,7 @@ def LocalPhases(
                 # Measure
                 Cycle(Meas(q) for q in qubits)
             ])
+            circuit_T0_X.measure()
 
             circuit_T1_X = Circuit([
                 # X on target qubit
@@ -1335,6 +1336,7 @@ def LocalPhases(
                 Cycle({X90(p[0]) for p in qubit_pairs}),
                 Cycle({VirtualZ(np.pi/2, p[0]) for p in qubit_pairs}),
             ])
+            circuit_T1_X.measure()
 
             n_elements = self._phases[self._qubits[0]].size
             circuits = list()
@@ -1350,9 +1352,14 @@ def LocalPhases(
             )
 
             for pair in self._qubits:
-                self._circuits[f'param: {self._params[pair]}'] = list(
-                    self._phases[pair]
-                ) * 4
+                self._circuits[f'param: {self._params[pair][0]}'] = (
+                    [0.0] * 2 * self._phases[pair].size + 
+                    list(self._phases[pair]) * 2
+                )
+                self._circuits[f'param: {self._params[pair][1]}'] = (
+                    list(self._phases[pair]) * 2 + 
+                    [0.0] * 2 * self._phases[pair].size
+                )                
 
         def analyze(self) -> None:
             """Analyze the data."""
@@ -1400,19 +1407,35 @@ def LocalPhases(
                 contrast_T0 = max(prob_T0_X) - min(prob_T0_X)
                 contrast_T1 = max(prob_T1_X) - min(prob_T1_X)
 
-                X_C0 = 2 * (prob_C0_X - min(prob_C0_X)) / contrast_C0 - 1
-                X_C1 = 2 * (prob_C1_X - min(prob_C1_X)) / contrast_C1 - 1
-                X_T0 = 2 * (prob_T0_X - min(prob_T0_X)) / contrast_T0 - 1
-                X_T1 = 2 * (prob_T1_X - min(prob_T1_X)) / contrast_T1 - 1
+                X_C0 = 2 * (
+                    np.array(prob_C0_X) - min(prob_C0_X)
+                ) / contrast_C0 - 1
+                X_C1 = 2 * (
+                    np.array(prob_C1_X) - min(prob_C1_X)
+                ) / contrast_C1 - 1
+                X_T0 = 2 * (
+                    np.array(prob_T0_X) - min(prob_T0_X)
+                ) / contrast_T0 - 1
+                X_T1 = 2 * (
+                    np.array(prob_T1_X) - min(prob_T1_X)
+                ) / contrast_T1 - 1
 
                 self._sweep_results[pair] = {
                     'X_C0': X_C0, 'X_C1': X_C1, 'X_T0': X_T0, 'X_T1': X_T1, 
                 }
 
-                self._fit[pair]['X_C0'].fit(self._phases[pair], X_C0)
-                self._fit[pair]['X_C1'].fit(self._phases[pair], -X_C1)
-                self._fit[pair]['X_T0'].fit(self._phases[pair], X_T0)
-                self._fit[pair]['X_T1'].fit(self._phases[pair], -X_T1)
+                self._fit[pair]['X_C0'].fit(
+                    self._phases[pair], X_C0, p0=(1, 1/(2*np.pi), 0, 0)
+                )
+                self._fit[pair]['X_C1'].fit(
+                    self._phases[pair], -X_C1, p0=(1, 1/(2*np.pi), 0, 0)
+                )
+                self._fit[pair]['X_T0'].fit(
+                    self._phases[pair], X_T0, p0=(1, 1/(2*np.pi), 0, 0)
+                )
+                self._fit[pair]['X_T1'].fit(
+                    self._phases[pair], X_T1, p0=(1, 1/(2*np.pi), 0, 0)
+                )
 
                 if (self._fit[pair]['X_C0'].fit_success and
                     self._fit[pair]['X_C1'].fit_success):
@@ -1471,10 +1494,10 @@ def LocalPhases(
 
                 # Control phase sweep
                 ax[0].plot(
-                    self._phases[pair], self._sweep_results['X_T0'], 'bo'
+                    self._phases[pair], self._sweep_results[pair]['X_T0'], 'bo'
                 )
                 ax[0].plot(
-                    self._phases[pair], self._sweep_results['X_T1'], 'ro'
+                   self._phases[pair], -self._sweep_results[pair]['X_T1'], 'ro'
                 )
                 if self._fit[pair]['X_T0'].fit_success:
                     x = np.linspace(
@@ -1491,7 +1514,7 @@ def LocalPhases(
                         self._phases[pair][0], self._phases[pair][-1], 100
                     )
                     ax[0].plot(x, -self._fit[pair]['X_T1'].predict(x), 'r-')
-                    ax[0].axvline(self._phase_T1, ls='-', c='b',
+                    ax[0].axvline(self._phase_T1, ls='-', c='r',
                         label=(
                          rf'Q{pair[1]} $|1\rangle$: {round(self._phase_T1, 2)}'
                         )
@@ -1499,10 +1522,10 @@ def LocalPhases(
 
                 # Target phase sweep
                 ax[1].plot(
-                    self._phases[pair], self._sweep_results['X_C0'], 'bo'
+                    self._phases[pair], self._sweep_results[pair]['X_C0'], 'bo'
                 )
                 ax[1].plot(
-                    self._phases[pair], self._sweep_results['X_C1'], 'ro'
+                    self._phases[pair], self._sweep_results[pair]['X_C1'], 'ro'
                 )
                 if self._fit[pair]['X_C0'].fit_success:
                     x = np.linspace(

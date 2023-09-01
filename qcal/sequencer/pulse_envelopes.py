@@ -215,18 +215,19 @@ def square(
 
 
 def virtualz(
-        length: float, sample_rate: float, amp: float = 1.0, phase: float= 0.0
+        length: float = 0, sample_rate: float = 0, 
+        amp: float = 1.0, phase: float= 0.0
     ) -> np.complex64:
     """_summary_
 
     Args:
-        length (float): _description_
-        sample_rate (float): _description_
-        amp (float, optional): _description_. Defaults to 1.0.
-        phase (float, optional): _description_. Defaults to 0.0.
+        length (float): pulse length in seconds. Defaults to 0.
+        sample_rate (float): sample rate in Hz. Defaults to 0.
+        amp (float, optional): pulse amplitude. Defaults to 1.0.
+        phase (float, optional): pulse phase. Defaults to 0.0.
 
     Returns:
-        np.complex64: _description_
+        np.complex64: phase.
     """
     return np.exp(1j*phase).astype(np.complex64)
 

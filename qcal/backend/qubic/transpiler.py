@@ -263,8 +263,7 @@ def add_multi_qubit_gate(config: Config, gate: Gate, circuit: List) -> None:
         if pulse['env'] == 'virtualz':
             circuit.append(
                 {'name': 'virtual_z',
-                 'freq': config.single_qubit[gate.qubits[0]][
-                     gate.subspace].freq[0],
+                 'freq': config[pulse['freq']],
                  'phase': pulse['kwargs']['phase']
                 }
             )
