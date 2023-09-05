@@ -48,7 +48,7 @@ def to_qcal(
             elif gate.name == 'Rz':
                 tcycle.append(
                     gate_mapper[gate.name](
-                        gate.parameters['phi'], q
+                        np.deg2rad(gate.parameters['phi']), q
                     )
                 )
             else:
@@ -119,11 +119,11 @@ class Transpiler(Transpiler):
             circuits = tq.CircuitCollection(circuits)
 
         tcircuits = CircuitSet([np.nan for _ in range(len(circuits))])
-        if self._parallelize and mp.cpu_count() > 4:
+        if self._parallelize and mp.cpu_count() > 2:
             logger.info(
-                f" Pooling {mp.cpu_count() - 2} processes for transpilation..."
+                f" Pooling 2 processes for transpilation..."
             )
-            pool = mp.Pool(mp.cpu_count())
+            pool = mp.Pool(2)
             try:
                 for i, circuit in enumerate(circuits):
                     pool.apply_async(
