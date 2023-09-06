@@ -161,7 +161,7 @@ def draw_circuit(circuit: Circuit, show: bool = True):
         titlefont_size=16,
         showlegend=False,
         hovermode='closest',
-        margin=dict(b=20,l=5,r=5,t=40),
+        margin=dict(b=20,l=10,r=5,t=50),
         annotations=[ dict(
             text="Quantum Circuit",
             showarrow=False,

@@ -102,6 +102,11 @@ class QPU:
         assert n_levels <= 3, 'n_levels > is not currently supported!'
         self._n_levels = n_levels
 
+        if classifier is not None:
+            assert n_levels == classifier[classifier._qubits[0]].n_components,(
+                "'n_levels' does not equal the number of classified states!"
+            )
+
         self._circuits = None
         self._compiled_circuits = None
         self._transpiled_circuits = None

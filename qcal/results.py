@@ -3,6 +3,7 @@
 All results are stored in a Results object.
 """
 import pandas as pd
+import plotly.express as px
 
 from collections import defaultdict
 from typing import Dict, Tuple
@@ -178,3 +179,25 @@ class Results:
             marg_results[marg_state] += counts
 
         return Results(marg_results)
+
+
+    def plot(self, normalize: bool = False) -> None:
+        """Plot the results in a histogram.
+
+        Args:
+            normalize (bool, optional): whether to plot the normalized counts. 
+                Defaults to False.
+        """
+        if normalize:
+            df = pd.DataFrame(
+                {'State': self.states, 'Probability': self.probabilities}
+            )
+            fig = px.bar(df, x='State', y='Probability')
+        else:
+            df = pd.DataFrame(
+                {'State': self.states, 'Count': self.counts}
+            )
+            fig = px.bar(df, x='State', y='Count')
+
+        fig.update_traces(marker_color='blue')
+        fig.show()
