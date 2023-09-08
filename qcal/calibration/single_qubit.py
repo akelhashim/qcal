@@ -261,16 +261,19 @@ def Amplitude(
 
             # Fit the probability of being in 0 from the gate amplitude sweep 
             # to a cosine or parabola
+            level = {'GE': '0', 'EF': '1'}
             for i, q in enumerate(self._qubits):
-                prob0 = []
+                prob = []
                 for circuit in self._circuits:
-                    prob0.append(
-                        circuit.results.marginalize(i)['0']['probabilities']
+                    prob.append(
+                        circuit.results.marginalize(i).populations[
+                                level[self._subspace]
+                            ]
                     )
-                self._sweep_results[q] = prob0
-                self._circuits[f'Q{q}: Prob(0)'] = prob0
+                self._sweep_results[q] = prob
+                self._circuits[f'Q{q}: Prob({level[self._subspace]})'] = prob
 
-                self._fit[q].fit(self._amplitudes[q], prob0)
+                self._fit[q].fit(self._amplitudes[q], prob)
 
                 # If the fit was successful, write find the new amp
                 if self._fit[q].fit_success:
@@ -323,7 +326,10 @@ def Amplitude(
                 self.save()
             self.plot(
                 xlabel='Amplitude (a.u.)',
-                ylabel=(r'$|0\rangle$ Population'),
+                ylabel=(
+                    r'$|0\rangle$ Population' if self._subspace == 'GE' else 
+                    r'$|1\rangle$ Population'
+                ),
                 save_path=self._data_manager._save_path
             )
             self.final()

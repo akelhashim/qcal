@@ -35,6 +35,7 @@ def add_reset(
         for _ in range(config.reset.reset.active.n_resets):
             for q in qubits:
                 add_measurement(config, q, reset_circuit)
+                reset_circuit.append({'name': 'barrier', 'scope': [f'Q{q}']})
                 reset_circuit.append(
                     {'name': 'branch_fproc',
                      'alu_cond': 'eq',

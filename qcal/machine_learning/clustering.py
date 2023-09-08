@@ -39,8 +39,8 @@ class GMM(GaussianMixture):
             covariance_type=covariance_type,
             **kwargs
         )
-        self._X = None
-        self._y = None
+        self.__X = None
+        self.__y = None
         self._snr = {}
         self._is_fitted = False
 
@@ -69,7 +69,7 @@ class GMM(GaussianMixture):
         Returns:
             ArrayLike: input data.
         """
-        return self._X
+        return self.__X
     
     @property
     def y(self) -> ArrayLike:
@@ -78,7 +78,7 @@ class GMM(GaussianMixture):
         Returns:
             ArrayLike: labels for data.
         """
-        return self._y
+        return self.__y
 
     def fit(self, X: ArrayLike, y: ArrayLike = None) -> None:
         """Fit a Guassian Mixture Model to the input data.
@@ -90,8 +90,8 @@ class GMM(GaussianMixture):
             y (ArrayLike): fit labels for each data point. Defaults to None.
         """
         super().fit(X)
-        self._X = X
-        self._y = y
+        self.__X = X
+        self.__y = y
 
         # if y is not None and not np.all(self.predict(X) == y):
         #     mapping = find_mapping(self.predict(X), y)

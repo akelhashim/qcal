@@ -23,8 +23,9 @@ import numpy as np
 import pandas as pd
 
 from IPython.display import clear_output
-from typing import Any, Callable, Dict, List, Tuple
-from numpy.typing import ArrayLike, NDArray
+from typing import Any, Callable, List, Tuple
+from matplotlib.colors import ListedColormap
+
 
 logger = logging.getLogger(__name__)
 
@@ -164,6 +165,8 @@ def ReadoutCalibration(
                 qubits=qubits, n_levels=n_levels, model=model,
                 **cm_kwargs 
             )
+            self._X = {}
+            self._y = {}
 
         @property
         def classifier(self) -> ClassificationManager:
@@ -239,7 +242,7 @@ def ReadoutCalibration(
 
                 if self._n_levels == 3:
                     iq_2 = self._circuits[f'Q{q}: iq_data'][2]
-                    xy_2 = np.hstack([np.real(iq_2), np.imag(iq_2)]),
+                    xy_2 = np.hstack([np.real(iq_2), np.imag(iq_2)])
                     means_init = np.vstack([
                         means_init, np.mean(xy_2, axis=0)
                     ])
@@ -247,12 +250,19 @@ def ReadoutCalibration(
                     y += [2] * self._n_shots
                 
                 y = np.array(y)
+                self._X[q] = X
+                self._y[q] = y
+
                 self._classifier[q].means_init = means_init
                 self._classifier.fit(q, X, y)
 
         def save(self) -> None:
             """Save all circuits and data."""
             qpu.save(self)
+            self.data_manager.save_to_pickle(
+                self._classifier, 
+                'ClassificationManager'
+            )
             save_to_pickle(
                 self._classifier, 
                 os.path.join(
@@ -261,13 +271,28 @@ def ReadoutCalibration(
                 )
             )
 
-        def plot(self) -> None:
-            """Plot the readout calibration results."""
+        def plot(self, raw=False) -> None:
+            """Plot the readout calibration results.
+
+            Args:
+                raw (bool, optional): plot the raw data. Defaults to False.
+            """
             nrows, ncols = calculate_nrows_ncols(len(self._qubits))
             figsize = (5 * ncols, 4 * nrows)
             fig, axes = plt.subplots(
                 nrows, ncols, figsize=figsize, layout='constrained'
             )
+
+            # if self._n_levels == 2:
+            #     colors = ["grey", "blue"]
+            # elif self._n_levels == 3:
+            #     colors = ["grey", "blue", "blueviolet"]
+            colors = [
+                (0.12156862745098039, 0.4666666666666667, 0.7058823529411765),
+                (1.0, 0.4980392156862745, 0.054901960784313725),
+                (0.5803921568627451, 0.403921568627451, 0.7411764705882353)
+            ]
+            cmap = ListedColormap(colors[:self._n_levels])
 
             k = -1
             for i in range(nrows):
@@ -284,62 +309,83 @@ def ReadoutCalibration(
                     if k < len(self._qubits):
                         q = self._qubits[k]
 
-                        ax.set_xlabel('I', fontsize=15)
-                        ax.set_ylabel('Q', fontsize=15)
-                        ax.tick_params(
-                            axis='both', which='major', labelsize=12
-                        )
-                        ax.grid(False)
+                    ax.set_xlabel('I', fontsize=15)
+                    ax.set_ylabel('Q', fontsize=15)
+                    ax.tick_params(
+                        axis='both', which='major', labelsize=12
+                    )
 
-                        # Plot the raw data
+                    if raw:
                         sc = ax.scatter(
-                            self._classifier[q].X[:, 0], 
-                            self._classifier[q].X[:, 1], 
-                            c=self._classifier[q].y,
-                            # c=self._classifier[q].predict(
-                            #     self._classifier[q]
-                            # ), 
-                            cmap='viridis', alpha=0.15
+                            self._X[q][:, 0], self._X[q][:, 1], 
+                            c=self._y[q], cmap=cmap, alpha=0.03
                         )
-
-                        # Create a mesh plot
-                        x_min, x_max = (
-                            self._classifier[q].X[:, 0].min() - 10, 
-                            self._classifier[q].X[:, 0].max() + 10
-                        )
-                        y_min, y_max =(
-                            self._classifier[q].X[:, 1].min() - 10, 
-                            self._classifier[q].X[:, 1].max() + 10
-                        )
-                        h = int(min([abs(x_min), abs(y_min)]) * 0.025)
-                        xx, yy = np.meshgrid(
-                            np.arange(x_min, x_max, h), 
-                            np.arange(y_min, y_max, h)
-                        )
-
-                        # Plot the decision boundary by assigning a color to 
-                        # each point in the mesh [x_min, x_max]x[y_min, y_max].
-                        Z = self._classifier[q].predict(
-                            np.c_[xx.ravel(), yy.ravel()]
-                        )
-                        Z = Z.reshape(xx.shape)
-                        ax.contourf(xx, yy, Z, cmap='viridis', alpha=0.1)
-                            
-                        ax.set_xlim([x_min, x_max])
-                        ax.set_ylim([y_min, y_max])
-
-                        ax.legend(
-                            handles=sc.legend_elements()[0], 
-                            labels=range(0, self._classifier[q].n_components), 
-                            fontsize=12
-                        )
-
                     else:
-                        ax.axis('off')
+                        ax.hexbin(
+                            self._X[q][:, 0], self._X[q][:, 1], 
+                            cmap='Greys', gridsize=75
+                        )
+
+                    # Create a mesh plot
+                    x_min, x_max = (
+                        self._X[q][:, 0].min() - 10, 
+                        self._X[q][:, 0].max() + 10
+                    )
+                    y_min, y_max =(
+                        self._X[q][:, 1].min() - 10, 
+                        self._X[q][:, 1].max() + 10
+                    )
+                    h = int(min([abs(x_min), abs(y_min)]) * 0.025)
+                    xx, yy = np.meshgrid(
+                        np.arange(x_min, x_max, h), 
+                        np.arange(y_min, y_max, h)
+                    )
+
+                    # Plot the decision boundary by assigning a color to 
+                    # each point in the mesh [x_min, x_max]x[y_min, y_max].
+                    Z = self._classifier[q].predict(
+                        np.c_[xx.ravel(), yy.ravel()]
+                    )
+                    Z = Z.reshape(xx.shape)
+                    if raw:
+                        ax.contourf(xx, yy, Z, cmap=cmap, alpha=0.15)
+                    else:
+                        cs = ax.contourf(xx, yy, Z, cmap=cmap, alpha=0.15)
+                        self._cs = cs
+                        
+                    ax.set_xlim([x_min, x_max])
+                    ax.set_ylim([y_min, y_max])
+
+                    if raw:
+                        leg = ax.legend(
+                            handles=sc.legend_elements()[0], 
+                            labels=range(0, self._n_levels), 
+                            fontsize=12,
+                            loc=0
+                        )
+                    else:
+                        handles = []
+                        for l in range(self._n_levels):
+                            handles.append(cs.legend_elements()[0][l*3])
+                        leg = ax.legend(
+                            handles=handles,
+                            labels=range(0, self._n_levels), 
+                            fontsize=12,
+                            loc=0
+                        )
+                    for lh in leg.legendHandles:
+                        lh.set_alpha(1)
                 
             fig.set_tight_layout(True)
             if settings.Settings.save_data:
-                fig.savefig(
+                if raw:
+                    fig.savefig(
+                        self._data_manager._save_path + 
+                        'readout_calibration_raw.png', 
+                        dpi=300
+                    )
+                else:
+                    fig.savefig(
                     self._data_manager._save_path + 'readout_calibration.png', 
                     dpi=300
                 )
