@@ -103,8 +103,8 @@ class QPU:
         self._n_levels = n_levels
 
         if classifier is not None:
-            assert n_levels == classifier[classifier._qubits[0]].n_components,(
-                "'n_levels' does not equal the number of classified states!"
+            assert n_levels <= classifier[classifier._qubits[0]].n_components,(
+                "'n_levels' is greater than the number of classified states!"
             )
 
         self._circuits = None

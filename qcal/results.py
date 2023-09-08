@@ -28,6 +28,7 @@ class Results:
             results (dict, optional): dictionary of bitstring results. 
                 Defaults to {}.
         """
+        results = dict(sorted(results.items()))
         self._dict = results
         self._df = pd.DataFrame([results], index=['counts'], dtype='object')
         self._df = pd.concat(
@@ -112,7 +113,7 @@ class Results:
         """
         pop = defaultdict(lambda: 0.)
         for state in self.states:
-            pop[state] = self._dict[state]/self.n_shots
+            pop[state] = self._dict[state] / self.n_shots
         return pop
 
     @property
@@ -200,4 +201,9 @@ class Results:
             fig = px.bar(df, x='State', y='Count')
 
         fig.update_traces(marker_color='blue')
+        fig.update_layout(
+            autosize=False,
+            width=200 * len(self.states),
+            height=400
+        )
         fig.show()
