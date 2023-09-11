@@ -155,7 +155,7 @@ single_qubit:
           length: 3.0e-08
           kwargs:
             alpha: 0.0
-            amp: 0.512819
+            amp: 0.512019
             anh: -270000000.0
             df: 0.0
             phase: 0.0
