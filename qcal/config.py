@@ -16,7 +16,7 @@ import logging
 import pandas as pd
 import yaml
 
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -416,37 +416,61 @@ class Config:
         from qcal.plotting.graphs import draw_processor
         draw_processor(self)
 
-    def plot_freqs(self):
-        """Plot all qubit, two_qubit and readout frequencies."""
+    def plot_freqs(self,
+            qubits:      List | Tuple | None = None,
+            qubit_pairs: List | Tuple | None = None
+        ) -> None:
+        """Plot all qubit, two_qubit and readout frequencies.
+        
+        Args:
+            qubits (List | Tuple | None, optional): qubits to plot. Defaults to 
+                None.
+            qubit_pairs (List | Tuple | None, optional): qubit pairs to plot. 
+                Defaults to None.
+        """
         from qcal.plotting.frequency import plot_freq_spectrum
         plot_freq_spectrum(
             self, 
+            qubits=qubits,
+            qubit_pairs=qubit_pairs,
             plot_GE=True, 
             plot_EF=True, # TODO: add checking EF
             plot_readout=True, 
             plot_two_qubit=True
         )
 
-    def plot_qubit_freqs(self, plot_EF: bool = False):
+    def plot_qubit_freqs(self,
+            qubits:  List | Tuple | None = None,
+            plot_EF: bool = False
+        ) -> None:
         """Plot all qubit frequencies.
 
         Args:
+            qubits (List | Tuple | None, optional): qubits to plot. Defaults to 
+                None.
             plot_EF (bool, optional): plot EF frequencies. Defaults to False.
         """
         from qcal.plotting.frequency import plot_freq_spectrum
         plot_freq_spectrum(
             self, 
+            qubits=qubits,
             plot_GE=True, 
             plot_EF=plot_EF,
             plot_readout=False, 
             plot_two_qubit=False
         )
 
-    def plot_readout_freqs(self):
-        """Plot all readout frequencies."""
+    def plot_readout_freqs(self, qubits:  List | Tuple | None = None):
+        """Plot all readout frequencies.
+        
+        Args:
+            qubits (List | Tuple | None, optional): qubits to plot. Defaults to 
+                None.
+        """
         from qcal.plotting.frequency import plot_freq_spectrum
         plot_freq_spectrum(
-            self, 
+            self,
+            qubits=qubits,
             plot_GE=False, 
             plot_EF=False,
             plot_readout=True, 
