@@ -88,14 +88,14 @@ def draw_circuit(circuit: Circuit, show: bool = True):
             for gate in cycle.gates:
                 if gate.is_single_qubit:
                     node_x.append(c)
-                    node_y.append(gate.qubits[0])
+                    node_y.append(circuit.qubits.index(gate.qubits[0]))
                     node_text.append(format_gate_text(gate))
                     node_symbols.append(symbol_map[gate.name][0])
                     marker_colors.append(color_map[gate.name])
                 elif gate.is_multi_qubit:
                     for q in gate.qubits:
                         node_x.append(c)
-                        node_y.append(q)
+                        node_y.append(circuit.qubits.index(q))
                     node_text.extend([format_gate_text(gate)]*2)
                     node_symbols.extend(symbol_map[gate.name])
                     marker_colors.extend(['grey', 'grey'])
@@ -123,7 +123,7 @@ def draw_circuit(circuit: Circuit, show: bool = True):
         edge_x = []
         for j in range(1, circuit.circuit_depth):
             edge_x.extend([j-1, j])
-        edge_y = [q]*(2*(circuit.circuit_depth - 2) + 2)
+        edge_y = [i]*(2*(circuit.circuit_depth - 2) + 2)
         edge_traces.append(
             go.Scatter(
                 x=edge_x, y=edge_y,
@@ -144,7 +144,7 @@ def draw_circuit(circuit: Circuit, show: bool = True):
                 if gate.is_multi_qubit:
                     for q in gate.qubits:
                         edge_x_mq.append(c)
-                        edge_y_mq.append(q)
+                        edge_y_mq.append(circuit.qubits.index(q))
                     edge_traces.append(
                         go.Scatter(
                         x=edge_x_mq, y=edge_y_mq,
@@ -169,7 +169,9 @@ def draw_circuit(circuit: Circuit, show: bool = True):
             x=-0.001, y=1.0) ],
         xaxis=dict(tick0=0, dtick=1, showgrid=False, zeroline=False, 
                    showticklabels=True),
-        yaxis=dict(tickmode ='array', tickvals = circuit.qubits, 
+        yaxis=dict(tickmode='array', 
+                   tickvals=[q for q in range(len(circuit.qubits))],
+                   ticktext=circuit.qubits,#[str(q) for q in ] 
                    showgrid=False, zeroline=False, showticklabels=True))
     )
     fig['layout']['yaxis']['autorange'] = "reversed"

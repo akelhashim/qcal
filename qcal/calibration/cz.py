@@ -272,6 +272,7 @@ def Amplitude(
             self._n_gates = n_gates
 
             self._params = {}
+
             for pair in qubit_pairs:
                 idx = find_pulse_index(config, f'two_qubit/{pair}/CZ/pulse')
                 self._params[pair] = (
@@ -279,20 +280,20 @@ def Amplitude(
                     f'two_qubit/{pair}/CZ/pulse/{idx+1}/kwargs/amp'
                 )
 
-                if not isinstance(amplitudes, dict):
+            if not isinstance(amplitudes, dict):
+                self._amplitudes = {}
+                for pair in qubit_pairs:
                     if relative_amp:
-                        self._amplitudes = {pair: (
+                        self._amplitudes[pair] = (
                         config[f'two_qubit/{pair}/CZ/pulse/{idx}/kwargs/amp']
-                         * amplitudes,
+                            * amplitudes,
                         config[f'two_qubit/{pair}/CZ/pulse/{idx+1}/kwargs/amp'] 
-                         * amplitudes
+                            * amplitudes
                         )
-                    }
                     else:
-                        self._amplitudes = {pair: (amplitudes, amplitudes)
-                    }
-                else:
-                    self._amplitudes = amplitudes
+                        self._amplitudes[pair] = (amplitudes, amplitudes)
+            else:
+                self._amplitudes = amplitudes
             self._param_sweep = self._amplitudes
                 
             self._R = {}

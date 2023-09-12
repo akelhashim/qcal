@@ -159,7 +159,7 @@ def SRB(qpu:             QPU,
                 nrows, ncols, figsize=figsize, layout='constrained'
             )
 
-            self._circuits.plot.raw(axes=axes)
+            self._circuits.plot.raw(axes=axes.ravel())
 
             k = -1
             for i in range(nrows):
