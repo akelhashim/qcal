@@ -30,7 +30,7 @@ single_qubit:
           env: cosine_square
           length: 6.0e-08
           kwargs:
-            amp: 0.089889
+            amp: 0.794566
             phase: 0.0
             ramp_fraction: 0.25
     EF:
@@ -99,7 +99,7 @@ single_qubit:
           env: cosine_square
           length: 6.0e-08
           kwargs:
-            amp: 0.378132
+            amp: 0.147182
             phase: 0.0
             ramp_fraction: 0.25
     EF:
@@ -168,7 +168,7 @@ single_qubit:
           env: cosine_square
           length: 6.0e-08
           kwargs:
-            amp: 0.38
+            amp: 0.162296
             phase: 0.0
             ramp_fraction: 0.25
     EF:
@@ -237,7 +237,7 @@ single_qubit:
           env: cosine_square
           length: 6.0e-08
           kwargs:
-            amp: 0.17
+            amp: 0.185
             phase: 0.0
             ramp_fraction: 0.25
     EF:
@@ -507,7 +507,7 @@ single_qubit:
           env: cosine_square
           length: 6.0e-08
           kwargs:
-            amp: 0.300873
+            amp: 0.153438
             phase: 0.0
             ramp_fraction: 0.25
     EF:
@@ -560,7 +560,7 @@ two_qubit:
         length: 4.0e-07
         kwargs:
           amp: 0.777413
-          phase: -2.474277
+          phase: 1.294819
           ramp_fraction: 0.25
       - channel: Q0.qdrv
         env: virtualz
@@ -766,15 +766,15 @@ two_qubit:
         env: cosine_square
         length: 4.0e-07
         kwargs:
-          amp: 0.288
+          amp: 0.5
           phase: 0.0
           ramp_fraction: 0.25
       - channel: Q0.qdrv
         env: cosine_square
         length: 4.0e-07
         kwargs:
-          amp: 0.288
-          phase: 0.0
+          amp: 0.5
+          phase: -0.027804
           ramp_fraction: 0.25
       - channel: Q7.qdrv
         env: virtualz
@@ -793,22 +793,22 @@ readout:
     channel: 7
     amp: 0.037
     freq: 6554556854.218374
-    phase: 2.0
+    phase: 2.2
   1:
     channel: 4
     amp: 0.03
     freq: 6558907827.371197
-    phase: 3.0
+    phase: 3.2
   2:
     channel: 1
     amp: 0.037
     freq: 6658224601.204804
-    phase: 1.0
+    phase: 1.2
   3:
     channel: 3
     amp: 0.028
     freq: 6699517073.864432
-    phase: 3.0
+    phase: 3.2
   4:
     channel: 5
     amp: 0.022
@@ -828,7 +828,7 @@ readout:
     channel: 0
     amp: 0.05
     freq: 6835987148.190145
-    phase: 3.0
+    phase: 3.3
   esp:
     enable: false
     qubits:
@@ -851,8 +851,8 @@ readout:
     ramp_fraction: 0.25
 reset:
   active:
-    enable: false
-    n_resets: 1
+    enable: true
+    n_resets: 3
     feedback_delay: 2.0e-07
   passive:
     delay: 0.0005
