@@ -11,21 +11,19 @@ single_qubit:
           env: virtualz
           length: 0.0
           kwargs:
-            phase: 0.008957
+            phase: 0.15
         - channel: Q0.qdrv
-          env: DRAG
-          length: 5.0e-08
+          env: cosine_square
+          length: 3.0e-08
           kwargs:
-            alpha: 0.0
-            amp: 0.859176
-            anh: -259548795.63784885
-            df: 0.0
+            amp: 0.791771
             phase: 0.0
+            ramp_fraction: 0.25
         - channel: Q0.qdrv
           env: virtualz
           length: 0.0
           kwargs:
-            phase: 0.008957
+            phase: 0.15
       X:
         pulse:
         - channel: Q0.qdrv
@@ -49,9 +47,9 @@ single_qubit:
             phase: -0.012293
         - channel: Q0.qdrv
           env: cosine_square
-          length: 5.0e-08
+          length: 3.0e-08
           kwargs:
-            amp: 0.859496
+            amp: 0.7
             phase: 0.0
             ramp_fraction: 0.25
         - channel: Q0.qdrv
@@ -80,13 +78,13 @@ single_qubit:
           env: virtualz
           length: 0.0
           kwargs:
-            phase: 0.101104
+            phase: 0.057852
         - channel: Q1.qdrv
           env: DRAG
           length: 3.0e-08
           kwargs:
             alpha: 1.0
-            amp: 0.26539
+            amp: 0.264783
             anh: -260157670.03385544
             df: 0.0
             phase: 0.0
@@ -94,7 +92,7 @@ single_qubit:
           env: virtualz
           length: 0.0
           kwargs:
-            phase: 0.101104
+            phase: 0.057852
       X:
         pulse:
         - channel: Q1.qdrv
@@ -149,13 +147,13 @@ single_qubit:
           env: virtualz
           length: 0.0
           kwargs:
-            phase: 0.023501
+            phase: 0.093667
         - channel: Q2.qdrv
           env: DRAG
           length: 3.0e-08
           kwargs:
             alpha: 0.0
-            amp: 0.291632
+            amp: 0.292253
             anh: -262979589.41769218
             df: 0.0
             phase: 0.0
@@ -163,7 +161,7 @@ single_qubit:
           env: virtualz
           length: 0.0
           kwargs:
-            phase: 0.023501
+            phase: 0.093667
       X:
         pulse:
         - channel: Q2.qdrv
@@ -218,13 +216,13 @@ single_qubit:
           env: virtualz
           length: 0.0
           kwargs:
-            phase: 0.136988
+            phase: 0.007658
         - channel: Q3.qdrv
           env: DRAG
           length: 3.0e-08
           kwargs:
             alpha: 0.0
-            amp: 0.32946
+            amp: 0.328196
             anh: -259793266.41689777
             df: 0.0
             phase: 0.0
@@ -232,7 +230,7 @@ single_qubit:
           env: virtualz
           length: 0.0
           kwargs:
-            phase: 0.136988
+            phase: 0.007658
       X:
         pulse:
         - channel: Q3.qdrv
@@ -277,7 +275,7 @@ single_qubit:
             ramp_fraction: 0.25
   4:
     GE:
-      freq: 5460923706.193614
+      freq: 5461548706.193614
       T1: 5.0e-05
       T2*: 9.0e-06
       T2e: 7.0e-06
@@ -289,14 +287,12 @@ single_qubit:
           kwargs:
             phase: 0.125474
         - channel: Q4.qdrv
-          env: DRAG
-          length: 3.0e-08
+          env: cosine_square
+          length: 4.0e-08
           kwargs:
-            alpha: 0.0
-            amp: 0.763294
-            anh: -258700545.92515278
-            df: 0.0
+            amp: 0.752733
             phase: 0.0
+            ramp_fraction: 0.25
         - channel: Q4.qdrv
           env: virtualz
           length: 0.0
@@ -346,7 +342,7 @@ single_qubit:
             ramp_fraction: 0.25
   5:
     GE:
-      freq: 5559571665.679482
+      freq: 5560201665.679482
       T1: null
       T2*: null
       T2e: null
@@ -358,14 +354,12 @@ single_qubit:
           kwargs:
             phase: 0.0
         - channel: Q5.qdrv
-          env: DRAG
-          length: 3.0e-08
+          env: cosine_square
+          length: 4.0e-08
           kwargs:
-            alpha: 0.0
-            amp: 0.739756
-            anh: -257658495.65952682
-            df: 0.0
+            amp: 0.715358
             phase: 0.0
+            ramp_fraction: 0.25
         - channel: Q5.qdrv
           env: virtualz
           length: 0.0
@@ -427,14 +421,12 @@ single_qubit:
           kwargs:
             phase: 0.0
         - channel: Q6.qdrv
-          env: DRAG
+          env: cosine_square
           length: 3.0e-08
           kwargs:
-            alpha: 0.0
-            amp: 0.480254
-            anh: -254210634.77170944
-            df: 0.0
+            amp: 0.2
             phase: 0.0
+            ramp_fraction: 0.25
         - channel: Q6.qdrv
           env: virtualz
           length: 0.0
@@ -494,13 +486,13 @@ single_qubit:
           env: virtualz
           length: 0.0
           kwargs:
-            phase: 0.057176
+            phase: 0.125084
         - channel: Q7.qdrv
           env: DRAG
           length: 3.0e-08
           kwargs:
             alpha: 0.0
-            amp: 0.276763
+            amp: 0.277549
             anh: -260926131.85729027
             df: 0.0
             phase: 0.0
@@ -508,7 +500,7 @@ single_qubit:
           env: virtualz
           length: 0.0
           kwargs:
-            phase: 0.057176
+            phase: 0.125084
       X:
         pulse:
         - channel: Q7.qdrv
@@ -799,7 +791,7 @@ two_qubit:
 readout:
   0:
     channel: 7
-    amp: 0.055
+    amp: 0.038
     freq: 6554556854.218374
     phase: 1.75
   1:
@@ -809,22 +801,22 @@ readout:
     phase: 3.0
   2:
     channel: 1
-    amp: 0.035
+    amp: 0.037
     freq: 6658224601.204804
     phase: 1.0
   3:
     channel: 3
-    amp: 0.025
+    amp: 0.028
     freq: 6699517073.864432
     phase: 3.0
   4:
     channel: 5
-    amp: 0.035
+    amp: 0.022
     freq: 6709558215.418671
     phase: -1.5
   5:
     channel: 6
-    amp: 0.035
+    amp: 0.022
     freq: 6707928573.902684
     phase: -1.0
   6:
@@ -834,9 +826,9 @@ readout:
     phase: 0.9312892237695153
   7:
     channel: 0
-    amp: 0.06
+    amp: 0.052
     freq: 6835987148.190145
-    phase: 1.5
+    phase: 3.0
   esp:
     enable: false
     qubits:
