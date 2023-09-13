@@ -30,9 +30,9 @@ def add_reset(
         qubits (List | Tuple): qubits to reset.
         circuit (List):        qubic circuit.
     """
-    if config.reset.reset.active.enable:
+    if config['reset/active/enable']:
         reset_circuit = []
-        for _ in range(config.reset.reset.active.n_resets):
+        for _ in range(config['reset/active/n_resets']):
             for q in qubits:
                 add_measurement(config, q, reset_circuit)
                 reset_circuit.append({'name': 'barrier', 'scope': [f'Q{q}']})
@@ -40,24 +40,24 @@ def add_reset(
                     {'name': 'branch_fproc',
                      'alu_cond': 'eq',
                      'cond_lhs': 1,
-                     'func_id': int(config.readout[q].channel),
+                     'func_id': int(config[f'readout/{q}/channel']),
                      'scope': [f'Q{q}'],
                         'true': [
                             {'name': 'delay', 
-                             't': config.reset.reset.active.feedback_delay, 
+                             't': config['reset/active/feedback_delay'], 
                              'qubit': [f'Q{q}']
                             }
                         ] + 
                         [
                             {'name': 'pulse',
-                             'freq': config.single_qubit[q]['GE'].freq[0],
+                             'freq': config[f'single_qubit/{q}/GE/freq'],
                              'amp': 1.0,
                              'dest': pulse['channel'], 
                              'phase': 0.0,
                              'twidth': pulse['length'],
                              'env': pulse_envelopes[pulse['env']](
                                 pulse['length'],
-                                config.hardware.loc['DAC_sample_rate'][0],
+                                config['hardware/DAC_sample_rate'],
                                 **pulse['kwargs']
                              )}
                         # TODO: add X90 capability
@@ -75,7 +75,7 @@ def add_reset(
     else:
          circuit.extend((
             {'name': 'delay',
-             't': config.reset.reset.passive.delay,
+             't': config['reset/passive/delay'],
              'qubit': [f'Q{q}' for q in qubits]},
             {'name': 'barrier', 'qubit': [f'Q{q}' for q in qubits]}
          ))
@@ -96,7 +96,7 @@ def add_heralding(
 
     circuit.extend((
             {'name': 'delay',
-             't': config.parameters['readout']['reset'],
+             't': config['readout/reset'],
              'qubit': [f'Q{q}' for q in qubits]},
             {'name': 'barrier', 'qubit': [f'Q{q}' for q in qubits]}
          ))
@@ -123,24 +123,24 @@ def add_measurement(
         if qubit in config.parameters['readout']['esp']['qubits']:
             circuit.extend([
                     {'name': 'pulse',
-                     'freq': config.single_qubit[qubit].EF.freq[0],
+                     'freq': config[f'single_qubit/{qubit}/EF/freq'],
                      'amp': 1.0,
                      'dest': pulse['channel'], 
                      'phase': 0.0,
                      'twidth': pulse['length'],
                      'env': pulse_envelopes[pulse['env']](
-                     pulse['length'],
-                     config.hardware.loc['DAC_sample_rate'][0],
-                     **pulse['kwargs']
-                    )
-                }
-            for pulse in config.single_qubit[qubit].EF.X.pulse
+                        pulse['length'],
+                        config['hardware/DAC_sample_rate'],
+                        **pulse['kwargs']
+                        )
+                    }
+                for pulse in config[f'single_qubit/{qubit}/EF/X/pulse']
             ]
         )
         
         else:
             length = 0.
-            for pulse in config.single_qubit[qubit].EF.X.pulse:
+            for pulse in config[f'single_qubit/{qubit}/EF/X/pulse']:
                 length += pulse['length']
             circuit.append(
                 {'name': 'delay',
@@ -154,15 +154,15 @@ def add_measurement(
     circuit.extend((
             {'name': 'pulse',
              'dest': f'Q{qubit}.rdrv',
-             'freq': config.readout[qubit].freq,
+             'freq': config[f'readout/{qubit}/freq'],
              'amp': 1.0, 
              'phase': 0.0,
-             'twidth': config.readout[qubit].length,
+             'twidth': config['readout/length'],
              'env': pulse_envelopes[config.readout[qubit].env](
-                    config.readout[qubit].length,
-                    config.readout[qubit].sample_rate,
-                    amp=config.readout[qubit].amp,
-                    **config.readout[qubit].kwargs
+                    config['readout/length'],
+                    config['readout/sample_rate'],
+                    amp=config[f'readout/{qubit}/amp'],
+                    **config['readout/kwargs']
                 )
             },
             {'name': 'delay',
@@ -171,13 +171,13 @@ def add_measurement(
             },
             {'name': 'pulse',
              'dest': f'Q{qubit}.rdlo',
-             'freq': config.readout[qubit].freq,
+             'freq': config[f'readout/{qubit}/freq'],
              'amp': 1.0,
-             'phase': config.readout[qubit].phase,  # Rotation in IQ plane
-             'twidth': config.readout[qubit].length,
+             'phase': config[f'readout/{qubit}/phase'],  # Rotation in IQ plane
+             'twidth': config['readout/length'],
              'env': pulse_envelopes['square'](
-                    config.readout[qubit].length,
-                    config.readout[qubit].sample_rate,
+                    config['readout/length'],
+                    config['readout/sample_rate'],
                 )
             }
         )
@@ -188,7 +188,8 @@ def add_delay(config: Config, gate: Gate, circuit: List) -> None:
     """Add a delay for an idle gate.
 
     Args:
-        config (Config): qcal Config object.
+        config (Config): qcal Config object. Unused, but included for 
+            convenation.
         gate (Gate):     single-qubit gate.
         circuit (List):  qubic circuit.
     """
@@ -209,7 +210,7 @@ def add_virtualz_gate(config: Config, gate: Gate, circuit: List) -> None:
     """
     circuit.append(
         {'name': 'virtual_z',
-         'freq': config.single_qubit[gate.qubits[0]][gate.subspace].freq[0],
+         'freq': config[f'single_qubit/{gate.qubits[0]}/{gate.subspace}/freq'],
          'phase': gate.properties['params']['phase']}
     )
 
@@ -222,14 +223,15 @@ def add_single_qubit_gate(config: Config, gate: Gate, circuit: List) -> None:
         gate (Gate):     single-qubit gate.
         circuit (List):  qubic circuit.
     """
+    qubit = gate.qubits[0]
     subspace = gate.subspace
     for pulse in (
-        config.single_qubit[gate.qubits[0]][subspace][gate.name].pulse):
+        config[f'single_qubit/{qubit}/{subspace}/{gate.name}/pulse']):
 
         if pulse['env'] == 'virtualz':
             circuit.append(
                 {'name': 'virtual_z',
-                 'freq': config.single_qubit[gate.qubits[0]][subspace].freq[0],
+                 'freq': config[f'single_qubit/{qubit}/{subspace}/freq'],
                  'phase': pulse['kwargs']['phase']
                 }
             )
@@ -238,13 +240,13 @@ def add_single_qubit_gate(config: Config, gate: Gate, circuit: List) -> None:
             circuit.append(
                 {'name': 'pulse',
                  'dest': pulse['channel'],
-                 'freq': config.single_qubit[gate.qubits[0]][subspace].freq[0],
+                 'freq': config[f'single_qubit/{qubit}/{subspace}/freq'],
                  'amp': 1.0,
                  'phase': 0.0,
                  'twidth': pulse['length'],
                  'env': pulse_envelopes[pulse['env']](
                         pulse['length'],
-                        config.hardware.loc['DAC_sample_rate'][0],
+                        config['hardware/DAC_sample_rate'],
                         **pulse['kwargs']
                     )
                 }
@@ -259,7 +261,7 @@ def add_multi_qubit_gate(config: Config, gate: Gate, circuit: List) -> None:
         gate (Gate):     multi-qubit gate.
         circuit (List):  qubic circuit.
     """
-    for pulse in config.two_qubit[gate.qubits][gate.name].pulse[0]:
+    for pulse in config[f'two_qubit/{gate.qubits}/{gate.name}/pulse']:
 
         if pulse['env'] == 'virtualz':
             circuit.append(
@@ -273,13 +275,13 @@ def add_multi_qubit_gate(config: Config, gate: Gate, circuit: List) -> None:
             circuit.append(
                 {'name': 'pulse',
                  'dest': pulse['channel'], 
-                 'freq': config.two_qubit[gate.qubits][gate.name].freq[0],
+                 'freq': config[f'two_qubit/{gate.qubits}/{gate.name}/freq'],
                  'amp': 1.0,
                  'phase': 0.0,
                  'twidth': pulse['length'], 
                  'env': pulse_envelopes[pulse['env']](
                         pulse['length'],
-                        config.hardware.loc['DAC_sample_rate'][0],
+                        config['hardware/DAC_sample_rate'],
                         **pulse['kwargs']
                     )
                 }
