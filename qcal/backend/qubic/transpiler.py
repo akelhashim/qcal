@@ -21,7 +21,7 @@ __all__ = ('to_qubic', 'Transpiler')
 
 
 def add_reset(
-        config: Config, qubits: List | Tuple, circuit: List
+       config: Config, qubits: List | Tuple, circuit: List, pulses: defaultdict
     ) -> None:
     """Add active or passive reset to the beginning of a circuit.
 
@@ -29,12 +29,13 @@ def add_reset(
         config (Config):       qcal Config object.
         qubits (List | Tuple): qubits to reset.
         circuit (List):        qubic circuit.
+        pulses (defaultdict):  pulses that have been stored for reuse.
     """
     if config['reset/active/enable']:
         reset_circuit = []
         for _ in range(config['reset/active/n_resets']):
             for q in qubits:
-                add_measurement(config, q, reset_circuit)
+                add_measurement(config, q, reset_circuit, pulses)
                 reset_circuit.append({'name': 'barrier', 'scope': [f'Q{q}']})
                 reset_circuit.append(
                     {'name': 'branch_fproc',
@@ -82,7 +83,7 @@ def add_reset(
 
 
 def add_heralding(
-        config: Config, qubits: List | Tuple, circuit: List
+       config: Config, qubits: List | Tuple, circuit: List, pulses: defaultdict
     ) -> None:
     """Add heralded readout to the beginning of the circuit.
 
@@ -90,9 +91,10 @@ def add_heralding(
         config (Config):       qcal Config object.
         qubits (List | Tuple): qubits to reset.
         circuit (List):        qubic circuit.
+        pulses (defaultdict):  pulses that have been stored for reuse.
     """
     for q in qubits:
-        add_measurement(config, q, circuit)
+        add_measurement(config, q, circuit, pulses)
 
     circuit.extend((
             {'name': 'delay',
@@ -118,8 +120,10 @@ def add_measurement(
     """
     if isinstance(qubit_or_gate, int):
         qubit = qubit_or_gate
+        qubits = (qubit,)
     elif isinstance(qubit_or_gate, Gate):
-        qubit = qubit_or_gate.qubits[0]
+        qubits = qubit_or_gate.qubits
+        qubit = qubits[0]
 
     meas_pulse = []
     # Excited state promotion
@@ -148,10 +152,7 @@ def add_measurement(
             for pulse in config[f'single_qubit/{qubit}/EF/X/pulse']:
                 length += pulse['length']
             meas_pulse.append(
-                {'name': 'delay',
-                 't': length,
-                 'qubit': [f'Q{qubit}']
-                }
+                {'name': 'delay', 't': length, 'qubit': [f'Q{qubit}']}
             )
             
     meas_pulse.append({'name': 'barrier', 'qubit': [f'Q{qubit}']})
@@ -188,7 +189,7 @@ def add_measurement(
         ]
     )
 
-    pulses[f'Meas:{qubit}'] = meas_pulse
+    pulses[f'MeasGE:{qubits}'] = meas_pulse
     circuit.extend(meas_pulse)
 
 
@@ -206,12 +207,9 @@ def add_delay(
     """
     qubit = gate.qubits[0]
     duration = gate.properties['params']['duration']
-    delay_pulse =  {'name': 'delay', 't': duration, 'qubit': [f'Q{qubit}']}
-    if duration > 0.:
-        pulses[f'Idle:{qubit}'] = delay_pulse
-    else:
-        pulses[f'I:{qubit}'] = delay_pulse
-    circuit.append(delay_pulse)
+    delay_pulse =  [{'name': 'delay', 't': duration, 'qubit': [f'Q{qubit}']}]
+    pulses[f'{gate.name}{gate.subspace}:{gate.qubits}'] = delay_pulse
+    circuit.extend(delay_pulse)
 
 
 def add_virtualz_gate(
@@ -225,15 +223,15 @@ def add_virtualz_gate(
         circuit (List):       qubic circuit.
         pulses (defaultdict): pulses that have been stored for reuse.
     """
-    qubit = gate.qubits[0]
+    subspace = gate.subspace
     phase = gate.properties['params']['phase']
-    phase_pulse = {
+    phase_pulse = [{
         'name': 'virtual_z',
-        'freq': config[f'single_qubit/{gate.qubits[0]}/{gate.subspace}/freq'],
+        'freq': config[f'single_qubit/{gate.qubits[0]}/{subspace}/freq'],
         'phase': phase
-    }
-    
-    circuit.append(phase_pulse)
+    }]
+    pulses[f'{gate.name}{phase}{gate.subspace}:{gate.qubits}'] = phase_pulse
+    circuit.extend(phase_pulse)
 
 
 def add_single_qubit_gate(
@@ -248,12 +246,14 @@ def add_single_qubit_gate(
         pulses (defaultdict): pulses that have been stored for reuse.
     """
     qubit = gate.qubits[0]
+    name = gate.name
     subspace = gate.subspace
+    sq_pulse = []
     for pulse in (
-        config[f'single_qubit/{qubit}/{subspace}/{gate.name}/pulse']):
+        config[f'single_qubit/{qubit}/{subspace}/{name}/pulse']):
 
         if pulse['env'] == 'virtualz':
-            circuit.append(
+            sq_pulse.append(
                 {'name': 'virtual_z',
                  'freq': config[f'single_qubit/{qubit}/{subspace}/freq'],
                  'phase': pulse['kwargs']['phase']
@@ -261,7 +261,7 @@ def add_single_qubit_gate(
             )
             
         else:
-            circuit.append(
+            sq_pulse.append(
                 {'name': 'pulse',
                  'dest': pulse['channel'],
                  'freq': config[f'single_qubit/{qubit}/{subspace}/freq'],
@@ -276,6 +276,9 @@ def add_single_qubit_gate(
                 }
             )
 
+    pulses[f'{name}{subspace}:{gate.qubits}'] = sq_pulse
+    circuit.extend(sq_pulse)
+
 
 def add_multi_qubit_gate(
         config: Config, gate: Gate, circuit: List, pulses: defaultdict
@@ -288,10 +291,13 @@ def add_multi_qubit_gate(
         circuit (List):       qubic circuit.
         pulses (defaultdict): pulses that have been stored for reuse.
     """
-    for pulse in config[f'two_qubit/{gate.qubits}/{gate.name}/pulse']:
+    qubits = gate.qubits
+    name = gate.name
+    mq_pulse = []
+    for pulse in config[f'two_qubit/{qubits}/{name}/pulse']:
 
         if pulse['env'] == 'virtualz':
-            circuit.append(
+            mq_pulse.append(
                 {'name': 'virtual_z',
                  'freq': config[pulse['freq']],
                  'phase': pulse['kwargs']['phase']
@@ -299,10 +305,10 @@ def add_multi_qubit_gate(
             )
 
         else:
-            circuit.append(
+            mq_pulse.append(
                 {'name': 'pulse',
                  'dest': pulse['channel'], 
-                 'freq': config[f'two_qubit/{gate.qubits}/{gate.name}/freq'],
+                 'freq': config[f'two_qubit/{qubits}/{name}/freq'],
                  'amp': 1.0,
                  'phase': 0.0,
                  'twidth': pulse['length'], 
@@ -313,6 +319,9 @@ def add_multi_qubit_gate(
                     )
                 }
             )
+
+    pulses[f'{name}{gate.subspace}:{qubits}'] = mq_pulse
+    circuit.extend(mq_pulse)
 
 
 def transpilation_error(*args):
@@ -346,17 +355,27 @@ def to_qubic(
     qubic_circuit = []
     
     # Add reset to the beginning of the circuit
-    add_reset(config, circuit.qubits, qubic_circuit)
+    add_reset(config, circuit.qubits, qubic_circuit, pulses)
 
     # Add (optional) readout heralding
     if config.parameters['readout']['herald']:
-        add_heralding(config, circuit.qubits, qubic_circuit)
+        add_heralding(config, circuit.qubits, qubic_circuit, pulses)
 
     for cycle in circuit.cycles:
 
         if not cycle.is_barrier:
             for gate in cycle:
-                gate_mapper[gate.name](config, gate, qubic_circuit, pulses)
+
+                name = gate.name
+                if 'phase' in gate.properties['params'].keys():
+                    name += str(gate.properties['params']['phase'])
+                if pulses[f'{name}{gate.subspace}:{gate.qubits}']:
+                    qubic_circuit.extend(
+                        pulses[f'{name}{gate.subspace}:{gate.qubits}']
+                    )
+
+                else:
+                    gate_mapper[gate.name](config, gate, qubic_circuit, pulses)
 
         elif cycle.is_barrier:
             qubits = cycle.qubits if cycle.qubits else circuit.qubits
@@ -371,7 +390,7 @@ def to_qubic(
 class Transpiler:
     """qcal to QubiC Transpiler."""
 
-    __slots__ = ('_config', '_gate_mapper', '_reset_pulse', '_pulses')
+    __slots__ = ('_config', '_gate_mapper', '_reload_pulse', '_pulses')
 
     def __init__(self, 
             config:       Config, 
@@ -443,32 +462,6 @@ class Transpiler:
         Returns:
             List[Dict]: transpiled circuits.
         """
-        # transpiled_circuits = []
-        # # Check for a param sweep
-        # params = [col for col in circuits._df.columns if 'param' in col]
-        # if params:
-        #     for i, circuit in enumerate(circuits):
-        #         for param in params:  # [7:] removes the string 'param: '
-        #             self._config[param[7:]] = circuits[param][i]
-        #         if self._reload_pulse:
-        #             self._pulses = defaultdict(lambda: False, {})
-        #         transpiled_circuits.append(
-        #             to_qubic(
-        #                 self._config, circuit, self._gate_mapper, self._pulses
-        #             )
-        #         )
-        #     self._config.reload()  # Reload after making all the changes
-
-        # else:
-        #     for circuit in enumerate(circuits):
-        #         if self._reload_pulse:
-        #             self._pulses = defaultdict(lambda: False, {})
-        #         transpiled_circuits.append(
-        #             to_qubic(
-        #                 self._config, circuit, self._gate_mapper, self._pulses
-        #             )
-        #         )
-
         transpiled_circuits = []
         # Check for a param sweep
         params = [col for col in circuits._df.columns if 'param' in col]
