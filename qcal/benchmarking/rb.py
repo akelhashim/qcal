@@ -10,6 +10,7 @@ from qcal.plotting.utils import calculate_nrows_ncols
 
 import logging
 import matplotlib.pyplot as plt
+import numpy as np
 
 from IPython.display import clear_output
 from typing import Any, Callable, List, Tuple, Iterable
@@ -32,7 +33,7 @@ def SRB(qpu:             QPU,
         n_circs_per_seq: int = 1,
         n_levels:        int = 2,
         compiled_pauli:  bool = True,
-        include_rcal:    bool = True,
+        include_rcal:    bool = False,
         **kwargs
     ) -> Callable:
     """Streamlined Randomized Benchmarking.
@@ -72,7 +73,7 @@ def SRB(qpu:             QPU,
             Pauli gate for each qubit in the cycle preceding a measurement 
             operation. Defaults to True.
         include_rcal (bool, optional): whether to measure RCAL circuits in the
-            same circuit collection as the SRB circuit. Defaults to True. If
+            same circuit collection as the SRB circuit. Defaults to False. If
             True, readout correction will be apply to the fit results 
             automatically.
 
@@ -99,7 +100,7 @@ def SRB(qpu:             QPU,
                 n_circs_per_seq: int = 1,
                 n_levels:        int = 2,
                 compiled_pauli:  bool = True,
-                include_rcal:    bool = True,
+                include_rcal:    bool = False,
                 **kwargs
             ) -> None:
             from qcal.interface.trueq.compiler import Compiler
@@ -158,8 +159,11 @@ def SRB(qpu:             QPU,
             fig, axes = plt.subplots(
                 nrows, ncols, figsize=figsize, layout='constrained'
             )
-
-            self._circuits.plot.raw(axes=axes.ravel())
+            
+            if isinstance(axes, np.ndarray):
+                self._circuits.plot.raw(axes=axes.ravel())
+            else:
+                self._circuits.plot.raw(axes=axes)
 
             k = -1
             for i in range(nrows):
@@ -227,8 +231,8 @@ def SRB(qpu:             QPU,
             if settings.Settings.save_data:
                 self.save() 
             self.analyze()
-            print(f"\nRuntime: {repr(self._runtime)[8:]}\n")
             self.plot()
+            print(f"\nRuntime: {repr(self._runtime)[8:]}\n")
 
 
     return SRB(

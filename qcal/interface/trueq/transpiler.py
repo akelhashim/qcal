@@ -11,13 +11,12 @@ import multiprocessing as mp
 import numpy as np
 
 from collections import defaultdict, deque
-from typing import List
 
 logger = logging.getLogger(__name__)
 
 
 def to_qcal(
-        circuit, gate_mapper: defaultdict, cs: CircuitSet, element: int,
+        circuit, gate_mapper: defaultdict, #cs: CircuitSet, element: int,
         barrier_between_all: bool = False
     ) -> None:
     """Compile a qcal circuit to a qubic circuit.
@@ -25,8 +24,8 @@ def to_qcal(
     Args:
         circuit (tq.Circuit):      True-Q circuit.
         gate_mapper (defaultdict): map between True-Q to qcal gates.
-        cs (CircuitSet):           set of transpiled circuits.
-        element (int):             element of the CircuitSet.
+        # cs (CircuitSet):           set of transpiled circuits.
+        # element (int):             element of the CircuitSet.
         barrier_between_all (bool, optional): whether to place a barrier
             between all cycles. Defaults to False. This is useful for
             benchmarking circuits to ensure that the circuit structure is
@@ -64,7 +63,9 @@ def to_qcal(
     tcircuit = Circuit(tcircuit)
     # tcircuit.measure()
 
-    cs.circuit[element] = tcircuit
+    return tcircuit
+
+    # cs.circuit[element] = tcircuit
 
 
 class Transpiler(Transpiler):
@@ -75,14 +76,14 @@ class Transpiler(Transpiler):
 
     def __init__(
             self, 
-            gate_mapper:         defaultdict | None = None, 
+            gate_mapper:         dict | None = None, 
             barrier_between_all: bool = False,
             parallelize:         bool = False
         ) -> None:
         """Initialize with a gate_mapper.
 
         Args:
-            gate_mapper (defaultdict | None, optional): dictionary which maps
+            gate_mapper (dict | None, optional): dictionary which maps
                 TrueQ gates to Qubic gates. Defaults to None.
             barrier_between_all (bool, optional): whether to place a barrier
                 between all cycles. Defaults to False. This is useful for
@@ -94,17 +95,14 @@ class Transpiler(Transpiler):
                 circuits and/or long circuit depths.
         """
         if gate_mapper is None:
-            gate_mapper = defaultdict(
-                lambda: 'Gate not currently supported!',
-                {**single_qubit_gates, **two_qubit_gates}
-            )
+            gate_mapper = {**single_qubit_gates, **two_qubit_gates}
         super().__init__(gate_mapper=gate_mapper)
         self._barrier_between_all = barrier_between_all
         self._parallelize = parallelize
 
     def transpile(
             self, circuits: tq.Circuit | tq.CircuitCollection
-        ) -> List[Circuit]:
+        ) -> CircuitSet:
         """Transpile all circuits.
 
         Args:
@@ -112,36 +110,41 @@ class Transpiler(Transpiler):
                 transpile.
 
         Returns:
-            List[Circuit]: transpiled circuits.
+            CircuitSet: transpiled circuits.
         """
         import trueq as tq
         if not isinstance(circuits, tq.CircuitCollection):
             circuits = tq.CircuitCollection(circuits)
 
-        tcircuits = CircuitSet([np.nan for _ in range(len(circuits))])
         if self._parallelize and mp.cpu_count() > 2:
+            tcircuits = {}
             logger.info(
-                f" Pooling 2 processes for transpilation..."
+                f" Pooling {mp.cpu_count() - 2} processes for transpilation..."
             )
-            pool = mp.Pool(2)
+            pool = mp.Pool(mp.cpu_count() - 2)
             try:
                 for i, circuit in enumerate(circuits):
-                    pool.apply_async(
-                        to_qcal(
-                            circuit, self._gate_mapper, tcircuits, i, 
-                            self._barrier_between_all
-                        )
+                    tcirc = pool.apply_async(
+                        to_qcal,
+                        args=[circuit, self._gate_mapper],
+                        kwds={'barrier_between_all': self._barrier_between_all}                      
                     )
+                    tcircuits[i] = tcirc.get()
             finally:
                 pool.close()
                 pool.join()
+                tcircuits = list(dict(sorted(tcircuits.items())).values())
 
         else:
+            tcircuits = []
             for i, circuit in enumerate(circuits):
-                to_qcal(
-                    circuit, self._gate_mapper, tcircuits, i, 
+                tcircuits.append(
+                    to_qcal(
+                    circuit, self._gate_mapper, #tcircuits, i, 
                     self._barrier_between_all
+                    )
                 )
-
+        
+        tcircuits = CircuitSet(circuits=tcircuits)
         tcircuits['key'] = [str(circ.key) for circ in circuits]
         return tcircuits

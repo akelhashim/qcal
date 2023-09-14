@@ -280,9 +280,12 @@ def Amplitude(
                     f'two_qubit/{pair}/CZ/pulse/{idx+1}/kwargs/amp'
                 )
 
+            self._amplitudes = {}
             if not isinstance(amplitudes, dict):
-                self._amplitudes = {}
                 for pair in qubit_pairs:
+                    idx = find_pulse_index(
+                        config, f'two_qubit/{pair}/CZ/pulse'
+                    )
                     if relative_amp:
                         self._amplitudes[pair] = (
                         config[f'two_qubit/{pair}/CZ/pulse/{idx}/kwargs/amp']
@@ -293,7 +296,10 @@ def Amplitude(
                     else:
                         self._amplitudes[pair] = (amplitudes, amplitudes)
             else:
-                self._amplitudes = amplitudes
+                for pair in qubit_pairs:
+                    self._amplitudes[pair] = (
+                        amplitudes[pair], amplitudes[pair]
+                    )
             self._param_sweep = self._amplitudes
                 
             self._R = {}
@@ -646,26 +652,31 @@ def RelativeAmp(
             self._qubits = qubit_pairs
 
             self._params = {}
-            self._amplitudes = {}
             for pair in qubit_pairs:
                 idx = find_pulse_index(config, f'two_qubit/{pair}/CZ/pulse')
                 self._params[pair] = (
                     f'two_qubit/{pair}/CZ/pulse/{idx+1}/kwargs/amp'
                 )
 
-                if not isinstance(amplitudes, dict):
-                    self._amplitudes = {
-                        pair: (
-                          config[f'two_qubit/{pair}/CZ/pulse/{idx}/kwargs/amp'] 
-                          * amplitudes
-                        )
-                    }
-                else:
-                    for pair, amps_ in amplitudes.items():
-                        self._amplitudes[pair] = (
-                          config[f'two_qubit/{pair}/CZ/pulse/{idx}/kwargs/amp'] 
-                          * amps_
-                        )
+            self._amplitudes = {}
+            if not isinstance(amplitudes, dict):
+                for pair in qubit_pairs:
+                    idx = find_pulse_index(
+                        config, f'two_qubit/{pair}/CZ/pulse'
+                    )
+                    self._amplitudes[pair] = (
+                        config[f'two_qubit/{pair}/CZ/pulse/{idx}/kwargs/amp'] 
+                        * amplitudes
+                    )
+            else:
+                for pair, amps_ in amplitudes.items():
+                    idx = find_pulse_index(
+                        config, f'two_qubit/{pair}/CZ/pulse'
+                    )
+                    self._amplitudes[pair] = (
+                        config[f'two_qubit/{pair}/CZ/pulse/{idx}/kwargs/amp'] 
+                        * amps_
+                    )
             self._param_sweep = self._amplitudes
                 
             self._R = {}
@@ -1369,34 +1380,35 @@ def LocalPhases(
             # Compute the conditionality and fit to a parabola
             qubits = list(set(chain.from_iterable(self._qubits)))
             for pair in self._qubits:
-                i = qubits.index(pair[0])
+                c = qubits.index(pair[0])
+                t = qubits.index(pair[1])
 
                 prob_C0_X = []
                 for circuit in self._circuits[
                     self._circuits['sequence'] == 'C0_X'].circuit:
                     prob_C0_X.append(
-                        circuit.results.marginalize(i+1).populations['0']
+                        circuit.results.marginalize(t).populations['0']
                     )
 
                 prob_C1_X = []
                 for circuit in self._circuits[
                     self._circuits['sequence'] == 'C1_X'].circuit:
                     prob_C1_X.append(
-                        circuit.results.marginalize(i+1).populations['0']
+                        circuit.results.marginalize(t).populations['0']
                     )
 
                 prob_T0_X = []
                 for circuit in self._circuits[
                     self._circuits['sequence'] == 'T0_X'].circuit:
                     prob_T0_X.append(
-                        circuit.results.marginalize(i).populations['0']
+                        circuit.results.marginalize(c).populations['0']
                     )
 
                 prob_T1_X = []
                 for circuit in self._circuits[
                     self._circuits['sequence'] == 'T1_X'].circuit:
                     prob_T1_X.append(
-                        circuit.results.marginalize(i).populations['0']
+                        circuit.results.marginalize(c).populations['0']
                     )
 
                 self._circuits[f'{pair}: Prob(0)'] = (
@@ -1426,16 +1438,32 @@ def LocalPhases(
                 }
 
                 self._fit[pair]['X_C0'].fit(
-                    self._phases[pair], X_C0, p0=(1, 1/(2*np.pi), 0, 0)
+                    self._phases[pair], X_C0, p0=(1, 1/(2*np.pi), 0, 0),
+                    bounds=(
+                        [0., 0., -np.pi, -0.1], 
+                        [1., np.inf, np.pi, 0.1]
+                    )
                 )
                 self._fit[pair]['X_C1'].fit(
-                    self._phases[pair], -X_C1, p0=(1, 1/(2*np.pi), 0, 0)
+                    self._phases[pair], X_C1, p0=(-1, 1/(2*np.pi), 0, 0),
+                    bounds=(
+                        [-1., 0., -np.pi, -0.1], 
+                        [0., np.inf, np.pi, 0.1]
+                    )
                 )
                 self._fit[pair]['X_T0'].fit(
-                    self._phases[pair], X_T0, p0=(1, 1/(2*np.pi), 0, 0)
+                    self._phases[pair], X_T0, p0=(1, 1/(2*np.pi), 0, 0),
+                    bounds=(
+                        [0., 0., -np.pi, -0.1], 
+                        [1., np.inf, np.pi, 0.1]
+                    )
                 )
                 self._fit[pair]['X_T1'].fit(
-                    self._phases[pair], X_T1, p0=(1, 1/(2*np.pi), 0, 0)
+                    self._phases[pair], X_T1, p0=(-1, 1/(2*np.pi), 0, 0),
+                    bounds=(
+                        [-1., 0., -np.pi, -0.1], 
+                        [0., np.inf, np.pi, 0.1]
+                    )
                 )
 
                 if (self._fit[pair]['X_C0'].fit_success and
@@ -1474,15 +1502,15 @@ def LocalPhases(
             """Plot the frequency sweep and fit results."""
             nrows = len(self._qubits)
             figsize = (12, 4 * nrows)
-            fig, ax = plt.subplots(
+            fig, axes = plt.subplots(
                 nrows, 2, figsize=figsize, layout='constrained'
             )
 
             for i, pair in enumerate(self._qubits):
                 if len(self._qubits) == 1:
-                    ax = ax
+                    ax = axes
                 else:
-                    ax = ax[i]
+                    ax = axes[i]
 
                 ax[0].set_xlabel(f'Phase Q{pair[0]} (rad.)', fontsize=15)
                 ax[1].set_xlabel(f'Phase Q{pair[1]} (rad.)', fontsize=15)
@@ -1498,7 +1526,7 @@ def LocalPhases(
                     self._phases[pair], self._sweep_results[pair]['X_T0'], 'bo'
                 )
                 ax[0].plot(
-                   self._phases[pair], -self._sweep_results[pair]['X_T1'], 'ro'
+                   self._phases[pair], self._sweep_results[pair]['X_T1'], 'ro'
                 )
                 if self._fit[pair]['X_T0'].fit_success:
                     x = np.linspace(
@@ -1514,7 +1542,7 @@ def LocalPhases(
                     x = np.linspace(
                         self._phases[pair][0], self._phases[pair][-1], 100
                     )
-                    ax[0].plot(x, -self._fit[pair]['X_T1'].predict(x), 'r-')
+                    ax[0].plot(x, self._fit[pair]['X_T1'].predict(x), 'r-')
                     ax[0].axvline(self._phase_T1, ls='-', c='r',
                         label=(
                          rf'Q{pair[1]} $|1\rangle$: {round(self._phase_T1, 2)}'
@@ -1542,7 +1570,7 @@ def LocalPhases(
                     x = np.linspace(
                         self._phases[pair][0], self._phases[pair][-1], 100
                     )
-                    ax[1].plot(x, -self._fit[pair]['X_C1'].predict(x), 'r-')
+                    ax[1].plot(x, self._fit[pair]['X_C1'].predict(x), 'r-')
                     ax[1].axvline(self._phase_C1, ls='-', c='r', 
                         label=(
                          rf'Q{pair[0]} $|1\rangle$: {round(self._phase_C1, 2)}'
