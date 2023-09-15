@@ -43,7 +43,8 @@ def ReadoutCalibration(
         gate:            str = 'X90',
         model:           str = 'gmm',
         compiler:        Any | Compiler | None = None, 
-        transpiler:      Any | None = None, 
+        transpiler:      Any | None = None,
+        classifier:      ClassificationManager = None,
         n_shots:         int = 1024, 
         n_batches:       int = 1, 
         n_circs_per_seq: int = 1, 
@@ -77,6 +78,8 @@ def ReadoutCalibration(
             compile the experimental circuits. Defaults to None.
         transpiler (Any | None, optional): custom transpiler to 
             transpile the experimental circuits. Defaults to None.
+        classifier (ClassificationManager, optional): manager used for 
+            classifying raw data. Defaults to None.
         n_shots (int, optional): number of measurements per circuit. 
             Defaults to 1024.
         n_batches (int, optional): number of batches of measurements. 
@@ -107,7 +110,8 @@ def ReadoutCalibration(
                 gate:            str = 'X90',
                 model:           str = 'gmm',
                 compiler:        Any | Compiler | None = None, 
-                transpiler:      Any | None = None, 
+                transpiler:      Any | None = None,
+                classifier:      ClassificationManager = None,
                 n_shots:         int = 1024, 
                 n_batches:       int = 1, 
                 n_circs_per_seq: int = 1, 
@@ -161,10 +165,13 @@ def ReadoutCalibration(
             )
             self._gate = gate
 
-            self._classifier = ClassificationManager(
-                qubits=qubits, n_levels=n_levels, model=model,
-                **cm_kwargs 
-            )
+            if classifier:
+                self._classifier = classifier
+            else:
+                self._classifier = ClassificationManager(
+                    qubits=qubits, n_levels=n_levels, model=model,
+                    **cm_kwargs 
+                )
             self._X = {}
             self._y = {}
 
@@ -283,10 +290,6 @@ def ReadoutCalibration(
                 nrows, ncols, figsize=figsize, layout='constrained'
             )
 
-            # if self._n_levels == 2:
-            #     colors = ["grey", "blue"]
-            # elif self._n_levels == 3:
-            #     colors = ["grey", "blue", "blueviolet"]
             colors = [
                 (0.12156862745098039, 0.4666666666666667, 0.7058823529411765),
                 (1.0, 0.4980392156862745, 0.054901960784313725),
@@ -414,7 +417,8 @@ def ReadoutCalibration(
         gate,
         model,
         compiler, 
-        transpiler, 
+        transpiler,
+        classifier,
         n_shots, 
         n_batches, 
         n_circs_per_seq, 

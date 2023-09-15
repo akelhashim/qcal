@@ -643,7 +643,7 @@ def Frequency(
             """Plot the frequency sweep and fit results."""
             nrows = len(self._qubits)
             figsize = (10, 4 * nrows)
-            fig, ax = plt.subplots(
+            fig, axes = plt.subplots(
                 nrows, 2, figsize=figsize, layout='constrained'
             )
             colors = plt.get_cmap('viridis', self._detunings.size)
@@ -651,9 +651,9 @@ def Frequency(
 
             for i, q in enumerate(self._qubits):
                 if len(self._qubits) == 1:
-                    ax = ax
+                    ax = axes
                 else:
-                    ax = ax[i]
+                    ax = axes[i]
 
                 ax[0].set_xlabel(r'Time ($\mu$s)', fontsize=15)
                 ax[1].set_xlabel('Detuning (MHz)', fontsize=15)
