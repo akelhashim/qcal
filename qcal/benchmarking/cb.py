@@ -254,75 +254,58 @@ def CB(qpu:                  QPU,
         def plot(self) -> None:
             """Plot the SRB fit results."""
             # Plot the raw curves
-            nrows = 2
-            if self._include_ref_cycle:
-                ncols = 2
-            figsize = (7 * ncols, 5 * nrows)
+            ncols = 2 if self._include_ref_cycle else 1
+            figsize = (6 * ncols, 5)
             fig, axes = plt.subplots(
-                nrows, ncols, figsize=figsize, layout='constrained'
+                1, ncols, figsize=figsize, layout='constrained'
             )
+            self._circuits.plot.raw(axes=axes)
+            for i in range(ncols):
+                if ncols == 1:
+                    ax = axes
+                elif ncols == 2:
+                    ax = axes[i]
+                ax.set_title(ax.get_title(), fontsize=20)
+                ax.xaxis.get_label().set_fontsize(15)
+                ax.yaxis.get_label().set_fontsize(15)
+                ax.tick_params(axis='both', which='major', labelsize=12)
+                ax.legend(prop=dict(size=12))
+                ax.grid(True)
 
-
-            
-            if isinstance(axes, np.ndarray):
-                self._circuits.plot.raw(axes=axes.ravel())
-            else:
-                self._circuits.plot.raw(axes=axes)
-
-            k = -1
-            for i in range(nrows):
-                for j in range(ncols):
-                    k += 1
-
-                    if len(self._qubit_labels) == 1:
-                        ax = axes
-                    elif axes.ndim == 1:
-                        ax = axes[j]
-                    elif axes.ndim == 2:
-                        ax = axes[i,j]
-
-                    if k < len(self._qubit_labels):
-                        ax.set_title(ax.get_title(), fontsize=20)
-                        ax.xaxis.get_label().set_fontsize(15)
-                        ax.yaxis.get_label().set_fontsize(15)
-                        ax.tick_params(
-                            axis='both', which='major', labelsize=12
-                        )
-                        ax.legend(prop=dict(size=12))
-                        ax.grid(True)
-
-                    else:
-                        ax.axis('off')
-                
-            fig.set_tight_layout(True)
-            if settings.Settings.save_data:
-                fig.savefig(
-                    self._data_manager._save_path + 'CB_decays.png', 
-                    dpi=300
-                )
-            plt.show()
+                fig.set_tight_layout(True)
+                if settings.Settings.save_data:
+                    fig.savefig(
+                        self._data_manager._save_path + 'CB_decays.png', 
+                        dpi=300
+                    )
+                plt.show()
 
             # Plot the CB infidelities
-            figsize = (5 * ncols, 4)
-            fig, ax = plt.subplots(figsize=figsize, layout='constrained')
-
-            self._circuits.plot.compare_pauli_infidelities(axes=ax)
-            ax.set_title(ax.get_title(), fontsize=18)
-            ax.xaxis.get_label().set_fontsize(15)
-            ax.yaxis.get_label().set_fontsize(15)
-            ax.tick_params(
-                axis='both', which='major', labelsize=12
+            nrows = 2 if self._include_ref_cycle else 1
+            figsize = (8, 5 * nrows)
+            fig, axes = plt.subplots(
+                nrows, 1, figsize=figsize, layout='constrained'
             )
-            ax.legend(prop=dict(size=12))
-            ax.grid(True)
+            self._circuits.plot.compare_pauli_infidelities(axes=axes)
+            for i in range(nrows):
+                if nrows == 1:
+                    ax = axes
+                elif nrows == 2:
+                    ax = axes[i]
+                ax.set_title(ax.get_title(), fontsize=18)
+                ax.xaxis.get_label().set_fontsize(15)
+                ax.yaxis.get_label().set_fontsize(15)
+                ax.tick_params(axis='both', which='major', labelsize=12)
+                ax.legend(prop=dict(size=12))
+                ax.grid(True)
 
-            fig.set_tight_layout(True)
-            if settings.Settings.save_data:
-                fig.savefig(
-                    self._data_manager._save_path + 'CB_infidelities.png', 
-                    dpi=300
-                )
-            plt.show()
+                fig.set_tight_layout(True)
+                if settings.Settings.save_data:
+                    fig.savefig(
+                        self._data_manager._save_path + 'CB_infidelities.png', 
+                        dpi=300
+                    )
+                plt.show()
 
         def run(self):
             """Run all experimental methods and analyze results."""
@@ -335,7 +318,7 @@ def CB(qpu:                  QPU,
             if settings.Settings.save_data:
                 self.save() 
             self.analyze()
-            # self.plot()
+            self.plot()
             print(f"\nRuntime: {repr(self._runtime)[8:]}\n")
 
 
