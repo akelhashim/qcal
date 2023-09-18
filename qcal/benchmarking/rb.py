@@ -1,5 +1,9 @@
 """Submodule for RB routines.
 
+For SRB, see:
+https://trueq.quantumbenchmark.com/guides/error_diagnostics/srb.html
+
+
 """
 import qcal.settings as settings
 
@@ -14,6 +18,7 @@ import numpy as np
 
 from IPython.display import clear_output
 from typing import Any, Callable, List, Tuple, Iterable
+
 
 logger = logging.getLogger(__name__)
 
@@ -148,7 +153,7 @@ def SRB(qpu:             QPU,
             """Analyze the SRB results."""
             logger.info(' Analyzing the results...')
             print('')
-            print(self._circuits.fit())
+            print(self._circuits.fit(analyze_dim=2))
 
         def plot(self) -> None:
             """Plot the SRB fit results."""
