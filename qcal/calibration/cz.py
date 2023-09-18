@@ -541,6 +541,362 @@ def Amplitude(
     )
 
 
+def Frequency(
+        qpu:             QPU,
+        config:          Config,
+        qubit_pairs:     List[Tuple],
+        frequencies:     ArrayLike | NDArray | Dict[ArrayLike | NDArray],
+        compiler:        Any | Compiler | None = None, 
+        transpiler:      Any | None = None,
+        classifier:      ClassificationManager = None,
+        n_shots:         int = 1024, 
+        n_batches:       int = 1, 
+        n_circs_per_seq: int = 1,
+        n_levels:        int = 2,
+        n_gates:         int = 1,
+        relative_freq:   bool = False,
+        esp:             bool = False,
+        heralding:       bool = True,
+        **kwargs
+    ) -> Callable:
+    """Frequency calibration for CZ gate.
+
+    This calibration finds the frequency where the conditionality is a maximum.
+
+    Basic example useage for initial calibration:
+
+    ```
+    frequencies = np.linspace(5.0, 5.2, 21) * GHz
+    cal = Amplitude(
+        CustomQPU, 
+        config, 
+        qubit_pairs=[(0, 1), (2, 3)],
+        frequencies=frequencies)
+    cal.run()
+    ```
+
+    Args:
+        qpu (QPU): custom QPU object.
+        config (Config): qcal Config object.
+        qubit_pairs (List[Tuple]): pairs of qubit labels for the two-qubit gate
+            calibration.
+        frequencies (ArrayLike | NDArray | Dict[ArrayLike | NDArray]): array of
+            frequencies to sweep over for calibrating the two-qubit CZ gate. 
+            If calibrating multiple gates at the same time, this should be a 
+            dictionary mapping an array to each qubit pair label.
+        compiler (Any | Compiler | None, optional): custom compiler to
+            compile the experimental circuits. Defaults to None.
+        transpiler (Any | None, optional): custom transpiler to 
+            transpile the experimental circuits. Defaults to None.
+        classifier (ClassificationManager, optional): manager used for 
+            classifying raw data. Defaults to None.
+        n_shots (int, optional): number of measurements per circuit. 
+            Defaults to 1024.
+        n_batches (int, optional): number of batches of measurements. 
+            Defaults to 1.
+        n_circs_per_seq (int, optional): maximum number of circuits that
+            can be measured per sequence. Defaults to 1.
+        n_levels (int, optional): number of energy levels to be measured. 
+            Defaults to 2. If n_levels = 3, this assumes that the
+            measurement supports qutrit classification.
+        n_gates (int, optional): number of gates for pulse repetition.
+            Defaults to 1.
+        relative_freq (bool, optional): whether or not the frequencies argument
+            is defined relative to the existing pulse frequencies. Defaults to
+            False. If True, the frequencies are swept over the current 
+            frequency plus/minus the frequencies argument.
+        esp (bool, optional): whether to enable excited state promotion for 
+            the calibration. Defaults to False.
+        heralding (bool, optional): whether to enable heralding for the 
+            calibraion. Defaults to True.
+
+    Returns:
+        Callable: Frequency calibration class.
+    """
+
+    class Frequency(qpu, Calibration):
+        """Frequency calibration class.
+        
+        This class inherits a custom QPU from the Frequency calibration
+        function.
+        """
+
+        def __init__(self, 
+                config:          Config,
+                qubit_pairs:     List[Tuple],
+                frequencies:     ArrayLike | Dict[ArrayLike],
+                compiler:        Any | Compiler | None = None, 
+                transpiler:      Any | None = None,
+                classifier:      ClassificationManager = None,
+                n_shots:         int = 1024, 
+                n_batches:       int = 1, 
+                n_circs_per_seq: int = 1,
+                n_levels:        int = 2,
+                n_gates:         int = 1,
+                relative_freq:   bool = False,
+                esp:             bool = False,
+                heralding:       bool = True,
+                **kwargs
+            ) -> None:
+            """Initialize the Amplitude class within the function."""
+            qpu.__init__(self,
+                config=config, 
+                compiler=compiler, 
+                transpiler=transpiler,
+                classifier=classifier,
+                n_shots=n_shots, 
+                n_batches=n_batches, 
+                n_circs_per_seq=n_circs_per_seq, 
+                n_levels=n_levels,
+                **kwargs
+            )
+            Calibration.__init__(self, 
+                config, 
+                esp=esp,
+                heralding=heralding
+            )
+
+            self._qubits = qubit_pairs
+            self._n_gates = n_gates
+
+            self._params = {}
+
+            for pair in qubit_pairs:
+                self._params[pair] = f'two_qubit/{pair}/CZ/freq'
+
+            self._frequencies = {}
+            if not isinstance(frequencies, dict):
+                for pair in qubit_pairs:
+                    if relative_freq:
+                        self._frequencies[pair] = (
+                            self._config[self._params[pair]] + frequencies
+                        )
+                    else:
+                        self._frequencies[pair] = frequencies
+            else:
+                self._frequencies = frequencies
+            self._param_sweep = self._frequencies
+                
+            self._R = {}
+            self._fit = {
+                pair: FitParabola() for pair in qubit_pairs
+            }
+
+        @property
+        def frequencies(self) -> Dict:
+            """Frequency sweep for each qubit pair.
+
+            Returns:
+                Dict: qubit to array map.
+            """
+            return self._frequencies
+        
+        @property
+        def qubit_pairs(self) -> List[Tuple]:
+            """Qubit pair labels.
+
+            Returns:
+                List[Tuple]: qubit pairs.
+            """
+            return self._qubits
+        
+        @property
+        def conditionality(self) -> Dict[Tuple]:
+            """Conditionality computed at each phase value.
+
+            Returns:
+                Dict[Tuple]: conditionality for each pair.
+            """
+            return self._R
+
+        def generate_circuits(self) -> None:
+            """Generate all amplitude calibration circuits."""
+            logger.info(' Generating circuits...')
+
+            self._circuits = tomography_circuits(
+                self._qubits,
+                self._frequencies[self._qubits[0]].size
+            )
+
+            for pair in self._qubits:
+                self._circuits[f'param: {self._params[pair]}'] = list(
+                    self._frequencies[pair]
+                ) * 4
+
+        def analyze(self) -> None:
+            """Analyze the data."""
+            logger.info(' Analyzing the data...')
+
+            # Compute the conditionality and fit to a parabola
+            qubits = list(set(chain.from_iterable(self._qubits)))
+            for pair in self._qubits:
+                i = qubits.index(pair[1])
+
+                prob_C0_X = []
+                for circuit in self._circuits[
+                    self._circuits['sequence'] == 'C0_X'].circuit:
+                    prob_C0_X.append(
+                        circuit.results.marginalize(i).populations['0']
+                    )
+
+                prob_C1_X = []
+                for circuit in self._circuits[
+                    self._circuits['sequence'] == 'C1_X'].circuit:
+                    prob_C1_X.append(
+                        circuit.results.marginalize(i).populations['0']
+                    )
+
+                prob_C0_Y = []
+                for circuit in self._circuits[
+                    self._circuits['sequence'] == 'C0_Y'].circuit:
+                    prob_C0_Y.append(
+                        circuit.results.marginalize(i).populations['0']
+                    )
+
+                prob_C1_Y = []
+                for circuit in self._circuits[
+                    self._circuits['sequence'] == 'C1_Y'].circuit:
+                    prob_C1_Y.append(
+                        circuit.results.marginalize(i).populations['0']
+                    )
+
+                self._circuits[f'{pair}: Prob(0)'] = (
+                    prob_C0_X + prob_C1_X + prob_C0_Y + prob_C1_Y
+                )
+                self._R[pair] = np.sqrt(
+                    (np.array(prob_C1_X) - np.array(prob_C0_X)) ** 2 + 
+                    (np.array(prob_C1_Y) - np.array(prob_C0_Y)) ** 2
+                )
+                self._sweep_results[pair] = self._R[pair]
+
+                self._fit[pair].fit(
+                    self._frequencies[pair][0], self._R[pair]
+                )
+
+                # If the fit was successful, find the new frequency
+                if self._fit[pair].fit_success:
+                    a, b, _ = self._fit[pair].fit_params
+                    newvalue = -b / (2 * a)  # Assume c = 0
+                    if a > 0:
+                        logger.warning(
+                            f'Fit failed for {pair} (positive curvature)!'
+                        )
+                        self._fit[pair]._fit_success = False
+                    elif not in_range(newvalue, self._frequencies[pair]):
+                        logger.warning(
+                            f'Fit failed for {pair} (out of range)!'
+                        )
+                        self._fit[pair]._fit_success = False
+                    else:
+                        self._cal_values[pair].append(newvalue)
+
+        def save(self):
+            """Save all circuits and data."""
+            qpu.save(self)
+            self._data_manager.save_to_csv(
+                 pd.DataFrame([self._sweep_results]), 'sweep_results'
+            )
+            self._data_manager.save_to_csv(
+                 pd.DataFrame([self._cal_values]), 'calibrated_values'
+            )
+
+        def plot(self) -> None:
+            """Plot the amplitude sweep and fit results."""
+            nrows, ncols = calculate_nrows_ncols(len(self._qubits))
+            figsize = (5 * ncols, 4 * nrows)
+            fig, axes = plt.subplots(
+                nrows, ncols, figsize=figsize, layout='constrained'
+            )
+
+            k = -1
+            for i in range(nrows):
+                for j in range(ncols):
+                    k += 1
+
+                    if len(self._qubits) == 1:
+                        ax = axes
+                    elif axes.ndim == 1:
+                        ax = axes[j]
+                    elif axes.ndim == 2:
+                        ax = axes[i,j]
+
+                    if k < len(self._qubits):
+                        q = self._qubits[k]
+
+                        ax.set_xlabel('Frequency (a.u.)', fontsize=15)
+                        ax.set_ylabel('Conditionality', fontsize=15)
+                        ax.tick_params(
+                            axis='both', which='major', labelsize=12
+                        )
+                        ax.grid(True)
+
+                        ax.plot(
+                            self._param_sweep[q], self._sweep_results[q],
+                            'o', c='blue', label=f'Meas, {q}'
+                        )
+
+                        if self._fit[q].fit_success:
+                            x = np.linspace(
+                                self._param_sweep[q][0],
+                                self._param_sweep[q][-1], 
+                                100
+                            )
+                            ax.plot(
+                                x, self._fit[q].predict(x),
+                                '-', c='orange', label='Fit'
+                            )
+                            ax.axvline(
+                                self._cal_values[q],
+                                ls='--', c='k', label='Fit value'
+                            )
+
+                        ax.legend(loc=0, fontsize=12)
+
+                    else:
+                        ax.axis('off')
+                
+            fig.set_tight_layout(True)
+            if settings.Settings.save_data:
+                fig.savefig(
+                    self._data_manager._save_path + 'calibration_results.png', 
+                    dpi=300
+                )
+            plt.show()
+
+        def run(self):
+            """Run all experimental methods and analyze results."""
+            self.generate_circuits()
+            qpu.run(self, self._circuits, save=False)
+            self.analyze()
+            clear_output(wait=True)
+            self._data_manager._exp_id += (
+                f'_CZ_Freq_cal_Q{"".join(str(q) for q in self._qubits)}'
+            )
+            if settings.Settings.save_data:
+                self.save()
+            self.plot()
+            self.final()
+            print(f"\nRuntime: {repr(self._runtime)[8:]}\n")
+
+    return Frequency(
+        config,
+        qubit_pairs,
+        frequencies,
+        compiler, 
+        transpiler,
+        classifier,
+        n_shots, 
+        n_batches, 
+        n_circs_per_seq,
+        n_levels,
+        n_gates,
+        relative_freq,
+        esp,
+        heralding,
+        **kwargs
+    )
+
+
 def RelativeAmp(
         qpu:             QPU,
         config:          Config,
