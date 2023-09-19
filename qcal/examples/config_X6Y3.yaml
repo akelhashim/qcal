@@ -670,30 +670,30 @@ two_qubit:
       pulse:
       - channel: Q4.qdrv
         env: cosine_square
-        length: 4.0e-07
+        length: 2.0e-07
         kwargs:
-          amp: 0.288
+          amp: 0.732658
           phase: 0.0
           ramp_fraction: 0.25
       - channel: Q5.qdrv
         env: cosine_square
-        length: 4.0e-07
+        length: 2.0e-07
         kwargs:
-          amp: 0.288
-          phase: 0.451395
+          amp: 0.732658
+          phase: 0.298501
           ramp_fraction: 0.25
       - channel: Q4.qdrv
         env: virtualz
         freq: single_qubit/4/GE/freq
         length: 0.0
         kwargs:
-          phase: 0.0
+          phase: -0.441041
       - channel: Q5.qdrv
         env: virtualz
         freq: single_qubit/5/GE/freq
         length: 0.0
         kwargs:
-          phase: 0.0
+          phase: 0.752092
   (5, 6):
     CZ:
       freq: 5500000000.0
