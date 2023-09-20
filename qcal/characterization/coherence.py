@@ -39,6 +39,7 @@ def T1(qpu:             QPU,
        n_circs_per_seq: int = 1, 
        esp:             bool = False,
        heralding:       bool = True,
+       raster_circuits: bool = False,
        **kwargs
     ) -> Callable:
     """T1 coherence characterization.
@@ -108,6 +109,7 @@ def T1(qpu:             QPU,
                 n_circs_per_seq: int = 1, 
                 esp:             bool = False,
                 heralding:       bool = True,
+                raster_circuits: bool = False,
                 **kwargs
             ) -> None:
             """Initialize the T1 experiment class within the function."""
@@ -122,6 +124,7 @@ def T1(qpu:             QPU,
                 n_batches, 
                 n_circs_per_seq, 
                 n_levels,
+                raster_circuits=raster_circuits,
                 **kwargs
             )
             Characterize.__init__(self, 
@@ -293,6 +296,7 @@ def T1(qpu:             QPU,
         n_circs_per_seq, 
         esp,
         heralding,
+        raster_circuits,
         **kwargs
     )
 
@@ -313,6 +317,7 @@ def T2(qpu:             QPU,
        n_circs_per_seq: int = 1, 
        esp:             bool = False,
        heralding:       bool = True,
+       raster_circuits: bool = False,
        **kwargs
     ) -> Callable:
     """T2 coherence characterization.
@@ -387,6 +392,7 @@ def T2(qpu:             QPU,
                 n_circs_per_seq: int = 1, 
                 esp:             bool = False,
                 heralding:       bool = True,
+                raster_circuits: bool = False,
                 **kwargs
             ) -> None:
             """Initialize the T2 experiment class within the function."""
@@ -401,6 +407,7 @@ def T2(qpu:             QPU,
                 n_batches, 
                 n_circs_per_seq, 
                 n_levels,
+                raster_circuits=raster_circuits,
                 **kwargs
             )
             Characterize.__init__(self, 
@@ -601,5 +608,6 @@ def T2(qpu:             QPU,
         n_circs_per_seq, 
         esp,
         heralding,
+        raster_circuits,
         **kwargs
     )

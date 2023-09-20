@@ -51,6 +51,7 @@ def ReadoutCalibration(
         n_levels:        int = 2,
         esp:             bool = False,
         heralding:       bool = False,
+        raster_circuits: bool = False,
         **kwargs
     ) -> Callable:
     """Readout calibration
@@ -92,6 +93,12 @@ def ReadoutCalibration(
             the calibration. Defaults to False.
         heralding (bool, optional): whether to enable heralding for the 
             calibraion. Defaults to False.
+        raster_circuits (bool, optional): whether to raster through all
+            circuits in a batch during measurement. Defaults to False. By
+            default, all circuits in a batch will be measured n_shots times
+            one by one. If True, all circuits in a batch will be measured
+            back-to-back one shot at a time. This can help average out the 
+            effects of drift on the timescale of a measurement.
 
     Returns:
         Callable: ReadoutCalibration class.
@@ -118,6 +125,7 @@ def ReadoutCalibration(
                 n_levels:        int = 2,
                 esp:             bool = False,
                 heralding:       bool = False,
+                raster_circuits: bool = False,
                 **kwargs
             ) -> None:
             """Initialize the Amplitude calibration class within the function.
@@ -146,6 +154,7 @@ def ReadoutCalibration(
                 n_batches=n_batches, 
                 n_circs_per_seq=n_circs_per_seq, 
                 n_levels=n_levels,
+                raster_circuits=raster_circuits,
                 **qpu_kwargs
             )
             Calibration.__init__(self, 
@@ -425,5 +434,6 @@ def ReadoutCalibration(
         n_levels,
         esp,
         heralding,
+        raster_circuits,
         **kwargs
     )

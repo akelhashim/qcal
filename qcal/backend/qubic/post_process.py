@@ -1,6 +1,7 @@
 """Submodule for post-processing results measured on QubiC.
 
 """
+from qcal.backend.qubic.qpu import calculate_n_reads
 from qcal.circuit import CircuitSet
 from qcal.config import Config
 from qcal.managers.classification_manager import ClassificationManager
@@ -35,10 +36,11 @@ def find_herald_idx(config: Config) -> int:
 
 
 def post_process(
-        config: Config, 
-        measurements: List, 
-        classifier: ClassificationManager | None, 
-        circuits: Any
+        config:          Config, 
+        measurements:    List, 
+        classifier:      ClassificationManager | None, 
+        circuits:        Any,
+        raster_circuits: bool = False
     ) -> None:
     """Post-process measurement results from QubiC.
 
@@ -53,6 +55,12 @@ def post_process(
         classifier (ClassificationManager, None): manager used for classifying
             raw data.
         circuits (Any): any collection or set of circuits.
+        raster_circuits (bool, optional): whether to raster through all
+            circuits in a batch during measurement. Defaults to False. By
+            default, all circuits in a batch will be measured n_shots times
+            one by one. If True, all circuits in a batch will be measured
+            back-to-back one shot at a time. This can help average out the 
+            effects of drift on the timescale of a measurement.
     """
     outputs = list(measurements[0].keys())
 
@@ -71,8 +79,9 @@ def post_process(
                 meas_qubits.add(chanmap[ch])
     meas_qubits = sorted(meas_qubits)
 
-    if 's11' in outputs:
-        # {'Q0': np.array([[...],...,[..]])} of shape (n circuits, n shots, n reads)}
+    if 's11' in outputs:  # Might not work with rastering
+        # {'Q0': np.array([[...],...,[...]])} of shape 
+        # (n circuits, n shots, n reads)}
         raw_iq = { 
             q: np.vstack([
                 meas['s11'][chanmap_r[q]] for meas in measurements
@@ -112,6 +121,21 @@ def post_process(
                 meas['shots'][q] for meas in measurements
             ]) for q in meas_qubits
         }
+
+    if raster_circuits:
+        n_reads = calculate_n_reads(config)
+        reorg_measurements = []
+        for q in meas_qubits:
+            for i in range(measurement[q].shape[0]):
+                reorg_measurement = np.vstack([
+                    measurement[q][i, :, j] for j in range(
+                        0, measurement[q].shape[-1], n_reads
+                    )
+                ])
+                reorg_measurements.append(reorg_measurement)
+            measurement[q] = np.vstack([
+                meas for meas in reorg_measurements
+            ])
 
     if measurement:
         all_results = []

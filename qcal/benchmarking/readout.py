@@ -32,14 +32,17 @@ def ReadoutFidelity(
         n_batches:       int = 1, 
         n_circs_per_seq: int = 1, 
         n_levels:        int = 2,
+        raster_circuits: bool = False,
         **kwargs
     ) -> Callable:
     """Function which passes a custom QPU to the ReadoutFidelity class.
 
     Basic example useage:
 
-        ro = ReadoutFidelity(CustomQPU, config, [0, 1, 2])
-        ro.run()
+    ```
+    ro = ReadoutFidelity(CustomQPU, config, [0, 1, 2])
+    ro.run()
+    ```
 
     Args:
         qpu (QPU): custom QPU object.
@@ -62,6 +65,12 @@ def ReadoutFidelity(
         n_levels (int, optional): number of energy levels to be measured. 
             Defaults to 2. If n_levels = 3, this assumes that the
             measurement supports qutrit classification.
+        raster_circuits (bool, optional): whether to raster through all
+            circuits in a batch during measurement. Defaults to False. By
+            default, all circuits in a batch will be measured n_shots times
+            one by one. If True, all circuits in a batch will be measured
+            back-to-back one shot at a time. This can help average out the 
+            effects of drift on the timescale of a measurement.
 
     Returns:
         Callable: ReadoutFidelity class.
@@ -85,6 +94,7 @@ def ReadoutFidelity(
                 n_batches:       int = 1, 
                 n_circs_per_seq: int = 1, 
                 n_levels:        int = 2,
+                raster_circuits: bool = False,
                 **kwargs
             ) -> None:
             """Initialize the ReadoutFidelity class within the function.
@@ -99,6 +109,7 @@ def ReadoutFidelity(
                 n_batches=n_batches, 
                 n_circs_per_seq=n_circs_per_seq, 
                 n_levels=n_levels,
+                raster_circuits=raster_circuits,
                 **kwargs
             )
             self._qubits = qubits
@@ -209,5 +220,6 @@ def ReadoutFidelity(
         n_batches, 
         n_circs_per_seq, 
         n_levels,
+        raster_circuits,
         **kwargs
     )

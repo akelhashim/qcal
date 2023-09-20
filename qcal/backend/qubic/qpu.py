@@ -21,7 +21,7 @@ __all__ = ('QubicQPU')
 
 
 def calculate_n_reads(config: Config) -> int:
-    """Calculate the number of reads from a config.
+    """Calculate the number of reads per circuit from a config.
 
     The number of reads will depend on:
     1) number of active resets
@@ -35,7 +35,7 @@ def calculate_n_reads(config: Config) -> int:
         config (Config): config object.
 
     Returns:
-        int: number of reads.
+        int: number of reads per circuit.
     """
     n_reads = 1  # Measurement at the end of the circuit
     
@@ -96,6 +96,7 @@ class QubicQPU(QPU):
                 n_circs_per_seq:     int = 1,
                 n_levels:            int = 2,
                 n_reads_per_shot:    int | None = None,
+                raster_circuits:     bool = False,
                 outputs:             list[str] = ['s11', 'shots', 'counts'],
                 delay_per_shot:      float | None = 0,
                 reload_cmd:          bool = True,
@@ -129,6 +130,12 @@ class QubicQPU(QPU):
                 per circuit. Defaults to None. If None, this will be computed
                 from the number of active resets and whether or not heralding
                 is used.
+            raster_circuits (bool, optional): whether to raster through all
+                circuits in a batch during measurement. Defaults to False. By
+                default, all circuits in a batch will be measured n_shots times
+                one by one. If True, all circuits in a batch will be measured
+                back-to-back one shot at a time. This can help average out the 
+                effects of drift on the timescale of a measurement.
             outputs (list[str]): what output data is desired for each
                 measurement. Defaults to ['s11', 'shots', 'counts']. 's11'
                 is to the integrated IQ data; 'shots' is the classified data
@@ -169,7 +176,8 @@ class QubicQPU(QPU):
             n_shots=n_shots, 
             n_batches=n_batches,
             n_circs_per_seq=n_circs_per_seq,
-            n_levels=n_levels
+            n_levels=n_levels,
+            raster_circuits=raster_circuits
         )
         # import qubic
         # import qubitconfig
@@ -306,17 +314,27 @@ class QubicQPU(QPU):
     def process(self) -> None:
         """Process the measurement data."""
         post_process(
-            self._config, self._measurements, self._classifier, self._circuits
+            self._config, 
+            self._measurements, 
+            self._classifier, 
+            self._circuits,
+            self._raster_circuits
         )
 
         if len(self._compiled_circuits) > 1:
             post_process(
-                self._config, self._measurements, self._classifier, 
-                self._compiled_circuits
+                self._config, 
+                self._measurements, 
+                self._classifier, 
+                self._compiled_circuits, 
+                self._raster_circuits
             )
 
         if len(self._transpiled_circuits) > 1:
             post_process(
-                self._config, self._measurements, self._classifier, 
-                self._transpiled_circuits
+                self._config, 
+                self._measurements, 
+                self._classifier, 
+                self._transpiled_circuits,
+                self._raster_circuits
             )

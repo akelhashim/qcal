@@ -167,6 +167,7 @@ def Amplitude(
         relative_amp:    bool = False,
         esp:             bool = False,
         heralding:       bool = True,
+        raster_circuits: bool = False,
         **kwargs
     ) -> Callable:
     """Amplitude calibration for CZ gate.
@@ -221,6 +222,12 @@ def Amplitude(
             the calibration. Defaults to False.
         heralding (bool, optional): whether to enable heralding for the 
             calibraion. Defaults to True.
+        raster_circuits (bool, optional): whether to raster through all
+            circuits in a batch during measurement. Defaults to False. By
+            default, all circuits in a batch will be measured n_shots times
+            one by one. If True, all circuits in a batch will be measured
+            back-to-back one shot at a time. This can help average out the 
+            effects of drift on the timescale of a measurement.
 
     Returns:
         Callable: Amplitude calibration class.
@@ -248,6 +255,7 @@ def Amplitude(
                 relative_amp:    bool = False,
                 esp:             bool = False,
                 heralding:       bool = True,
+                raster_circuits: bool = False,
                 **kwargs
             ) -> None:
             """Initialize the Amplitude class within the function."""
@@ -260,6 +268,7 @@ def Amplitude(
                 n_batches=n_batches, 
                 n_circs_per_seq=n_circs_per_seq, 
                 n_levels=n_levels,
+                raster_circuits=raster_circuits,
                 **kwargs
             )
             Calibration.__init__(self, 
@@ -537,6 +546,7 @@ def Amplitude(
         relative_amp,
         esp,
         heralding,
+        raster_circuits,
         **kwargs
     )
 
@@ -557,6 +567,7 @@ def Frequency(
         relative_freq:   bool = False,
         esp:             bool = False,
         heralding:       bool = True,
+        raster_circuits: bool = False,
         **kwargs
     ) -> Callable:
     """Frequency calibration for CZ gate.
@@ -609,6 +620,12 @@ def Frequency(
             the calibration. Defaults to False.
         heralding (bool, optional): whether to enable heralding for the 
             calibraion. Defaults to True.
+        raster_circuits (bool, optional): whether to raster through all
+            circuits in a batch during measurement. Defaults to False. By
+            default, all circuits in a batch will be measured n_shots times
+            one by one. If True, all circuits in a batch will be measured
+            back-to-back one shot at a time. This can help average out the 
+            effects of drift on the timescale of a measurement.
 
     Returns:
         Callable: Frequency calibration class.
@@ -636,6 +653,7 @@ def Frequency(
                 relative_freq:   bool = False,
                 esp:             bool = False,
                 heralding:       bool = True,
+                raster_circuits: bool = False,
                 **kwargs
             ) -> None:
             """Initialize the Amplitude class within the function."""
@@ -648,6 +666,7 @@ def Frequency(
                 n_batches=n_batches, 
                 n_circs_per_seq=n_circs_per_seq, 
                 n_levels=n_levels,
+                raster_circuits=raster_circuits,
                 **kwargs
             )
             Calibration.__init__(self, 
@@ -893,6 +912,7 @@ def Frequency(
         relative_freq,
         esp,
         heralding,
+        raster_circuits,
         **kwargs
     )
 
@@ -911,6 +931,7 @@ def RelativeAmp(
         n_levels:        int = 2,
         esp:             bool = False,
         heralding:       bool = True,
+        raster_circuits: bool = False,
         **kwargs
     ) -> Callable:
     """Relative amplitude calibration for CZ gate.
@@ -960,6 +981,12 @@ def RelativeAmp(
             the calibration. Defaults to False.
         heralding (bool, optional): whether to enable heralding for the 
             calibraion. Defaults to True.
+        raster_circuits (bool, optional): whether to raster through all
+            circuits in a batch during measurement. Defaults to False. By
+            default, all circuits in a batch will be measured n_shots times
+            one by one. If True, all circuits in a batch will be measured
+            back-to-back one shot at a time. This can help average out the 
+            effects of drift on the timescale of a measurement.
 
     Returns:
         Callable: RelativeAmp calibration class.
@@ -985,6 +1012,7 @@ def RelativeAmp(
                 n_levels:        int = 2, 
                 esp:             bool = False,
                 heralding:       bool = True,
+                raster_circuits: bool = False,
                 **kwargs
             ) -> None:
             """Initialize the RelativePhase class within the function."""
@@ -997,6 +1025,7 @@ def RelativeAmp(
                 n_batches=n_batches, 
                 n_circs_per_seq=n_circs_per_seq, 
                 n_levels=n_levels,
+                raster_circuits=raster_circuits,
                 **kwargs
             )
             Calibration.__init__(self, 
@@ -1185,6 +1214,7 @@ def RelativeAmp(
         n_levels, 
         esp,
         heralding,
+        raster_circuits,
         **kwargs
     )
 
@@ -1203,6 +1233,7 @@ def RelativePhase(
         n_levels:        int = 2,
         esp:             bool = False,
         heralding:       bool = True,
+        raster_circuits: bool = False,
         **kwargs
     ) -> Callable:
     """Relative phase calibration for CZ gate.
@@ -1250,6 +1281,12 @@ def RelativePhase(
             the calibration. Defaults to False.
         heralding (bool, optional): whether to enable heralding for the 
             calibraion. Defaults to True.
+        raster_circuits (bool, optional): whether to raster through all
+            circuits in a batch during measurement. Defaults to False. By
+            default, all circuits in a batch will be measured n_shots times
+            one by one. If True, all circuits in a batch will be measured
+            back-to-back one shot at a time. This can help average out the 
+            effects of drift on the timescale of a measurement.
 
     Returns:
         Callable: RelativePhase calibration calss.
@@ -1275,6 +1312,7 @@ def RelativePhase(
                 n_levels:        int = 2, 
                 esp:             bool = False,
                 heralding:       bool = True,
+                raster_circuits: bool = False,
                 **kwargs
             ) -> None:
             """Initialize the RelativePhase class within the function."""
@@ -1287,6 +1325,7 @@ def RelativePhase(
                 n_batches=n_batches, 
                 n_circs_per_seq=n_circs_per_seq, 
                 n_levels=n_levels,
+                raster_circuits=raster_circuits,
                 **kwargs
             )
             Calibration.__init__(self, 
@@ -1461,6 +1500,7 @@ def RelativePhase(
         n_levels, 
         esp,
         heralding,
+        raster_circuits,
         **kwargs
     )
 
@@ -1479,6 +1519,7 @@ def LocalPhases(
         n_levels:        int = 2,
         esp:             bool = False,
         heralding:       bool = True,
+        raster_circuits: bool = False,
         **kwargs
     ) -> Callable:
     """Relative phase calibration for CZ gate.
@@ -1524,6 +1565,12 @@ def LocalPhases(
             the calibration. Defaults to False.
         heralding (bool, optional): whether to enable heralding for the 
             calibraion. Defaults to True.
+        raster_circuits (bool, optional): whether to raster through all
+            circuits in a batch during measurement. Defaults to False. By
+            default, all circuits in a batch will be measured n_shots times
+            one by one. If True, all circuits in a batch will be measured
+            back-to-back one shot at a time. This can help average out the 
+            effects of drift on the timescale of a measurement.
 
     Returns:
         Callable: LocalPhases calibration calss.
@@ -1549,6 +1596,7 @@ def LocalPhases(
                 n_levels:        int = 2, 
                 esp:             bool = False,
                 heralding:       bool = True,
+                raster_circuits: bool = False,
                 **kwargs
             ) -> None:
             """Initialize the RelativePhase class within the function."""
@@ -1561,6 +1609,7 @@ def LocalPhases(
                 n_batches=n_batches, 
                 n_circs_per_seq=n_circs_per_seq, 
                 n_levels=n_levels,
+                raster_circuits=raster_circuits,
                 **kwargs
             )
             Calibration.__init__(self, 
@@ -1972,5 +2021,6 @@ def LocalPhases(
         n_levels, 
         esp,
         heralding,
+        raster_circuits,
         **kwargs
     )

@@ -49,6 +49,7 @@ def Amplitude(
         relative_amp:    bool = False,
         esp:             bool = False,
         heralding:       bool = True,
+        raster_circuits: bool = False,
         **kwargs
     ) -> Callable:
     """Amplitude calibration for single-qubit gates.
@@ -127,6 +128,7 @@ def Amplitude(
                 relative_amp:    bool = False,
                 esp:             bool = False,
                 heralding:       bool = True,
+                raster_circuits: bool = False,
                 **kwargs
             ) -> None:
             """Initialize the Amplitude calibration class within the function.
@@ -141,6 +143,7 @@ def Amplitude(
                 n_batches=n_batches, 
                 n_circs_per_seq=n_circs_per_seq, 
                 n_levels=n_levels,
+                raster_circuits=raster_circuits,
                 **kwargs
             )
             Calibration.__init__(self, 
@@ -351,6 +354,7 @@ def Amplitude(
         relative_amp,
         esp,
         heralding,
+        raster_circuits,
         **kwargs
     )
 
@@ -371,6 +375,7 @@ def Frequency(
         n_circs_per_seq: int = 1, 
         esp:             bool = False,
         heralding:       bool = True,
+        raster_circuits: bool = False,
         **kwargs
     ) -> Callable:
     """Frequency calibration for single qubits.
@@ -440,6 +445,7 @@ def Frequency(
                 n_circs_per_seq: int = 1, 
                 esp:             bool = False,
                 heralding:       bool = True,
+                raster_circuits: bool = False,
                 **kwargs
             ) -> None:
             """Initialize the Frequency experiment class within the function.
@@ -454,6 +460,7 @@ def Frequency(
                 n_batches=n_batches, 
                 n_circs_per_seq=n_circs_per_seq, 
                 n_levels=n_levels,
+                raster_circuits=raster_circuits,
                 **kwargs
             )
             Calibration.__init__(self, 
@@ -763,6 +770,7 @@ def Frequency(
         n_circs_per_seq, 
         esp,
         heralding,
+        raster_circuits,
         **kwargs
     )
 
@@ -781,6 +789,7 @@ def Phase(
         n_circs_per_seq: int = 1, 
         esp:             bool = False,
         heralding:       bool = True,
+        raster_circuits: bool = False,
         **kwargs
     ) -> Callable:
     """Phase calibration for single-qubit gates.
@@ -851,6 +860,7 @@ def Phase(
                 n_circs_per_seq: int = 1, 
                 esp:             bool = False,
                 heralding:       bool = True,
+                raster_circuits: bool = False,
                 **kwargs
             ) -> None:
             """Initialize the Phase calibration class within the function."""
@@ -864,6 +874,7 @@ def Phase(
                 n_batches=n_batches, 
                 n_circs_per_seq=n_circs_per_seq, 
                 n_levels=n_levels,
+                raster_circuits=raster_circuits,
                 **kwargs
             )
             Calibration.__init__(self, 
@@ -1169,5 +1180,6 @@ def Phase(
         n_circs_per_seq, 
         esp,
         heralding,
+        raster_circuits,
         **kwargs
     )

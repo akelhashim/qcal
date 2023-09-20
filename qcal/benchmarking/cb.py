@@ -71,6 +71,7 @@ def CB(qpu:                  QPU,
        compiled_pauli:       bool = True,
        include_ref_cycle:    bool = False,
        include_rcal:         bool = False,
+       raster_circuits:      bool = False,
        **kwargs
     ) -> Callable:
     """Cycle Benchmarking.
@@ -136,6 +137,12 @@ def CB(qpu:                  QPU,
             same circuit collection as the SRB circuit. Defaults to False. If
             True, readout correction will be apply to the fit results 
             automatically.
+        raster_circuits (bool, optional): whether to raster through all
+            circuits in a batch during measurement. Defaults to False. By
+            default, all circuits in a batch will be measured n_shots times
+            one by one. If True, all circuits in a batch will be measured
+            back-to-back one shot at a time. This can help average out the 
+            effects of drift on the timescale of a measurement.
 
     Returns:
         Callable: CB class instance.
@@ -166,6 +173,7 @@ def CB(qpu:                  QPU,
                 compiled_pauli:       bool = True,
                 include_ref_cycle:    bool = False,
                 include_rcal:         bool = False,
+                raster_circuits:      bool = False,
                 **kwargs
             ) -> None:
             from qcal.interface.trueq.compiler import Compiler
@@ -196,6 +204,7 @@ def CB(qpu:                  QPU,
                 n_batches=n_batches, 
                 n_circs_per_seq=n_circs_per_seq, 
                 n_levels=n_levels,
+                raster_circuits=raster_circuits,
                 **kwargs
             )
 
@@ -343,5 +352,6 @@ def CB(qpu:                  QPU,
         compiled_pauli,
         include_ref_cycle,
         include_rcal,
+        raster_circuits,
         **kwargs
     )

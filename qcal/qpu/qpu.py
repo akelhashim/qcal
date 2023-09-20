@@ -49,6 +49,7 @@ class QPU:
         '_n_batches',
         '_n_circs_per_seq',
         '_n_levels',
+        '_raster_circuits',
         '_circuits',
         '_compiled_circuits',
         '_transpiled_circuits',
@@ -70,6 +71,7 @@ class QPU:
             n_batches:       int = 1,
             n_circs_per_seq: int = 1,
             n_levels:        int = 2,
+            raster_circuits: bool = False
         ) -> None:
         """Initialize an instance of the Quantum Processing Unit.
 
@@ -90,6 +92,12 @@ class QPU:
             n_levels (int, optional): number of energy levels to be measured. 
                 Defaults to 2. If n_levels = 3, this assumes that the
                 measurement supports qutrit classification.
+            raster_circuits (bool, optional): whether to raster through all
+                circuits in a batch during measurement. Defaults to False. By
+                default, all circuits in a batch will be measured n_shots times
+                one by one. If True, all circuits in a batch will be measured
+                back-to-back one shot at a time. This can help average out the 
+                effects of drift on the timescale of a measurement.
         """
         self._config = config
         self._compiler = compiler
@@ -98,6 +106,7 @@ class QPU:
         self._n_shots = n_shots
         self._n_batches = n_batches
         self._n_circs_per_seq = n_circs_per_seq
+        self._raster_circuits = raster_circuits
 
         assert n_levels <= 3, 'n_levels > is not currently supported!'
         self._n_levels = n_levels

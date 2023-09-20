@@ -39,6 +39,7 @@ def SRB(qpu:             QPU,
         n_levels:        int = 2,
         compiled_pauli:  bool = True,
         include_rcal:    bool = False,
+        raster_circuits: bool = False,
         **kwargs
     ) -> Callable:
     """Streamlined Randomized Benchmarking.
@@ -81,6 +82,12 @@ def SRB(qpu:             QPU,
             same circuit collection as the SRB circuit. Defaults to False. If
             True, readout correction will be apply to the fit results 
             automatically.
+        raster_circuits (bool, optional): whether to raster through all
+            circuits in a batch during measurement. Defaults to False. By
+            default, all circuits in a batch will be measured n_shots times
+            one by one. If True, all circuits in a batch will be measured
+            back-to-back one shot at a time. This can help average out the 
+            effects of drift on the timescale of a measurement.
 
     Returns:
         Callable: SRB class instance.
@@ -106,6 +113,7 @@ def SRB(qpu:             QPU,
                 n_levels:        int = 2,
                 compiled_pauli:  bool = True,
                 include_rcal:    bool = False,
+                raster_circuits: bool = False,
                 **kwargs
             ) -> None:
             from qcal.interface.trueq.compiler import Compiler
@@ -131,6 +139,7 @@ def SRB(qpu:             QPU,
                 n_batches=n_batches, 
                 n_circs_per_seq=n_circs_per_seq, 
                 n_levels=n_levels,
+                raster_circuits=raster_circuits,
                 **kwargs
             )
 
@@ -256,5 +265,6 @@ def SRB(qpu:             QPU,
         n_levels,
         compiled_pauli,
         include_rcal,
+        raster_circuits,
         **kwargs
     )
