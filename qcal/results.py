@@ -4,6 +4,7 @@ All results are stored in a Results object.
 """
 import pandas as pd
 import plotly.express as px
+import plotly.graph_objects as go
 
 from collections import defaultdict
 from typing import Dict, Tuple
@@ -87,7 +88,7 @@ class Results:
         return self._df
 
     @property
-    def dict(self) -> defaultdict:
+    def dictionary(self) -> defaultdict:
         """Dictionary of bitstrings and counts.
 
         Returns:
@@ -181,7 +182,6 @@ class Results:
 
         return Results(marg_results)
 
-
     def plot(self, normalize: bool = False) -> None:
         """Plot the results in a histogram.
 
@@ -189,21 +189,32 @@ class Results:
             normalize (bool, optional): whether to plot the normalized counts. 
                 Defaults to False.
         """
+        fig = go.Figure()
         if normalize:
-            df = pd.DataFrame(
-                {'State': self.states, 'Probability': self.probabilities}
-            )
-            fig = px.bar(df, x='State', y='Probability')
+            title = 'Probability'
+            fig.add_trace(go.Bar(y=self.probabilities))
         else:
-            df = pd.DataFrame(
-                {'State': self.states, 'Count': self.counts}
-            )
-            fig = px.bar(df, x='State', y='Count')
+            title = 'Counts'
+            fig.add_trace(go.Bar(y=self.counts))
 
         fig.update_traces(marker_color='blue')
         fig.update_layout(
             autosize=False,
-            width=200 * len(self.states),
-            height=400
+            width=75 * len(self.states),
+            height=400,
+            xaxis=dict(
+                tickvals=[i for i in range(len(self.states))],
+                ticktext=self.states,
+                title='Bit String',
+                titlefont_size=20,
+                tickfont_size=15
+            ),
+            yaxis=dict(
+                title=title,
+                titlefont_size=20,
+                tickfont_size=15
+            )
         )
+        if len(self.states[0]) > 5:
+            fig.update_xaxes(tickangle=-45)
         fig.show()
