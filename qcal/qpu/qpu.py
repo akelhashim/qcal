@@ -296,7 +296,7 @@ class QPU:
             logger.info(' Compiling circuits...')
             t0 = timeit.default_timer()
             self.compile()
-            self._runtime['Compile'][0] += round(
+            self._runtime['Compile'].iloc[0] += round(
                     timeit.default_timer() - t0, 1
                 )
 
@@ -304,28 +304,28 @@ class QPU:
             logger.info(' Transpiling circuits...')
             t0 = timeit.default_timer()
             self.transpile()
-            self._runtime['Transpile'][0] += round(
+            self._runtime['Transpile'].iloc[0] += round(
                     timeit.default_timer() - t0, 1
                 )
         
         logger.info(' Generating sequences...')
         t0 = timeit.default_timer()
         self.generate_sequence()
-        self._runtime['Sequencing'][0] += round(
+        self._runtime['Sequencing'].iloc[0] += round(
             timeit.default_timer() - t0, 1
         )
 
         logger.info(' Writing sequences...')
         t0 = timeit.default_timer()
         self.write()
-        self._runtime['Write'][0] += round(
+        self._runtime['Write'].iloc[0] += round(
             timeit.default_timer() - t0, 1
         )
 
         logger.info(' Measuring...')
         t0 = timeit.default_timer()
         self.acquire()
-        self._runtime['Measure'][0] += round(
+        self._runtime['Measure'].iloc[0] += round(
                 timeit.default_timer() - t0, 1
             )
         
