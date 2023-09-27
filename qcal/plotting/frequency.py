@@ -78,8 +78,8 @@ def plot_freq_spectrum(
         for i, q in enumerate(qubits):
             fig.add_trace(
                 go.Scatter(
-                    x=[config.single_qubit[q].GE.freq[0] / 1e9,
-                       config.single_qubit[q].GE.freq[0] / 1e9],
+                    x=[config[f'single_qubit/{q}/GE/freq'] / 1e9,
+                       config[f'single_qubit/{q}/GE/freq'] / 1e9],
                     y=[1, 0],
                     line_width=3,
                     mode='lines',
@@ -88,18 +88,18 @@ def plot_freq_spectrum(
                 )
             )
         x_mins.append(
-            min([config.single_qubit[q].GE.freq[0] / 1e9 for q in qubits])
+            min([config[f'single_qubit/{q}/GE/freq'] / 1e9 for q in qubits])
         )
         x_maxs.append(
-            max([config.single_qubit[q].GE.freq[0] / 1e9 for q in qubits])
+            max([config[f'single_qubit/{q}/GE/freq'] / 1e9 for q in qubits])
         )
 
     if plot_EF:
         for i, q in enumerate(qubits):
             fig.add_trace(
                 go.Scatter(
-                    x=[config.single_qubit[q].EF.freq[0] / 1e9,
-                       config.single_qubit[q].EF.freq[0] / 1e9],
+                    x=[config[f'single_qubit/{q}/EF/freq'] / 1e9,
+                       config[f'single_qubit/{q}/EF/freq'] / 1e9],
                     y=[1, 0],
                     line_width=3,
                     mode='lines',
@@ -108,18 +108,18 @@ def plot_freq_spectrum(
                 )
             )
         x_mins.append(
-            min([config.single_qubit[q].EF.freq[0] / 1e9 for q in qubits])
+            min([config[f'single_qubit/{q}/EF/freq'] / 1e9 for q in qubits])
         )
         x_maxs.append(
-            max([config.single_qubit[q].EF.freq[0] / 1e9 for q in qubits])
+            max([config[f'single_qubit/{q}/EF/freq'] / 1e9 for q in qubits])
         )
 
     if plot_readout:
         for i, q in enumerate(qubits):
             fig.add_trace(
                 go.Scatter(
-                    x=[config.readout[q].freq / 1e9,
-                       config.readout[q].freq / 1e9],
+                    x=[config[f'readout/{q}/freq'] / 1e9,
+                       config[f'readout/{q}/freq'] / 1e9],
                     y=[1, 0],
                     line_width=3,
                     mode='lines',
@@ -129,10 +129,10 @@ def plot_freq_spectrum(
             )
 
         x_mins.append(
-            min([config.readout[q].freq / 1e9 for q in qubits])
+            min([config[f'readout/{q}/freq'] / 1e9 for q in qubits])
         )
         x_maxs.append(
-            max([config.readout[q].freq / 1e9 for q in qubits])
+            max([config[f'readout/{q}/freq'] / 1e9 for q in qubits])
         )
 
     if plot_two_qubit:
@@ -142,8 +142,8 @@ def plot_freq_spectrum(
                 i += 1
                 fig.add_trace(
                     go.Scatter(
-                        x=[config.two_qubit[qp][gate]['freq'][0] / 1e9,
-                           config.two_qubit[qp][gate]['freq'][0] / 1e9],
+                        x=[config[f'two_qubit/{qp}/{gate}/freq'] / 1e9,
+                           config[f'two_qubit/{qp}/{gate}/freq'] / 1e9],
                         y=[1, 0],
                         line_width=3,
                         mode='lines',
