@@ -83,8 +83,8 @@ def CB(qpu:                  QPU,
         config (Config): qcal Config object.
         cycle (Dict, tq.Cycle): cycle (or subcircuit) to benchmark.
         circuit_depths (List[int] | Tuple[int]): a list of positive integers 
-            specifying how many cycles of random Clifford gates to generate for
-            RB, for example, [4, 64, 256].
+            specifying how many interleaved cycles of the target cycle and 
+            random Pauli operators to generate, for example, [4, 16, 64].
         tq_config (str | Any, optional): True-Q config yaml file or config
             object. Defaults to None.
         compiler (Any | Compiler | None, optional): custom compiler to compile
@@ -278,7 +278,9 @@ def CB(qpu:                  QPU,
                 ax.xaxis.get_label().set_fontsize(15)
                 ax.yaxis.get_label().set_fontsize(15)
                 ax.tick_params(axis='both', which='major', labelsize=12)
-                ax.legend(prop=dict(size=12))
+                handles, labels = ax.get_legend_handles_labels()
+                ax.legend(handles[:5], labels[:5], fontsize=12)
+                # ax.legend(prop=dict(size=12))
                 ax.grid(True)
 
                 fig.set_tight_layout(True)
