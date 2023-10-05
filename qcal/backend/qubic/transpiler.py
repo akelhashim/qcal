@@ -6,7 +6,10 @@ https://ieeexplore.ieee.org/document/9552516
 import qcal
 from qcal.circuit import Circuit, CircuitSet
 from qcal.config import Config
+from qcal.circuit import Cycle
 from qcal.gate.gate import Gate
+from qcal.gate.single_qubit import Id, Idle, MCM, Rz, X
+from qcal.sequencer.dynamical_decoupling import dd_sequences
 from qcal.sequencer.pulse_envelopes import pulse_envelopes
 
 import logging
@@ -62,7 +65,7 @@ def add_reset(
                                 **pulse['kwargs']
                              )}
                         # TODO: add X90 capability
-                        for pulse in config.single_qubit[q]['GE']['X'].pulse
+                        for pulse in config[f'single_qubit{q}/GE/X/pulse']
                         ],
                         'false': []
                     },
@@ -106,7 +109,7 @@ def add_heralding(
 
 def add_measurement(
         config: Config, 
-        qubit_or_gate: int | Gate,
+        qubit_or_meas: int | Gate,
         circuit: List, 
         pulses: defaultdict
     ) -> None:
@@ -114,15 +117,15 @@ def add_measurement(
 
     Args:
        config (Config):            qcal Config object.
-       qubit_or_gate (int | Gate): qubit label or Gate object.
+       qubit_or_meas (int | Gate): qubit label or measurement Gate object.
        circuit (List):             qubic circuit.
        pulses (defaultdict):       pulses that have been stored for reuse.
     """
-    if isinstance(qubit_or_gate, int):
-        qubit = qubit_or_gate
+    if isinstance(qubit_or_meas, int):
+        qubit = qubit_or_meas
         qubits = (qubit,)
-    elif isinstance(qubit_or_gate, Gate):
-        qubits = qubit_or_gate.qubits
+    elif isinstance(qubit_or_meas, Gate):
+        qubits = qubit_or_meas.qubits
         qubit = qubits[0]
 
     meas_pulse = []
@@ -154,9 +157,16 @@ def add_measurement(
             meas_pulse.append(
                 {'name': 'delay', 't': length, 'qubit': [f'Q{qubit}']}
             )
-            
-    meas_pulse.append({'name': 'barrier', 'qubit': [f'Q{qubit}']})
 
+    if isinstance(qubit_or_meas, Gate) and qubit_or_meas.name == 'MCM':
+        meas_pulse.append({
+            'name': 'barrier', 
+            'qubit': [
+               f'Q{q}' for q in qubit_or_meas.properties['params']['dd_qubits']
+            ]
+        })
+
+    meas_pulse.append({'name': 'barrier', 'qubit': [f'Q{qubit}']})
     meas_pulse.extend([
             {'name': 'pulse',
              'dest': f'Q{qubit}.rdrv',
@@ -189,8 +199,101 @@ def add_measurement(
         ]
     )
 
-    pulses[f'MeasGE:{qubits}'] = meas_pulse
+    if isinstance(qubit_or_meas, Gate) and qubit_or_meas.name == 'MCM':
+        for q in qubit_or_meas.properties['params']['dd_qubits']:
+            add_dynamical_decoupling(
+                config,
+                qubit_or_meas.properties['params']['dd_method'],
+                q,
+                config['readout/length'],
+                qubit_or_meas.properties['params']['n_dd_pulses'],
+                meas_pulse
+            )
+        add_mcm_apply(config, qubit_or_meas, meas_pulse)
+        pulses[f'MCMGE:{qubits}'] = meas_pulse
+    
+    else:
+        pulses[f'MeasGE:{qubits}'] = meas_pulse
+    
     circuit.extend(meas_pulse)
+
+
+def add_dynamical_decoupling(
+        config: Config, 
+        dd_method: str, 
+        qubit: int, 
+        length: float, 
+        n_dd_pulses: int, 
+        pulse: List
+    ) -> None:
+    """Add dynamical decoupling pulses to a sequence.
+
+    Args:
+        config (Config): qcal Config object.
+        dd_method (str): dynamical decoupling method.
+        qubit (int): qubit label.
+        length (float): length of time over which to perform the DD.
+        n_dd_pulses (int): number of dynamical decoupling pulses.
+        pulse (List): qubic pulse.
+    """
+    dd_circuit = dd_sequences[dd_method](config, qubit, length, n_dd_pulses)
+    for cycle in dd_circuit: 
+        if cycle.is_barrier:
+            pulse.append({'name': 'barrier', 'qubit': [f'Q{qubit}']})
+        else:
+            pulse.extend(cycle_pulse(config, cycle))
+
+                
+def add_mcm_apply(config: Config, mcm: MCM, pulse: List) -> None:
+    """Add a conditional gate depending on the results of a MCM.
+
+    Args:
+        config (Config): qcal Config object.
+        mcm (MCM): mid-circuit measurement object.
+        pulse (List): qubic pulse.
+    """
+    q_meas = MCM.qubits[0]
+    q_cond = MCM['params']['apply']['1'].qubits
+
+    # Initial barrier
+    pulse.append(
+        {'name': 'barrier', 
+         'scope': [f'Q{q}' for q in [q_meas] + [qc for qc in q_cond]]
+        }
+    )
+
+    # Seqeuence to apply if 1 is measured
+    true_apply = [
+        {'name': 'delay', 
+         't': config['reset/active/feedback_delay'], 
+         'qubit': [f'Q{q}' for q in [qc for qc in q_cond]]
+        },
+    ]
+    true_apply.extend(
+        cycle_pulse(config, MCM['params']['apply']['1'])
+    )
+
+    # Sequence to apply if 0 is measured
+    false_apply = cycle_pulse(config, MCM['params']['apply']['0'])
+
+    # Conditional operation
+    pulse.append(
+        {'name': 'branch_fproc', 
+         'alu_cond': 'eq', 
+         'cond_lhs': 1, 
+         'func_id': int(config[f'readout/{q_meas}/channel']), 
+         'scope': [f'Q{q}' for q in [qc for qc in q_cond]],
+         'true': true_apply,
+         'false': false_apply
+        }
+    )
+
+    # Final barrier
+    pulse.append(
+        {'name': 'barrier', 
+         'scope': [f'Q{q}' for q in [q_meas] + [qc for qc in q_cond]]
+        }
+    )
 
 
 def add_delay(
@@ -324,6 +427,61 @@ def add_multi_qubit_gate(
     circuit.extend(mq_pulse)
 
 
+def cycle_pulse(config: Config, cycle: Cycle) -> List:
+    """Generate a pulse from a cycle of operations.
+
+    This is useful for generating sub-pulses for DD sequences or MCM.
+
+    Args:
+        config (Config): qcal Config object.
+        cycle (Cycle): cycle of gates.
+
+    Returns:
+        List: pulse.
+    """
+    pulse = []
+    for gate in cycle:
+        qubit = gate.qubits[0]
+        subspace = gate.subspace
+
+        if isinstance(gate, Id):
+            continue
+
+        if isinstance(gate, Idle):
+            pulse.append(
+                {'name': 'delay', 
+                 't': gate.properties['params']['duration'], 
+                 'qubit': [f'Q{qubit}']
+                }
+            )
+
+        elif isinstance(gate, Rz):
+            pulse.append(
+                {'name': 'virtual_z',
+                 'freq': config[f'single_qubit/{qubit}/{subspace}/freq'],
+                 'phase': gate.properties['params']['phase']
+                }
+            )
+
+        elif isinstance(gate, X):
+            pulse.extend([
+                {'name': 'pulse',
+                 'dest': p['channel'], 
+                 'freq': config[f'single_qubit/{qubit}/{subspace}/freq'],
+                 'amp': clip_amplitude(p['kwargs']['amp']),
+                 'phase': p['kwargs']['phase'],
+                 'twidth': p['length'],
+                 'env': pulse_envelopes[p['env']](
+                    p['length'],
+                    config['hardware/DAC_sample_rate'],
+                    **{key: val for key, val in p['kwargs'].items() 
+                       if key not in ['amp', 'phase']}
+                )} for p in config[f'single_qubit{qubit}/{subspace}/X/pulse']
+            ])
+
+    return pulse
+
+
 def transpilation_error(*args):
     """Generic transpilation error.
 
@@ -336,10 +494,11 @@ def transpilation_error(*args):
 
 
 def to_qubic(
-        config: Config, 
-        circuit: Circuit, 
-        gate_mapper: defaultdict, 
-        pulses: defaultdict
+        config:      Config, 
+        circuit:     Circuit, 
+        gate_mapper: defaultdict,
+        pulses:      defaultdict,
+        qubit_reset: bool = True
     ) -> List:
     """Compile a qcal circuit to a qubic circuit.
 
@@ -348,6 +507,9 @@ def to_qubic(
         circuit (Circuit):         qcal circuit.
         gate_mapper (defaultdict): map between qcal to QubiC gates.
         pulses (defaultdict):      pulses that have been stored for reuse.
+        qubit_reset (bool):        whether to reset the qubits before a 
+                circuit. Defaults to True. This can be set to False when adding
+                subcircuits like mid-circuit measurement.
 
     Returns:
         List: compiled qubic circuit.
@@ -355,11 +517,12 @@ def to_qubic(
     qubic_circuit = []
     
     # Add reset to the beginning of the circuit
-    add_reset(config, circuit.qubits, qubic_circuit, pulses)
+    if qubit_reset:
+        add_reset(config, circuit.qubits, qubic_circuit, pulses)
 
-    # Add (optional) readout heralding
-    if config.parameters['readout']['herald']:
-        add_heralding(config, circuit.qubits, qubic_circuit, pulses)
+        # Add (optional) readout heralding
+        if config.parameters['readout']['herald']:
+            add_heralding(config, circuit.qubits, qubic_circuit, pulses)
 
     for cycle in circuit.cycles:
 
@@ -380,8 +543,7 @@ def to_qubic(
         elif cycle.is_barrier:
             qubits = cycle.qubits if cycle.qubits else circuit.qubits
             qubic_circuit.append(
-                {'name': 'barrier', 
-                 'qubit': [f'Q{q}' for q in qubits]},
+                {'name': 'barrier', 'qubit': [f'Q{q}' for q in qubits]},
             )
 
     return qubic_circuit
@@ -390,12 +552,15 @@ def to_qubic(
 class Transpiler:
     """qcal to QubiC Transpiler."""
 
-    __slots__ = ('_config', '_gate_mapper', '_reload_pulse', '_pulses')
+    # __slots__ = (
+    #     '_config', '_gate_mapper', '_reload_pulse', '_qubit_reset', '_pulses'
+    # )
 
     def __init__(self, 
             config:       Config, 
             gate_mapper:  defaultdict | None = None,
-            reload_pulse: bool = True
+            reload_pulse: bool = True,
+            qubit_reset:  bool = True
         ) -> None:
         """Initialize with a qcal Config object.
 
@@ -405,12 +570,17 @@ class Transpiler:
                 circuit gates to QubiC gates. Defaults to None.
             reload_pulse (bool): reloads the stored pulses when compiling each
                 circuit. Defaults to True.
+            qubit_reset (bool): whether to reset the qubits before a circuit.
+                Defaults to True. This can be set to False when adding
+                subcircuits like mid-circuit measurement.
+
         """
         self._config = config
         
         if gate_mapper is None:
             self._gate_mapper = defaultdict(lambda: transpilation_error,
                 {'Meas':     add_measurement,
+                 'MCM' :     add_measurement,
                  'I':        add_delay,
                  'Idle':     add_delay,
                  'Rz':       add_virtualz_gate,
@@ -431,6 +601,7 @@ class Transpiler:
             self._gate_mapper = gate_mapper
 
         self._reload_pulse = reload_pulse
+        self._qubit_reset = qubit_reset
         self._pulses = defaultdict(lambda: False, {})
 
     @property
@@ -475,7 +646,11 @@ class Transpiler:
             
             transpiled_circuits.append(
                 to_qubic(
-                    self._config, circuit, self._gate_mapper, self._pulses
+                    self._config, 
+                    circuit, 
+                    self._gate_mapper, 
+                    self._pulses,
+                    self._qubit_reset
                 )
             )
             

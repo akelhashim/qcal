@@ -94,7 +94,7 @@ def post_process(
                     m[:, -1].reshape(-1, 1) for m in meas
                 ]
 
-    # meas[q].shape = (n circuits, n shots, n reads)
+    # meas[q]['s11'].shape = (n circuits, n shots, n reads)
     if ('s11' in outputs) and (classifier is not None):
         measurement = {}
         for q, meas in raw_iq.items():

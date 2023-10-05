@@ -10,7 +10,7 @@ import numpy as np
 from collections import defaultdict
 from numpy.typing import NDArray
 from random import gauss, randint
-from typing import List, Tuple, Union
+from typing import List, Dict, Tuple, Union
 
 # TODO: add Clifford gates
 
@@ -21,6 +21,7 @@ __all__ = (
     'Id',
     'Idle',
     'Meas',
+    'MCM',
     'RandSU2',
     'Rn',
     'Rx',
@@ -256,6 +257,49 @@ class Meas(Gate):
         super().__init__(meas, qubit)
         self._properties['name'] = 'Meas'
         self._properties['params']['basis'] = basis
+
+    @property
+    def is_measurement(self) -> bool:
+        """Whether or not gate is a measurement operation.
+
+        Returns:
+            bool: measurement or not.
+        """
+        return True
+    
+
+class MCM(Gate):
+    """Class for a single-qubit mid-circuit measurement operation."""
+
+    def __init__(
+            self, 
+            qubit:       int = 0, 
+            basis:       str = 'Z',
+            apply:       Dict = {}, 
+            dd_qubits:   List | Tuple = [],
+            dd_method:   str = 'XY',
+            n_dd_pulses: int = 8,
+        ) -> None:
+        """Initialize using the meas matrix.
+        
+        Args:
+            qubit (int): qubit label. Defaults to 0.
+            basis (str): measurement basis. Defaults to Z.
+            apply (Dict): conditional gates to apply to another qubit depending
+                on the outcomes of the mid-circuit measurement. Defaults to {}.
+                Example: apply = {'0': Cycle({Id(1)}), '1': Cycle({X(1)})}.
+            dd_qubits (List | Tuple, optional): which qubits to dynamical 
+                decouple during a mid-circuit measurement. Defaults to [].
+            dd_method (str): dynamical decoupling protocol. Defaults to 'XY'.
+            n_dd_pulses (int): number of pulses for dd protocol. Defaults to 8.
+        """
+        super().__init__(meas, qubit)
+        self._properties['name'] = 'MCM'
+        self._properties['params']['basis'] = basis
+        self._properties['params']['apply'] = apply
+        self._properties['params']['dd_qubits'] = dd_qubits
+        self._properties['params']['dd_method'] = dd_method
+        self._properties['params']['n_dd_pulses'] = n_dd_pulses
 
     @property
     def is_measurement(self) -> bool:
@@ -730,6 +774,7 @@ single_qubit_gates = defaultdict(lambda: 'Gate not currently supported!', {
     'Id':       Id,
     'Idle':     Idle,
     'Meas':     Meas,
+    'MCM':      MCM,
     'RandSU2':  RandSU2,
     'Rn':       Rn,
     'Rx':       Rx, 
