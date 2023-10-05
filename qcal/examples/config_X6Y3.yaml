@@ -637,6 +637,12 @@ two_qubit:
   (3, 4):
     CZ:
       freq: 5230000000.0
+      dynamical_decoupling:
+        enable: true
+        method: XY
+        n_pulses: 4
+        qubits:
+        - 5
       pulse:
       - channel: Q3.qdrv
         env: cosine_square

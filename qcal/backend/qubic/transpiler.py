@@ -4,6 +4,7 @@ References:
 https://ieeexplore.ieee.org/document/9552516
 """
 import qcal
+from qcal.calibration.utils import find_pulse_index
 from qcal.circuit import Circuit, CircuitSet
 from qcal.config import Config
 from qcal.circuit import Cycle
@@ -397,6 +398,21 @@ def add_multi_qubit_gate(
     qubits = gate.qubits
     name = gate.name
     mq_pulse = []
+
+    # Add dynamical decoupling
+    if config[f'two_qubit/{qubits}/{name}/dynamical_decoupling/enable']:
+        sub_config = config[f'two_qubit/{qubits}/{name}/dynamical_decoupling']
+        idx = find_pulse_index(config, f'two_qubit/{qubits}/{name}/pulse')
+        for q in sub_config['qubits']:
+            add_dynamical_decoupling(
+                config,
+                sub_config['dd_method'],
+                q,
+                config[f'two_qubit/{qubits}/{name}/pulse'][idx]['length'],
+                sub_config['n_pulses'],
+                mq_pulse
+            )
+
     for pulse in config[f'two_qubit/{qubits}/{name}/pulse']:
 
         if pulse['env'] == 'virtualz':
