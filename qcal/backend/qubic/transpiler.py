@@ -12,10 +12,12 @@ from qcal.gate.gate import Gate
 from qcal.gate.single_qubit import Id, Idle, MCM, Rz, X
 from qcal.sequencer.dynamical_decoupling import dd_sequences
 from qcal.sequencer.pulse_envelopes import pulse_envelopes
+from qcal.sequencer.utils import clip_amplitude
 
 import logging
 
 from collections import defaultdict
+from numpy.typing import NDArray
 from typing import Dict, List, Tuple
 
 logger = logging.getLogger(__name__)
@@ -60,11 +62,14 @@ def add_reset(
                              'dest': pulse['channel'], 
                              'phase': 0.0,
                              'twidth': pulse['length'],
-                             'env': pulse_envelopes[pulse['env']](
-                                pulse['length'],
-                                config['hardware/DAC_sample_rate'],
-                                **pulse['kwargs']
-                             )}
+                             'env': clip_amplitude(
+                                pulse_envelopes[pulse['env']](
+                                    pulse['length'],
+                                    config['hardware/DAC_sample_rate'],
+                                    **pulse['kwargs']
+                                )
+                             )
+                            }
                         # TODO: add X90 capability
                         for pulse in config[f'single_qubit{q}/GE/X/pulse']
                         ],
@@ -141,11 +146,13 @@ def add_measurement(
                      'dest': pulse['channel'], 
                      'phase': 0.0,
                      'twidth': pulse['length'],
-                     'env': pulse_envelopes[pulse['env']](
-                        pulse['length'],
-                        config['hardware/DAC_sample_rate'],
-                        **pulse['kwargs']
+                     'env': clip_amplitude(
+                        pulse_envelopes[pulse['env']](
+                            pulse['length'],
+                            config['hardware/DAC_sample_rate'],
+                            **pulse['kwargs']
                         )
+                     )
                     }
                     for pulse in config[f'single_qubit/{qubit}/EF/X/pulse']
                 ]
@@ -175,15 +182,17 @@ def add_measurement(
              'amp': 1.0, 
              'phase': 0.0,
              'twidth': config['readout/length'],
-             'env': pulse_envelopes[config.readout[qubit].env](
+             'env': clip_amplitude(
+                pulse_envelopes[config.readout[qubit].env](
                     config['readout/length'],
                     config['readout/sample_rate'],
                     amp=config[f'readout/{qubit}/amp'],
                     **config['readout/kwargs']
                 )
+             )
             },
             {'name': 'delay',
-             't': config.parameters['readout']['delay'],
+             't': config[f'readout/{qubit}/delay'],
              'qubit': [f'Q{qubit}.rdlo']
             },
             {'name': 'pulse',
@@ -192,10 +201,12 @@ def add_measurement(
              'amp': 1.0,
              'phase': config[f'readout/{qubit}/phase'],  # Rotation in IQ plane
              'twidth': config['readout/length'],
-             'env': pulse_envelopes['square'](
+             'env': clip_amplitude(
+                pulse_envelopes['square'](
                     config['readout/length'],
                     config['readout/sample_rate'],
                 )
+             )
             }
         ]
     )
@@ -369,13 +380,14 @@ def add_single_qubit_gate(
                 {'name': 'pulse',
                  'dest': pulse['channel'],
                  'freq': config[f'single_qubit/{qubit}/{subspace}/freq'],
-                 'amp': 1.0,
-                 'phase': 0.0,
+                 'amp': clip_amplitude(pulse['kwargs']['amp']),
+                 'phase': pulse['kwargs']['phase'],
                  'twidth': pulse['length'],
                  'env': pulse_envelopes[pulse['env']](
                         pulse['length'],
                         config['hardware/DAC_sample_rate'],
-                        **pulse['kwargs']
+                        **{key: val for key, val in pulse['kwargs'].items() 
+                           if key not in ['amp', 'phase']}
                     )
                 }
             )
@@ -428,13 +440,14 @@ def add_multi_qubit_gate(
                 {'name': 'pulse',
                  'dest': pulse['channel'], 
                  'freq': config[f'two_qubit/{qubits}/{name}/freq'],
-                 'amp': 1.0,
-                 'phase': 0.0,
+                 'amp': clip_amplitude(pulse['kwargs']['amp']),
+                 'phase': pulse['kwargs']['phase'],
                  'twidth': pulse['length'], 
                  'env': pulse_envelopes[pulse['env']](
                         pulse['length'],
                         config['hardware/DAC_sample_rate'],
-                        **pulse['kwargs']
+                        **{key: val for key, val in pulse['kwargs'].items() 
+                           if key not in ['amp', 'phase']}
                     )
                 }
             )
@@ -669,7 +682,7 @@ class Transpiler:
                     self._qubit_reset
                 )
             )
-            
+              
         if params:
             self._config.reload()  # Reload after making all the changes
 

@@ -200,7 +200,7 @@ class Results:
         fig.update_traces(marker_color='blue')
         fig.update_layout(
             autosize=False,
-            width=75 * len(self.states),
+            width=100 * len(self.states),
             height=400,
             xaxis=dict(
                 tickvals=[i for i in range(len(self.states))],

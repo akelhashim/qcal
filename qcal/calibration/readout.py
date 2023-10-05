@@ -23,7 +23,8 @@ import numpy as np
 import pandas as pd
 
 from IPython.display import clear_output
-from typing import Any, Callable, List, Tuple
+from numpy.typing import ArrayLike
+from typing import Any, Callable, Dict, List, Tuple
 from matplotlib.colors import ListedColormap
 
 
@@ -128,7 +129,7 @@ def ReadoutCalibration(
                 raster_circuits: bool = False,
                 **kwargs
             ) -> None:
-            """Initialize the Amplitude calibration class within the function.
+            """Initialize the readout calibration class within the function.
             """
             qpu_args = list(inspect.signature(qpu).parameters)
             qpu_kwargs = {
@@ -163,11 +164,12 @@ def ReadoutCalibration(
                 heralding=heralding
             )
 
+            self._qubits = qubits
+
             assert method in ('pi_pulse', 'rabi'), (
                 "'method' must be one of 'pi_pulse' or 'rabi'!"
             )
-
-            self._qubits = qubits
+            self._method = method
             
             assert gate in ('X90', 'X'), (
                 "'gate' must be one of 'X90' or 'X'!"
@@ -422,6 +424,357 @@ def ReadoutCalibration(
     return ReadoutCalibration(
         config,
         qubits,
+        method,
+        gate,
+        model,
+        compiler, 
+        transpiler,
+        classifier,
+        n_shots, 
+        n_batches, 
+        n_circs_per_seq, 
+        n_levels,
+        esp,
+        heralding,
+        raster_circuits,
+        **kwargs
+    )
+
+
+def Separation(
+        qpu:             QPU,
+        config:          Config,
+        qubits:          List | Tuple,
+        params:          List[str],
+        param_sweep:     ArrayLike | List[ArrayLike],
+        method:          str = 'pi_pulse',
+        gate:            str = 'X90',
+        model:           str = 'gmm',
+        compiler:        Any | Compiler | None = None, 
+        transpiler:      Any | None = None,
+        classifier:      ClassificationManager = None,
+        n_shots:         int = 1024, 
+        n_batches:       int = 1, 
+        n_circs_per_seq: int = 1, 
+        n_levels:        int = 2,
+        esp:             bool = False,
+        heralding:       bool = False,
+        raster_circuits: bool = False,
+        **kwargs
+    ) -> Callable:
+    """Separation calibration.
+
+    Basic example useage:
+        
+        # ```
+        # cal = ReadoutCalibration(
+        #     CustomQPU, 
+        #     config, 
+        #     qubits=[0, 1, 2])
+        # cal.run()
+        # ```
+
+    Args:
+        qpu (QPU): custom QPU object.
+        config (Config): qcal Config object.
+        qubits (List | Tuple): qubits to calibrate.
+        params (List[str]): list specifying which config params to sweep over.
+        param_sweep (ArrayLike | List[ArrayLike]): value sweep for each param.
+        method (str, optional): calibration method. Must be one of ('pi_pulse',
+            'rabi').
+        gate (str, optional): native gate to calibrate. Defaults 
+            to 'X90'.
+        model (str, optional): classification algorithm. Defaults to 'gmm'.
+        compiler (Any | Compiler | None, optional): custom compiler to
+            compile the experimental circuits. Defaults to None.
+        transpiler (Any | None, optional): custom transpiler to 
+            transpile the experimental circuits. Defaults to None.
+        classifier (ClassificationManager, optional): manager used for 
+            classifying raw data. Defaults to None.
+        n_shots (int, optional): number of measurements per circuit. 
+            Defaults to 1024.
+        n_batches (int, optional): number of batches of measurements. 
+            Defaults to 1.
+        n_circs_per_seq (int, optional): maximum number of circuits that
+            can be measured per sequence. Defaults to 1.
+        n_levels (int, optional): number of energy levels to classify. 
+            Defaults to 2.
+        esp (bool, optional): whether to enable excited state promotion for 
+            the calibration. Defaults to False.
+        heralding (bool, optional): whether to enable heralding for the 
+            calibraion. Defaults to False.
+        raster_circuits (bool, optional): whether to raster through all
+            circuits in a batch during measurement. Defaults to False. By
+            default, all circuits in a batch will be measured n_shots times
+            one by one. If True, all circuits in a batch will be measured
+            back-to-back one shot at a time. This can help average out the 
+            effects of drift on the timescale of a measurement.
+
+    Returns:
+        Callable: Separation class.
+    """
+
+    class Separation(qpu, Calibration):
+        """Separation class.
+        
+        This class inherits a custom QPU from the Separation function.
+        """
+
+        def __init__(self, 
+                config:          Config,
+                qubits:          List | Tuple,
+                params:          List[str],
+                param_sweep:     ArrayLike | List[ArrayLike],
+                method:          str = 'pi_pulse',
+                gate:            str = 'X90',
+                model:           str = 'gmm',
+                compiler:        Any | Compiler | None = None, 
+                transpiler:      Any | None = None,
+                classifier:      ClassificationManager = None,
+                n_shots:         int = 1024, 
+                n_batches:       int = 1, 
+                n_circs_per_seq: int = 1, 
+                n_levels:        int = 2,
+                esp:             bool = False,
+                heralding:       bool = False,
+                raster_circuits: bool = False,
+                **kwargs
+            ) -> None:
+            """Initialize the Amplitude calibration class within the function.
+            """
+            self._rcal = ReadoutCalibration(
+                qpu = qpu,
+                config = config,
+                qubits = qubits,
+                method = method,
+                gate = gate,
+                model = model,
+                compiler = compiler, 
+                transpiler = transpiler,
+                classifier = classifier,
+                n_shots = n_shots, 
+                n_batches = n_batches, 
+                n_circs_per_seq = n_circs_per_seq, 
+                n_levels = n_levels,
+                esp = esp,
+                heralding = heralding,
+                raster_circuits = raster_circuits,
+                **kwargs
+            )
+
+            assert len(qubits) == len(params), (
+                "The number of qubits must be equal to the number of params!"
+            )
+            self._qubits = qubits
+
+            self._params = params
+            self._param_sweep = (
+                param_sweep if isinstance(param_sweep, list) else [
+                    param_sweep for _ in range(len(params))
+                ]
+            )
+
+            self._groupings = []
+            for groupings in np.array(np.triu_indices(n_levels, 1)).T:
+                self._groupings.append("{0}{1}".format(*groupings))
+            self._sep = {q: {
+                    grouping: [] for grouping in self._groupings
+                } for q in qubits
+            }
+
+        @property
+        def separation(self) -> dict:
+            """Separation.
+
+            Returns:
+                dict: separation of states for each qubit for the param sweep.
+            """
+            return self._sep
+
+        def run(self) -> None:
+            """Run the experiment."""
+            for i in range(len(self._param_sweep[0])):
+                for j, param in enumerate(self._params):
+                    self._config[param] = self._param_sweep[j][i]
+
+                self._rcal._config = self._config
+                self._rcal.generate_circuits()
+                self._rcal.qpu.run(self._rcal._circuits, save=False)
+                self._rcal.analyze()
+                clear_output(wait=True)
+                self._rcal._data_manager._exp_id += (
+                    f'_RCal_Q{"".join(str(q) for q in self._qubits)}'
+                )
+                if settings.Settings.save_data:
+                    self._rcal.save()
+                self._rcal.final()
+
+                for q in self._qubits:
+                    for g in self._groupings:
+                        self._sep[q][g].append(self._rcal.fit[q].snr[g])
+                
+        def analyze(self) -> None:
+            """Analyze the data."""
+            logger.info(' Analyzing the data...')
+            
+            for q in self._qubits:
+                
+                argmax = np.argmax(
+                    self._sep[q][g]
+                )
+
+        def save(self) -> None:
+            """Save all circuits and data."""
+            qpu.save(self)
+            self.data_manager.save_to_pickle(
+                self._classifier, 
+                'ClassificationManager'
+            )
+            save_to_pickle(
+                self._classifier, 
+                os.path.join(
+                    os.path.dirname(self._config.filename), 
+                    'ClassificationManager'
+                )
+            )
+
+        def plot(self, raw=False) -> None:
+            """Plot the readout calibration results.
+
+            Args:
+                raw (bool, optional): plot the raw data. Defaults to False.
+            """
+            nrows, ncols = calculate_nrows_ncols(len(self._qubits))
+            figsize = (5 * ncols, 4 * nrows)
+            fig, axes = plt.subplots(
+                nrows, ncols, figsize=figsize, layout='constrained'
+            )
+
+            colors = [
+                (0.12156862745098039, 0.4666666666666667, 0.7058823529411765),
+                (1.0, 0.4980392156862745, 0.054901960784313725),
+                (0.5803921568627451, 0.403921568627451, 0.7411764705882353)
+            ]
+            cmap = ListedColormap(colors[:self._n_levels])
+
+            k = -1
+            for i in range(nrows):
+                for j in range(ncols):
+                    k += 1
+
+                    if len(self._qubits) == 1:
+                        ax = axes
+                    elif axes.ndim == 1:
+                        ax = axes[j]
+                    elif axes.ndim == 2:
+                        ax = axes[i,j]
+
+                    if k < len(self._qubits):
+                        q = self._qubits[k]
+
+                    ax.set_xlabel('I', fontsize=15)
+                    ax.set_ylabel('Q', fontsize=15)
+                    ax.tick_params(
+                        axis='both', which='major', labelsize=12
+                    )
+
+                    if raw:
+                        sc = ax.scatter(
+                            self._X[q][:, 0], self._X[q][:, 1], 
+                            c=self._y[q], cmap=cmap, alpha=0.03
+                        )
+                    else:
+                        ax.hexbin(
+                            self._X[q][:, 0], self._X[q][:, 1], 
+                            cmap='Greys', gridsize=75
+                        )
+
+                    # Create a mesh plot
+                    x_min, x_max = (
+                        self._X[q][:, 0].min() - 10, 
+                        self._X[q][:, 0].max() + 10
+                    )
+                    y_min, y_max =(
+                        self._X[q][:, 1].min() - 10, 
+                        self._X[q][:, 1].max() + 10
+                    )
+                    h = int(min([abs(x_min), abs(y_min)]) * 0.025)
+                    xx, yy = np.meshgrid(
+                        np.arange(x_min, x_max, h), 
+                        np.arange(y_min, y_max, h)
+                    )
+
+                    # Plot the decision boundary by assigning a color to 
+                    # each point in the mesh [x_min, x_max]x[y_min, y_max].
+                    Z = self._classifier[q].predict(
+                        np.c_[xx.ravel(), yy.ravel()]
+                    )
+                    Z = Z.reshape(xx.shape)
+                    if raw:
+                        ax.contourf(xx, yy, Z, cmap=cmap, alpha=0.15)
+                    else:
+                        cs = ax.contourf(xx, yy, Z, cmap=cmap, alpha=0.15)
+                        self._cs = cs
+                        
+                    ax.set_xlim([x_min, x_max])
+                    ax.set_ylim([y_min, y_max])
+
+                    if raw:
+                        leg = ax.legend(
+                            handles=sc.legend_elements()[0], 
+                            labels=range(0, self._n_levels), 
+                            fontsize=12,
+                            loc=0
+                        )
+                    else:
+                        handles = []
+                        for l in range(self._n_levels):
+                            handles.append(cs.legend_elements()[0][l*3])
+                        leg = ax.legend(
+                            handles=handles,
+                            labels=range(0, self._n_levels), 
+                            fontsize=12,
+                            loc=0
+                        )
+                    for lh in leg.legendHandles:
+                        lh.set_alpha(1)
+                
+            fig.set_tight_layout(True)
+            if settings.Settings.save_data:
+                if raw:
+                    fig.savefig(
+                        self._data_manager._save_path + 
+                        'readout_calibration_raw.png', 
+                        dpi=300
+                    )
+                else:
+                    fig.savefig(
+                    self._data_manager._save_path + 'readout_calibration.png', 
+                    dpi=300
+                )
+            plt.show()
+    
+
+        def run(self):
+            """Run all experimental methods and analyze results."""
+            self.generate_circuits()
+            qpu.run(self, self._circuits, save=False)
+            self.analyze()
+            clear_output(wait=True)
+            self._data_manager._exp_id += (
+                f'_RCal_Q{"".join(str(q) for q in self._qubits)}'
+            )
+            if settings.Settings.save_data:
+                self.save()
+            print(f"\nRuntime: {repr(self._runtime)[8:]}\n")
+            self.plot()
+            self.final()
+
+    return Separation(
+        config,
+        qubits,
+        params,
+        param_sweep,
         method,
         gate,
         model,

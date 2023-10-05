@@ -2,7 +2,7 @@
 
 """
 # from qcal.circuit import CircuitSet
-from .post_process import post_process
+from .post_process import calculate_n_reads, post_process
 from .transpiler import Transpiler
 from qcal.config import Config
 from qcal.managers.classification_manager import ClassificationManager
@@ -18,34 +18,6 @@ logger = logging.getLogger(__name__)
 
 
 __all__ = ('QubicQPU')
-
-
-def calculate_n_reads(config: Config) -> int:
-    """Calculate the number of reads per circuit from a config.
-
-    The number of reads will depend on:
-    1) number of active resets
-    2) heralding
-    3) readout at the end of the circuit
-
-    This function assumes that there is no mid-circuit measurement, and that
-    there is always a readout at the end of a circuit.
-
-    Args:
-        config (Config): config object.
-
-    Returns:
-        int: number of reads per circuit.
-    """
-    n_reads = 1  # Measurement at the end of the circuit
-    
-    if config.parameters['reset']['active']['enable']:
-        n_reads += config.parameters['reset']['active']['n_resets']
-    
-    if config.parameters['readout']['herald']:
-        n_reads += 1
-
-    return n_reads
 
 
 def calculate_delay_per_shot(
@@ -179,8 +151,6 @@ class QubicQPU(QPU):
             n_levels=n_levels,
             raster_circuits=raster_circuits
         )
-        # import qubic
-        # import qubitconfig
         from qubic import rpc_client, job_manager
         from qubic.rfsoc.hwconfig import FPGAConfig, load_channel_configs
         from qubic.state_disc import GMMManager
@@ -227,13 +197,13 @@ class QubicQPU(QPU):
         # Overwrite qubit and readout frequencies:
         for q in self._config.qubits:
             self._qchip.qubits[f'Q{q}'].freq = (
-                self._config.single_qubit[q].GE.freq[0]
+                self._config[f'single_qubit/{q}/GE/freq']
             )
             self._qchip.qubits[f'Q{q}'].freq_ef = (
-                self._config.single_qubit[q].EF.freq[0]
+                self._config[f'single_qubit/{q}/EF/freq']
             )
             self._qchip.qubits[f'Q{q}'].readfreq = (
-                self._config.readout[q].freq
+                self._config[f'readout/{q}/freq']
             )
 
     @property
@@ -279,6 +249,13 @@ class QubicQPU(QPU):
             circuits (List): TODO
         """
         from qubic.toolchain import run_compile_stage, run_assemble_stage
+
+        if self._raster_circuits:
+            rastered_circuit = []
+            for circuit in self._exp_circuits:
+                rastered_circuit.extend(circuit)
+            self._exp_circuits = [rastered_circuit]
+
         self._compiled_program = run_compile_stage(
             self._exp_circuits, self._fpga_config, self._qchip
         )

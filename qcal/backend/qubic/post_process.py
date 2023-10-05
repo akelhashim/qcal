@@ -1,7 +1,6 @@
 """Submodule for post-processing results measured on QubiC.
 
 """
-from qcal.backend.qubic.qpu import calculate_n_reads
 from qcal.circuit import CircuitSet
 from qcal.config import Config
 from qcal.managers.classification_manager import ClassificationManager
@@ -16,6 +15,34 @@ logger = logging.getLogger(__name__)
 
 
 __all__ = ('post_process')
+
+
+def calculate_n_reads(config: Config) -> int:
+    """Calculate the number of reads per circuit from a config.
+
+    The number of reads will depend on:
+    1) number of active resets
+    2) heralding
+    3) readout at the end of the circuit
+
+    This function assumes that there is no mid-circuit measurement, and that
+    there is always a readout at the end of a circuit.
+
+    Args:
+        config (Config): config object.
+
+    Returns:
+        int: number of reads per circuit.
+    """
+    n_reads = 1  # Measurement at the end of the circuit
+    
+    if config.parameters['reset']['active']['enable']:
+        n_reads += config.parameters['reset']['active']['n_resets']
+    
+    if config.parameters['readout']['herald']:
+        n_reads += 1
+
+    return n_reads
 
 
 def find_herald_idx(config: Config) -> int:
@@ -88,6 +115,23 @@ def post_process(
             ]) for q in meas_qubits
         }
 
+        if raster_circuits:
+            n_reads = calculate_n_reads(config)
+            for q in meas_qubits:
+                reorg_raw_iqs = []
+                for i in range(raw_iq[q].shape[0]):
+                    reorg_raw_iq = np.vstack([
+                        raw_iq[q][i, :, j] for j in range(
+                            0, raw_iq[q].shape[-1], n_reads
+                        )
+                    ])
+                    reorg_raw_iqs.append(reorg_raw_iq)
+                raw_iq[q] = np.vstack([
+                    iq for iq in reorg_raw_iqs
+                ])
+        # print(raw_iq['Q7'].shape)
+        # print(raw_iq['Q7'])
+
         if isinstance(circuits, CircuitSet):
             for q, meas in raw_iq.items():
                 circuits[f'{q}: iq_data'] = [
@@ -122,20 +166,20 @@ def post_process(
             ]) for q in meas_qubits
         }
 
-    if raster_circuits:
-        n_reads = calculate_n_reads(config)
-        reorg_measurements = []
-        for q in meas_qubits:
-            for i in range(measurement[q].shape[0]):
-                reorg_measurement = np.vstack([
-                    measurement[q][i, :, j] for j in range(
-                        0, measurement[q].shape[-1], n_reads
-                    )
+        if raster_circuits:
+            n_reads = calculate_n_reads(config)
+            for q in meas_qubits:
+                reorg_measurements = []
+                for i in range(measurement[q].shape[0]):
+                    reorg_measurement = np.vstack([
+                        measurement[q][i, :, j] for j in range(
+                            0, measurement[q].shape[-1], n_reads
+                        )
+                    ])
+                    reorg_measurements.append(reorg_measurement)
+                measurement[q] = np.vstack([
+                    meas for meas in reorg_measurements
                 ])
-                reorg_measurements.append(reorg_measurement)
-            measurement[q] = np.vstack([
-                meas for meas in reorg_measurements
-            ])
 
     if measurement:
         all_results = []

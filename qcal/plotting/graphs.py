@@ -166,7 +166,7 @@ def draw_circuit(circuit: Circuit, show: bool = True):
             text="Quantum Circuit",
             showarrow=False,
             xref="paper", yref="paper",
-            x=-0.001, y=1.0) ],
+            x=-0.001, y=1.1) ],
         xaxis=dict(tick0=0, dtick=1, showgrid=False, zeroline=False, 
                    showticklabels=True),
         yaxis=dict(tickmode='array', 
