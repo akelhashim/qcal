@@ -9,7 +9,7 @@ from qcal.circuit import Circuit, CircuitSet
 from qcal.config import Config
 from qcal.circuit import Cycle
 from qcal.gate.gate import Gate
-from qcal.gate.single_qubit import Id, Idle, MCM, Reset, Rz, X
+from qcal.gate.single_qubit import Id, Idle, Meas, MCM, Reset, Rz, X
 from qcal.sequencer.dynamical_decoupling import dd_sequences
 from qcal.sequencer.pulse_envelopes import pulse_envelopes
 from qcal.sequencer.utils import clip_amplitude
@@ -60,6 +60,29 @@ def add_reset(
                         pulses
                     )
 
+                # Reset pulse w/ qutrit reset
+                reset_q_pulse = [
+                    {'name': 'delay', 
+                     't': config['reset/active/feedback_delay'], 
+                     'qubit': [f'Q{q}']
+                    }
+                ]
+                if (config.parameters['readout']['esp']['enable'] and
+                    q in config.parameters['readout']['esp']['qubits']):
+                    reset_q_pulse.extend(
+                        cycle_pulse(config, Cycle({X(q, subspace='EF')}))
+                    )
+                    reset_q_pulse.extend(
+                        cycle_pulse(config, Cycle({X(q, subspace='GE')}))
+                    )
+                else:
+                    reset_q_pulse.extend(
+                        cycle_pulse(config, Cycle({X(q, subspace='GE')}))
+                    )
+                    reset_q_pulse.extend(
+                        cycle_pulse(config, Cycle({X(q, subspace='EF')}))
+                    )
+
                 reset_circuit.append({'name': 'barrier', 'scope': [f'Q{q}']})
                 reset_circuit.append(
                     {'name': 'branch_fproc',
@@ -67,30 +90,7 @@ def add_reset(
                      'cond_lhs': 1,
                      'func_id': int(config[f'readout/{q}/channel']),
                      'scope': [f'Q{q}'],
-                        'true': [
-                            {'name': 'delay', 
-                             't': config['reset/active/feedback_delay'], 
-                             'qubit': [f'Q{q}']
-                            }
-                        ] + 
-                        [
-                            {'name': 'pulse',
-                             'freq': config[f'single_qubit/{q}/GE/freq'],
-                             'amp': 1.0,
-                             'dest': pulse['channel'], 
-                             'phase': 0.0,
-                             'twidth': pulse['length'],
-                             'env': clip_amplitude(
-                                pulse_envelopes[pulse['env']](
-                                    pulse['length'],
-                                    config['hardware/DAC_sample_rate'],
-                                    **pulse['kwargs']
-                                )
-                             )
-                            }
-                        # TODO: add X90 capability
-                        for pulse in config[f'single_qubit{q}/GE/X/pulse']
-                        ],
+                        'true': reset_q_pulse,
                         'false': []
                     },
                 )
@@ -157,23 +157,8 @@ def add_measurement(
     if config.parameters['readout']['esp']['enable']:
         # TODO: add X90 capability
         if qubit in config.parameters['readout']['esp']['qubits']:
-            meas_pulse.extend([
-                    {'name': 'pulse',
-                     'freq': config[f'single_qubit/{qubit}/EF/freq'],
-                     'amp': 1.0,
-                     'dest': pulse['channel'], 
-                     'phase': 0.0,
-                     'twidth': pulse['length'],
-                     'env': clip_amplitude(
-                        pulse_envelopes[pulse['env']](
-                            pulse['length'],
-                            config['hardware/DAC_sample_rate'],
-                            **pulse['kwargs']
-                        )
-                     )
-                    }
-                    for pulse in config[f'single_qubit/{qubit}/EF/X/pulse']
-                ]
+            meas_pulse.extend(
+                cycle_pulse(config, Cycle({X(qubit, subspace='EF')}))
             )
         
         else:
@@ -193,41 +178,42 @@ def add_measurement(
         })
 
     meas_pulse.append({'name': 'barrier', 'qubit': [f'Q{qubit}']})
-    meas_pulse.extend([
-            {'name': 'pulse',
-             'dest': f'Q{qubit}.rdrv',
-             'freq': config[f'readout/{qubit}/freq'],
-             'amp': 1.0, 
-             'phase': 0.0,
-             'twidth': config['readout/length'],
-             'env': clip_amplitude(
-                pulse_envelopes[config.readout[qubit].env](
-                    config['readout/length'],
-                    config['readout/sample_rate'],
-                    amp=config[f'readout/{qubit}/amp'],
-                    **config['readout/kwargs']
-                )
-             )
-            },
-            {'name': 'delay',
-             't': config[f'readout/{qubit}/delay'],
-             'qubit': [f'Q{qubit}.rdlo']
-            },
-            {'name': 'pulse',
-             'dest': f'Q{qubit}.rdlo',
-             'freq': config[f'readout/{qubit}/freq'],
-             'amp': 1.0,
-             'phase': config[f'readout/{qubit}/phase'],  # Rotation in IQ plane
-             'twidth': config['readout/length'],
-             'env': clip_amplitude(
-                pulse_envelopes['square'](
-                    config['readout/length'],
-                    config['readout/sample_rate'],
-                )
-             )
-            }
-        ]
-    )
+    meas_pulse.extend(cycle_pulse(config, Cycle({Meas(qubit)})))
+    # meas_pulse.extend([
+    #         {'name': 'pulse',
+    #          'dest': f'Q{qubit}.rdrv',
+    #          'freq': config[f'readout/{qubit}/freq'],
+    #          'amp': 1.0, 
+    #          'phase': 0.0,
+    #          'twidth': config['readout/length'],
+    #          'env': clip_amplitude(
+    #             pulse_envelopes[config.readout[qubit].env](
+    #                 config['readout/length'],
+    #                 config['readout/sample_rate'],
+    #                 amp=config[f'readout/{qubit}/amp'],
+    #                 **config['readout/kwargs']
+    #             )
+    #          )
+    #         },
+    #         {'name': 'delay',
+    #          't': config[f'readout/{qubit}/delay'],
+    #          'qubit': [f'Q{qubit}.rdlo']
+    #         },
+    #         {'name': 'pulse',
+    #          'dest': f'Q{qubit}.rdlo',
+    #          'freq': config[f'readout/{qubit}/freq'],
+    #          'amp': 1.0,
+    #          'phase': config[f'readout/{qubit}/phase'],  # Rotation in IQ plane
+    #          'twidth': config['readout/length'],
+    #          'env': clip_amplitude(
+    #             pulse_envelopes['square'](
+    #                 config['readout/length'],
+    #                 config['readout/sample_rate'],
+    #             )
+    #          )
+    #         }
+    #     ]
+    # )
 
     if isinstance(qubit_or_meas, Gate) and qubit_or_meas.name == 'MCM':
         for q in qubit_or_meas.properties['params']['dd_qubits']:
@@ -529,6 +515,36 @@ def cycle_pulse(config: Config, cycle: Cycle) -> List:
                     **{key: val for key, val in p['kwargs'].items() 
                        if key not in ['amp', 'phase']}
                 )} for p in config[f'single_qubit{qubit}/{subspace}/X/pulse']
+            ])
+
+        elif isinstance(gate, Meas):
+            pulse.extend([
+                {'name': 'pulse',
+                 'dest': f'Q{qubit}.rdrv',
+                 'freq': config[f'readout/{qubit}/freq'],
+                 'amp': config[f'readout/{qubit}/amp'], 
+                 'phase': config[f'readout/{qubit}/phase'],
+                 'twidth': config['readout/length'],
+                 'env': pulse_envelopes[config.readout[qubit].env](
+                        config['readout/length'],
+                        config['readout/sample_rate']
+                    )
+                },
+                {'name': 'delay',
+                 't': config[f'readout/{qubit}/delay'],
+                 'qubit': [f'Q{qubit}.rdlo']
+                },
+                {'name': 'pulse',
+                 'dest': f'Q{qubit}.rdlo',
+                 'freq': config[f'readout/{qubit}/freq'],
+                 'amp': 1.0,
+                 'phase': config[f'readout/{qubit}/phase'],  # Rotation in IQ plane
+                 'twidth': config['readout/length'],
+                 'env': pulse_envelopes['square'](
+                        config['readout/length'],
+                        config['readout/sample_rate'],
+                    )
+                }
             ])
 
     return pulse
