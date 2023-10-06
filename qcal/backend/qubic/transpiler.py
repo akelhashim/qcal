@@ -9,7 +9,7 @@ from qcal.circuit import Circuit, CircuitSet
 from qcal.config import Config
 from qcal.circuit import Cycle
 from qcal.gate.gate import Gate
-from qcal.gate.single_qubit import Id, Idle, MCM, Rz, X
+from qcal.gate.single_qubit import Id, Idle, MCM, Reset, Rz, X
 from qcal.sequencer.dynamical_decoupling import dd_sequences
 from qcal.sequencer.pulse_envelopes import pulse_envelopes
 from qcal.sequencer.utils import clip_amplitude
@@ -27,21 +27,39 @@ __all__ = ('to_qubic', 'Transpiler')
 
 
 def add_reset(
-       config: Config, qubits: List | Tuple, circuit: List, pulses: defaultdict
+       config: Config, 
+       qubits_or_reset: List | Tuple | Reset, 
+       circuit: List, 
+       pulses: defaultdict
     ) -> None:
     """Add active or passive reset to the beginning of a circuit.
 
     Args:
         config (Config):       qcal Config object.
-        qubits (List | Tuple): qubits to reset.
+        qubits_or_reset (List | Tuple | Reset): qubits to reset, or Reset
+            operation.
         circuit (List):        qubic circuit.
         pulses (defaultdict):  pulses that have been stored for reuse.
     """
+    if isinstance(qubits_or_reset, (list, tuple)):
+        qubits = qubits_or_reset
+    elif isinstance(qubits_or_reset, Reset):
+        qubits = qubits_or_reset.qubits
+
     if config['reset/active/enable']:
         reset_circuit = []
         for _ in range(config['reset/active/n_resets']):
             for q in qubits:
-                add_measurement(config, q, reset_circuit, pulses)
+                if isinstance(qubits_or_reset, (list, tuple)):
+                    add_measurement(config, q, reset_circuit, pulses)
+                elif isinstance(qubits_or_reset, Reset):
+                    add_measurement(
+                        config, 
+                        qubits_or_reset.properties['params']['meas'], 
+                        reset_circuit, 
+                        pulses
+                    )
+
                 reset_circuit.append({'name': 'barrier', 'scope': [f'Q{q}']})
                 reset_circuit.append(
                     {'name': 'branch_fproc',
@@ -415,6 +433,11 @@ def add_multi_qubit_gate(
     if config[f'two_qubit/{qubits}/{name}/dynamical_decoupling/enable']:
         sub_config = config[f'two_qubit/{qubits}/{name}/dynamical_decoupling']
         idx = find_pulse_index(config, f'two_qubit/{qubits}/{name}/pulse')
+        mq_pulse.append(
+            {'name': 'barrier', 
+             'scope': [f'Q{q}' for q in sub_config['qubits']]
+            }
+        )
         for q in sub_config['qubits']:
             add_dynamical_decoupling(
                 config,
@@ -608,7 +631,8 @@ class Transpiler:
         
         if gate_mapper is None:
             self._gate_mapper = defaultdict(lambda: transpilation_error,
-                {'Meas':     add_measurement,
+                {'Reset':    add_reset,
+                 'Meas':     add_measurement,
                  'MCM' :     add_measurement,
                  'I':        add_delay,
                  'Idle':     add_delay,

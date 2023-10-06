@@ -23,6 +23,7 @@ __all__ = (
     'Meas',
     'MCM',
     'RandSU2',
+    'Reset',
     'Rn',
     'Rx',
     'Ry',
@@ -310,6 +311,20 @@ class MCM(Gate):
         """
         return True
 
+
+class Reset(Gate):
+    """Class for qubit reset in the middle of a circuit."""
+
+    def __init__(self, qubit: int = 0, meas: Meas | MCM = Meas) -> None:
+        """Initialize using the meas matrix.
+
+        Args:
+            qubit (int, optional): _description_. Defaults to 0.
+            meas (Meas | MCM, optional): measurement type. Defaults to Meas.
+        """
+        super().__init__(meas, qubit)
+        self._properties['name'] = 'Reset'
+        self._properties['params']['meas'] = meas(qubit)
 
 class RandSU2(Gate):
     """Class for a random SU(2) gate."""
@@ -776,6 +791,7 @@ single_qubit_gates = defaultdict(lambda: 'Gate not currently supported!', {
     'Meas':     Meas,
     'MCM':      MCM,
     'RandSU2':  RandSU2,
+    'Reset':    Reset,
     'Rn':       Rn,
     'Rx':       Rx, 
     'Ry':       Ry,

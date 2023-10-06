@@ -43,7 +43,7 @@ def XY(
     idle_time = tau - gate_time / 2
 
     DD_sequence = Circuit([
-        Barrier((qubit,)),
+        # Barrier((qubit,)),
         # Idle
         Cycle({Idle(qubit, duration=idle_time)}),
         # X
@@ -66,7 +66,7 @@ def XY(
         Cycle({Rz(-np.pi/2, qubit)}),
         # Idle
         Cycle({Idle(qubit, duration=idle_time)}),
-        Barrier((qubit,)),
+        # Barrier((qubit,)),
     ])
 
     DD_circuit = Circuit()
