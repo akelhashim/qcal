@@ -155,7 +155,6 @@ def add_measurement(
     meas_pulse = []
     # Excited state promotion
     if config.parameters['readout']['esp']['enable']:
-        # TODO: add X90 capability
         if qubit in config.parameters['readout']['esp']['qubits']:
             meas_pulse.extend(
                 cycle_pulse(config, Cycle({X(qubit, subspace='EF')}))

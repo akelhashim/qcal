@@ -590,6 +590,92 @@ def Separation(
                 dict: separation of states for each qubit for the param sweep.
             """
             return self._sep
+                
+        def analyze(self) -> None:
+            """Analyze the data."""
+            logger.info(' Analyzing the data...')
+            
+            # Find the maximum separation for 
+            for q in self._qubits:
+                sep = np.array(self._sep[q][self._groupings[0]])
+                for g in self._groupings[1:]:
+                    sep += np.array(self._sep[q][g])
+                max_sep_idx = np.argmax(sep)
+                self._cal_values[q] = self._param_sweep[q][max_sep_idx]
+
+        def plot(self, raw=False) -> None:
+            """Plot the readout calibration results.
+
+            Args:
+                raw (bool, optional): plot the raw data. Defaults to False.
+            """
+            nrows, ncols = calculate_nrows_ncols(len(self._qubits))
+            figsize = (5 * ncols, 4 * nrows)
+            fig, axes = plt.subplots(
+                nrows, ncols, figsize=figsize, layout='constrained'
+            )
+
+            colors = [
+                (0.12156862745098039, 0.4666666666666667, 0.7058823529411765),
+                (1.0, 0.4980392156862745, 0.054901960784313725),
+                (0.5803921568627451, 0.403921568627451, 0.7411764705882353)
+            ]
+
+            k = -1
+            for i in range(nrows):
+                for j in range(ncols):
+                    k += 1
+
+                    if len(self._qubits) == 1:
+                        ax = axes
+                    elif axes.ndim == 1:
+                        ax = axes[j]
+                    elif axes.ndim == 2:
+                        ax = axes[i,j]
+
+                    if k < len(self._qubits):
+                        q = self._qubits[k]
+
+                        ax.set_xlabel('Parameter Sweep', fontsize=15)
+                        ax.set_ylabel('Separation (SNR)', fontsize=15)
+                        ax.tick_params(
+                            axis='both', which='major', labelsize=12
+                        )
+
+                        for m, g in enumerate(self._groupings):
+                            ax.plot(
+                                self._param_sweep[q], 
+                                self._sep[q][g],
+                                'o-',
+                                c=colors[m],
+                                label=g
+                            )
+
+                        ax.axvline(
+                            self._cal_values[q],  
+                            ls='--', c='k', label='Max separation'
+                        )
+
+                        ax.legend(loc=0, fontsize=12)
+
+                    else:
+                        ax.axis('off')
+                
+            fig.set_tight_layout(True)
+            if settings.Settings.save_data:
+                fig.savefig(
+                    self._data_manager._save_path + 'sep_calibration.png', 
+                    dpi=300
+                )
+            plt.show()
+
+        def final(self) -> None:
+            """Save and load the config after changing parameters."""
+            for q in self._qubits:
+                self._config[self._params[q]] = self._cal_values[q]
+
+            self._config.save()
+            self._config.load()
 
         def run(self) -> None:
             """Run the experiment."""
@@ -612,161 +698,10 @@ def Separation(
                 for q in self._qubits:
                     for g in self._groupings:
                         self._sep[q][g].append(self._rcal.fit[q].snr[g])
-                
-        def analyze(self) -> None:
-            """Analyze the data."""
-            logger.info(' Analyzing the data...')
-            
-            for q in self._qubits:
-                
-                argmax = np.argmax(
-                    self._sep[q][g]
-                )
 
-        def save(self) -> None:
-            """Save all circuits and data."""
-            qpu.save(self)
-            self.data_manager.save_to_pickle(
-                self._classifier, 
-                'ClassificationManager'
-            )
-            save_to_pickle(
-                self._classifier, 
-                os.path.join(
-                    os.path.dirname(self._config.filename), 
-                    'ClassificationManager'
-                )
-            )
-
-        def plot(self, raw=False) -> None:
-            """Plot the readout calibration results.
-
-            Args:
-                raw (bool, optional): plot the raw data. Defaults to False.
-            """
-            nrows, ncols = calculate_nrows_ncols(len(self._qubits))
-            figsize = (5 * ncols, 4 * nrows)
-            fig, axes = plt.subplots(
-                nrows, ncols, figsize=figsize, layout='constrained'
-            )
-
-            colors = [
-                (0.12156862745098039, 0.4666666666666667, 0.7058823529411765),
-                (1.0, 0.4980392156862745, 0.054901960784313725),
-                (0.5803921568627451, 0.403921568627451, 0.7411764705882353)
-            ]
-            cmap = ListedColormap(colors[:self._n_levels])
-
-            k = -1
-            for i in range(nrows):
-                for j in range(ncols):
-                    k += 1
-
-                    if len(self._qubits) == 1:
-                        ax = axes
-                    elif axes.ndim == 1:
-                        ax = axes[j]
-                    elif axes.ndim == 2:
-                        ax = axes[i,j]
-
-                    if k < len(self._qubits):
-                        q = self._qubits[k]
-
-                    ax.set_xlabel('I', fontsize=15)
-                    ax.set_ylabel('Q', fontsize=15)
-                    ax.tick_params(
-                        axis='both', which='major', labelsize=12
-                    )
-
-                    if raw:
-                        sc = ax.scatter(
-                            self._X[q][:, 0], self._X[q][:, 1], 
-                            c=self._y[q], cmap=cmap, alpha=0.03
-                        )
-                    else:
-                        ax.hexbin(
-                            self._X[q][:, 0], self._X[q][:, 1], 
-                            cmap='Greys', gridsize=75
-                        )
-
-                    # Create a mesh plot
-                    x_min, x_max = (
-                        self._X[q][:, 0].min() - 10, 
-                        self._X[q][:, 0].max() + 10
-                    )
-                    y_min, y_max =(
-                        self._X[q][:, 1].min() - 10, 
-                        self._X[q][:, 1].max() + 10
-                    )
-                    h = int(min([abs(x_min), abs(y_min)]) * 0.025)
-                    xx, yy = np.meshgrid(
-                        np.arange(x_min, x_max, h), 
-                        np.arange(y_min, y_max, h)
-                    )
-
-                    # Plot the decision boundary by assigning a color to 
-                    # each point in the mesh [x_min, x_max]x[y_min, y_max].
-                    Z = self._classifier[q].predict(
-                        np.c_[xx.ravel(), yy.ravel()]
-                    )
-                    Z = Z.reshape(xx.shape)
-                    if raw:
-                        ax.contourf(xx, yy, Z, cmap=cmap, alpha=0.15)
-                    else:
-                        cs = ax.contourf(xx, yy, Z, cmap=cmap, alpha=0.15)
-                        self._cs = cs
-                        
-                    ax.set_xlim([x_min, x_max])
-                    ax.set_ylim([y_min, y_max])
-
-                    if raw:
-                        leg = ax.legend(
-                            handles=sc.legend_elements()[0], 
-                            labels=range(0, self._n_levels), 
-                            fontsize=12,
-                            loc=0
-                        )
-                    else:
-                        handles = []
-                        for l in range(self._n_levels):
-                            handles.append(cs.legend_elements()[0][l*3])
-                        leg = ax.legend(
-                            handles=handles,
-                            labels=range(0, self._n_levels), 
-                            fontsize=12,
-                            loc=0
-                        )
-                    for lh in leg.legendHandles:
-                        lh.set_alpha(1)
-                
-            fig.set_tight_layout(True)
-            if settings.Settings.save_data:
-                if raw:
-                    fig.savefig(
-                        self._data_manager._save_path + 
-                        'readout_calibration_raw.png', 
-                        dpi=300
-                    )
-                else:
-                    fig.savefig(
-                    self._data_manager._save_path + 'readout_calibration.png', 
-                    dpi=300
-                )
-            plt.show()
-    
-
-        def run(self):
-            """Run all experimental methods and analyze results."""
-            self.generate_circuits()
-            qpu.run(self, self._circuits, save=False)
             self.analyze()
             clear_output(wait=True)
-            self._data_manager._exp_id += (
-                f'_RCal_Q{"".join(str(q) for q in self._qubits)}'
-            )
-            if settings.Settings.save_data:
-                self.save()
-            print(f"\nRuntime: {repr(self._runtime)[8:]}\n")
+            print(f"\nRuntime: {repr(self._rcal._runtime)[8:]}\n")
             self.plot()
             self.final()
 
