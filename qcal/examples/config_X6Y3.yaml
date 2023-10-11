@@ -798,51 +798,51 @@ readout:
   0:
     channel: 7
     amp: 0.05
-    freq: 6555456854.218374
+    freq: 6555681854.21837
     phase: 0.0
-    delay: 4.0e-07
+    delay: 4.75e-07
   1:
     channel: 4
-    amp: 0.04
-    freq: 6559107827.371197
+    amp: 0.05
+    freq: 6558757827.3712
     phase: 0.6
-    delay: 4.0e-07
+    delay: 4.75e-07
   2:
     channel: 1
-    amp: 0.05
+    amp: 0.07
     freq: 6658504601.204804
     phase: -2.3
-    delay: 4.0e-07
+    delay: 4.475e-07
   3:
     channel: 3
-    amp: 0.05
+    amp: 0.07
     freq: 6699523073.864432
     phase: 1.2
-    delay: 4.0e-07
+    delay: 2.825e-07
   4:
     channel: 5
-    amp: 0.06
-    freq: 6710258215.418671
+    amp: 0.065
+    freq: 6710208215.41867
     phase: -0.3
-    delay: 4.0e-07
+    delay: 6.125e-07
   5:
     channel: 6
-    amp: 0.08
-    freq: 6707928573.902684
+    amp: 0.062
+    freq: 6708403573.90268
     phase: -0.5
-    delay: 4.0e-07
+    delay: 5.575e-07
   6:
     channel: 2
-    amp: 0.075
-    freq: 6784291290.240388
+    amp: 0.06
+    freq: 6783941290.24039
     phase: 1.3
-    delay: 4.0e-07
+    delay: 4.2e-07
   7:
     channel: 0
-    amp: 0.08
-    freq: 6836587148.190145
+    amp: 0.073
+    freq: 6784291290.240388
     phase: 2.0
-    delay: 4.0e-07
+    delay: 4.75e-07
   esp:
     enable: false
     qubits:
