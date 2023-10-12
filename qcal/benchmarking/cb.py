@@ -209,7 +209,7 @@ def CB(qpu:                  QPU,
             )
 
         def generate_circuits(self):
-            """Generate all True-Q SRB circuits."""
+            """Generate all True-Q CB circuits."""
             logger.info(' Generating circuits from True-Q...')
             import trueq as tq
 
@@ -241,7 +241,7 @@ def CB(qpu:                  QPU,
                 self._circuits.append(tq.make_rcal(self._circuits.labels))
 
         def analyze(self):
-            """Analyze the SRB results."""
+            """Analyze the CB results."""
             logger.info(' Analyzing the results...')
             import trueq as tq
 
@@ -261,7 +261,7 @@ def CB(qpu:                  QPU,
                 print(self._circuits.fit(analyze_dim=2))
 
         def plot(self) -> None:
-            """Plot the SRB fit results."""
+            """Plot the CB fit results."""
             # Plot the raw curves
             ncols = 2 if self._include_ref_cycle else 1
             figsize = (6 * ncols, 5)

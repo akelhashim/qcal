@@ -154,7 +154,7 @@ def KNR(qpu:                  QPU,
             )
 
         def generate_circuits(self):
-            """Generate all True-Q SRB circuits."""
+            """Generate all True-Q KNR circuits."""
             logger.info(' Generating circuits from True-Q...')
             import trueq as tq
 
@@ -172,24 +172,23 @@ def KNR(qpu:                  QPU,
                 self._circuits.append(tq.make_rcal(self._circuits.labels))
 
         def analyze(self):
-            """Analyze the SRB results."""
+            """Analyze the KNR results."""
             logger.info(' Analyzing the results...')
             print('')
-            print(self._circuits.fit(analyze_dim=2))
+            for fit in self._circuits.fit(analyze_dim=2):
+                print(fit)
 
         def plot(self) -> None:
-            """Plot the SRB fit results."""
+            """Plot the KNR fit results."""
             # Plot the raw curves
-            fig, ax = plt.subplots(figsize=(6, 5), layout='constrained')
-            self._circuits.plot.raw(axes=ax)
-            ax.set_title(ax.get_title(), fontsize=20)
-            ax.xaxis.get_label().set_fontsize(15)
-            ax.yaxis.get_label().set_fontsize(15)
-            ax.tick_params(axis='both', which='major', labelsize=12)
-            handles, labels = ax.get_legend_handles_labels()
-            ax.legend(handles[:5], labels[:5], fontsize=12)
-            # ax.legend(prop=dict(size=12))
-            ax.grid(True)
+            self._circuits.plot.raw()
+            fig = plt.gcf()
+            for ax in fig.axes:
+                ax.set_title(ax.get_title(), fontsize=20)
+                ax.xaxis.get_label().set_fontsize(15)
+                ax.yaxis.get_label().set_fontsize(15)
+                ax.tick_params(axis='both', which='major', labelsize=12)
+                ax.grid(True)
 
             fig.set_tight_layout(True)
             if settings.Settings.save_data:
@@ -200,14 +199,14 @@ def KNR(qpu:                  QPU,
             plt.show()
 
             # Plot the KNR infidelities
-            fig, ax = plt.subplots(figsize=(8, 5), layout='constrained')
-            self._circuits.plot.compare_pauli_infidelities(axes=ax)
-            ax.set_title(ax.get_title(), fontsize=18)
-            ax.xaxis.get_label().set_fontsize(15)
-            ax.yaxis.get_label().set_fontsize(15)
-            ax.tick_params(axis='both', which='major', labelsize=12)
-            ax.legend(prop=dict(size=12))
-            ax.grid(True)
+            self._circuits.plot.compare_pauli_infidelities()
+            fig = plt.gcf()
+            for ax in fig.axes:
+                ax.set_title(ax.get_title(), fontsize=20)
+                ax.xaxis.get_label().set_fontsize(15)
+                ax.yaxis.get_label().set_fontsize(15)
+                ax.tick_params(axis='both', which='major', labelsize=12)
+                ax.grid(True)
 
             fig.set_tight_layout(True)
             if settings.Settings.save_data:
@@ -222,7 +221,6 @@ def KNR(qpu:                  QPU,
             fig = plt.gcf()
             fig.set_size_inches((8, 8))
 
-            fig.set_tight_layout(True)
             if settings.Settings.save_data:
                 fig.savefig(
                     self._data_manager._save_path + 'KNR_heatmap.png', 
