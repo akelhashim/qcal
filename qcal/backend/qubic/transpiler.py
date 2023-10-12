@@ -513,7 +513,7 @@ def cycle_pulse(config: Config, cycle: Cycle) -> List:
                     config['hardware/DAC_sample_rate'],
                     **{key: val for key, val in p['kwargs'].items() 
                        if key not in ['amp', 'phase']}
-                )} for p in config[f'single_qubit{qubit}/{subspace}/X/pulse']
+                )} for p in config[f'single_qubit/{qubit}/{subspace}/X/pulse']
             ])
 
         elif isinstance(gate, Meas):
