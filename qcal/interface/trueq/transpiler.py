@@ -56,9 +56,9 @@ def to_qcal(
         tcircuit.append(tcycle)
 
         if cycle.marker > 0 and not barrier_between_all:
-            tcircuit.append(Barrier(cycle.labels))
+            tcircuit.append(Barrier(circuit.labels))
         elif barrier_between_all and i < (len(circuit) - 1):
-            tcircuit.append(Barrier(cycle.labels))
+            tcircuit.append(Barrier(circuit.labels))
     
     tcircuit = Circuit(tcircuit)
     # tcircuit.measure()

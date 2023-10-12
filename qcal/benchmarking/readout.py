@@ -186,9 +186,10 @@ def ReadoutFidelity(
             for i, circuit in enumerate(self._circuits):  # i = prep state
                 for j, q in enumerate(self._qubits):  # j, q = idx, qubit
                     self._confusion_mat.iloc[i].loc[f'Q{q}'][
-                        'Meas State'] = (
-                        circuit.results.marginalize(j).probabilities
-                    )
+                        'Meas State'] = ([
+                        circuit.results.marginalize(j).populations[f'{n}']
+                        for n in range(self._n_levels)
+                    ])
 
         def save(self):
             """Save all circuits and data."""

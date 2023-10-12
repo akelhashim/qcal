@@ -4,6 +4,7 @@
 import qcal.settings as settings
 
 from .calibration import Calibration
+from qcal.benchmarking.readout import ReadoutFidelity
 from qcal.circuit import Barrier, Cycle, Circuit, CircuitSet
 from qcal.compilation.compiler import Compiler
 from qcal.config import Config
@@ -323,72 +324,75 @@ def ReadoutCalibration(
                     if k < len(self._qubits):
                         q = self._qubits[k]
 
-                    ax.set_xlabel('I', fontsize=15)
-                    ax.set_ylabel('Q', fontsize=15)
-                    ax.tick_params(
-                        axis='both', which='major', labelsize=12
-                    )
-
-                    if raw:
-                        sc = ax.scatter(
-                            self._X[q][:, 0], self._X[q][:, 1], 
-                            c=self._y[q], cmap=cmap, alpha=0.03
+                        ax.set_xlabel('I', fontsize=15)
+                        ax.set_ylabel('Q', fontsize=15)
+                        ax.tick_params(
+                            axis='both', which='major', labelsize=12
                         )
+
+                        if raw:
+                            sc = ax.scatter(
+                                self._X[q][:, 0], self._X[q][:, 1], 
+                                c=self._y[q], cmap=cmap, alpha=0.03
+                            )
+                        else:
+                            ax.hexbin(
+                                self._X[q][:, 0], self._X[q][:, 1], 
+                                cmap='Greys', gridsize=75
+                            )
+
+                        # Create a mesh plot
+                        x_min, x_max = (
+                            self._X[q][:, 0].min() - 10, 
+                            self._X[q][:, 0].max() + 10
+                        )
+                        y_min, y_max =(
+                            self._X[q][:, 1].min() - 10, 
+                            self._X[q][:, 1].max() + 10
+                        )
+                        h = int(min([abs(x_min), abs(y_min)]) * 0.025)
+                        xx, yy = np.meshgrid(
+                            np.arange(x_min, x_max, h), 
+                            np.arange(y_min, y_max, h)
+                        )
+
+                        # Plot the decision boundary by assigning a color to 
+                        # each point in the mesh [x_min, x_max]x[y_min, y_max].
+                        Z = self._classifier[q].predict(
+                            np.c_[xx.ravel(), yy.ravel()]
+                        )
+                        Z = Z.reshape(xx.shape)
+                        if raw:
+                            ax.contourf(xx, yy, Z, cmap=cmap, alpha=0.15)
+                        else:
+                            cs = ax.contourf(xx, yy, Z, cmap=cmap, alpha=0.15)
+                            self._cs = cs
+                            
+                        ax.set_xlim([x_min, x_max])
+                        ax.set_ylim([y_min, y_max])
+
+                        if raw:
+                            leg = ax.legend(
+                                handles=sc.legend_elements()[0], 
+                                labels=range(0, self._n_levels), 
+                                fontsize=12,
+                                loc=0
+                            )
+                        else:
+                            handles = []
+                            for l in range(self._n_levels):
+                                handles.append(cs.legend_elements()[0][l*3])
+                            leg = ax.legend(
+                                handles=handles,
+                                labels=range(0, self._n_levels), 
+                                fontsize=12,
+                                loc=0
+                            )
+                        for lh in leg.legendHandles:
+                            lh.set_alpha(1)
+
                     else:
-                        ax.hexbin(
-                            self._X[q][:, 0], self._X[q][:, 1], 
-                            cmap='Greys', gridsize=75
-                        )
-
-                    # Create a mesh plot
-                    x_min, x_max = (
-                        self._X[q][:, 0].min() - 10, 
-                        self._X[q][:, 0].max() + 10
-                    )
-                    y_min, y_max =(
-                        self._X[q][:, 1].min() - 10, 
-                        self._X[q][:, 1].max() + 10
-                    )
-                    h = int(min([abs(x_min), abs(y_min)]) * 0.025)
-                    xx, yy = np.meshgrid(
-                        np.arange(x_min, x_max, h), 
-                        np.arange(y_min, y_max, h)
-                    )
-
-                    # Plot the decision boundary by assigning a color to 
-                    # each point in the mesh [x_min, x_max]x[y_min, y_max].
-                    Z = self._classifier[q].predict(
-                        np.c_[xx.ravel(), yy.ravel()]
-                    )
-                    Z = Z.reshape(xx.shape)
-                    if raw:
-                        ax.contourf(xx, yy, Z, cmap=cmap, alpha=0.15)
-                    else:
-                        cs = ax.contourf(xx, yy, Z, cmap=cmap, alpha=0.15)
-                        self._cs = cs
-                        
-                    ax.set_xlim([x_min, x_max])
-                    ax.set_ylim([y_min, y_max])
-
-                    if raw:
-                        leg = ax.legend(
-                            handles=sc.legend_elements()[0], 
-                            labels=range(0, self._n_levels), 
-                            fontsize=12,
-                            loc=0
-                        )
-                    else:
-                        handles = []
-                        for l in range(self._n_levels):
-                            handles.append(cs.legend_elements()[0][l*3])
-                        leg = ax.legend(
-                            handles=handles,
-                            labels=range(0, self._n_levels), 
-                            fontsize=12,
-                            loc=0
-                        )
-                    for lh in leg.legendHandles:
-                        lh.set_alpha(1)
+                        ax.axis('off')
                 
             fig.set_tight_layout(True)
             if settings.Settings.save_data:
@@ -441,6 +445,294 @@ def ReadoutCalibration(
     )
 
 
+def Fidelity(
+        qpu:             QPU,
+        config:          Config,
+        qubits:          List | Tuple,
+        params:          List[str],
+        param_sweep:     ArrayLike | List[ArrayLike],
+        gate:            str = 'X90',
+        compiler:        Any | Compiler | None = None, 
+        transpiler:      Any | None = None,
+        classifier:      ClassificationManager = None,
+        n_shots:         int = 1024, 
+        n_batches:       int = 1, 
+        n_circs_per_seq: int = 1, 
+        n_levels:        int = 2,
+        esp:             bool = False,
+        heralding:       bool = True,
+        raster_circuits: bool = False,
+        **kwargs
+    ) -> Callable:
+    """Fidelity calibration.
+
+    Basic example useage:
+        
+    ```
+    qubits=[0, 1, 2, 3, 4, 5, 6, 7]
+    params = [f'readout/{q}/amp' for q in qubits]
+    param_sweep = [
+        np.linspace(-0.005, 0.005, 21)
+        + cfg[f'readout/{q}/amp'] for q in qubits
+    ]
+
+    cal = Fidelity(
+        CustomQPU,
+        config,
+        qubits=qubits,
+        params=params,
+        param_sweep=param_sweep
+    )
+    cal.run()
+    ```
+
+    Args:
+        qpu (QPU): custom QPU object.
+        config (Config): qcal Config object.
+        qubits (List | Tuple): qubits to calibrate.
+        params (List[str]): list specifying which config params to sweep over.
+        param_sweep (ArrayLike | List[ArrayLike]): value sweep for each param.
+        gate (str, optional): native gate to used to prepare states. Defaults 
+            to 'X90'.
+        compiler (Any | Compiler | None, optional): custom compiler to
+            compile the experimental circuits. Defaults to None.
+        transpiler (Any | None, optional): custom transpiler to 
+            transpile the experimental circuits. Defaults to None.
+        classifier (ClassificationManager, optional): manager used for 
+            classifying raw data. Defaults to None.
+        n_shots (int, optional): number of measurements per circuit. 
+            Defaults to 1024.
+        n_batches (int, optional): number of batches of measurements. 
+            Defaults to 1.
+        n_circs_per_seq (int, optional): maximum number of circuits that
+            can be measured per sequence. Defaults to 1.
+        n_levels (int, optional): number of energy levels to classify. 
+            Defaults to 2.
+        esp (bool, optional): whether to enable excited state promotion for 
+            the calibration. Defaults to False.
+        heralding (bool, optional): whether to enable heralding for the 
+            calibraion. Defaults to True.
+        raster_circuits (bool, optional): whether to raster through all
+            circuits in a batch during measurement. Defaults to False. By
+            default, all circuits in a batch will be measured n_shots times
+            one by one. If True, all circuits in a batch will be measured
+            back-to-back one shot at a time. This can help average out the 
+            effects of drift on the timescale of a measurement.
+
+    Returns:
+        Callable: Fidelity class.
+    """
+
+    class Fidelity(qpu, Calibration):
+        """Fidelity class.
+        
+        This class inherits a custom QPU from the Fidelity function.
+        """
+
+        def __init__(self, 
+                config:          Config,
+                qubits:          List | Tuple,
+                params:          List[str],
+                param_sweep:     ArrayLike | List[ArrayLike],
+                gate:            str = 'X90',
+                compiler:        Any | Compiler | None = None, 
+                transpiler:      Any | None = None,
+                classifier:      ClassificationManager = None,
+                n_shots:         int = 1024, 
+                n_batches:       int = 1, 
+                n_circs_per_seq: int = 1, 
+                n_levels:        int = 2,
+                esp:             bool = False,
+                heralding:       bool = True,
+                raster_circuits: bool = False,
+                **kwargs
+            ) -> None:
+            """Initialize the Fidelity calibration class within the function.
+            """
+            self._rcal = ReadoutFidelity(
+                qpu=qpu,
+                config=config,
+                qubits=qubits,
+                gate=gate,
+                compiler=compiler, 
+                transpiler=transpiler,
+                classifier=classifier,
+                n_shots=n_shots, 
+                n_batches=n_batches, 
+                n_circs_per_seq=n_circs_per_seq, 
+                n_levels=n_levels,
+                raster_circuits=raster_circuits,
+                **kwargs
+            )
+
+            Calibration.__init__(self, 
+                config, 
+                esp=esp,
+                heralding=heralding
+            )
+
+            assert len(qubits) == len(params), (
+                "The number of qubits must be equal to the number of params!"
+            )
+            self._qubits = qubits
+
+            self._params = params
+            self._param_sweep = (
+                param_sweep if isinstance(param_sweep, list) else [
+                    param_sweep for _ in range(len(params))
+                ]
+            )
+
+            self._n_levels = n_levels
+            self._fid = {q: {
+                    level: [] for level in range(n_levels)
+                } for q in qubits
+            }
+
+        @property
+        def fidelity(self) -> dict:
+            """Fidelity.
+
+            Returns:
+                dict: fidelity of states for each qubit for the param sweep.
+            """
+            return self._fid
+                
+        def analyze(self) -> None:
+            """Analyze the data."""
+            logger.info(' Analyzing the data...')
+            
+            # Find the maximum separation for 
+            for q in self._qubits:
+                fid = np.array(self._fid[q][0])
+                for n in range(self._n_levels)[1:]:
+                    fid += np.array(self._fid[q][n])
+                max_fid_idx = np.argmax(fid)
+                self._cal_values[q] = self._param_sweep[
+                        self._qubits.index(q)
+                    ][max_fid_idx]
+
+        def plot(self) -> None:
+            """Plot the fidelity calibration results."""
+            nrows, ncols = calculate_nrows_ncols(len(self._qubits))
+            figsize = (5 * ncols, 4 * nrows)
+            fig, axes = plt.subplots(
+                nrows, ncols, figsize=figsize, layout='constrained'
+            )
+
+            colors = [
+                (0.12156862745098039, 0.4666666666666667, 0.7058823529411765),
+                (1.0, 0.4980392156862745, 0.054901960784313725),
+                (0.5803921568627451, 0.403921568627451, 0.7411764705882353)
+            ]
+
+            k = -1
+            for i in range(nrows):
+                for j in range(ncols):
+                    k += 1
+
+                    if len(self._qubits) == 1:
+                        ax = axes
+                    elif axes.ndim == 1:
+                        ax = axes[j]
+                    elif axes.ndim == 2:
+                        ax = axes[i,j]
+
+                    if k < len(self._qubits):
+                        q = self._qubits[k]
+
+                        ax.set_xlabel('Parameter Sweep', fontsize=15)
+                        ax.set_ylabel('Fidelity', fontsize=15)
+                        ax.tick_params(
+                            axis='both', which='major', labelsize=12
+                        )
+
+                        for n in range(self._n_levels):
+                            ax.plot(
+                                self._param_sweep[self._qubits.index(q)], 
+                                self._fid[q][n],
+                                'o-',
+                                c=colors[n],
+                                label=rf'$|{n}\rangle$'
+                            )
+
+                        ax.axvline(
+                            self._cal_values[q],  
+                            ls='--', c='k', label='Max fid.'
+                        )
+
+                        ax.legend(loc=0, fontsize=12)
+
+                    else:
+                        ax.axis('off')
+                
+            fig.set_tight_layout(True)
+            if settings.Settings.save_data:
+                fig.savefig(
+                   self._rcal._data_manager._save_path + 'fid_calibration.png', 
+                   dpi=300
+                )
+            plt.show()
+
+        def final(self) -> None:
+            """Save and load the config after changing parameters."""
+            for q in self._qubits:
+                self._config[
+                        self._params[self._qubits.index(q)]
+                    ] = self._cal_values[q]
+
+            if self._disable_esp:
+                self.set_param('readout/esp/enable', False)
+
+            if self._disable_heralding:
+                self.set_param('readout/herald', False)
+
+            self._config.save()
+            self._config.load()
+
+        def run(self) -> None:
+            """Run the experiment."""
+            for i in range(len(self._param_sweep[0])):
+                for j, param in enumerate(self._params):
+                    self._rcal._config[param] = self._param_sweep[j][i]
+
+                self._rcal._measurements = []
+                self._rcal.run()
+
+                for q in self._qubits:
+                    for n in range(self._n_levels):
+                        self._fid[q][n].append(
+                            self._rcal.confusion_matrix[f'Q{q}'].loc[
+                                    'Prep State', 'Meas State'
+                                ].loc[n][n]
+                        )
+
+            self.analyze()
+            clear_output(wait=True)
+            print(f"\nRuntime: {repr(self._rcal._runtime)[8:]}\n")
+            self.plot()
+            self.final()
+
+    return Fidelity(
+        config,
+        qubits,
+        params,
+        param_sweep,
+        gate,
+        compiler, 
+        transpiler,
+        classifier,
+        n_shots, 
+        n_batches, 
+        n_circs_per_seq, 
+        n_levels,
+        esp,
+        heralding,
+        raster_circuits,
+        **kwargs
+    )
+
+
 def Separation(
         qpu:             QPU,
         config:          Config,
@@ -466,13 +758,23 @@ def Separation(
 
     Basic example useage:
         
-        # ```
-        # cal = ReadoutCalibration(
-        #     CustomQPU, 
-        #     config, 
-        #     qubits=[0, 1, 2])
-        # cal.run()
-        # ```
+    ```
+    qubits=[0, 1, 2, 3, 4, 5, 6, 7]
+    params = [f'readout/{q}/freq' for q in qubits]
+    param_sweep = [ # +/- 500 kHz sweep around the current frequency
+        np.linspace(-0.25, 0.25, 21) * MHz
+        + config[f'readout/{q}/freq'] for q in qubits
+    ]
+
+    cal = Separation(
+        CustomQPU,
+        config,
+        qubits=qubits,
+        params=params,
+        param_sweep=param_sweep
+    )
+    cal.run()
+    ```
 
     Args:
         qpu (QPU): custom QPU object.
@@ -482,7 +784,7 @@ def Separation(
         param_sweep (ArrayLike | List[ArrayLike]): value sweep for each param.
         method (str, optional): calibration method. Must be one of ('pi_pulse',
             'rabi').
-        gate (str, optional): native gate to calibrate. Defaults 
+        gate (str, optional): native gate used for state preparation. Defaults 
             to 'X90'.
         model (str, optional): classification algorithm. Defaults to 'gmm'.
         compiler (Any | Compiler | None, optional): custom compiler to
@@ -562,6 +864,12 @@ def Separation(
                 **kwargs
             )
 
+            Calibration.__init__(self, 
+                config, 
+                esp=esp,
+                heralding=heralding
+            )
+
             assert len(qubits) == len(params), (
                 "The number of qubits must be equal to the number of params!"
             )
@@ -601,14 +909,12 @@ def Separation(
                 for g in self._groupings[1:]:
                     sep += np.array(self._sep[q][g])
                 max_sep_idx = np.argmax(sep)
-                self._cal_values[q] = self._param_sweep[q][max_sep_idx]
+                self._cal_values[q] = self._param_sweep[
+                        self._qubits.index(q)
+                    ][max_sep_idx]
 
-        def plot(self, raw=False) -> None:
-            """Plot the readout calibration results.
-
-            Args:
-                raw (bool, optional): plot the raw data. Defaults to False.
-            """
+        def plot(self) -> None:
+            """Plot the calibration results for the maximum separation."""
             nrows, ncols = calculate_nrows_ncols(len(self._qubits))
             figsize = (5 * ncols, 4 * nrows)
             fig, axes = plt.subplots(
@@ -644,7 +950,7 @@ def Separation(
 
                         for m, g in enumerate(self._groupings):
                             ax.plot(
-                                self._param_sweep[q], 
+                                self._param_sweep[self._qubits.index(q)], 
                                 self._sep[q][g],
                                 'o-',
                                 c=colors[m],
@@ -653,7 +959,7 @@ def Separation(
 
                         ax.axvline(
                             self._cal_values[q],  
-                            ls='--', c='k', label='Max separation'
+                            ls='--', c='k', label='Max sep.'
                         )
 
                         ax.legend(loc=0, fontsize=12)
@@ -664,15 +970,23 @@ def Separation(
             fig.set_tight_layout(True)
             if settings.Settings.save_data:
                 fig.savefig(
-                    self._data_manager._save_path + 'sep_calibration.png', 
-                    dpi=300
+                   self._rcal._data_manager._save_path + 'sep_calibration.png', 
+                   dpi=300
                 )
             plt.show()
 
         def final(self) -> None:
             """Save and load the config after changing parameters."""
             for q in self._qubits:
-                self._config[self._params[q]] = self._cal_values[q]
+                self._config[
+                        self._params[self._qubits.index(q)]
+                    ] = self._cal_values[q]
+
+            if self._disable_esp:
+                self.set_param('readout/esp/enable', False)
+
+            if self._disable_heralding:
+                self.set_param('readout/herald', False)
 
             self._config.save()
             self._config.load()
@@ -681,23 +995,14 @@ def Separation(
             """Run the experiment."""
             for i in range(len(self._param_sweep[0])):
                 for j, param in enumerate(self._params):
-                    self._config[param] = self._param_sweep[j][i]
+                    self._rcal._config[param] = self._param_sweep[j][i]
 
-                self._rcal._config = self._config
-                self._rcal.generate_circuits()
-                self._rcal.qpu.run(self._rcal._circuits, save=False)
-                self._rcal.analyze()
-                clear_output(wait=True)
-                self._rcal._data_manager._exp_id += (
-                    f'_RCal_Q{"".join(str(q) for q in self._qubits)}'
-                )
-                if settings.Settings.save_data:
-                    self._rcal.save()
-                self._rcal.final()
+                self._rcal._measurements = []
+                self._rcal.run()
 
                 for q in self._qubits:
                     for g in self._groupings:
-                        self._sep[q][g].append(self._rcal.fit[q].snr[g])
+                        self._sep[q][g].append(self._rcal.classifier[q].snr[g])
 
             self.analyze()
             clear_output(wait=True)
