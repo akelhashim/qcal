@@ -804,13 +804,13 @@ readout:
   1:
     channel: 4
     amp: 0.055
-    freq: 6558857827.3712
+    freq: 6558757827.3712
     phase: 0.6
     delay: 3.925e-07
   2:
     channel: 1
     amp: 0.058
-    freq: 6658454601.2048
+    freq: 6658429601.2048
     phase: -2.3
     delay: 6.5e-07
   3:
