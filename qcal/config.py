@@ -10,6 +10,8 @@ Basic example useage:
 """
 import qcal.settings as settings
 
+from qcal.math.utils import round_sig_figures
+
 import copy
 import io
 import logging
@@ -385,9 +387,11 @@ class Config:
                 (e.g. ['single_qubit', 0, 'GE', 'freq']).
             newvalue (Any): new value to assign to the parameter.
         """
-        newvalue = (round(float(newvalue), 6) if isinstance(newvalue, float) 
-            else newvalue
-        )
+        if isinstance(newvalue, float):
+            if abs(newvalue) > 1 or newvalue == 0:
+                newvalue = round(float(newvalue), 5)
+            elif abs(newvalue) < 1:
+                newvalue = round_sig_figures(float(newvalue), 5)
         cfg_param = self.get(param[:-1])
         cfg_param[param[-1]] = newvalue
         logger.info(f' Param {param} set to {newvalue}.')

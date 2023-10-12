@@ -24,6 +24,20 @@ def reciprocal_uncertainty(x: float, sigma_x: float) -> Tuple[float]:
     return rec_x, rec_sigma_x
 
 
+def round_sig_figures(x: float, n_sig_figs: int = 1) -> float:
+    """Rounds a number to a given number of significant figures.
+
+    Args:
+        x (float): number to round.
+        n_sig_decimals (int, optional): number of significant figures. 
+            Defaults to 1.
+
+    Returns:
+        float: rounded number.
+    """
+    return round(x, n_sig_figs - int(np.floor(np.log10(abs(x)))) - 1)
+
+
 def round_to_order_error(
         val: float, err: float, error_precision: int = 1
     ) -> Tuple[float]:
