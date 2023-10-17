@@ -677,15 +677,17 @@ class CircuitSet:
             index (List[int] | None, optional): Indices for the circuits in the 
                 DataFrame. Defaults to None.
         """
-        self._df = pd.DataFrame(columns=['circuit'], dtype='object')
-
         if circuits is not None:
-            if isinstance(circuits, Iterable):
+            if isinstance(circuits, pd.DataFrame):
+                self._df = circuits
+            elif isinstance(circuits, list):
+                self._df = pd.DataFrame(columns=['circuit'], dtype='object')
                 self._df['circuit'] = circuits
-                # self._df['Results'] = [dict()] * len(circuits)
             else:
+                self._df = pd.DataFrame(columns=['circuit'], dtype='object')
                 self._df['circuit'] = [circuits]
-                # self._df['Results'] = [dict()] * len([circuits])
+        else:
+            self._df = pd.DataFrame(columns=['circuit'], dtype='object')
         
         if index is not None:
             self._df = self._df.set_index(pd.Index(index))
@@ -789,9 +791,7 @@ class CircuitSet:
             CircuitSet: CircuitSet of maximum size given by batch_size.
         """
         for i in range(0, len(self), batch_size):
-            yield CircuitSet(
-                self._df.iloc[i:i + batch_size]['circuit'].tolist()
-            )
+            yield CircuitSet(self._df.iloc[i:i + batch_size])
 
     def save(self, path: str):
         """Save the CircuitSet dataframe.
