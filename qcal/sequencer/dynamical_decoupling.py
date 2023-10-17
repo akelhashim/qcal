@@ -1,6 +1,7 @@
 """Submodule for handling dynamical decoupling sequences.
 
 """
+from qcal.calibration.utils import find_pulse_index
 from qcal.circuit import Barrier, Circuit, Cycle
 from qcal.config import Config
 from qcal.gate.single_qubit import Idle, X, Rz
@@ -39,7 +40,8 @@ def XY(
     """
     assert n_pulses % 4 == 0, "'n_pulses' must be a multiple of 4!"
     tau = length / (2 * n_pulses)  # Base interval
-    gate_time = config[f'single_qubit/{qubit}/GE/X/pulse/']['length']
+    idx = find_pulse_index(config, f'single_qubit/{qubit}/GE/X/pulse')
+    gate_time = config[f'single_qubit/{qubit}/GE/X/pulse'][idx]['length']
     idle_time = tau - gate_time / 2
 
     DD_sequence = Circuit([
@@ -68,9 +70,9 @@ def XY(
         Cycle({Idle(qubit, duration=idle_time)}),
         # Barrier((qubit,)),
     ])
-
+    
     DD_circuit = Circuit()
-    for _ in range(n_pulses / 4):
+    for _ in range(int(n_pulses / 4)):
         DD_circuit.extend(DD_sequence)
 
     return DD_circuit
