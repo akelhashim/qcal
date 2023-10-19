@@ -830,7 +830,7 @@ readout:
   2:
     channel: 1
     amp: 0.0735
-    freq: 6658429601.2048
+    freq: 6658904601.2048
     length: 1.0e-06
     phase: -2.3
     delay: 2.0e-07
