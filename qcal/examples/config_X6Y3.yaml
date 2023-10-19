@@ -829,11 +829,11 @@ readout:
     delay: 4.25e-07
   2:
     channel: 1
-    amp: 0.0735
+    amp: 0.076
     freq: 6658904601.2048
-    length: 1.0e-06
+    length: 9.9e-07
     phase: -2.3
-    delay: 2.0e-07
+    delay: 1.95e-07
   3:
     channel: 3
     amp: 0.0505
