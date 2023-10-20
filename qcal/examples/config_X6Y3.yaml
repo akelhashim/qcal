@@ -815,58 +815,58 @@ two_qubit:
 readout:
   0:
     channel: 7
-    amp: 0.035
+    amp: 0.0545
     freq: 6555381854.21837
-    length: 1.02e-06
+    length: 1.48e-06
     phase: 0.0
     delay: 4.25e-07
   1:
     channel: 4
-    amp: 0.055
+    amp: 0.031
     freq: 6558807827.3712
-    length: 1.01e-06
+    length: 1.4e-06
     phase: 0.6
     delay: 4.25e-07
   2:
     channel: 1
-    amp: 0.076
+    amp: 0.056
     freq: 6658904601.2048
-    length: 9.9e-07
+    length: 1.53e-06
     phase: -2.3
     delay: 2.0e-07
   3:
     channel: 3
-    amp: 0.0505
+    amp: 0.056
     freq: 6699548073.86443
-    length: 1.01e-06
+    length: 1.53e-06
     phase: 1.2
     delay: 3.9e-07
   4:
     channel: 5
-    amp: 0.05225
+    amp: 0.063
     freq: 6710633215.41867
-    length: 9.8e-07
+    length: 1.46e-06
     phase: 0.25
     delay: 4.6e-07
   5:
     channel: 6
-    amp: 0.0545
+    amp: 0.05
     freq: 6708678573.90268
-    length: 9.0e-07
+    length: 1.46e-06
     phase: 1.0
     delay: 4.6e-07
   6:
     channel: 2
-    amp: 0.0557
+    amp: 0.057
     freq: 6783991290.24039
-    length: 1.14e-06
+    length: 1.4e-06
     phase: 0.0
     delay: 3.725e-07
   7:
     channel: 0
-    amp: 0.06125
+    amp: 0.0735
     freq: 6836612148.19014
-    length: 1.06e-06
+    length: 1.44e-06
     phase: 2.0
     delay: 4.6e-07
   esp:
