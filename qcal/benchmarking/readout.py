@@ -193,22 +193,24 @@ def ReadoutFidelity(
 
         def save(self):
             """Save all circuits and data."""
-            qpu.save(self)
-            self._data_manager.save_to_csv(
-                self._confusion_mat, 'confusion_matrix'
-            )
+            clear_output(wait=True)
+            self._data_manager._exp_id += '_readout_fidelity'
+            if settings.Settings.save_data:
+                qpu.save(self)
+                self._data_manager.save_to_csv(
+                    self._confusion_mat, 'confusion_matrix'
+                )
+
+        def final(self):
+            """Final calibration method."""
+            print(f"Runtime: {repr(self._runtime)[8:]}\n")
 
         def run(self):
             """Run all experimental methods and analyze results."""
             self.generate_circuits()
             qpu.run(self, self._circuits, save=False)
             self.analyze()
-            clear_output(wait=True)
-            if settings.Settings.save_data:
-                self._data_manager._exp_id += '_readout_fidelity'
-                self.save()
-            print(f"Runtime: {repr(self._runtime)[8:]}\n")
-
+            self.save()
 
     return ReadoutFidelity(
         config,

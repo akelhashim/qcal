@@ -81,7 +81,7 @@ def plot_freq_spectrum(
                     x=[config[f'single_qubit/{q}/GE/freq'] / 1e9,
                        config[f'single_qubit/{q}/GE/freq'] / 1e9],
                     y=[1, 0],
-                    line_width=3,
+                    line_width=5,
                     mode='lines',
                     name=f'Q{q} GE',
                     line=dict(color=colors[i])
@@ -101,7 +101,7 @@ def plot_freq_spectrum(
                     x=[config[f'single_qubit/{q}/EF/freq'] / 1e9,
                        config[f'single_qubit/{q}/EF/freq'] / 1e9],
                     y=[1, 0],
-                    line_width=3,
+                    line_width=5,
                     mode='lines',
                     name=f'Q{q} EF',
                     line=dict(color=colors[i], dash='dash')
@@ -121,7 +121,7 @@ def plot_freq_spectrum(
                     x=[config[f'readout/{q}/freq'] / 1e9,
                        config[f'readout/{q}/freq'] / 1e9],
                     y=[1, 0],
-                    line_width=3,
+                    line_width=5,
                     mode='lines',
                     name=f'R{q}',
                     line=dict(color=colors[i], dash='dot')
@@ -145,7 +145,7 @@ def plot_freq_spectrum(
                         x=[config[f'two_qubit/{qp}/{gate}/freq'] / 1e9,
                            config[f'two_qubit/{qp}/{gate}/freq'] / 1e9],
                         y=[1, 0],
-                        line_width=3,
+                        line_width=5,
                         mode='lines',
                         name=f'{gate} {qp}',
                         line=dict(color=colors_tq[i])
