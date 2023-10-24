@@ -161,9 +161,15 @@ def ReadoutCalibration(
             )
             Calibration.__init__(self, 
                 config, 
-                esp=esp,
+                esp=False,
                 heralding=heralding
             )
+
+            if self._config['readout/esp/enable']:
+                self.set_param('readout/esp/enable', False)
+                self._enable_esp = True
+            else:
+                self._enable_esp = False
 
             self._qubits = qubits
 
@@ -408,7 +414,13 @@ def ReadoutCalibration(
                     dpi=300
                 )
             plt.show()
-    
+
+        def final(self):
+            """Final calibration methods."""
+            if self._enable_esp:
+                self.set_param('readout/esp/enable', True)
+            
+            Calibration.final(self)
 
         def run(self):
             """Run all experimental methods and analyze results."""
@@ -845,22 +857,22 @@ def Separation(
             """Initialize the Amplitude calibration class within the function.
             """
             self._rcal = ReadoutCalibration(
-                qpu = qpu,
-                config = config,
-                qubits = qubits,
-                method = method,
-                gate = gate,
-                model = model,
-                compiler = compiler, 
-                transpiler = transpiler,
-                classifier = classifier,
-                n_shots = n_shots, 
-                n_batches = n_batches, 
-                n_circs_per_seq = n_circs_per_seq, 
-                n_levels = n_levels,
-                esp = esp,
-                heralding = heralding,
-                raster_circuits = raster_circuits,
+                qpu=qpu,
+                config=config,
+                qubits=qubits,
+                method=method,
+                gate=gate,
+                model=model,
+                compiler=compiler, 
+                transpiler=transpiler,
+                classifier=classifier,
+                n_shots=n_shots, 
+                n_batches=n_batches, 
+                n_circs_per_seq=n_circs_per_seq, 
+                n_levels=n_levels,
+                esp=esp,
+                heralding=heralding,
+                raster_circuits=raster_circuits,
                 **kwargs
             )
 
