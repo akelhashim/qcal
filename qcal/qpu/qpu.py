@@ -234,7 +234,8 @@ class QPU:
             self._n_shots = n_shots
         if n_batches is not None:
             self._batches = n_batches
-            
+
+        self._measurements = []    
         self._runtime = pd.DataFrame({
             'Compile':    0.0,
             'Transpile':  0.0,
@@ -285,7 +286,6 @@ class QPU:
         """
         pass
 
-    # def measure(self, circuits: Any) -> None:
     def measure(self) -> None:
         """Measure a set of circuits.
 
@@ -366,20 +366,12 @@ class QPU:
         self._data_manager.create_data_path()
         self._data_manager.save_to_pickle(self._circuits, 'circuits')
 
-        # if not self._compiled_circuits.is_empty:
         if len(self._compiled_circuits) > 1:
-            # self._data_manager.save_to_pickle(
-            #     self._compiled_circuits, 'compiled_circuits'
-            # )
             self._compiled_circuits.save(
                 self._data_manager._save_path + 'compiled_circuits.pkl'
             )
 
-        # if not self._transpiled_circuits.is_empty:
         if len(self._transpiled_circuits) > 1: 
-            # self._data_manager.save_to_pickle(
-            #     self._transpiled_circuits, 'transpiled_circuits'
-            # )
             self._transpiled_circuits.save(
                 self._data_manager._save_path + 'compiled_circuits.pkl'
             )
