@@ -216,9 +216,10 @@ def post_process(
             try:
                 circuit.results = results
             except Exception:
-                logger.warning(
-                    f'Cannot write results to type {type(circuit)}!'
-                )
+                if i == 0:
+                    logger.warning(
+                        f'Cannot write results to type {type(circuit)}!'
+                    )
 
             all_results.append(results)
 

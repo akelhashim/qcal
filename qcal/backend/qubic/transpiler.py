@@ -168,51 +168,16 @@ def add_measurement(
                 {'name': 'delay', 't': length, 'qubit': [f'Q{qubit}']}
             )
 
-    if isinstance(qubit_or_meas, Gate) and qubit_or_meas.name == 'MCM':
-        meas_pulse.append({
-            'name': 'barrier', 
-            'qubit': [
-               f'Q{q}' for q in qubit_or_meas.properties['params']['dd_qubits']
-            ]
-        })
+    # if isinstance(qubit_or_meas, Gate) and qubit_or_meas.name == 'MCM':
+    #     meas_pulse.append({
+    #         'name': 'barrier', 
+    #         'qubit': [
+    #            f'Q{q}' for q in qubit_or_meas.properties['params']['dd_qubits']
+    #         ]
+    #     })
 
     meas_pulse.append({'name': 'barrier', 'qubit': [f'Q{qubit}']})
     meas_pulse.extend(cycle_pulse(config, Cycle({Meas(qubit)})))
-    # meas_pulse.extend([
-    #         {'name': 'pulse',
-    #          'dest': f'Q{qubit}.rdrv',
-    #          'freq': config[f'readout/{qubit}/freq'],
-    #          'amp': 1.0, 
-    #          'phase': 0.0,
-    #          'twidth': config['readout/length'],
-    #          'env': clip_amplitude(
-    #             pulse_envelopes[config.readout[qubit].env](
-    #                 config['readout/length'],
-    #                 config['readout/sample_rate'],
-    #                 amp=config[f'readout/{qubit}/amp'],
-    #                 **config['readout/kwargs']
-    #             )
-    #          )
-    #         },
-    #         {'name': 'delay',
-    #          't': config[f'readout/{qubit}/delay'],
-    #          'qubit': [f'Q{qubit}.rdlo']
-    #         },
-    #         {'name': 'pulse',
-    #          'dest': f'Q{qubit}.rdlo',
-    #          'freq': config[f'readout/{qubit}/freq'],
-    #          'amp': 1.0,
-    #          'phase': config[f'readout/{qubit}/phase'],  # Rotation in IQ plane
-    #          'twidth': config['readout/length'],
-    #          'env': clip_amplitude(
-    #             pulse_envelopes['square'](
-    #                 config['readout/length'],
-    #                 config['readout/sample_rate'],
-    #             )
-    #          )
-    #         }
-    #     ]
-    # )
 
     if isinstance(qubit_or_meas, Gate) and qubit_or_meas.name == 'MCM':
         for q in qubit_or_meas.properties['params']['dd_qubits']:
@@ -220,7 +185,7 @@ def add_measurement(
                 config,
                 qubit_or_meas.properties['params']['dd_method'],
                 q,
-                config['readout/length'],
+                config[f'readout/{qubit}/length'],
                 qubit_or_meas.properties['params']['n_dd_pulses'],
                 meas_pulse
             )
@@ -267,8 +232,8 @@ def add_mcm_apply(config: Config, mcm: MCM, pulse: List) -> None:
         mcm (MCM): mid-circuit measurement object.
         pulse (List): qubic pulse.
     """
-    q_meas = MCM.qubits[0]
-    q_cond = MCM['params']['apply']['1'].qubits
+    q_meas = mcm.qubits[0]
+    q_cond = mcm['params']['apply']['1'].qubits
 
     # Initial barrier
     pulse.append(
@@ -418,15 +383,15 @@ def add_multi_qubit_gate(
     if config[f'two_qubit/{qubits}/{name}/dynamical_decoupling/enable']:
         sub_config = config[f'two_qubit/{qubits}/{name}/dynamical_decoupling']
         idx = find_pulse_index(config, f'two_qubit/{qubits}/{name}/pulse')
-        mq_pulse.append(
-            {'name': 'barrier', 
-             'scope': [f'Q{q}' for q in sub_config['qubits']]
-            }
-        )
+        # mq_pulse.append(
+        #     {'name': 'barrier', 
+        #      'scope': [f'Q{q}' for q in sub_config['qubits']]
+        #     }
+        # )
         for q in sub_config['qubits']:
             add_dynamical_decoupling(
                 config,
-                sub_config['dd_method'],
+                sub_config['method'],
                 q,
                 config[f'two_qubit/{qubits}/{name}/pulse'][idx]['length'],
                 sub_config['n_pulses'],
@@ -522,10 +487,10 @@ def cycle_pulse(config: Config, cycle: Cycle) -> List:
                  'dest': f'Q{qubit}.rdrv',
                  'freq': config[f'readout/{qubit}/freq'],
                  'amp': config[f'readout/{qubit}/amp'], 
-                 'phase': config[f'readout/{qubit}/phase'],
-                 'twidth': config['readout/length'],
+                 'phase': 0.0,
+                 'twidth': config[f'readout/{qubit}/length'],
                  'env': pulse_envelopes[config.readout[qubit].env](
-                        config['readout/length'],
+                        config[f'readout/{qubit}/length'],
                         config['readout/sample_rate']
                     )
                 },
@@ -538,9 +503,9 @@ def cycle_pulse(config: Config, cycle: Cycle) -> List:
                  'freq': config[f'readout/{qubit}/freq'],
                  'amp': 1.0,
                  'phase': config[f'readout/{qubit}/phase'],  # Rotation in IQ plane
-                 'twidth': config['readout/length'],
+                 'twidth': config[f'readout/{qubit}/length'],
                  'env': pulse_envelopes['square'](
-                        config['readout/length'],
+                        config[f'readout/{qubit}/length'],
                         config['readout/sample_rate'],
                     )
                 }
@@ -594,6 +559,9 @@ def to_qubic(
     for cycle in circuit.cycles:
 
         if not cycle.is_barrier:
+            qubic_circuit.append(
+               {'name': 'barrier', 'qubit': [f'Q{q}' for q in circuit.qubits]},
+            )
             for gate in cycle:
 
                 name = gate.name
@@ -608,9 +576,9 @@ def to_qubic(
                     gate_mapper[gate.name](config, gate, qubic_circuit, pulses)
 
         elif cycle.is_barrier:
-            qubits = cycle.qubits if cycle.qubits else circuit.qubits
+            # qubits = cycle.qubits if cycle.qubits else circuit.qubits
             qubic_circuit.append(
-                {'name': 'barrier', 'qubit': [f'Q{q}' for q in qubits]},
+               {'name': 'barrier', 'qubit': [f'Q{q}' for q in circuit.qubits]},
             )
 
     return qubic_circuit
@@ -710,7 +678,7 @@ class Transpiler:
 
             if params:
                 for param in params:  # [7:] removes the string 'param: '
-                    self._config[param[7:]] = circuits[param][i]
+                    self._config[param[7:]] = circuits[param].iloc[i]
             
             transpiled_circuits.append(
                 to_qubic(
