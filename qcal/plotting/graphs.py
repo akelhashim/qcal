@@ -59,7 +59,7 @@ def draw_circuit(circuit: Circuit, show: bool = True):
     # https://plotly.com/python/marker-style/
     symbol_map = defaultdict(lambda: ['square', 'square'],
         {'Meas':   ['triangle-right'],
-         'MCM':    ['triangle-right-dot'],
+         'MCM':    ['triangle-right-open'],
          'Reset':  ['triangle-left'],
          'CH':     ['circle', 'square'],
          'CNot':   ['circle', 'circle-cross'],
@@ -72,7 +72,13 @@ def draw_circuit(circuit: Circuit, show: bool = True):
          'SWAP':   ['x-thin', 'x-thin'],
          'iSWAP':  ['square-x', 'square-x']}
     )
-    color_map = defaultdict(lambda: '#3366CC', {'Meas': '#B82E2E'})
+    # color_map = defaultdict(lambda: '#3366CC', {'Meas': '#B82E2E'})
+    color_map = defaultdict(lambda: 'white',
+        {'Meas': 'black',
+         'MCM': 'black',
+         'Reset': 'black'
+        }
+    )
 
     node_x = []
     node_y = []
@@ -95,7 +101,9 @@ def draw_circuit(circuit: Circuit, show: bool = True):
                     node_text.append(format_gate_text(gate))
                     node_symbols.append(symbol_map[gate.name][0])
                     gate_names.append(
-                        gate.name if len(gate.name) < 3 else gate.name[:3]
+                        '' if gate.name == 'Meas' else (
+                            gate.name if len(gate.name) < 3 else gate.name[:3]
+                        )
                     )
                     marker_colors.append(color_map[gate.name])
                 elif gate.is_multi_qubit:
@@ -105,9 +113,9 @@ def draw_circuit(circuit: Circuit, show: bool = True):
                     node_text.extend([format_gate_text(gate)]*2)
                     node_symbols.extend(symbol_map[gate.name])
                     gate_names.extend(
-                        [gate.name if len(gate.name) < 3 else gate.name[:3]]*2
+                        [gate.name if len(gate.name) < 3 else gate.name[0]]*2
                     )
-                    marker_colors.extend(['grey', 'grey'])
+                    marker_colors.extend(['white', 'white'])
 
     # ms_scale = 200
     node_trace = go.Scatter(
@@ -177,7 +185,7 @@ def draw_circuit(circuit: Circuit, show: bool = True):
             text="Quantum Circuit",
             showarrow=False,
             xref="paper", yref="paper",
-            x=-0.001, y=1.1) ],
+            x=-0.001, y=1.05) ],
         xaxis=dict(tick0=0, dtick=1, showgrid=False, zeroline=False, 
                    showticklabels=True),
         yaxis=dict(tickmode='array', 
@@ -185,6 +193,13 @@ def draw_circuit(circuit: Circuit, show: bool = True):
                    ticktext=circuit.qubits,#[str(q) for q in ] 
                    showgrid=False, zeroline=False, showticklabels=True))
     )
+    for x, y, name in zip(node_x, node_y, gate_names):
+        fig.add_annotation(
+            font=dict(color='black', size=13),
+            x=x, y=y,
+            text=name,
+            showarrow=False
+        )
     fig['layout']['yaxis']['autorange'] = "reversed"
     for loc in barrier_locs:
         fig.add_vline(x=loc, line_width=3,
