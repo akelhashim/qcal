@@ -17,7 +17,6 @@ from qcal.sequencer.utils import clip_amplitude
 import logging
 
 from collections import defaultdict
-from numpy.typing import NDArray
 from typing import Dict, List, Tuple
 
 logger = logging.getLogger(__name__)
@@ -61,12 +60,13 @@ def add_reset(
                     )
 
                 # Reset pulse w/ qutrit reset
-                reset_q_pulse = [
-                    {'name': 'delay', 
-                     't': config['reset/active/feedback_delay'], 
-                     'qubit': [f'Q{q}']
-                    }
-                ]
+                reset_q_pulse = []
+                # reset_q_pulse = [
+                #     {'name': 'delay', 
+                #      't': config['reset/active/feedback_delay'], 
+                #      'qubit': [f'Q{q}']
+                #     }
+                # ]
                 if (config.parameters['readout']['esp']['enable'] and
                     q in config.parameters['readout']['esp']['qubits']):
                     reset_q_pulse.extend(
@@ -88,7 +88,8 @@ def add_reset(
                     {'name': 'branch_fproc',
                      'alu_cond': 'eq',
                      'cond_lhs': 1,
-                     'func_id': int(config[f'readout/{q}/channel']),
+                    #  'func_id': int(config[f'readout/{q}/channel']),
+                     'func_id': f'Q{q}.meas',
                      'scope': [f'Q{q}'],
                         'true': reset_q_pulse,
                         'false': []
@@ -243,12 +244,13 @@ def add_mcm_apply(config: Config, mcm: MCM, pulse: List) -> None:
     )
 
     # Seqeuence to apply if 1 is measured
-    true_apply = [
-        {'name': 'delay', 
-         't': config['reset/active/feedback_delay'], 
-         'qubit': [f'Q{q}' for q in [qc for qc in q_cond]]
-        },
-    ]
+    true_apply = []
+    # true_apply = [
+    #     {'name': 'delay', 
+    #      't': config['reset/active/feedback_delay'], 
+    #      'qubit': [f'Q{q}' for q in [qc for qc in q_cond]]
+    #     },
+    # ]
     true_apply.extend(
         cycle_pulse(config, MCM['params']['apply']['1'])
     )
@@ -261,7 +263,8 @@ def add_mcm_apply(config: Config, mcm: MCM, pulse: List) -> None:
         {'name': 'branch_fproc', 
          'alu_cond': 'eq', 
          'cond_lhs': 1, 
-         'func_id': int(config[f'readout/{q_meas}/channel']), 
+        #  'func_id': int(config[f'readout/{q_meas}/channel']),
+         'func_id': f'Q{q_meas}.meas',
          'scope': [f'Q{q}' for q in [qc for qc in q_cond]],
          'true': true_apply,
          'false': false_apply
@@ -383,11 +386,6 @@ def add_multi_qubit_gate(
     if config[f'two_qubit/{qubits}/{name}/dynamical_decoupling/enable']:
         sub_config = config[f'two_qubit/{qubits}/{name}/dynamical_decoupling']
         idx = find_pulse_index(config, f'two_qubit/{qubits}/{name}/pulse')
-        # mq_pulse.append(
-        #     {'name': 'barrier', 
-        #      'scope': [f'Q{q}' for q in sub_config['qubits']]
-        #     }
-        # )
         for q in sub_config['qubits']:
             add_dynamical_decoupling(
                 config,
@@ -521,7 +519,7 @@ def transpilation_error(*args):
         Exception: transpilation error for non-native gate.
     """
     raise Exception(
-        f'Cannot transpile {args[1].name}! is a non-native gate.'
+        f'Cannot transpile {args[1].name} (non-native gate)!.'
     ) 
 
 
@@ -544,7 +542,7 @@ def to_qubic(
                 subcircuits like mid-circuit measurement.
 
     Returns:
-        List: compiled qubic circuit.
+        List: transpiled qubic circuit.
     """
     qubic_circuit = []
     
