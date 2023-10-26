@@ -111,7 +111,7 @@ class Config:
                     settings.Settings.config_path + 'config.yaml'
                 )
             except Exception:
-                logger.warning('No configuration file was provided.')
+                logger.warning(' No configuration file was provided.')
                 self._parameters = {}
 
     def __call__(self) -> Dict:

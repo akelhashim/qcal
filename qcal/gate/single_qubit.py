@@ -319,7 +319,7 @@ class Reset(Gate):
         """Initialize using the meas matrix.
 
         Args:
-            qubit (int, optional): _description_. Defaults to 0.
+            qubit (int, optional): qubit label. Defaults to 0.
             meas (Meas | MCM, optional): measurement type. Defaults to Meas.
         """
         super().__init__(meas, qubit)
