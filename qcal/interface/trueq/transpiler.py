@@ -16,20 +16,22 @@ logger = logging.getLogger(__name__)
 
 
 def to_qcal(
-        circuit, gate_mapper: defaultdict, #cs: CircuitSet, element: int,
+        circuit, 
+        gate_mapper: defaultdict,
         barrier_between_all: bool = False
-    ) -> None:
-    """Compile a qcal circuit to a qubic circuit.
+    ) -> Circuit:
+    """Transpile a True-Q circuit to a qcal circuit.
 
     Args:
         circuit (tq.Circuit):      True-Q circuit.
         gate_mapper (defaultdict): map between True-Q to qcal gates.
-        # cs (CircuitSet):           set of transpiled circuits.
-        # element (int):             element of the CircuitSet.
         barrier_between_all (bool, optional): whether to place a barrier
             between all cycles. Defaults to False. This is useful for
             benchmarking circuits to ensure that the circuit structure is
             preserved.
+
+    Returns:
+        Circuit: qcal circuit.
     """
     import trueq as tq
 
@@ -61,24 +63,19 @@ def to_qcal(
             tcircuit.append(Barrier(circuit.labels))
     
     tcircuit = Circuit(tcircuit)
-    # tcircuit.measure()
-
     return tcircuit
-
-    # cs.circuit[element] = tcircuit
 
 
 class Transpiler(Transpiler):
     """True-Q to qcal Transpiler."""
     import trueq as tq
 
-    __slots__ = ('_gate_mapper', '_barrier_between_all', '_parallelize')
+    __slots__ = ('_gate_mapper', '_barrier_between_all')
 
     def __init__(
             self, 
             gate_mapper:         dict | None = None, 
-            barrier_between_all: bool = False,
-            parallelize:         bool = False
+            barrier_between_all: bool = False
         ) -> None:
         """Initialize with a gate_mapper.
 
@@ -89,16 +86,11 @@ class Transpiler(Transpiler):
                 between all cycles. Defaults to False. This is useful for
                 benchmarking circuits to ensure that the circuit structure is
                 preserved.
-            parallelize (bool, optional): whether to use multiprocessing to
-                parallelize the circuit transpilation. Defaults to False. This
-                can speed up the transpilation process if there are many
-                circuits and/or long circuit depths.
         """
         if gate_mapper is None:
             gate_mapper = {**single_qubit_gates, **two_qubit_gates}
         super().__init__(gate_mapper=gate_mapper)
         self._barrier_between_all = barrier_between_all
-        self._parallelize = parallelize
 
     def transpile(
             self, circuits: tq.Circuit | tq.CircuitCollection
@@ -116,34 +108,15 @@ class Transpiler(Transpiler):
         if not isinstance(circuits, tq.CircuitCollection):
             circuits = tq.CircuitCollection(circuits)
 
-        if self._parallelize and mp.cpu_count() > 2:
-            tcircuits = {}
-            logger.info(
-                f" Pooling {mp.cpu_count() - 2} processes for transpilation..."
-            )
-            pool = mp.Pool(mp.cpu_count() - 2)
-            try:
-                for i, circuit in enumerate(circuits):
-                    tcirc = pool.apply_async(
-                        to_qcal,
-                        args=[circuit, self._gate_mapper],
-                        kwds={'barrier_between_all': self._barrier_between_all}                      
-                    )
-                    tcircuits[i] = tcirc.get()
-            finally:
-                pool.close()
-                pool.join()
-                tcircuits = list(dict(sorted(tcircuits.items())).values())
-
-        else:
-            tcircuits = []
-            for i, circuit in enumerate(circuits):
-                tcircuits.append(
-                    to_qcal(
-                    circuit, self._gate_mapper, #tcircuits, i, 
+        tcircuits = []
+        for circuit in circuits:
+            tcircuits.append(
+                to_qcal(
+                    circuit, 
+                    self._gate_mapper,
                     self._barrier_between_all
-                    )
                 )
+            )
         
         tcircuits = CircuitSet(circuits=tcircuits)
         tcircuits['key'] = [str(circ.key) for circ in circuits]
