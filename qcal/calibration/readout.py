@@ -21,11 +21,10 @@ import logging
 import matplotlib.pyplot as plt
 import os
 import numpy as np
-import pandas as pd
 
 from IPython.display import clear_output
 from numpy.typing import ArrayLike
-from typing import Any, Callable, Dict, List, Tuple
+from typing import Any, Callable, List, Tuple
 from matplotlib.colors import ListedColormap
 
 
@@ -376,6 +375,12 @@ def ReadoutCalibration(
                             
                         ax.set_xlim([x_min, x_max])
                         ax.set_ylim([y_min, y_max])
+                        ax.text(
+                            x_min + 0.1 * x_min, 
+                            y_max - 0.1 * y_max,
+                            f'Q{q}',
+                            size=12
+                        )
 
                         if raw:
                             leg = ax.legend(
