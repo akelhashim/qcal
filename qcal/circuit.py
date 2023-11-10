@@ -100,7 +100,7 @@ class Barrier:
 class Cycle:
     """Class defining a cycle in a circuit."""
 
-    __slots__ = '_gates'
+    __slots__ = ('_gates', '_qubits')
 
     def __init__(self, gates: Set[Gate] = None) -> None:
         """
@@ -108,6 +108,10 @@ class Cycle:
             gates (Set[Gate], optional): Set of gates. Defaults to None.
         """
         self._gates = gates if gates is not None else set()
+        
+        self._qubits = set()
+        for gate in self._gates:
+            self._qubits.update(gate.qubits)
 
     def __getitem__(self, idx: int) -> Gate:
         """Index the gates in the cycle/layer.
@@ -167,6 +171,12 @@ class Cycle:
 
         return df_styler.to_html()
     
+    def _update_qubits(self) -> None:
+        """Update the qubits in the cycle."""
+        self._qubits = set()
+        for gate in self._gates:
+            self._qubits.update(gate.qubits)
+    
     @property
     def is_barrier(self) -> bool:
         """Whether or not the cycle is a barrier.
@@ -210,10 +220,7 @@ class Cycle:
         Returns:
             Tuple: qubit labels.
         """
-        qubits = tuple()
-        for gate in self._gates:
-            qubits += gate.qubits
-        return tuple(sorted(set(qubits)))
+        return tuple(sorted(set(self._qubits)))
     
     def append(self, gate: Gate) -> None:
         """Appends a gate to the existing cycle/layer.
@@ -223,6 +230,7 @@ class Cycle:
         """
         assert isinstance(gate, Gate), "The gate must be a qcal Gate object!"
         self._gates.add(gate)
+        self._update_qubits()
 
     def copy(self) -> Cycle | Layer:
         """Deep copy of the cycle/layer.
@@ -260,7 +268,7 @@ class Cycle:
 class Layer(Cycle):
     """Class defining a layer in a circuit."""
 
-    # __slots__ = ['_gates', '_qubits']
+    __slots__ = ('_gates', '_qubits')
 
     def __init__(self, gates: Set[Gate] = set()) -> None:
         super().__init__(gates)
@@ -282,7 +290,7 @@ class Layer(Cycle):
 
 class Circuit:
 
-    __slots__ = ('_cycles', '_results')
+    __slots__ = ('_cycles', '_qubits', '_results')
 
     def __init__(self,
             cycles_or_layers: List[Cycle | Layer] | deque[Cycle | Layer] = []
@@ -299,6 +307,10 @@ class Circuit:
                 Cycle(cycle) for cycle in cycles_or_layers
             ]
         self._cycles = deque(cycles_or_layers)
+
+        self._qubits = set()
+        for cycle in self._cycles:
+            self._qubits.update(cycle.qubits)
 
         self._results = Results()
 
@@ -328,6 +340,12 @@ class Circuit:
         from qcal.plotting.graphs import draw_circuit
         fig = draw_circuit(self, show=False)
         return pio.to_html(fig)
+    
+    def _update_qubits(self) -> None:
+        """Update the qubits in the circuit."""
+        self._qubits = set()
+        for cycle in self._cycles:
+            self._qubits.update(cycle.qubits)
 
     @property
     def cycles(self) -> deque:
@@ -407,12 +425,8 @@ class Circuit:
 
         Returns:
             Tuple: qubit labels.
-        """
-        qubits = tuple()
-        for cycle in self._cycles:
-            qubits += cycle.qubits
-        qubits = tuple(sorted(set(qubits)))
-        return qubits
+        """ 
+        return tuple(sorted(self._qubits))
     
     @results.setter
     def results(self, results: Dict):
@@ -424,22 +438,24 @@ class Circuit:
         self._results = Results(results)
     
     def append(
-            self, cycle_or_layer: List[Cycle | Layer] | Cycle | Layer
+            self, cycle_or_layer: Barrier | Cycle | Layer | List
         ) -> None:
         """Appends a cycle/layer to the end of the circuit.
 
         Args:
-            cycle_or_layer (List, Cycle, Layer): cycle/layer to append.
+            cycle_or_layer (Barrier, Cycle, Layer, List): cycle/layer to 
+                append.
         """
         if isinstance(cycle_or_layer, List):
             cycle_or_layer = Cycle(cycle_or_layer)
         else:
             assert (
+                isinstance(cycle_or_layer, Barrier) or
                 isinstance(cycle_or_layer, Cycle) or 
-                isinstance(cycle_or_layer, Layer) or
-                isinstance(cycle_or_layer, Barrier)
+                isinstance(cycle_or_layer, Layer)
             ), "cycle_or_layer must be a Cycle, Layer or Barrier object!"
         self._cycles.append(cycle_or_layer)
+        self._qubits.update(cycle_or_layer.qubits)
 
     def copy(self) -> Circuit:
         """Deep copy of the Circuit.
@@ -449,11 +465,12 @@ class Circuit:
         """
         return self.__copy__()
 
-    def extend(self, circuit: Circuit | List[Cycle | Layer]) -> None:
+    def extend(self, circuit: Circuit | List[Barrier | Cycle | Layer]) -> None:
         """Appends another circuit to the end of the current circuit.
 
         Args:
-            circuit (Circuit | List[Cycle | Layer]): circuit to append.
+            circuit (Circuit | List[Barrier | Cycle | Layer]): circuit to 
+                append.
         """
         if isinstance(circuit, List):
             circuit = Circuit(circuit)
@@ -462,6 +479,7 @@ class Circuit:
                 isinstance(circuit, Circuit)
             ), "circuit must be a Circuit object!"
         self._cycles.extend(circuit._cycles)
+        self._qubits.update(circuit.qubits)
 
     def draw(self) -> None:
         """Draw the circuit."""
@@ -470,7 +488,7 @@ class Circuit:
 
     # TODO
     def get_index(self,
-            cycle_or_layer: Union[List, Cycle, Layer], beg=0, end=-1
+            cycle_or_layer: Barrier | Cycle | Layer | List, beg=0, end=-1
         ) -> int:
         """Returns the first index of the cycle_or_layer in the circuit.
 
@@ -478,7 +496,7 @@ class Circuit:
         the `end` index.
 
         Args:
-            cycle_or_layer (List, Cycle, Layer): cycle/layer to index.
+            cycle_or_layer (Barrier, Cycle, Layer, List): cycle/layer to index.
             beg (int, optional): beginning index. Defaults to 0.
             end (int, optional): ending index. Defaults to -1.
 
@@ -489,28 +507,32 @@ class Circuit:
             cycle_or_layer = Cycle(cycle_or_layer)
         else:
             assert (
+                isinstance(cycle_or_layer, Barrier) or
                 isinstance(cycle_or_layer, Cycle) or 
                 isinstance(cycle_or_layer, Layer)
-            ), "cycle_or_layer must be a Cycle or Layer object!"
+            ), "cycle_or_layer must be a Cycle, Layer or Barrier object!"
         return self._cycles.index(cycle_or_layer, beg, end)
 
     def insert(self,
-            cycle_or_layer: Union[List, Cycle, Layer], idx: int
+            cycle_or_layer: Barrier | Cycle | Layer | List, idx: int
         ) -> None:
         """Inserts a cycle/layer at index `idx`.
 
         Args:
-            cycle_or_layer (Union[List, Cycle, Layer]): qcal Cycle or Layer object.
+            cycle_or_layer (Barrier, Cycle, Layer, List): cycle/layer to 
+                insert.
             idx (int): index at which the cycle/layer is inserted.
         """
         if isinstance(cycle_or_layer, List):
             cycle_or_layer = Cycle(cycle_or_layer)
         else:
             assert (
+                isinstance(cycle_or_layer, Barrier) or
                 isinstance(cycle_or_layer, Cycle) or 
                 isinstance(cycle_or_layer, Layer)
-            ), "cycle_or_layer must be a Cycle or Layer object!"
+            ), "cycle_or_layer must be a Cycle, Layer or Barrier object!"
         self._cycles.insert(idx, cycle_or_layer)
+        self._qubits.update(cycle_or_layer.qubits)
 
     def measure(self,
             qubits: List | Tuple = None,
@@ -544,31 +566,39 @@ class Circuit:
     def pop(self) -> None:
         """Removes the last cycle/layer to the end of the circuit."""
         self._cycles.pop()
+        self._update_qubits()
 
     def popleft(self) -> None:
-        """Removes the first cycle/layer to the end of the circuit."""
+        """Removes the first cycle/layer at the front of the circuit."""
         self._cycles.popleft()
+        self._update_qubits()
 
-    def prepend(self, cycle_or_layer: Union[List, Cycle, Layer]) -> None:
-        """Prepends a cycle/layer to the end of the circuit.
+    def prepend(self, cycle_or_layer: Barrier | Cycle | Layer | List) -> None:
+        """Prepends a cycle/layer to the front of the circuit.
 
         Args:
-            cycle_or_layer (Union[List, Cycle, Layer]): cycle/layer to prepend.
+            cycle_or_layer (Barrier, Cycle, Laye, List): cycle/layer to 
+                prepend.
         """
         if isinstance(cycle_or_layer, List):
             cycle_or_layer = Cycle(cycle_or_layer)
         else:
             assert (
+                isinstance(cycle_or_layer, Barrier) or
                 isinstance(cycle_or_layer, Cycle) or 
                 isinstance(cycle_or_layer, Layer)
-            ), "cycle_or_layer must be a Cycle or Layer object!"
+            ), "cycle_or_layer must be a Cycle, Layer or Barrier object!"
         self._cycles.appendleft(cycle_or_layer)
+        self._qubits.update(cycle_or_layer.qubits)
 
-    def prepend_circuit(self, circuit) -> None:
-        """Prepends another circuit to the beginning of the current circuit..
+    def prepend_circuit(
+            self, circuit: Circuit | List[Barrier | Cycle | Layer]
+        ) -> None:
+        """Prepends another circuit to the beginning of the current circuit.
 
         Args:
-            circuit (List[Cycle], List[Layer], Circuit): circuit to prepend.
+            circuit (Circuit | List[Barrier | Cycle | Layer]): circuit to
+                prepend.
         """
         if isinstance(circuit, List):
             circuit = Circuit(circuit)
@@ -577,59 +607,76 @@ class Circuit:
                 isinstance(circuit, Circuit)
             ), "circuit must be a Circuit object!"
         self._cycles.extendleft(circuit._cycles)
+        self._qubits.update(circuit.qubits)
 
-    # TODO
     def relable(self, map: Dict) -> None:
-        pass
+        """Relable the qubit labels in a circuit.
+
+        Args:
+            map (Dict): dictionary mapping the old to new qubit labels.
+        """
+        for cycle in self._cycle:
+            if cycle.is_barrier:
+                cycle._qubits = (map[q] for q in cycle._qubits)
+            else:
+                for gate in cycle:
+                    gate._qubits = (map[q] for q in gate._qubits)
     
     # TODO
-    def remove(self, cycle_or_layer: Union[List, Cycle, Layer]) -> None:
+    def remove(self, cycle_or_layer: Barrier | Cycle | Layer | List) -> None:
         """Removes the first instance of the cycle/layer found in the circuit.
 
         Args:
-            cycle_or_layer (Union[List, Cycle, Layer]): cycle/layer to remove.
+            cycle_or_layer (Barrier, Cycle, Layer, List): cycle/layer to 
+                remove.
         """
         if isinstance(cycle_or_layer, List):
             cycle_or_layer = Cycle(cycle_or_layer)
         else:
             assert (
+                isinstance(cycle_or_layer, Barrier) or
                 isinstance(cycle_or_layer, Cycle) or 
                 isinstance(cycle_or_layer, Layer)
-            ), "cycle_or_layer must be a Cycle or Layer object!"
+            ), "cycle_or_layer must be a Cycle, Layer or Barrier object!"
         self._cycles.remove(cycle_or_layer)
+        self._update_qubits()
 
     # TODO    
     def replace(self, 
-            old_cycle_or_layer: Union[List, Cycle, Layer],
-            new_cycle_or_layer: Union[List, Cycle, Layer]
+            old_cycle_or_layer: Barrier | Cycle | Layer | List,
+            new_cycle_or_layer: Barrier | Cycle | Layer | List
         ) -> None:
         """Replaces an old cycle/layer with a new one in the circuit.
 
         Args:
-            old_cycle_or_layer (Union[List, Cycle, Layer]): cycle/layer to 
+            old_cycle_or_layer (Barrier, Cycle, Layer, List): cycle/layer to 
                 replace.
-            new_cycle_or_layer (Union[List, Cycle, Layer]): new cycle/layer.
+            new_cycle_or_layer (Barrier, Cycle, Layer, List): new cycle/layer.
         """
         if isinstance(old_cycle_or_layer, List):
             old_cycle_or_layer = Cycle(old_cycle_or_layer)
         else:
             assert (
+                isinstance(old_cycle_or_layer, Barrier) or 
                 isinstance(old_cycle_or_layer, Cycle) or 
                 isinstance(old_cycle_or_layer, Layer)
-            ), "old_cycle_or_layer must be a Cycle or Layer object!"
+            ), "old_cycle_or_layer must be a Barrier, Cycle, or Layer object!"
         
         if isinstance(new_cycle_or_layer, List):
             new_cycle_or_layer = Cycle(new_cycle_or_layer)
         else:
             assert (
+                isinstance(new_cycle_or_layer, Barrier) or 
                 isinstance(new_cycle_or_layer, Cycle) or 
                 isinstance(new_cycle_or_layer, Layer)
-            ), "new_cycle_or_layer must be a Cycle or Layer object!"
+            ), "new_cycle_or_layer must be a Barrier, Cycle, or Layer object!"
         
         for i, cycle in enumerate(self._cycles):
             if cycle == old_cycle_or_layer:
                 self.remove(old_cycle_or_layer)
                 self.insert(new_cycle_or_layer, i)
+
+        self._update_qubits()
 
     def reverse(self) -> None:
         """Reverses the order of the cycles."""

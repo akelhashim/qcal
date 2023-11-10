@@ -10,4 +10,4 @@ from qcal.config import Config
 
 from qcal.results import Results
 
-# from qcal import interface
+from qcal.utils import *
