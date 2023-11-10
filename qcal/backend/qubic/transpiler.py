@@ -25,6 +25,23 @@ logger = logging.getLogger(__name__)
 __all__ = ('to_qubic', 'Transpiler')
 
 
+def readout_time(config: Config, qubit: int) -> float:
+    """Compute the total readout time for a given qubit.
+
+    Args:
+        config (Config): qcal Config object.
+        qubit (int):     qubit label.
+
+    Returns:
+        float: total readout time (readout + demod - integration delay)
+    """
+    time = (
+        config[f'readout/{qubit}/delay'] + 
+        config[f'readout/{qubit}/demod_time']
+    )
+    return time
+
+
 def add_reset(
        config: Config, 
        qubits_or_reset: List | Tuple | Reset, 
@@ -45,25 +62,26 @@ def add_reset(
     elif isinstance(qubits_or_reset, Reset):
         qubits = qubits_or_reset.qubits
 
-    if config['reset/active/enable']:
+    if config['reset/active/enable'] or isinstance(qubits_or_reset, Reset):
         reset_circuit = []
         for _ in range(config['reset/active/n_resets']):
             for q in qubits:
                 if isinstance(qubits_or_reset, (list, tuple)):
-                    add_measurement(config, q, reset_circuit, pulses)
+                    add_measurement(config, q, reset_circuit, None)
                 elif isinstance(qubits_or_reset, Reset):
                     add_measurement(
                         config, 
                         qubits_or_reset.properties['params']['meas'], 
                         reset_circuit, 
-                        pulses
+                        None
                     )
 
                 # Reset pulse w/ qutrit reset
                 reset_q_pulse = []
                 # reset_q_pulse = [
-                #     {'name': 'delay', 
-                #      't': config['reset/active/feedback_delay'], 
+                #     {'name':  'delay',
+                #     #  'tag':  'Feedback delay', 
+                #      't':     config['reset/active/feedback_delay'], 
                 #      'qubit': [f'Q{q}']
                 #     }
                 # ]
@@ -88,7 +106,6 @@ def add_reset(
                     {'name': 'branch_fproc',
                      'alu_cond': 'eq',
                      'cond_lhs': 1,
-                    #  'func_id': int(config[f'readout/{q}/channel']),
                      'func_id': f'Q{q}.meas',
                      'scope': [f'Q{q}'],
                         'true': reset_q_pulse,
@@ -99,12 +116,16 @@ def add_reset(
             reset_circuit.append(
                 {'name': 'barrier', 'qubit': [f'Q{q}' for q in qubits]}
             )
+
+        if isinstance(qubits_or_reset, Reset):
+            pulses[f'ResetGE:{qubits}'] = reset_circuit
+
         circuit.extend(reset_circuit)
     
     else:
          circuit.extend((
-            {'name': 'delay',
-             't': config['reset/passive/delay'],
+            {'name':  'delay',
+             't':     config['reset/passive/delay'],
              'qubit': [f'Q{q}' for q in qubits]},
             {'name': 'barrier', 'qubit': [f'Q{q}' for q in qubits]}
          ))
@@ -125,8 +146,8 @@ def add_heralding(
         add_measurement(config, q, circuit, pulses)
 
     circuit.extend((
-            {'name': 'delay',
-             't': config['readout/reset'],
+            {'name':  'delay',
+             't':     config['readout/reset'],
              'qubit': [f'Q{q}' for q in qubits]},
             {'name': 'barrier', 'qubit': [f'Q{q}' for q in qubits]}
          ))
@@ -136,15 +157,15 @@ def add_measurement(
         config: Config, 
         qubit_or_meas: int | Gate,
         circuit: List, 
-        pulses: defaultdict
+        pulses: defaultdict | None
     ) -> None:
     """Add measurement to a circuit.
 
     Args:
-       config (Config):            qcal Config object.
-       qubit_or_meas (int | Gate): qubit label or measurement Gate object.
-       circuit (List):             qubic circuit.
-       pulses (defaultdict):       pulses that have been stored for reuse.
+       config (Config):             qcal Config object.
+       qubit_or_meas (int | Gate):  qubit label or measurement Gate object.
+       circuit (List):              qubic circuit.
+       pulses (defaultdict | None): pulses that have been stored for reuse.
     """
     if isinstance(qubit_or_meas, int):
         qubit = qubit_or_meas
@@ -166,16 +187,10 @@ def add_measurement(
             for pulse in config[f'single_qubit/{qubit}/EF/X/pulse']:
                 length += pulse['length']
             meas_pulse.append(
-                {'name': 'delay', 't': length, 'qubit': [f'Q{qubit}']}
+                {'name':  'delay',
+                 't':     length, 
+                 'qubit': [f'Q{qubit}']}
             )
-
-    # if isinstance(qubit_or_meas, Gate) and qubit_or_meas.name == 'MCM':
-    #     meas_pulse.append({
-    #         'name': 'barrier', 
-    #         'qubit': [
-    #            f'Q{q}' for q in qubit_or_meas.properties['params']['dd_qubits']
-    #         ]
-    #     })
 
     meas_pulse.append({'name': 'barrier', 'qubit': [f'Q{qubit}']})
     meas_pulse.extend(cycle_pulse(config, Cycle({Meas(qubit)})))
@@ -186,15 +201,18 @@ def add_measurement(
                 config,
                 qubit_or_meas.properties['params']['dd_method'],
                 q,
-                config[f'readout/{qubit}/length'],
+                readout_time(config, qubit),
                 qubit_or_meas.properties['params']['n_dd_pulses'],
                 meas_pulse
             )
-        add_mcm_apply(config, qubit_or_meas, meas_pulse)
-        pulses[f'MCMGE:{qubits}'] = meas_pulse
+        if qubit_or_meas.properties['params']['apply']:
+            add_mcm_apply(config, qubit_or_meas, meas_pulse)
+        if pulses is not None:
+            pulses[f'MCMGE:{qubits}'] = meas_pulse
     
     else:
-        pulses[f'MeasGE:{qubits}'] = meas_pulse
+        if pulses is not None:
+            pulses[f'MeasGE:{qubits}'] = meas_pulse
     
     circuit.extend(meas_pulse)
 
@@ -234,11 +252,11 @@ def add_mcm_apply(config: Config, mcm: MCM, pulse: List) -> None:
         pulse (List): qubic pulse.
     """
     q_meas = mcm.qubits[0]
-    q_cond = mcm['params']['apply']['1'].qubits
+    q_cond = mcm.properties['params']['apply']['1'].qubits
 
     # Initial barrier
     pulse.append(
-        {'name': 'barrier', 
+        {'name': 'barrier',
          'scope': [f'Q{q}' for q in [q_meas] + [qc for qc in q_cond]]
         }
     )
@@ -246,24 +264,34 @@ def add_mcm_apply(config: Config, mcm: MCM, pulse: List) -> None:
     # Seqeuence to apply if 1 is measured
     true_apply = []
     # true_apply = [
-    #     {'name': 'delay', 
-    #      't': config['reset/active/feedback_delay'], 
+    #     {'name':  'delay',
+    #     #  'tag':   'Feedback delay',
+    #      't':     config['reset/active/feedback_delay'], 
     #      'qubit': [f'Q{q}' for q in [qc for qc in q_cond]]
     #     },
     # ]
     true_apply.extend(
-        cycle_pulse(config, MCM['params']['apply']['1'])
+        cycle_pulse(config, mcm.properties['params']['apply']['1'])
     )
 
     # Sequence to apply if 0 is measured
-    false_apply = cycle_pulse(config, MCM['params']['apply']['0'])
+    false_apply = []
+    # false_apply = [
+    #     {'name':  'delay', 
+    #     #  'tag':   'Feedback delay',
+    #      't':     config['reset/active/feedback_delay'], 
+    #      'qubit': [f'Q{q}' for q in [qc for qc in q_cond]]
+    #     },
+    # ]
+    false_apply.extend(
+        cycle_pulse(config, mcm.properties['params']['apply']['0'])
+    )
 
     # Conditional operation
     pulse.append(
         {'name': 'branch_fproc', 
          'alu_cond': 'eq', 
          'cond_lhs': 1, 
-        #  'func_id': int(config[f'readout/{q_meas}/channel']),
          'func_id': f'Q{q_meas}.meas',
          'scope': [f'Q{q}' for q in [qc for qc in q_cond]],
          'true': true_apply,
@@ -312,8 +340,8 @@ def add_virtualz_gate(
     subspace = gate.subspace
     phase = gate.properties['params']['phase']
     phase_pulse = [{
-        'name': 'virtual_z',
-        'freq': config[f'single_qubit/{gate.qubits[0]}/{subspace}/freq'],
+        'name':  'virtual_z',
+        'freq':  config[f'single_qubit/{gate.qubits[0]}/{subspace}/freq'],
         'phase': phase
     }]
     pulses[f'{gate.name}{phase}{gate.subspace}:{gate.qubits}'] = phase_pulse
@@ -340,26 +368,27 @@ def add_single_qubit_gate(
 
         if pulse['env'] == 'virtualz':
             sq_pulse.append(
-                {'name': 'virtual_z',
-                 'freq': config[f'single_qubit/{qubit}/{subspace}/freq'],
+                {'name':  'virtual_z',
+                 'freq':  config[f'single_qubit/{qubit}/{subspace}/freq'],
                  'phase': pulse['kwargs']['phase']
                 }
             )
             
         else:
             sq_pulse.append(
-                {'name': 'pulse',
-                 'dest': pulse['channel'],
-                 'freq': config[f'single_qubit/{qubit}/{subspace}/freq'],
-                 'amp': clip_amplitude(pulse['kwargs']['amp']),
-                 'phase': pulse['kwargs']['phase'],
+                {'name':   'pulse',
+                 'tag':    f'{name} {subspace}',
+                 'dest':   pulse['channel'],
+                 'freq':   config[f'single_qubit/{qubit}/{subspace}/freq'],
+                 'amp':    clip_amplitude(pulse['kwargs']['amp']),
+                 'phase':  pulse['kwargs']['phase'],
                  'twidth': pulse['length'],
-                 'env': pulse_envelopes[pulse['env']](
-                        pulse['length'],
-                        config['hardware/DAC_sample_rate'],
-                        **{key: val for key, val in pulse['kwargs'].items() 
-                           if key not in ['amp', 'phase']}
-                    )
+                 'env':    pulse_envelopes[pulse['env']](
+                            pulse['length'],
+                            config['hardware/DAC_sample_rate'],
+                            **{key: val for key, val in pulse['kwargs'].items() 
+                            if key not in ['amp', 'phase']}
+                        )
                 }
             )
 
@@ -400,26 +429,27 @@ def add_multi_qubit_gate(
 
         if pulse['env'] == 'virtualz':
             mq_pulse.append(
-                {'name': 'virtual_z',
-                 'freq': config[pulse['freq']],
+                {'name':  'virtual_z',
+                 'freq':  config[pulse['freq']],
                  'phase': pulse['kwargs']['phase']
                 }
             )
 
         else:
             mq_pulse.append(
-                {'name': 'pulse',
-                 'dest': pulse['channel'], 
-                 'freq': config[f'two_qubit/{qubits}/{name}/freq'],
-                 'amp': clip_amplitude(pulse['kwargs']['amp']),
-                 'phase': pulse['kwargs']['phase'],
+                {'name':  'pulse',
+                 'tag':    name,
+                 'dest':   pulse['channel'], 
+                 'freq':   config[f'two_qubit/{qubits}/{name}/freq'],
+                 'amp':    clip_amplitude(pulse['kwargs']['amp']),
+                 'phase':  pulse['kwargs']['phase'],
                  'twidth': pulse['length'], 
-                 'env': pulse_envelopes[pulse['env']](
-                        pulse['length'],
-                        config['hardware/DAC_sample_rate'],
-                        **{key: val for key, val in pulse['kwargs'].items() 
-                           if key not in ['amp', 'phase']}
-                    )
+                 'env':    pulse_envelopes[pulse['env']](
+                            pulse['length'],
+                            config['hardware/DAC_sample_rate'],
+                            **{key: val for key, val in pulse['kwargs'].items() 
+                            if key not in ['amp', 'phase']}
+                        )
                 }
             )
 
@@ -449,63 +479,66 @@ def cycle_pulse(config: Config, cycle: Cycle) -> List:
 
         if isinstance(gate, Idle):
             pulse.append(
-                {'name': 'delay', 
-                 't': gate.properties['params']['duration'], 
+                {'name':  'delay',
+                 't':     gate.properties['params']['duration'], 
                  'qubit': [f'Q{qubit}']
                 }
             )
 
         elif isinstance(gate, Rz):
             pulse.append(
-                {'name': 'virtual_z',
-                 'freq': config[f'single_qubit/{qubit}/{subspace}/freq'],
+                {'name':  'virtual_z',
+                 'freq':  config[f'single_qubit/{qubit}/{subspace}/freq'],
                  'phase': gate.properties['params']['phase']
                 }
             )
 
         elif isinstance(gate, X):
             pulse.extend([
-                {'name': 'pulse',
-                 'dest': p['channel'], 
-                 'freq': config[f'single_qubit/{qubit}/{subspace}/freq'],
-                 'amp': clip_amplitude(p['kwargs']['amp']),
-                 'phase': p['kwargs']['phase'],
+                {'name':   'pulse',
+                 'tag':    f'X {subspace}',
+                 'dest':   p['channel'], 
+                 'freq':   config[f'single_qubit/{qubit}/{subspace}/freq'],
+                 'amp':    clip_amplitude(p['kwargs']['amp']),
+                 'phase':  p['kwargs']['phase'],
                  'twidth': p['length'],
-                 'env': pulse_envelopes[p['env']](
-                    p['length'],
-                    config['hardware/DAC_sample_rate'],
-                    **{key: val for key, val in p['kwargs'].items() 
-                       if key not in ['amp', 'phase']}
+                 'env':    pulse_envelopes[p['env']](
+                                p['length'],
+                                config['hardware/DAC_sample_rate'],
+                                **{key: val for key, val in p['kwargs'].items() 
+                                if key not in ['amp', 'phase']}
                 )} for p in config[f'single_qubit/{qubit}/{subspace}/X/pulse']
             ])
 
         elif isinstance(gate, Meas):
             pulse.extend([
-                {'name': 'pulse',
-                 'dest': f'Q{qubit}.rdrv',
-                 'freq': config[f'readout/{qubit}/freq'],
-                 'amp': config[f'readout/{qubit}/amp'], 
-                 'phase': 0.0,
+                {'name':   'pulse',
+                 'tag':    'Readout',
+                 'dest':   f'Q{qubit}.rdrv',
+                 'freq':   config[f'readout/{qubit}/freq'],
+                 'amp':    config[f'readout/{qubit}/amp'], 
+                 'phase':  0.0,
                  'twidth': config[f'readout/{qubit}/length'],
-                 'env': pulse_envelopes[config.readout[qubit].env](
-                        config[f'readout/{qubit}/length'],
-                        config['readout/sample_rate']
-                    )
+                 'env':    pulse_envelopes[config.readout[qubit].env](
+                                config[f'readout/{qubit}/length'],
+                                config['readout/sample_rate']
+                           )
                 },
                 {'name': 'delay',
-                 't': config[f'readout/{qubit}/delay'],
+                 't':     config[f'readout/{qubit}/delay'],
                  'qubit': [f'Q{qubit}.rdlo']
                 },
-                {'name': 'pulse',
-                 'dest': f'Q{qubit}.rdlo',
-                 'freq': config[f'readout/{qubit}/freq'],
-                 'amp': 1.0,
-                 'phase': config[f'readout/{qubit}/phase'],  # Rotation in IQ plane
-                 'twidth': config[f'readout/{qubit}/length'],
-                 'env': pulse_envelopes['square'](
-                        config[f'readout/{qubit}/length'],
-                        config['readout/sample_rate'],
-                    )
+                {'name':   'pulse',
+                 'tag':    'Demodulation',
+                 'dest':   f'Q{qubit}.rdlo',
+                 'freq':   config[f'readout/{qubit}/freq'],
+                 'amp':    1.0,
+                 'phase':  config[f'readout/{qubit}/phase'],  # Rotation in IQ plane
+                 'twidth': config[f'readout/{qubit}/demod_time'],
+                 'env':    pulse_envelopes[config.readout[qubit].env](
+                                config[f'readout/{qubit}/demod_time'],
+                                config['readout/sample_rate']
+                           )
                 }
             ])
 

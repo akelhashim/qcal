@@ -315,16 +315,27 @@ class MCM(Gate):
 class Reset(Gate):
     """Class for qubit reset in the middle of a circuit."""
 
-    def __init__(self, qubit: int = 0, meas: Meas | MCM = Meas) -> None:
+    def __init__(
+            self, 
+            qubit: int = 0, 
+            dd_qubits:   List | Tuple = [],
+            dd_method:   str = 'XY',
+            n_dd_pulses: int = 8,
+        ) -> None:
         """Initialize using the meas matrix.
 
         Args:
             qubit (int, optional): qubit label. Defaults to 0.
-            meas (Meas | MCM, optional): measurement type. Defaults to Meas.
+            dd_qubits (List | Tuple, optional): which qubits to dynamical 
+                decouple during a mid-circuit measurement. Defaults to [].
+            dd_method (str): dynamical decoupling protocol. Defaults to 'XY'.
+            n_dd_pulses (int): number of pulses for dd protocol. Defaults to 8.
         """
         super().__init__(meas, qubit)
         self._properties['name'] = 'Reset'
-        self._properties['params']['meas'] = meas(qubit)
+        self._properties['params']['meas'] = MCM(
+            qubit, dd_qubits, dd_method, n_dd_pulses
+        )
 
 class RandSU2(Gate):
     """Class for a random SU(2) gate."""
