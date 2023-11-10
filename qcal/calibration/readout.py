@@ -376,10 +376,8 @@ def ReadoutCalibration(
                         ax.set_xlim([x_min, x_max])
                         ax.set_ylim([y_min, y_max])
                         ax.text(
-                            x_min + 0.1 * x_min, 
-                            y_max - 0.1 * y_max,
-                            f'Q{q}',
-                            size=12
+                            0.05, 0.9, f'Q{q}', size=15, 
+                            transform=ax.transAxes
                         )
 
                         if raw:
