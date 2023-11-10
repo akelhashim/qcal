@@ -17,6 +17,7 @@ __all__ = (
     'AGate',
     'Barenco',
     'BGate',
+    'bSWAP',
     'CH',
     'CNOT',
     'CPhase',
@@ -78,6 +79,11 @@ b_gate = berkeley = np.sqrt(2 - np.sqrt(2)) / 2 * np.array([
     [0., 1.j*(1 + np.sqrt(2)), 1., 0.],
     [1.j, 0., 0., 1. + np.sqrt(2)]
 ])
+
+bswap = np.array([[0., 0., 0., 1.],
+                  [0., 1., 0., 0.],
+                  [0., 0., 1., 0.],
+                  [1., 0., 0., 0.]])
 
 cnot = cx = np.array([[1., 0., 0., 0.],
                       [0., 1., 0., 0.],
@@ -461,6 +467,19 @@ class BGate(Gate):
         super().__init__(b_gate, qubits)
         self._properties['alias'] = 'Berkeley'
         self._properties['name'] = 'BGate'
+
+
+class bSWAP(Gate):
+    """Class for the bSWAP gate."""
+
+    def __init__(self, qubits: Tuple = (0, 1)) -> None:
+        """Initialize using the bSWAP gate.
+        
+        Args:
+            qubits (int | tuple): qubit labels. Defaults to (0, 1).
+        """
+        super().__init__(bswap, qubits)
+        self._properties['name'] = 'bSWAP'
     
 
 class CH(Gate):
@@ -1048,6 +1067,7 @@ two_qubit_gates = defaultdict(lambda: 'Gate not currently supported!', {
     'AGate':        AGate,
     'Barenco':      Barenco,
     'BGate':        BGate,
+    'bSWAP':        bSWAP,
     'CH':           CH,
     'CNOT':         CNOT,
     'CPhase':       CPhase,
