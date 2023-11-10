@@ -59,10 +59,10 @@ def draw_circuit(circuit: Circuit, show: bool = True):
     # https://plotly.com/python/marker-style/
     symbol_map = defaultdict(lambda: ['square', 'square'],
         {'Meas':   ['triangle-right'],
-         'MCM':    ['triangle-right-open'],
-         'Reset':  ['triangle-left'],
+         'MCM':    ['triangle-right'],
+         'Reset':  ['bowtie'],
          'CH':     ['circle', 'square'],
-         'CNot':   ['circle', 'circle-cross'],
+         'CNOT':   ['circle', 'circle-cross'],
          'CPhase': ['circle', 'square'],
          'CRot':   ['circle', 'square'],
          'CV':     ['circle', 'square'],
@@ -75,8 +75,8 @@ def draw_circuit(circuit: Circuit, show: bool = True):
     # color_map = defaultdict(lambda: '#3366CC', {'Meas': '#B82E2E'})
     color_map = defaultdict(lambda: 'white',
         {'Meas': 'black',
-         'MCM': 'black',
-         'Reset': 'black'
+         'MCM':  'white',
+         'Reset': 'white'
         }
     )
 
@@ -101,7 +101,7 @@ def draw_circuit(circuit: Circuit, show: bool = True):
                     node_text.append(format_gate_text(gate))
                     node_symbols.append(symbol_map[gate.name][0])
                     gate_names.append(
-                        '' if gate.name == 'Meas' else (
+                        'M' if gate.name in ('Meas', 'MCM') else (
                             gate.name if len(gate.name) < 3 else gate.name[:3]
                         )
                     )
@@ -113,14 +113,15 @@ def draw_circuit(circuit: Circuit, show: bool = True):
                     node_text.extend([format_gate_text(gate)]*2)
                     node_symbols.extend(symbol_map[gate.name])
                     gate_names.extend(
-                        [gate.name if len(gate.name) < 3 else gate.name[0]]*2
+                        # [gate.name if len(gate.name) < 3 else gate.name[0]]*2
+                        ['', '']
                     )
                     marker_colors.extend(['white', 'white'])
 
     # ms_scale = 200
     node_trace = go.Scatter(
         x=node_x, y=node_y,
-        mode='markers',#+text',
+        mode='markers',
         hoverinfo='text',
         marker_symbol=node_symbols,
         marker_line_color="black",
@@ -130,8 +131,6 @@ def draw_circuit(circuit: Circuit, show: bool = True):
             color=marker_colors,
             size=30,
             line_width=2),
-        # text=gate_names,
-        # textposition="top center"
         )
     node_trace.text = node_text
 
