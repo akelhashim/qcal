@@ -64,7 +64,8 @@ def find_herald_idx(config: Config) -> int:
 
 def post_process(
         config:          Config, 
-        measurements:    List, 
+        measurements:    List,
+        measure_qubits:  List[str] | None,
         classifier:      ClassificationManager | None, 
         circuits:        Any,
         raster_circuits: bool = False
@@ -79,6 +80,9 @@ def post_process(
     Args:
         config (Config): qcal Config object.
         measurements (List): list of batched measurements.
+        measure_qubits (List[str] | None, optional): list of qubit labels 
+            for post-processing measurements. If None, these will be extracted
+            from the measurements.
         classifier (ClassificationManager, None): manager used for classifying
             raw data.
         circuits (Any): any collection or set of circuits.
@@ -98,12 +102,16 @@ def post_process(
         chanmap_r[f'Q{q}'] = str(int(ch))
 
     meas_qubits = set()
-    for meas in measurements:
-        if 'shots' in outputs:
-            meas_qubits |= set(meas['shots'].keys())
-        elif 's11' in outputs:
-            for ch in meas['s11'].keys():
-                meas_qubits.add(chanmap[ch])
+    if measure_qubits is not None:
+        for q in measure_qubits:
+            meas_qubits.add(q)
+    else:
+        for meas in measurements:
+            if 'shots' in outputs:
+                meas_qubits |= set(meas['shots'].keys())
+            elif 's11' in outputs:
+                for ch in meas['s11'].keys():
+                    meas_qubits.add(chanmap[ch])
     meas_qubits = sorted(meas_qubits)
 
     if 's11' in outputs:  # Might not work with rastering

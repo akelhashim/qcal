@@ -211,6 +211,7 @@ def ReadoutFidelity(
             qpu.run(self, self._circuits, save=False)
             self.analyze()
             self.save()
+            self.final()
 
     return ReadoutFidelity(
         config,

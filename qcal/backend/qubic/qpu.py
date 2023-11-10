@@ -12,7 +12,7 @@ import logging
 import os
 # import sys
 
-from typing import Any
+from typing import Any, List
 
 logger = logging.getLogger(__name__)
 
@@ -69,7 +69,8 @@ class QubicQPU(QPU):
                 n_levels:            int = 2,
                 n_reads_per_shot:    int | None = None,
                 raster_circuits:     bool = False,
-                outputs:             list[str] = ['s11', 'shots', 'counts'],
+                outputs:             List[str] = ['s11', 'shots', 'counts'],
+                measure_qubits:      List[str] | None = None,
                 delay_per_shot:      float | None = 0,
                 reload_cmd:          bool = True,
                 reload_freq:         bool = True,
@@ -108,11 +109,15 @@ class QubicQPU(QPU):
                 one by one. If True, all circuits in a batch will be measured
                 back-to-back one shot at a time. This can help average out the 
                 effects of drift on the timescale of a measurement.
-            outputs (list[str]): what output data is desired for each
+            outputs (List[str]): what output data is desired for each
                 measurement. Defaults to ['s11', 'shots', 'counts']. 's11'
                 is to the integrated IQ data; 'shots' is the classified data
                 for each read; and 'counts' is the accumulated statistics
-                for each read. 
+                for each read.
+            measure_qubits (List[str] | None, optional): list of qubit labels 
+                for post-processing measurements. Defaults to None. This will
+                overwrite the measurement qubits listed in the measurement
+                objects. Example: ```measure_qubits = ['Q0', 'Q1', 'Q3']```.
             delay_per_shot (float | None, optional): wait time between 
                 measuring and offloading the data. Defaults to 0. If 0, this
                 will be computed automatically. If None, this is computed by
@@ -160,6 +165,7 @@ class QubicQPU(QPU):
             if n_reads_per_shot is None else n_reads_per_shot
         )
         self._outputs = outputs
+        self._measure_qubits = measure_qubits
         self._delay_per_shot = delay_per_shot
         self._reload_cmd = reload_cmd
         self._reload_freq = reload_freq
@@ -169,13 +175,13 @@ class QubicQPU(QPU):
         self._gmm_manager = gmm_manager if gmm_manager is not None else (
             os.path.join(os.path.dirname(__file__), 'gmm_manager.pkl')
         )
-        self._fpga_config = FPGAConfig(
-            **{'fpga_clk_period': 2.e-9,
-               'alu_instr_clks': 5,
-               'jump_cond_clks': 5, 
-               'jump_fproc_clks': 5, 
-               'pulse_regwrite_clks': 3}
-        )
+        self._fpga_config = FPGAConfig()
+        #     **{'fpga_clk_period': 2.e-9,
+        #        'alu_instr_clks': 5,
+        #        'jump_cond_clks': 5, 
+        #        'jump_fproc_clks': 5, 
+        #        'pulse_regwrite_clks': 3}
+        # )
         self._channel_config = load_channel_configs(
             os.path.join(os.path.dirname(__file__), 'channel_config.json')
         )
@@ -292,7 +298,8 @@ class QubicQPU(QPU):
         """Process the measurement data."""
         post_process(
             self._config, 
-            self._measurements, 
+            self._measurements,
+            self._measure_qubits,
             self._classifier, 
             self._circuits,
             self._raster_circuits
@@ -301,7 +308,8 @@ class QubicQPU(QPU):
         if len(self._compiled_circuits) > 1:
             post_process(
                 self._config, 
-                self._measurements, 
+                self._measurements,
+                self._measure_qubits, 
                 self._classifier, 
                 self._compiled_circuits, 
                 self._raster_circuits
@@ -310,7 +318,8 @@ class QubicQPU(QPU):
         if len(self._transpiled_circuits) > 1:
             post_process(
                 self._config, 
-                self._measurements, 
+                self._measurements,
+                self._measure_qubits,
                 self._classifier, 
                 self._transpiled_circuits,
                 self._raster_circuits
