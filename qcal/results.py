@@ -2,14 +2,91 @@
 
 All results are stored in a Results object.
 """
+from __future__ import annotations
+
+import itertools
+import logging
+import numpy as np
 import pandas as pd
-import plotly.express as px
 import plotly.graph_objects as go
 
 from collections import defaultdict
 from typing import Dict, Tuple
+from pandas import DataFrame
 
-__all__ = ('Results')
+logger = logging.getLogger(__name__)
+
+
+__all__ = ('readout_correction', 'Results')
+
+
+def readout_correction(results: Results, confusion_matrix: DataFrame) -> Dict:
+    """Perform readout correction using a measured confusion matrix.
+
+    This readout correction is performed individually on each qubit.
+    Therefore, it is scalable, but will not correct correlated readout
+    errors.
+
+    Args:
+        results (Results): Results object.
+        confusion_matrix (DataFrame): confusion matrix measured using the
+            ```qcal.benchmarking.fidelity.ReadoutFidelity``` module.
+
+    Returns:
+        Dict: corrected results dictionary.
+    """
+    if confusion_matrix.columns[0][0] == 'Meas State':
+        cmats = [confusion_matrix.to_numpy().astype(float).T]
+    else:
+        cmats = []
+        qubits = set()
+        for col in confusion_matrix:
+            qubits.add(col[0])
+        qubits = tuple(sorted(qubits))
+        for q in qubits:
+            cmats.append(
+                confusion_matrix[q].to_numpy().astype(float).T
+            )
+
+    if len(cmats) != len(results.keys()[0]):
+        logger.warning(
+            ' The number of confusion matrices does not match the length'
+            ' of the provided bitstrings. No readout correction will be'
+            ' performed!'
+        )
+        return results
+
+    else:
+        corrected_results = {}
+        cmats_inv = [np.linalg.inv(cmat) for cmat in cmats]
+        btstrs = [
+            ''.join(i) for i in itertools.product(
+                [str(j) for j in results.levels], 
+                repeat=len(results.states[0])
+            )
+        ]
+        # Observable, i.e. measured bitstrings (e.g. '00', '10', etc.)
+        for obsrv in results.states:
+
+            ideal_dists = []  # List of ideal distributions
+            for o in obsrv:
+                dist = np.zeros(results.dim)
+                dist[o] = 1.
+                ideal_dists.append(dist)
+
+            corrected_value = 0.
+            for btstr in btstrs:  # 00, 01, 10, 11
+                coeff = 1.  # Coefficient for capturing readout errors
+                for q in range(len(results.states[0])):  # Qubit index
+                    coeff *= np.dot(
+                        ideal_dists[q], cmats_inv[q][:, int(btstr[q])]
+                    )
+                corrected_value += coeff * results[btstr].counts
+
+            corrected_results[obsrv] = max(0, int(corrected_value))
+
+        return corrected_results
+
 
 # TODO: add fidelity and TVD
 class Results:
@@ -18,25 +95,37 @@ class Results:
     This class should be passed a dictionary which maps bitstrings to counts.
     
     Basic example useage:
-
-        results = Results({'000': 200, '010': 10, '100': 12, '111': 200})
+    ```results = Results({'000': 200, '010': 10, '100': 12, '111': 200})```
     """
 
-    def __init__(self, results: dict = {}) -> None:
+    def __init__(self,
+            results: Dict | None = None, 
+            confusion_matrix: DataFrame | None = None
+        ) -> None:
         """Initialize a Results object.
 
         Args:
-            results (dict, optional): dictionary of bitstring results. 
-                Defaults to {}.
+            results (Dict | None, optional): dictionary of bitstring results.
+                Defaults to None.
+            confusion_matrix (DataFrame | None, optional): confusion matrix 
+                used for readout correction. Defaults to None.
         """
-        results = dict(sorted(results.items()))
-        self._dict = results
+        if results is not None:
+            results = dict(sorted(results.items()))
+        else:
+            results = dict()
+        
+        self._results = results
         self._df = pd.DataFrame([results], index=['counts'], dtype='object')
         self._df = pd.concat(
             [self._df,
-             pd.DataFrame([self.populations], index=['probabilities'])],
+             pd.DataFrame([self.populations], index=['probabilities'])
+            ],
             join='inner'
         )
+
+        if confusion_matrix is not None:
+            self.apply_readout_correction(confusion_matrix)
 
     def __getitem__(self, item: str) -> pd.Series:
         """Index the dataframe by bitstring.
@@ -48,8 +137,16 @@ class Results:
             pd.Series: dataseries of counts and probabilities for a given
                 bistring.
         """
-        assert item in self._dict.keys(), f'{item} is not a valid bitstring!'
-        return self._df[item]
+        # assert item in self._results.keys(), f'{item} is not a valid bitstring!'
+        if item not in self._results.keys():
+            return pd.Series(
+                data=[0, 0.], 
+                index=['counts', 'probabilities'], 
+                name=item, 
+                dtype='object'
+            )
+        else:
+            return self._df[item]
 
     def __repr__(self) -> str:
         return str(self._df)
@@ -94,7 +191,7 @@ class Results:
         Returns:
             defaultdict: dictionary of results.
         """
-        return self._dict
+        return self._results
 
     @property
     def n_shots(self) -> int:
@@ -114,7 +211,7 @@ class Results:
         """
         pop = defaultdict(lambda: 0.)
         for state in self.states:
-            pop[state] = self._dict[state] / self.n_shots
+            pop[state] = self._results[state] / self.n_shots
         return pop
 
     @property
@@ -136,7 +233,7 @@ class Results:
             Tuple: energy levels.
         """
         levels = set()
-        for key in self._dict.keys():
+        for key in self._results.keys():
             for i in key:
                 levels.add(int(i))
         return tuple(sorted(levels))
@@ -148,7 +245,27 @@ class Results:
         Returns:
             Tuple: unique bitstrings.
         """
-        return tuple(sorted(self._dict.keys()))
+        return tuple(sorted(self._results.keys()))
+    
+    def apply_readout_correction(self, confusion_matrix: DataFrame) -> None:
+        """Apply local readout correction using a measured confusion matrix.
+
+        Args:
+            confusion_matrix (DataFrame): confusion matrix measured using the
+                ```qcal.benchmarking.fidelity.ReadoutFidelity``` module.
+        """
+        self._raw_results = self._results.copy()
+        self._confusion_matrix = confusion_matrix
+        self._results = readout_correction(self, confusion_matrix)
+        self._df = pd.DataFrame(
+            [self._results], index=['counts'], dtype='object'
+        )
+        self._df = pd.concat(
+            [self._df,
+             pd.DataFrame([self.populations], index=['probabilities'])
+            ],
+            join='inner'
+        )
 
     def marginalize(self, idx: int | Tuple[int]):
         """Marginalize the results over a given bistring index.
@@ -174,7 +291,7 @@ class Results:
         marg_states = tuple(sorted(marg_states))
 
         marg_results = {state: 0 for state in marg_states}
-        for btstr, counts in self._dict.items():
+        for btstr, counts in self._results.items():
             marg_state = ''
             for i in idx:
                 marg_state += btstr[i]
@@ -218,3 +335,4 @@ class Results:
         if len(self.states[0]) > 5:
             fig.update_xaxes(tickangle=-45)
         fig.show()
+                
