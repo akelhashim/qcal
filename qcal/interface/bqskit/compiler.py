@@ -2,7 +2,7 @@
 
 See: https://github.com/BQSKit/bqskit
 """
-from qcal.circuit import Circuit, CircuitSet
+from qcal.circuit import Barrier, Circuit, CircuitSet
 from qcal.config import Config
 from qcal.interface.bqskit.transpiler import Transpiler
 
@@ -174,6 +174,11 @@ class Compiler:
         to_qcal = False
         if isinstance(circuits[0], Circuit):
             to_qcal = True
+
+            # Add a barrier accross entire register to maintain qubit labeling
+            for circuit in circuits:
+                circuit.prepend(Barrier(self._config.qubits))
+
             circuits = self._to_bqskit.transpile(circuits)
 
         if self._parallelize and mp.cpu_count() > 2:
@@ -250,6 +255,9 @@ class Compiler:
 
         if to_qcal:
             ccircuits = self._to_qcal.transpile(ccircuits)
+            # Remove the barrier accross entire register
+            for circuit in ccircuits:
+                circuit.popleft()
         else:
             ccircuits = CircuitSet(circuits=ccircuits)
 
