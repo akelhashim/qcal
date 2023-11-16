@@ -68,10 +68,12 @@ class QubicQPU(QPU):
                 n_circs_per_seq:     int = 1,
                 n_levels:            int = 2,
                 n_reads_per_shot:    int | None = None,
-                raster_circuits:     bool = False,
+                raster_circuits:     bool = True,
                 outputs:             List[str] = ['s11', 'shots', 'counts'],
+                hardware_vz_qubits:  List[str] = [],
                 measure_qubits:      List[str] | None = None,
                 delay_per_shot:      float | None = 0,
+                reload_pulse:        bool = True,
                 reload_cmd:          bool = True,
                 reload_freq:         bool = True,
                 reload_env:          bool = True,
@@ -104,7 +106,7 @@ class QubicQPU(QPU):
                 from the number of active resets and whether or not heralding
                 is used.
             raster_circuits (bool, optional): whether to raster through all
-                circuits in a batch during measurement. Defaults to False. By
+                circuits in a batch during measurement. Defaults to True. By
                 default, all circuits in a batch will be measured n_shots times
                 one by one. If True, all circuits in a batch will be measured
                 back-to-back one shot at a time. This can help average out the 
@@ -114,6 +116,12 @@ class QubicQPU(QPU):
                 is to the integrated IQ data; 'shots' is the classified data
                 for each read; and 'counts' is the accumulated statistics
                 for each read.
+            hardware_vz_qubits (List[str], optional): list of qubit labels
+                specifying for which qubits should the virtualz gates be done
+                on hardware (as opposed to software). Defaults to None. This is
+                necessary if doing conditional phase shifts using mid-
+                circuit measurements. Example: ```measure_qubits = ['Q0', 'Q1', 
+                'Q3']```.
             measure_qubits (List[str] | None, optional): list of qubit labels 
                 for post-processing measurements. Defaults to None. This will
                 overwrite the measurement qubits listed in the measurement
@@ -122,6 +130,8 @@ class QubicQPU(QPU):
                 measuring and offloading the data. Defaults to 0. If 0, this
                 will be computed automatically. If None, this is computed by
                 the length of the full sequence plus a 1 us buffer.
+            reload_pulse (bool): reloads the stored pulses when compiling each
+                circuit. Defaults to True.
             reload_cmd (bool, optional): reload pulse command buffer for each
                 batched circuit. Defaults to True.
             reload_freq (bool, optional): reload pulse frequencies when loading
@@ -143,8 +153,6 @@ class QubicQPU(QPU):
                 Defaults to '192.168.1.25'.
             port (int, option): port for RPC server. Defaults to 9096.
         """
-        if transpiler is None:
-            transpiler = Transpiler(config)
         QPU.__init__(self,
             config=config,
             compiler=compiler,
@@ -172,16 +180,15 @@ class QubicQPU(QPU):
         self._reload_env = reload_env
         self._zero_between_reload = zero_between_reload
         
+        self._qubic_transpiler = Transpiler(
+            config, 
+            reload_pulse=reload_pulse,
+            hardware_vz_qubits=hardware_vz_qubits
+        )
         self._gmm_manager = gmm_manager if gmm_manager is not None else (
             os.path.join(os.path.dirname(__file__), 'gmm_manager.pkl')
         )
         self._fpga_config = FPGAConfig()
-        #     **{'fpga_clk_period': 2.e-9,
-        #        'alu_instr_clks': 5,
-        #        'jump_cond_clks': 5, 
-        #        'jump_fproc_clks': 5, 
-        #        'pulse_regwrite_clks': 3}
-        # )
         self._channel_config = load_channel_configs(
             os.path.join(os.path.dirname(__file__), 'channel_config.json')
         )
@@ -256,7 +263,14 @@ class QubicQPU(QPU):
         """
         from qubic.toolchain import run_compile_stage, run_assemble_stage
 
+        self._exp_circuits = self._qubic_transpiler.transpile(
+            self._exp_circuits
+        )
+
         if self._raster_circuits:
+            self._n_reads_per_shot = (
+                calculate_n_reads(self._config) * len(self._exp_circuits)
+            )
             rastered_circuit = []
             for circuit in self._exp_circuits:
                 rastered_circuit.extend(circuit)

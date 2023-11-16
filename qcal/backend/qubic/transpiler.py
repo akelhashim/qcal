@@ -9,7 +9,9 @@ from qcal.circuit import Circuit, CircuitSet
 from qcal.config import Config
 from qcal.circuit import Cycle
 from qcal.gate.gate import Gate
-from qcal.gate.single_qubit import Id, Idle, Meas, MCM, Reset, Rz, X
+from qcal.gate.single_qubit import (
+    Id, Idle, Meas, MCM, Reset, Rz, VirtualZ, X, Z
+)
 from qcal.sequencer.dynamical_decoupling import dd_sequences
 from qcal.sequencer.pulse_envelopes import pulse_envelopes
 from qcal.sequencer.utils import clip_amplitude
@@ -67,48 +69,42 @@ def add_reset(
         for _ in range(config['reset/active/n_resets']):
             for q in qubits:
                 if isinstance(qubits_or_reset, (list, tuple)):
-                    add_measurement(config, q, reset_circuit, None)
+                    add_measurement(config, q, reset_circuit, None, reset=True)
                 elif isinstance(qubits_or_reset, Reset):
                     add_measurement(
                         config, 
                         qubits_or_reset.properties['params']['meas'], 
                         reset_circuit, 
-                        None
+                        None,
+                        reset=True
                     )
 
                 # Reset pulse w/ qutrit reset
                 reset_q_pulse = []
-                # reset_q_pulse = [
-                #     {'name':  'delay',
-                #     #  'tag':  'Feedback delay', 
-                #      't':     config['reset/active/feedback_delay'], 
-                #      'qubit': [f'Q{q}']
-                #     }
-                # ]
-                if (config.parameters['readout']['esp']['enable'] and
-                    q in config.parameters['readout']['esp']['qubits']):
-                    reset_q_pulse.extend(
-                        cycle_pulse(config, Cycle({X(q, subspace='EF')}))
-                    )
-                    reset_q_pulse.extend(
-                        cycle_pulse(config, Cycle({X(q, subspace='GE')}))
-                    )
-                else:
-                    reset_q_pulse.extend(
-                        cycle_pulse(config, Cycle({X(q, subspace='GE')}))
-                    )
-                    reset_q_pulse.extend(
-                        cycle_pulse(config, Cycle({X(q, subspace='EF')}))
-                    )
+                # if (config.parameters['readout']['esp']['enable'] and
+                #     q in config.parameters['readout']['esp']['qubits']):
+                #     reset_q_pulse.extend(
+                #         cycle_pulse(config, Cycle({X(q, subspace='EF')}))
+                #     )
+                #     reset_q_pulse.extend(
+                #         cycle_pulse(config, Cycle({X(q, subspace='GE')}))
+                #     )
+                # else:
+                reset_q_pulse.extend(
+                    cycle_pulse(config, Cycle({X(q, subspace='GE')}))
+                )
+                    # reset_q_pulse.extend(
+                    #     cycle_pulse(config, Cycle({X(q, subspace='EF')}))
+                    # )
 
                 reset_circuit.append({'name': 'barrier', 'scope': [f'Q{q}']})
                 reset_circuit.append(
-                    {'name': 'branch_fproc',
+                    {'name':     'branch_fproc',
                      'alu_cond': 'eq',
                      'cond_lhs': 1,
-                     'func_id': f'Q{q}.meas',
-                     'scope': [f'Q{q}'],
-                        'true': reset_q_pulse,
+                     'func_id':  f'Q{q}.meas',
+                     'scope':    [f'Q{q}'],
+                        'true':  reset_q_pulse,
                         'false': []
                     },
                 )
@@ -157,15 +153,18 @@ def add_measurement(
         config: Config, 
         qubit_or_meas: int | Gate,
         circuit: List, 
-        pulses: defaultdict | None
+        pulses: defaultdict | None,
+        reset: bool = False
     ) -> None:
     """Add measurement to a circuit.
 
     Args:
-       config (Config):             qcal Config object.
-       qubit_or_meas (int | Gate):  qubit label or measurement Gate object.
-       circuit (List):              qubic circuit.
-       pulses (defaultdict | None): pulses that have been stored for reuse.
+        config (Config):             qcal Config object.
+        qubit_or_meas (int | Gate):  qubit label or measurement Gate object.
+        circuit (List):              qubic circuit.
+        pulses (defaultdict | None): pulses that have been stored for reuse.
+        reset (bool):                whether or not the measurement is for a
+            reset operation. Defaults to False.
     """
     if isinstance(qubit_or_meas, int):
         qubit = qubit_or_meas
@@ -176,7 +175,7 @@ def add_measurement(
 
     meas_pulse = []
     # Excited state promotion
-    if config.parameters['readout']['esp']['enable']:
+    if config.parameters['readout']['esp']['enable'] and not reset:
         if qubit in config.parameters['readout']['esp']['qubits']:
             meas_pulse.extend(
                 cycle_pulse(config, Cycle({X(qubit, subspace='EF')}))
@@ -263,26 +262,12 @@ def add_mcm_apply(config: Config, mcm: MCM, pulse: List) -> None:
 
     # Seqeuence to apply if 1 is measured
     true_apply = []
-    # true_apply = [
-    #     {'name':  'delay',
-    #     #  'tag':   'Feedback delay',
-    #      't':     config['reset/active/feedback_delay'], 
-    #      'qubit': [f'Q{q}' for q in [qc for qc in q_cond]]
-    #     },
-    # ]
     true_apply.extend(
         cycle_pulse(config, mcm.properties['params']['apply']['1'])
     )
 
     # Sequence to apply if 0 is measured
     false_apply = []
-    # false_apply = [
-    #     {'name':  'delay', 
-    #     #  'tag':   'Feedback delay',
-    #      't':     config['reset/active/feedback_delay'], 
-    #      'qubit': [f'Q{q}' for q in [qc for qc in q_cond]]
-    #     },
-    # ]
     false_apply.extend(
         cycle_pulse(config, mcm.properties['params']['apply']['0'])
     )
@@ -427,7 +412,38 @@ def add_multi_qubit_gate(
 
     for pulse in config[f'two_qubit/{qubits}/{name}/pulse']:
 
-        if pulse['env'] == 'virtualz':
+        if isinstance(pulse, str):
+            name = pulse.split('/')[-2] + pulse.split('/')[-3]
+            freq = config['/'.join(pulse.split('/')[:-2]) +'/freq']
+            for p in config[pulse]:
+                if p['env'] == 'virtualz':
+                    mq_pulse.append(
+                        {'name':  'virtual_z',
+                         'freq':  freq,
+                         'phase': p['kwargs']['phase']
+                        }
+                    )
+                else:
+                    mq_pulse.append(
+                        {'name':  'pulse',
+                         'tag':    name,
+                         'dest':   p['channel'], 
+                         'freq':   freq,
+                         'amp':    clip_amplitude(p['kwargs']['amp']),
+                         'phase':  p['kwargs']['phase'],
+                         'twidth': p['length'], 
+                         'env':    pulse_envelopes[p['env']](
+                                    p['length'],
+                                    config['hardware/DAC_sample_rate'],
+                                    **{key: val for key, val 
+                                       in p['kwargs'].items() 
+                                       if key not in ['amp', 'phase']
+                                      }
+                                )
+                        }
+                    )
+        
+        elif pulse['env'] == 'virtualz':
             mq_pulse.append(
                 {'name':  'virtual_z',
                  'freq':  config[pulse['freq']],
@@ -485,7 +501,7 @@ def cycle_pulse(config: Config, cycle: Cycle) -> List:
                 }
             )
 
-        elif isinstance(gate, Rz):
+        elif isinstance(gate, (Rz, VirtualZ, Z)):
             pulse.append(
                 {'name':  'virtual_z',
                  'freq':  config[f'single_qubit/{qubit}/{subspace}/freq'],
@@ -557,11 +573,12 @@ def transpilation_error(*args):
 
 
 def to_qubic(
-        config:      Config, 
-        circuit:     Circuit, 
-        gate_mapper: defaultdict,
-        pulses:      defaultdict,
-        qubit_reset: bool = True
+        config:             Config, 
+        circuit:            Circuit, 
+        gate_mapper:        defaultdict,
+        pulses:             defaultdict,
+        qubit_reset:        bool = True,
+        hardware_vz_qubits: List[str] = [],
     ) -> List:
     """Compile a qcal circuit to a qubic circuit.
 
@@ -571,14 +588,35 @@ def to_qubic(
         gate_mapper (defaultdict): map between qcal to QubiC gates.
         pulses (defaultdict):      pulses that have been stored for reuse.
         qubit_reset (bool):        whether to reset the qubits before a 
-                circuit. Defaults to True. This can be set to False when adding
-                subcircuits like mid-circuit measurement.
+            circuit. Defaults to True. This can be set to False when adding
+            subcircuits like mid-circuit measurement.
+        hardware_vz_qubits (List[str], optional): list of qubit labels
+            specifying for which qubits should the virtualz gates be done
+            on hardware (as opposed to software). Defaults to None. This is
+            necessary if doing conditional phase shifts using mid-
+            circuit measurements. Example: ```measure_qubits = ['Q0', 'Q1', 
+            'Q3']```.
 
     Returns:
         List: transpiled qubic circuit.
     """
     qubic_circuit = []
     
+    # Specify virtual_z gates to be done on hardware
+    for q in hardware_vz_qubits:
+        qubic_circuit.extend([
+            {'name':  'declare', 
+             'var':   f'{q}_phase', 
+             'dtype': 'phase', 
+             'scope': [q]
+            },
+            {'name': 'set_var', 'value': 0, 'var': f'{q}_phase'},
+            {'name': 'bind_phase',
+             'freq': config[f'single_qubit/{q[1:]}/GE/freq'],  # TODO
+             'var':  f'{q}_phase'
+            }
+        ])
+
     # Add reset to the beginning of the circuit
     if qubit_reset:
         add_reset(config, circuit.qubits, qubic_circuit, pulses)
@@ -623,10 +661,11 @@ class Transpiler:
     # )
 
     def __init__(self, 
-            config:       Config, 
-            gate_mapper:  defaultdict | None = None,
-            reload_pulse: bool = True,
-            qubit_reset:  bool = True
+            config:             Config, 
+            gate_mapper:        defaultdict | None = None,
+            reload_pulse:       bool = True,
+            qubit_reset:        bool = True,
+            hardware_vz_qubits: List[str] = [],
         ) -> None:
         """Initialize with a qcal Config object.
 
@@ -639,6 +678,12 @@ class Transpiler:
             qubit_reset (bool): whether to reset the qubits before a circuit.
                 Defaults to True. This can be set to False when adding
                 subcircuits like mid-circuit measurement.
+            hardware_vz_qubits (List[str], optional): list of qubit labels
+                specifying for which qubits should the virtualz gates be done
+                on hardware (as opposed to software). Defaults to None. This is
+                necessary if doing conditional phase shifts using mid-
+                circuit measurements. Example: ```measure_qubits = ['Q0', 'Q1', 
+                'Q3']```.
 
         """
         self._config = config
@@ -669,6 +714,7 @@ class Transpiler:
 
         self._reload_pulse = reload_pulse
         self._qubit_reset = qubit_reset
+        self._hardware_vz_qubits = hardware_vz_qubits
         self._pulses = defaultdict(lambda: False, {})
 
     @property
@@ -717,7 +763,8 @@ class Transpiler:
                     circuit, 
                     self._gate_mapper, 
                     self._pulses,
-                    self._qubit_reset
+                    self._qubit_reset,
+                    self._hardware_vz_qubits
                 )
             )
               

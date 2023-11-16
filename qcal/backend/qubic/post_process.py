@@ -122,23 +122,20 @@ def post_process(
                 meas['s11'][chanmap_r[q]] for meas in measurements
             ]) for q in meas_qubits
         }
-
         if raster_circuits:
             n_reads = calculate_n_reads(config)
             for q in meas_qubits:
                 reorg_raw_iqs = []
                 for i in range(raw_iq[q].shape[0]):
                     reorg_raw_iq = np.vstack([
-                        raw_iq[q][i, :, j] for j in range(
+                        [raw_iq[q][i, :, j:j+n_reads] for j in range(
                             0, raw_iq[q].shape[-1], n_reads
-                        )
+                        )]
                     ])
                     reorg_raw_iqs.append(reorg_raw_iq)
                 raw_iq[q] = np.vstack([
                     iq for iq in reorg_raw_iqs
                 ])
-        # print(raw_iq['Q7'].shape)
-        # print(raw_iq['Q7'])
 
         if isinstance(circuits, CircuitSet):
             for q, meas in raw_iq.items():
@@ -180,9 +177,9 @@ def post_process(
                 reorg_measurements = []
                 for i in range(measurement[q].shape[0]):
                     reorg_measurement = np.vstack([
-                        measurement[q][i, :, j] for j in range(
+                        [measurement[q][i, :, j:j+n_reads] for j in range(
                             0, measurement[q].shape[-1], n_reads
-                        )
+                        )]
                     ])
                     reorg_measurements.append(reorg_measurement)
                 measurement[q] = np.vstack([
