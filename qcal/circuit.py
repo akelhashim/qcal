@@ -211,7 +211,7 @@ class Cycle:
         Returns:
             List: gates in cycle/layer.
         """
-        return self._gates
+        return [gate for gate in self._gates]
     
     @property
     def qubits(self) -> Tuple:
@@ -348,20 +348,20 @@ class Circuit:
             self._qubits.update(cycle.qubits)
 
     @property
-    def cycles(self) -> deque:
+    def cycles(self) -> list:
         """The cycles in the circuit.
 
         Returns:
-            deque: list of cycles.
+            list: list of cycles.
         """
         return [cycle for cycle in self._cycles]
     
     @property
-    def layers(self) -> deque:
+    def layers(self) -> list:
         """The layers in the circuit.
 
         Returns:
-            deque: list of layers.
+            list: list of layers.
         """
         return [cycle for cycle in self._cycles]
     
@@ -554,13 +554,13 @@ class Circuit:
         meas_cycle = Cycle({Meas(q, b) for q, b in zip(qubits, basis)})
         if all([meas.properties['params']['basis'].upper() == 'Z' for meas in 
                 meas_cycle]):
-            self.append(Barrier(self.qubits))
+            # self.append(Barrier(self.qubits))
             self.append(meas_cycle)
         else:
             self.append(
                 Cycle({basis_rotation(meas) for meas in meas_cycle})
             )
-            self.append(Barrier(self.qubits))
+            # self.append(Barrier(self.qubits))
             self.append(meas_cycle)
 
     def pop(self) -> None:
@@ -615,12 +615,16 @@ class Circuit:
         Args:
             map (Dict): dictionary mapping the old to new qubit labels.
         """
-        for cycle in self._cycle:
+        for cycle in self._cycles:
             if cycle.is_barrier:
-                cycle._qubits = (map[q] for q in cycle._qubits)
+                cycle._qubits = tuple(map[q] for q in cycle._qubits)
             else:
                 for gate in cycle:
-                    gate._qubits = (map[q] for q in gate._qubits)
+                    gate._properties['qubits'] = tuple(
+                        map[q] for q in gate.qubits
+                    )
+                cycle._update_qubits()
+        self._update_qubits()
     
     # TODO
     def remove(self, cycle_or_layer: Barrier | Cycle | Layer | List) -> None:

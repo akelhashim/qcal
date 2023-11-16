@@ -255,7 +255,7 @@ def CB(qpu:                  QPU,
                 print(ref_subset.fit(analyze_dim=2))
 
                 e_C, err = compute_cycle_infidelity(cycle_subset, ref_subset)
-                print(f'Interleaved cycle infidelity: e_C = {e_C} ({err})')
+                print(f'Interleaved cycle infidelity: e_C = {e_C} ({err})\n')
 
             else:
                 print(self._circuits.fit(analyze_dim=2))

@@ -98,9 +98,10 @@ def to_qcal(
                     tcircuit.extend(tcycle)
 
         else:
-            tcircuit.append(
-                transpile_cycle(cycle, gate_mapper)
-            )
+            if len(cycle) > 0:
+                tcircuit.append(
+                    transpile_cycle(cycle, gate_mapper)
+                )
 
         if cycle.marker > 0 and not barrier_between_all and i < len(circuit)-1:
             tcircuit.append(Barrier(circuit.labels))

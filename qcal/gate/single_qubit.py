@@ -334,7 +334,8 @@ class Reset(Gate):
         super().__init__(meas, qubit)
         self._properties['name'] = 'Reset'
         self._properties['params']['meas'] = MCM(
-            qubit, dd_qubits, dd_method, n_dd_pulses
+            qubit, 
+            dd_qubits=dd_qubits, dd_method=dd_method, n_dd_pulses=n_dd_pulses
         )
 
 class RandSU2(Gate):

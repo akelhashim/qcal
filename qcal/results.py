@@ -48,7 +48,7 @@ def readout_correction(results: Results, confusion_matrix: DataFrame) -> Dict:
                 confusion_matrix[q].to_numpy().astype(float).T
             )
 
-    if len(cmats) != len(results.keys()[0]):
+    if len(cmats) != len(tuple(results._results.keys())[0]):
         logger.warning(
             ' The number of confusion matrices does not match the length'
             ' of the provided bitstrings. No readout correction will be'
@@ -70,8 +70,10 @@ def readout_correction(results: Results, confusion_matrix: DataFrame) -> Dict:
 
             ideal_dists = []  # List of ideal distributions
             for o in obsrv:
+                # print(o)
                 dist = np.zeros(results.dim)
-                dist[o] = 1.
+                # print(dist)
+                dist[int(o)] = 1.
                 ideal_dists.append(dist)
 
             corrected_value = 0.
@@ -317,7 +319,7 @@ class Results:
         fig.update_traces(marker_color='blue')
         fig.update_layout(
             autosize=False,
-            width=100 * len(self.states),
+            width=175 * len(self.states),
             height=400,
             xaxis=dict(
                 tickvals=[i for i in range(len(self.states))],

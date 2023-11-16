@@ -206,6 +206,15 @@ class QPU:
         """
         return self._sequence
     
+    @property
+    def measurements(self) -> List[Any]:
+        """Returns the list of measurement objects.
+
+        Returns:
+            List[Any]: measurements.
+        """
+        return self._measurements
+    
     def initialize(self, 
             circuits:  Any | List[Any],
             n_shots:   int | None = None,
@@ -249,9 +258,11 @@ class QPU:
         
     def compile(self) -> None:
         """Compile the circuits using a custom compiler."""
-        self._exp_circuits = self._compiler.compile(
-            self._exp_circuits
-        )
+        if isinstance(self._compiler, Iterable):
+            for compiler in self._compiler:
+                self._exp_circuits = compiler.compile(self._exp_circuits)
+        else:
+            self._exp_circuits = self._compiler.compile(self._exp_circuits)
         self._compiled_circuits.append(self._exp_circuits)
 
     def transpile(self) -> None:
