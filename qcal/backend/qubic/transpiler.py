@@ -93,9 +93,9 @@ def add_reset(
                 reset_q_pulse.extend(
                     cycle_pulse(config, Cycle({X(q, subspace='GE')}))
                 )
-                    # reset_q_pulse.extend(
-                    #     cycle_pulse(config, Cycle({X(q, subspace='EF')}))
-                    # )
+                # reset_q_pulse.extend(
+                #     cycle_pulse(config, Cycle({X(q, subspace='EF')}))
+                # )
 
                 reset_circuit.append({'name': 'barrier', 'scope': [f'Q{q}']})
                 reset_circuit.append(
@@ -193,6 +193,7 @@ def add_measurement(
 
     meas_pulse.append({'name': 'barrier', 'qubit': [f'Q{qubit}']})
     meas_pulse.extend(cycle_pulse(config, Cycle({Meas(qubit)})))
+    meas_pulse.append({'name': 'barrier', 'qubit': [f'Q{qubit}']})
 
     if isinstance(qubit_or_meas, Gate) and qubit_or_meas.name == 'MCM':
         for q in qubit_or_meas.properties['params']['dd_qubits']:

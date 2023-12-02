@@ -2,8 +2,9 @@
 
 """
 # from qcal.circuit import CircuitSet
-from .post_process import calculate_n_reads, post_process
+from .post_process import post_process
 from .transpiler import Transpiler
+from .utils import calculate_n_reads
 from qcal.config import Config
 from qcal.managers.classification_manager import ClassificationManager
 from qcal.qpu.qpu import QPU
@@ -18,33 +19,6 @@ logger = logging.getLogger(__name__)
 
 
 __all__ = ('QubicQPU')
-
-
-def calculate_delay_per_shot(
-        config: Config, compiled_program, channel_config,
-    ) -> float:
-    """Calculate the delay per shot for offloading measurement data.
-
-    This is the maximum sequence length for the handshake from the compiled
-    program. This function assumes that all sequences are the same length. If
-    this is not true, then the circuits should be batched one-by-one. This
-    function also assumes that the last sequence element is a readout pulse.
-
-    Args:
-        config (Config): qcal config object.
-        compiled_program: QubiC compiled program object.
-        channel_config: QubiC channel_config object.
-
-    Returns:
-        float: delay per shot in seconds.
-    """
-    delay = 1.e-6  # Built-in buffer
-    delay += (     # Start time of last sequence element
-        list(compiled_program[-1].program.values())[-1][-2]['start_time'] / 
-        channel_config['fpga_clk_freq']
-    )
-    delay += config.parameters['readout']['length']  # Readout length
-    return delay
 
 
 class QubicQPU(QPU):
@@ -67,20 +41,19 @@ class QubicQPU(QPU):
                 n_batches:           int = 1, 
                 n_circs_per_seq:     int = 1,
                 n_levels:            int = 2,
-                n_reads_per_shot:    int | None = None,
-                raster_circuits:     bool = True,
-                outputs:             List[str] = ['s11', 'shots', 'counts'],
+                n_reads_per_shot:    int | dict | None = None,
+                raster_circuits:     bool = False,
+                outputs:             List[str] = ['s11'],
                 hardware_vz_qubits:  List[str] = [],
                 measure_qubits:      List[str] | None = None,
-                delay_per_shot:      float | None = 0,
                 reload_pulse:        bool = True,
                 reload_cmd:          bool = True,
                 reload_freq:         bool = True,
                 reload_env:          bool = True,
                 zero_between_reload: bool = True,
                 gmm_manager:         GMMManager = None,
-                rpc_ip_address:      str = '192.168.1.25',
-                port:                int = 9096
+                rpc_ip_address:      str = '192.168.1.122',
+                port:                int = 9095
         ) -> None:
         """Initialize a instance of a QPU for QubiC.
 
@@ -101,12 +74,13 @@ class QubicQPU(QPU):
             n_levels (int, optional): number of energy levels to be measured. 
                 Defaults to 2. If n_levels = 3, this assumes that the
                 measurement supports qutrit classification.
-            n_reads_per_shot (int | None, optional): number of reads per shot
-                per circuit. Defaults to None. If None, this will be computed
-                from the number of active resets and whether or not heralding
-                is used.
+            n_reads_per_shot (int | dict | None, optional): number of reads per 
+                shot per circuit. Defaults to None. If None, this will be 
+                computed from the number of active resets and whether or not 
+                heralding is used. This can also be a dictionary mapping a 
+                different number of reads per shot per qubit.
             raster_circuits (bool, optional): whether to raster through all
-                circuits in a batch during measurement. Defaults to True. By
+                circuits in a batch during measurement. Defaults to False. By
                 default, all circuits in a batch will be measured n_shots times
                 one by one. If True, all circuits in a batch will be measured
                 back-to-back one shot at a time. This can help average out the 
@@ -126,10 +100,6 @@ class QubicQPU(QPU):
                 for post-processing measurements. Defaults to None. This will
                 overwrite the measurement qubits listed in the measurement
                 objects. Example: ```measure_qubits = ['Q0', 'Q1', 'Q3']```.
-            delay_per_shot (float | None, optional): wait time between 
-                measuring and offloading the data. Defaults to 0. If 0, this
-                will be computed automatically. If None, this is computed by
-                the length of the full sequence plus a 1 us buffer.
             reload_pulse (bool): reloads the stored pulses when compiling each
                 circuit. Defaults to True.
             reload_cmd (bool, optional): reload pulse command buffer for each
@@ -174,7 +144,6 @@ class QubicQPU(QPU):
         )
         self._outputs = outputs
         self._measure_qubits = measure_qubits
-        self._delay_per_shot = delay_per_shot
         self._reload_cmd = reload_cmd
         self._reload_freq = reload_freq
         self._reload_env = reload_env
@@ -268,9 +237,11 @@ class QubicQPU(QPU):
         )
 
         if self._raster_circuits:
-            self._n_reads_per_shot = (
-                calculate_n_reads(self._config) * len(self._exp_circuits)
-            )
+            if isinstance(self._n_reads_per_shot, dict):
+                for key in self._n_reads_per_shot.keys():
+                    self._n_reads_per_shot[key] *= len(self._exp_circuits)
+            else:
+                self._n_reads_per_shot *=  len(self._exp_circuits)
             rastered_circuit = []
             for circuit in self._exp_circuits:
                 rastered_circuit.extend(circuit)
@@ -284,23 +255,13 @@ class QubicQPU(QPU):
         )
 
     def acquire(self) -> None:
-        """Measure all circuits."""
-        if self._delay_per_shot is None:
-            self._delay_per_shot = (
-                calculate_delay_per_shot(
-                    self._config,
-                    self._compiled_program,
-                    self._channel_config
-                )
-            )
-        
+        """Measure all circuits."""        
         measurement = self._jobman.build_and_run_circuits(
             self._sequence, 
             self._n_shots, 
             self._outputs, 
             fit_gmm=False,
             reads_per_shot=self._n_reads_per_shot,
-            delay_per_shot=self._delay_per_shot,
             reload_cmd=self._reload_cmd,
             reload_freq=self._reload_freq,
             reload_env=self._reload_env,
