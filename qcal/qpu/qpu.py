@@ -375,16 +375,21 @@ class QPU:
     def save(self) -> None:
         """Save all circuits."""
         self._data_manager.create_data_path()
-        self._data_manager.save_to_pickle(self._circuits, 'circuits')
+
+        if len(self._circuits) > 1:
+            self._circuits.save(
+                self._data_manager._save_path + 'circuits.qc'
+            )
+        # self._data_manager.save_to_pickle(self._circuits, 'circuits')
 
         if len(self._compiled_circuits) > 1:
             self._compiled_circuits.save(
-                self._data_manager._save_path + 'compiled_circuits.pkl'
+                self._data_manager._save_path + 'compiled_circuits.qc'
             )
 
         if len(self._transpiled_circuits) > 1: 
             self._transpiled_circuits.save(
-                self._data_manager._save_path + 'compiled_circuits.pkl'
+                self._data_manager._save_path + 'transpiled_circuits.qc'
             )
 
         self._data_manager.save_to_pickle(self._measurements, 'measurements')

@@ -48,13 +48,11 @@ def format_gate_text(gate: Gate):
     return text
 
 
-def draw_circuit(circuit: Circuit, show: bool = True):
+def draw_circuit(circuit: Circuit):
     """Draw a circuit.
 
     Args:
         circuit (Circuit): qcal Circuit object.
-        show (bool): whether to plot the Fig. Defaults to True. If False, the 
-            Fig object is returned instead.
     """
     # https://plotly.com/python/marker-style/
     symbol_map = defaultdict(lambda: ['square', 'square'],
@@ -214,10 +212,17 @@ def draw_circuit(circuit: Circuit, show: bool = True):
                else 150,
     )
     
-    if show:
-        fig.show()
-    else:
-        return fig
+    save_properties = {
+        'toImageButtonOptions': {
+            'format': 'png', # one of png, svg, jpeg, webp
+            'filename': 'quantum_circuit',
+            # 'height': 500,
+            # 'width': 1000,
+            'scale': 10 # Multiply title/legend/axis/canvas sizes by this factor
+        }
+    }
+
+    fig.show(config=save_properties)
 
 
 def draw_DAG(G: nx.Graph):
@@ -323,7 +328,7 @@ def format_qubit_text(qubit: Dict) -> str:
     return text
 
 
-def draw_processor(config: Config):
+def draw_qpu(config: Config):
     """Draw a processor connectivity graph for a given config.
 
     Args:
@@ -430,12 +435,24 @@ def draw_processor(config: Config):
             hovermode='closest',
             margin=dict(b=20,l=5,r=5,t=40),
             annotations=[ dict(
-                text="Processor Layout",
+                text="QPU",
                 showarrow=False,
                 xref="paper", yref="paper",
-                x=0.005, y=-0.002 ) ],
+                x=0.005, y=-0.002,
+                font=dict(size=25) ) ],
             xaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
             yaxis=dict(showgrid=False, zeroline=False, showticklabels=False)
         )
     )
-    fig.show()
+
+    save_properties = {
+        'toImageButtonOptions': {
+            'format': 'png', # one of png, svg, jpeg, webp
+            'filename': 'qpu_layout',
+            # 'height': 500,
+            # 'width': 1000,
+            'scale': 10 # Multiply title/legend/axis/canvas sizes by this factor
+        }
+    }
+
+    fig.show(config=save_properties)

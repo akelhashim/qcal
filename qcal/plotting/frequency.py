@@ -42,13 +42,13 @@ def plot_freq_spectrum(
     # TODO: add support for qubit_LO and readout_LO
     fig = go.Figure(
         layout=go.Layout(
-        title={
-            'text': 'Frequency Spectrum',
-            'x': 0.5,
-            'xanchor': 'center',
-            'yanchor': 'top'
-        },
-        titlefont_size=16,
+        # title={
+        #     'text': 'Frequency Spectrum',
+        #     'x': 0.5,
+        #     'xanchor': 'center',
+        #     'yanchor': 'top'
+        # },
+        titlefont_size=25,
         showlegend=True,
         hovermode='closest',
         margin=dict(b=20,l=5,r=5,t=40),
@@ -168,6 +168,18 @@ def plot_freq_spectrum(
         xaxis_range=[min(x_mins) - 0.05, max(x_maxs) + 0.05],
         yaxis_range=[0, 1],
         yaxis_hoverformat='',
+        font=dict(size=20),
+        legend = dict(font = dict(size=17))
     )
 
-    fig.show()
+    save_properties = {
+        'toImageButtonOptions': {
+            'format': 'png', # one of png, svg, jpeg, webp
+            'filename': 'frequency_plot',
+            'height': 500,
+            'width': 1000,
+            'scale': 10 # Multiply title/legend/axis/canvas sizes by this factor
+        }
+    }
+
+    fig.show(config=save_properties)

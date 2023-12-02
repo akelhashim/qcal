@@ -414,11 +414,11 @@ class Config:
         """Reload from the yaml file."""
         self.load()
 
-    def draw_processor(self):
+    def draw_qpu(self):
         """Plot a graph displaying the connectivity of the quantum processor.
         """
-        from qcal.plotting.graphs import draw_processor
-        draw_processor(self)
+        from qcal.plotting.graphs import draw_qpu
+        draw_qpu(self)
 
     def plot_freqs(self,
             qubits:      List | Tuple | None = None,

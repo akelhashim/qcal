@@ -46,6 +46,12 @@ class Calibration:
         self._cal_values = {}
         self._errors = {}
 
+        if esp or self._config['readout/esp/enable']:
+            logger.warning(
+                ' Excited State Promotion is enabled!'
+                ' This can cause errors in calibration!'
+            )
+
         if esp and not self._config['readout/esp/enable']:
             self.set_param('readout/esp/enable', True)
             self._disable_esp = True
