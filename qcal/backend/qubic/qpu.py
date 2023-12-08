@@ -226,9 +226,6 @@ class QubicQPU(QPU):
             config and the qchip layout.
         2) Generate the raw ASM code. This is what we are calling the
             "sequence."
-
-        Args:
-            circuits (List): TODO
         """
         from qubic.toolchain import run_compile_stage, run_assemble_stage
 

@@ -10,7 +10,7 @@ from qcal.config import Config
 from qcal.circuit import Cycle
 from qcal.gate.gate import Gate
 from qcal.gate.single_qubit import (
-    Id, Idle, Meas, MCM, Reset, Rz, VirtualZ, X, Z
+    Id, Idle, Meas, MCM, Reset, Rz, VirtualZ, X, X90, Z
 )
 from qcal.sequencer.dynamical_decoupling import dd_sequences
 from qcal.sequencer.pulse_envelopes import pulse_envelopes
@@ -263,15 +263,23 @@ def add_mcm_apply(config: Config, mcm: MCM, pulse: List) -> None:
 
     # Seqeuence to apply if 1 is measured
     true_apply = []
-    true_apply.extend(
-        cycle_pulse(config, mcm.properties['params']['apply']['1'])
-    )
+    if isinstance(mcm.properties['params']['apply']['1'], Circuit):
+        for cycle in mcm.properties['params']['apply']['1']:
+            true_apply.extend(cycle_pulse(config, cycle))
+    else:
+        true_apply.extend(
+            cycle_pulse(config, mcm.properties['params']['apply']['1'])
+        )
 
     # Sequence to apply if 0 is measured
     false_apply = []
-    false_apply.extend(
-        cycle_pulse(config, mcm.properties['params']['apply']['0'])
-    )
+    if isinstance(mcm.properties['params']['apply']['0'], Circuit):
+        for cycle in mcm.properties['params']['apply']['0']:
+            false_apply.extend(cycle_pulse(config, cycle))
+    else:
+        false_apply.extend(
+            cycle_pulse(config, mcm.properties['params']['apply']['0'])
+        )
 
     # Conditional operation
     pulse.append(
@@ -509,6 +517,39 @@ def cycle_pulse(config: Config, cycle: Cycle) -> List:
                  'phase': gate.properties['params']['phase']
                 }
             )
+
+        elif isinstance(gate, X90):
+            for p in config[f'single_qubit/{qubit}/{subspace}/X90/pulse']:
+
+                if p['env'] == 'virtualz':
+                    pulse.append(
+                        {'name':  'virtual_z',
+                         'freq':  config[
+                                    f'single_qubit/{qubit}/{subspace}/freq'],
+                         'phase': p['kwargs']['phase']
+                        }
+                    )
+                    
+                else:
+                    pulse.append(
+                        {'name':   'pulse',
+                         'tag':    f'X90 {subspace}',
+                         'dest':   p['channel'],
+                         'freq':   config[
+                             f'single_qubit/{qubit}/{subspace}/freq'],
+                         'amp':    clip_amplitude(p['kwargs']['amp']),
+                         'phase':  p['kwargs']['phase'],
+                         'twidth': p['length'],
+                         'env':    pulse_envelopes[p['env']](
+                                     p['length'],
+                                     config['hardware/DAC_sample_rate'],
+                                     **{key: val for key, val in 
+                                        p['kwargs'].items() if key not in 
+                                        ['amp', 'phase']
+                                       }
+                                   )
+                        }
+                    )
 
         elif isinstance(gate, X):
             pulse.extend([
