@@ -77,13 +77,20 @@ def to_qcal(
             cycle_replacement is not None and
             i < len(circuit) -1):
             # If a marker is specified, only replace the specified cycle
-            if cycle_replacement['marker']:
-                if cycle.marker == cycle_replacement['marker']:
-                    tcycle = cycle_replacement['cycle']
+            if isinstance(cycle_replacement, (dict, defaultdict)):
+                if cycle.marker in cycle_replacement.keys():
+                    tcycle = cycle_replacement[cycle.marker]
                     if isinstance(tcycle, Cycle):
                         tcircuit.append(tcycle)
                     elif isinstance(tcycle, Circuit):
                         tcircuit.extend(tcycle)
+            # if cycle_replacement['marker']:
+            #     if cycle.marker == cycle_replacement['marker']:
+            #         tcycle = cycle_replacement['cycle']
+            #         if isinstance(tcycle, Cycle):
+            #             tcircuit.append(tcycle)
+            #         elif isinstance(tcycle, Circuit):
+            #             tcircuit.extend(tcycle)
                 else:
                     tcircuit.append(
                         transpile_cycle(cycle, gate_mapper)
@@ -91,7 +98,7 @@ def to_qcal(
 
             # If no marker is specified, replace every marked cycle
             else:
-                tcycle = cycle_replacement['cycle']
+                tcycle = cycle_replacement#['cycle']
                 if isinstance(tcycle, Cycle):
                     tcircuit.append(tcycle)
                 elif isinstance(tcycle, Circuit):

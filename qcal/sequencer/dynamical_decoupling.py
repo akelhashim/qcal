@@ -16,7 +16,7 @@ from typing import Any, List
 logger = logging.getLogger(__name__)
 
 
-__all__ = ('XY')
+__all__ = ('XY', 'dd_sequences')
 
 
 def XY(

@@ -48,11 +48,14 @@ def format_gate_text(gate: Gate):
     return text
 
 
-def draw_circuit(circuit: Circuit):
+def draw_circuit(circuit: Circuit, show: bool = True):
     """Draw a circuit.
 
     Args:
         circuit (Circuit): qcal Circuit object.
+        show (bool):       whether to plot the circuit. Defaults to True. If
+            False, the figure object is returned.
+
     """
     # https://plotly.com/python/marker-style/
     symbol_map = defaultdict(lambda: ['square', 'square'],
@@ -222,7 +225,10 @@ def draw_circuit(circuit: Circuit):
         }
     }
 
-    fig.show(config=save_properties)
+    if show:
+        fig.show(config=save_properties)
+    else:
+        return fig
 
 
 def draw_DAG(G: nx.Graph):
