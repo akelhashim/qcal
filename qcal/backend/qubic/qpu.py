@@ -76,9 +76,8 @@ class QubicQPU(QPU):
                 measurement supports qutrit classification.
             n_reads_per_shot (int | dict | None, optional): number of reads per 
                 shot per circuit. Defaults to None. If None, this will be 
-                computed from the number of active resets and whether or not 
-                heralding is used. This can also be a dictionary mapping a 
-                different number of reads per shot per qubit.
+                computed from the number of reads per channel in the compiled
+                program.
             raster_circuits (bool, optional): whether to raster through all
                 circuits in a batch during measurement. Defaults to False. By
                 default, all circuits in a batch will be measured n_shots times
@@ -139,9 +138,10 @@ class QubicQPU(QPU):
         from qubic.state_disc import GMMManager
         from qubitconfig.qchip import QChip
 
-        self._n_reads_per_shot = (calculate_n_reads(config) 
-            if n_reads_per_shot is None else n_reads_per_shot
-        )
+        # self._n_reads_per_shot = (calculate_n_reads(config) 
+        #     if n_reads_per_shot is None else n_reads_per_shot
+        # )
+        self._n_reads_per_shot = n_reads_per_shot
         self._outputs = outputs
         self._measure_qubits = measure_qubits
         self._reload_cmd = reload_cmd
@@ -234,11 +234,6 @@ class QubicQPU(QPU):
         )
 
         if self._raster_circuits:
-            if isinstance(self._n_reads_per_shot, dict):
-                for key in self._n_reads_per_shot.keys():
-                    self._n_reads_per_shot[key] *= len(self._exp_circuits)
-            else:
-                self._n_reads_per_shot *=  len(self._exp_circuits)
             rastered_circuit = []
             for circuit in self._exp_circuits:
                 rastered_circuit.extend(circuit)
@@ -252,7 +247,12 @@ class QubicQPU(QPU):
         )
 
     def acquire(self) -> None:
-        """Measure all circuits."""        
+        """Measure all circuits."""
+        if self._n_reads_per_shot is None:
+            self._n_reads_per_shot = calculate_n_reads(
+                self._config, self._compiled_program[0]
+            )
+
         measurement = self._jobman.build_and_run_circuits(
             self._sequence, 
             self._n_shots, 
@@ -271,28 +271,31 @@ class QubicQPU(QPU):
         post_process(
             self._config, 
             self._measurements,
-            self._measure_qubits,
-            self._classifier, 
             self._circuits,
-            self._raster_circuits
+            measure_qubits=self._measure_qubits,
+            n_reads_per_shot=self._n_reads_per_shot,
+            classifier=self._classifier, 
+            raster_circuits=self._raster_circuits
         )
 
         if len(self._compiled_circuits) > 1:
             post_process(
                 self._config, 
                 self._measurements,
-                self._measure_qubits, 
-                self._classifier, 
-                self._compiled_circuits, 
-                self._raster_circuits
+                self._compiled_circuits,
+                measure_qubits=self._measure_qubits,
+                n_reads_per_shot=self._n_reads_per_shot,
+                classifier=self._classifier, 
+                raster_circuits=self._raster_circuits
             )
 
         if len(self._transpiled_circuits) > 1:
             post_process(
-                self._config, 
+                self._config,
                 self._measurements,
-                self._measure_qubits,
-                self._classifier, 
                 self._transpiled_circuits,
-                self._raster_circuits
+                measure_qubits=self._measure_qubits,
+                n_reads_per_shot=self._n_reads_per_shot,
+                classifier=self._classifier, 
+                raster_circuits=self._raster_circuits
             )

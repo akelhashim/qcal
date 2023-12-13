@@ -36,12 +36,13 @@ def find_herald_idx(config: Config) -> int:
 
 
 def post_process(
-        config:          Config, 
-        measurements:    List,
-        measure_qubits:  List[str] | None,
-        classifier:      ClassificationManager | None, 
-        circuits:        Any,
-        raster_circuits: bool = False
+        config:           Config, 
+        measurements:     List,
+        circuits:         Any,
+        measure_qubits:   List[str] | None = None,
+        n_reads_per_shot: int | dict | None = None,
+        classifier:       ClassificationManager | None = None, 
+        raster_circuits:  bool = False
     ) -> None:
     """Post-process measurement results from QubiC.
 
@@ -53,12 +54,14 @@ def post_process(
     Args:
         config (Config): qcal Config object.
         measurements (List): list of batched measurements.
-        measure_qubits (List[str] | None, optional): list of qubit labels 
-            for post-processing measurements. If None, these will be extracted
-            from the measurements.
-        classifier (ClassificationManager, None): manager used for classifying
-            raw data.
         circuits (Any): any collection or set of circuits.
+        measure_qubits (List[str] | None, optional): list of qubit labels 
+            for post-processing measurements. Defaults to None. If None, these 
+            will be extracted from the measurements.
+         n_reads_per_shot (int | dict | None, optional): number of reads per 
+                shot per circuit. Defaults to None.
+        classifier (ClassificationManager, None): manager used for classifying
+            raw data. Defaults to None.
         raster_circuits (bool, optional): whether to raster through all
             circuits in a batch during measurement. Defaults to False. By
             default, all circuits in a batch will be measured n_shots times
@@ -96,8 +99,15 @@ def post_process(
             ]) for q in meas_qubits
         }
         if raster_circuits:
-            n_reads = calculate_n_reads(config)
+            assert n_reads_per_shot is not None
             for q in meas_qubits:
+                if isinstance(n_reads_per_shot, dict):
+                    n_reads = int(
+                        n_reads_per_shot[chanmap_r[q]] / len(circuits)
+                    )
+                elif isinstance(n_reads_per_shot, int):
+                    n_reads = int(n_reads_per_shot / len(circuits))
+
                 reorg_raw_iqs = []
                 for i in range(raw_iq[q].shape[0]):
                     reorg_raw_iq = np.vstack([
@@ -145,8 +155,15 @@ def post_process(
         }
 
         if raster_circuits:
-            n_reads = calculate_n_reads(config)
+            assert n_reads_per_shot is not None
             for q in meas_qubits:
+                if isinstance(n_reads_per_shot, dict):
+                    n_reads = int(
+                        n_reads_per_shot[chanmap_r[q]] / len(circuits)
+                    )
+                elif isinstance(n_reads_per_shot, int):
+                    n_reads = int(n_reads_per_shot / len(circuits))
+                
                 reorg_measurements = []
                 for i in range(measurement[q].shape[0]):
                     reorg_measurement = np.vstack([
