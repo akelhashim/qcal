@@ -1,0 +1,292 @@
+{
+    "fpga_clk_freq": 500e6,
+
+    "Q0.qdrv":{
+        "core_ind": 7,
+        "elem_ind": 0,
+        "elem_params":{
+            "samples_per_clk": 16,
+            "interp_ratio": 1
+        },
+        "env_mem_name": "qdrvenv{core_ind}",
+        "freq_mem_name": "qdrvfreq{core_ind}",
+        "acc_mem_name": "accbuf{core_ind}"
+    },
+
+    "Q0.rdrv":{
+        "core_ind": 7,
+        "elem_ind": 1,
+        "elem_params":{
+            "samples_per_clk": 16,
+            "interp_ratio": 16
+        },
+        "env_mem_name": "rdrvenv{core_ind}",
+        "freq_mem_name": "rdrvfreq{core_ind}",
+        "acc_mem_name": "accbuf{core_ind}"
+    },
+
+    "Q0.rdlo":{
+        "core_ind": 7,
+        "elem_ind": 2,
+        "elem_params":{
+            "samples_per_clk": 4,
+            "interp_ratio": 4
+        },
+        "env_mem_name": "rdloenv{core_ind}",
+        "freq_mem_name": "rdlofreq{core_ind}",
+        "acc_mem_name": "accbuf{core_ind}"
+    },
+
+    "Q1.qdrv":{
+        "core_ind": 4,
+        "elem_ind": 0,
+        "elem_params":{
+            "samples_per_clk": 16,
+            "interp_ratio": 1
+        },
+        "env_mem_name": "qdrvenv{core_ind}",
+        "freq_mem_name": "qdrvfreq{core_ind}",
+        "acc_mem_name": "accbuf{core_ind}"
+    },
+
+    "Q1.rdrv":{
+        "core_ind": 4,
+        "elem_ind": 1,
+        "elem_params":{
+            "samples_per_clk": 16,
+            "interp_ratio": 16
+        },
+        "env_mem_name": "rdrvenv{core_ind}",
+        "freq_mem_name": "rdrvfreq{core_ind}",
+        "acc_mem_name": "accbuf{core_ind}"
+    },
+
+    "Q1.rdlo":{
+        "core_ind": 4,
+        "elem_ind": 2,
+        "elem_params":{
+            "samples_per_clk": 4,
+            "interp_ratio": 4
+        },
+        "env_mem_name": "rdloenv{core_ind}",
+        "freq_mem_name": "rdlofreq{core_ind}",
+        "acc_mem_name": "accbuf{core_ind}"
+    },
+
+    "Q2.qdrv":{
+        "core_ind": 1,
+        "elem_ind": 0,
+        "elem_params":{
+            "samples_per_clk": 16,
+            "interp_ratio": 1
+        },
+        "env_mem_name": "qdrvenv{core_ind}",
+        "freq_mem_name": "qdrvfreq{core_ind}",
+        "acc_mem_name": "accbuf{core_ind}"
+    },
+
+    "Q2.rdrv":{
+        "core_ind": 1,
+        "elem_ind": 1,
+        "elem_params":{
+            "samples_per_clk": 16,
+            "interp_ratio": 16
+        },
+        "env_mem_name": "rdrvenv{core_ind}",
+        "freq_mem_name": "rdrvfreq{core_ind}",
+        "acc_mem_name": "accbuf{core_ind}"
+    },
+
+    "Q2.rdlo":{
+        "core_ind": 1,
+        "elem_ind": 2,
+        "elem_params":{
+            "samples_per_clk": 4,
+            "interp_ratio": 4
+        },
+        "env_mem_name": "rdloenv{core_ind}",
+        "freq_mem_name": "rdlofreq{core_ind}",
+        "acc_mem_name": "accbuf{core_ind}"
+    },
+
+    "Q3.qdrv":{
+        "core_ind": 3,
+        "elem_ind": 0,
+        "elem_params":{
+            "samples_per_clk": 16,
+            "interp_ratio": 1
+        },
+        "env_mem_name": "qdrvenv{core_ind}",
+        "freq_mem_name": "qdrvfreq{core_ind}",
+        "acc_mem_name": "accbuf{core_ind}"
+    },
+
+    "Q3.rdrv":{
+        "core_ind": 3,
+        "elem_ind": 1,
+        "elem_params":{
+            "samples_per_clk": 16,
+            "interp_ratio": 16
+        },
+        "env_mem_name": "rdrvenv{core_ind}",
+        "freq_mem_name": "rdrvfreq{core_ind}",
+        "acc_mem_name": "accbuf{core_ind}"
+    },
+
+    "Q3.rdlo":{
+        "core_ind": 3,
+        "elem_ind": 2,
+        "elem_params":{
+            "samples_per_clk": 4,
+            "interp_ratio": 4
+        },
+        "env_mem_name": "rdloenv{core_ind}",
+        "freq_mem_name": "rdlofreq{core_ind}",
+        "acc_mem_name": "accbuf{core_ind}"
+    },
+
+    "Q4.qdrv":{
+        "core_ind": 5,
+        "elem_ind": 0,
+        "elem_params":{
+            "samples_per_clk": 16,
+            "interp_ratio": 1
+        },
+        "env_mem_name": "qdrvenv{core_ind}",
+        "freq_mem_name": "qdrvfreq{core_ind}",
+        "acc_mem_name": "accbuf{core_ind}"
+    },
+
+    "Q4.rdrv":{
+        "core_ind": 5,
+        "elem_ind": 1,
+        "elem_params":{
+            "samples_per_clk": 16,
+            "interp_ratio": 16
+        },
+        "env_mem_name": "rdrvenv{core_ind}",
+        "freq_mem_name": "rdrvfreq{core_ind}",
+        "acc_mem_name": "accbuf{core_ind}"
+    },
+
+    "Q4.rdlo":{
+        "core_ind": 5,
+        "elem_ind": 2,
+        "elem_params":{
+            "samples_per_clk": 4,
+            "interp_ratio": 4
+        },
+        "env_mem_name": "rdloenv{core_ind}",
+        "freq_mem_name": "rdlofreq{core_ind}",
+        "acc_mem_name": "accbuf{core_ind}"
+    },
+
+    "Q5.qdrv":{
+        "core_ind": 6,
+        "elem_ind": 0,
+        "elem_params":{
+            "samples_per_clk": 16,
+            "interp_ratio": 1
+        },
+        "env_mem_name": "qdrvenv{core_ind}",
+        "freq_mem_name": "qdrvfreq{core_ind}",
+        "acc_mem_name": "accbuf{core_ind}"
+    },
+
+    "Q5.rdrv":{
+        "core_ind": 6,
+        "elem_ind": 1,
+        "elem_params":{
+            "samples_per_clk": 16,
+            "interp_ratio": 16
+        },
+        "env_mem_name": "rdrvenv{core_ind}",
+        "freq_mem_name": "rdrvfreq{core_ind}",
+        "acc_mem_name": "accbuf{core_ind}"
+    },
+
+    "Q5.rdlo":{
+        "core_ind": 6,
+        "elem_ind": 2,
+        "elem_params":{
+            "samples_per_clk": 4,
+            "interp_ratio": 4
+        },
+        "env_mem_name": "rdloenv{core_ind}",
+        "freq_mem_name": "rdlofreq{core_ind}",
+        "acc_mem_name": "accbuf{core_ind}"
+    },
+
+    "Q6.qdrv":{
+        "core_ind": 2,
+        "elem_ind": 0,
+        "elem_params":{
+            "samples_per_clk": 16,
+            "interp_ratio": 1
+        },
+        "env_mem_name": "qdrvenv{core_ind}",
+        "freq_mem_name": "qdrvfreq{core_ind}",
+        "acc_mem_name": "accbuf{core_ind}"
+    },
+
+    "Q6.rdrv":{
+        "core_ind": 2,
+        "elem_ind": 1,
+        "elem_params":{
+            "samples_per_clk": 16,
+            "interp_ratio": 16
+        },
+        "env_mem_name": "rdrvenv{core_ind}",
+        "freq_mem_name": "rdrvfreq{core_ind}",
+        "acc_mem_name": "accbuf{core_ind}"
+    },
+
+    "Q6.rdlo":{
+        "core_ind": 2,
+        "elem_ind": 2,
+        "elem_params":{
+            "samples_per_clk": 4,
+            "interp_ratio": 4
+        },
+        "env_mem_name": "rdloenv{core_ind}",
+        "freq_mem_name": "rdlofreq{core_ind}",
+        "acc_mem_name": "accbuf{core_ind}"
+    },
+
+    "Q7.qdrv":{
+        "core_ind": 0,
+        "elem_ind": 0,
+        "elem_params":{
+            "samples_per_clk": 16,
+            "interp_ratio": 1
+        },
+        "env_mem_name": "qdrvenv{core_ind}",
+        "freq_mem_name": "qdrvfreq{core_ind}",
+        "acc_mem_name": "accbuf{core_ind}"
+    },
+
+    "Q7.rdrv":{
+        "core_ind": 0,
+        "elem_ind": 1,
+        "elem_params":{
+            "samples_per_clk": 16,
+            "interp_ratio": 16
+        },
+        "env_mem_name": "rdrvenv{core_ind}",
+        "freq_mem_name": "rdrvfreq{core_ind}",
+        "acc_mem_name": "accbuf{core_ind}"
+    },
+
+    "Q7.rdlo":{
+        "core_ind": 0,
+        "elem_ind": 2,
+        "elem_params":{
+            "samples_per_clk": 4,
+            "interp_ratio": 4
+        },
+        "env_mem_name": "rdloenv{core_ind}",
+        "freq_mem_name": "rdlofreq{core_ind}",
+        "acc_mem_name": "accbuf{core_ind}"
+    }
+
+}
