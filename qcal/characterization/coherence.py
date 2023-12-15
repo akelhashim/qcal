@@ -37,8 +37,6 @@ def T1(qpu:             QPU,
        n_shots:         int = 1024, 
        n_batches:       int = 1, 
        n_circs_per_seq: int = 1, 
-       esp:             bool = False,
-       heralding:       bool = True,
        raster_circuits: bool = False,
        **kwargs
     ) -> Callable:
@@ -78,10 +76,6 @@ def T1(qpu:             QPU,
             Defaults to 1.
         n_circs_per_seq (int, optional): maximum number of circuits that
             can be measured per sequence. Defaults to 1.
-        esp (bool, optional): whether to enable excited state promotion for 
-            the calibration. Defaults to False.
-        heralding (bool, optional): whether to enable heralding for the 
-            calibraion. Defaults to True.
 
     Returns:
         Callable: T1 class.
@@ -107,8 +101,6 @@ def T1(qpu:             QPU,
                 n_shots:         int = 1024, 
                 n_batches:       int = 1, 
                 n_circs_per_seq: int = 1, 
-                esp:             bool = False,
-                heralding:       bool = True,
                 raster_circuits: bool = False,
                 **kwargs
             ) -> None:
@@ -127,11 +119,7 @@ def T1(qpu:             QPU,
                 raster_circuits=raster_circuits,
                 **kwargs
             )
-            Characterize.__init__(self, 
-                config, 
-                esp=esp,
-                heralding=heralding
-            )
+            Characterize.__init__(self, config)
 
             self._qubits = qubits
             
@@ -294,8 +282,6 @@ def T1(qpu:             QPU,
         n_shots, 
         n_batches, 
         n_circs_per_seq, 
-        esp,
-        heralding,
         raster_circuits,
         **kwargs
     )
@@ -315,8 +301,6 @@ def T2(qpu:             QPU,
        n_shots:         int = 1024, 
        n_batches:       int = 1, 
        n_circs_per_seq: int = 1, 
-       esp:             bool = False,
-       heralding:       bool = True,
        raster_circuits: bool = False,
        **kwargs
     ) -> Callable:
@@ -360,10 +344,6 @@ def T2(qpu:             QPU,
             Defaults to 1.
         n_circs_per_seq (int, optional): maximum number of circuits that
             can be measured per sequence. Defaults to 1.
-        esp (bool, optional): whether to enable excited state promotion for 
-            the calibration. Defaults to False.
-        heralding (bool, optional): whether to enable heralding for the 
-            calibraion. Defaults to True.
 
     Returns:
         Callable: T2 class.
@@ -390,8 +370,6 @@ def T2(qpu:             QPU,
                 n_shots:         int = 1024, 
                 n_batches:       int = 1, 
                 n_circs_per_seq: int = 1, 
-                esp:             bool = False,
-                heralding:       bool = True,
                 raster_circuits: bool = False,
                 **kwargs
             ) -> None:
@@ -410,11 +388,7 @@ def T2(qpu:             QPU,
                 raster_circuits=raster_circuits,
                 **kwargs
             )
-            Characterize.__init__(self, 
-                config, 
-                esp=esp,
-                heralding=heralding
-            )
+            Characterize.__init__(self, config)
 
             self._qubits = qubits
             self._echo = echo
@@ -606,8 +580,6 @@ def T2(qpu:             QPU,
         n_shots, 
         n_batches, 
         n_circs_per_seq, 
-        esp,
-        heralding,
         raster_circuits,
         **kwargs
     )

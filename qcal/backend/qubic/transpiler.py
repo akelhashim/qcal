@@ -15,6 +15,7 @@ from qcal.gate.single_qubit import (
 from qcal.sequencer.dynamical_decoupling import dd_sequences
 from qcal.sequencer.pulse_envelopes import pulse_envelopes
 from qcal.sequencer.utils import clip_amplitude
+from qcal.units import ns
 
 import logging
 
@@ -569,6 +570,46 @@ def cycle_pulse(config: Config, cycle: Cycle) -> List:
             ])
 
         elif isinstance(gate, Meas):
+            # if config[f'readout/{qubit}/detuning']:
+            #     pulse.extend([
+            #         {'name':   'pulse',
+            #          'tag':    'CW ramp up',
+            #          'dest':   f'Q{qubit}.qdrv',
+            #          'freq':   (config[f'single_qubit/{qubit}/GE/freq'] + 
+            #                     config[f'readout/{qubit}/detuning']),
+            #          'amp':    0.2, 
+            #          'phase':  0.0,
+            #          'twidth': 10 * ns,
+            #          'env':    pulse_envelopes['linear'](
+            #                     10 * ns,
+            #                     config['hardware/DAC_sample_rate'],
+            #                )
+            #         },
+            #         {'name':   'pulse',
+            #          'tag':    'Stark Shift (CW)',
+            #          'dest':   f'Q{qubit}.qdrv',
+            #          'freq':   (config[f'single_qubit/{qubit}/GE/freq'] + 
+            #                     config[f'readout/{qubit}/detuning']),
+            #          'amp':    0.2, 
+            #          'phase':  0.0,
+            #          'twidth': config[f'readout/{qubit}/length'] - 20 * ns,
+            #          'env':    'cw'
+            #         },
+            #         {'name':   'pulse',
+            #          'tag':    'CW ramp down',
+            #          'dest':   f'Q{qubit}.qdrv',
+            #          'freq':   (config[f'single_qubit/{qubit}/GE/freq'] + 
+            #                     config[f'readout/{qubit}/detuning']),
+            #          'amp':    -0.2, 
+            #          'phase':  0.0,
+            #          'twidth': 10 * ns,
+            #          'env':    pulse_envelopes['linear'](
+            #                     10 * ns,
+            #                     config['hardware/DAC_sample_rate'],
+            #                )
+            #         },
+
+            #     ])
             pulse.extend([
                 {'name':   'pulse',
                  'tag':    'Readout',

@@ -21,19 +21,11 @@ class Characterize:
     This class will handle basic characterization methods.
     """
 
-    def __init__(self, 
-            config:    Config, 
-            esp:       bool = False,
-            heralding: bool = True
-        ) -> None:
+    def __init__(self, config: Config) -> None:
         """Initialize the main Calibration class.
         
         Args:
             config (Config): qcal Config object.
-            esp (bool, optional): whether to enable excited state
-                promotion for the calibration. Defaults to False.
-            heralding (bool, optional): whether to enable heralding
-                for the calibraion. Defaults to True.
         """
         self._config = config
         self._gate = None
@@ -45,18 +37,6 @@ class Characterize:
         self._fit = {}
         self._char_values = {}
         self._errors = {}
-
-        if esp and not self._config['readout/esp/enable']:
-            self.set_param('readout/esp/enable', True)
-            self._disable_esp = True
-        else:
-            self._disable_esp = False
-
-        if heralding and not self._config['readout/herald']:
-            self.set_param('readout/herald', True)
-            self._disable_heralding = True
-        else:
-            self._disable_heralding = False
 
     @property
     def characterized_values(self) -> Dict:
@@ -148,12 +128,6 @@ class Characterize:
         for q in self._qubits:
             if self._fit[q].fit_success:
                 self.set_param(self._params[q], self._char_values[q])
-
-        if self._disable_esp:
-            self.set_param('readout/esp/enable', False)
-
-        if self._disable_heralding:
-            self.set_param('readout/herald', False)
 
         self._config.save()
         self._config.load()

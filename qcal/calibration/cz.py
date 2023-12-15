@@ -168,8 +168,6 @@ def AmpFreqSweep(
         n_circs_per_seq: int = 1,
         n_levels:        int = 2,
         n_gates:         int = 1,
-        esp:             bool = False,
-        heralding:       bool = True,
         raster_circuits: bool = False,
         **kwargs
     ) -> Callable:
@@ -223,10 +221,6 @@ def AmpFreqSweep(
             measurement supports qutrit classification.
         n_gates (int, optional): number of gates for pulse repetition.
             Defaults to 1.
-        esp (bool, optional): whether to enable excited state promotion for 
-            the calibration. Defaults to False.
-        heralding (bool, optional): whether to enable heralding for the 
-            calibraion. Defaults to True.
         raster_circuits (bool, optional): whether to raster through all
             circuits in a batch during measurement. Defaults to False. By
             default, all circuits in a batch will be measured n_shots times
@@ -257,8 +251,6 @@ def AmpFreqSweep(
                 n_circs_per_seq: int = 1,
                 n_levels:        int = 2,
                 n_gates:         int = 1,
-                esp:             bool = False,
-                heralding:       bool = True,
                 raster_circuits: bool = False,
                 **kwargs
             ) -> None:
@@ -275,11 +267,7 @@ def AmpFreqSweep(
                 raster_circuits=raster_circuits,
                 **kwargs
             )
-            Calibration.__init__(self, 
-                config, 
-                esp=esp,
-                heralding=heralding
-            )
+            Calibration.__init__(self, config)
 
             self._qubits = qubit_pairs
             self._n_gates = n_gates
@@ -552,8 +540,6 @@ def AmpFreqSweep(
         n_circs_per_seq,
         n_levels,
         n_gates,
-        esp,
-        heralding,
         raster_circuits,
         **kwargs
     )
@@ -573,8 +559,6 @@ def Amplitude(
         n_levels:        int = 2,
         n_gates:         int = 1,
         relative_amp:    bool = False,
-        esp:             bool = False,
-        heralding:       bool = True,
         raster_circuits: bool = False,
         **kwargs
     ) -> Callable:
@@ -626,10 +610,6 @@ def Amplitude(
             is defined relative to the existing pulse amplitude. Defaults to
             False. If True, the amplitudes are swept over the current amplitude
             times the amplitudes argument.
-        esp (bool, optional): whether to enable excited state promotion for 
-            the calibration. Defaults to False.
-        heralding (bool, optional): whether to enable heralding for the 
-            calibraion. Defaults to True.
         raster_circuits (bool, optional): whether to raster through all
             circuits in a batch during measurement. Defaults to False. By
             default, all circuits in a batch will be measured n_shots times
@@ -661,8 +641,6 @@ def Amplitude(
                 n_levels:        int = 2,
                 n_gates:         int = 1,
                 relative_amp:    bool = False,
-                esp:             bool = False,
-                heralding:       bool = True,
                 raster_circuits: bool = False,
                 **kwargs
             ) -> None:
@@ -679,11 +657,7 @@ def Amplitude(
                 raster_circuits=raster_circuits,
                 **kwargs
             )
-            Calibration.__init__(self, 
-                config, 
-                esp=esp,
-                heralding=heralding
-            )
+            Calibration.__init__(self, config)
 
             self._qubits = qubit_pairs
             self._n_gates = n_gates
@@ -949,8 +923,6 @@ def Amplitude(
         n_levels,
         n_gates,
         relative_amp,
-        esp,
-        heralding,
         raster_circuits,
         **kwargs
     )
@@ -970,8 +942,6 @@ def Frequency(
         n_levels:        int = 2,
         n_gates:         int = 1,
         relative_freq:   bool = False,
-        esp:             bool = False,
-        heralding:       bool = True,
         raster_circuits: bool = False,
         **kwargs
     ) -> Callable:
@@ -1021,10 +991,6 @@ def Frequency(
             is defined relative to the existing pulse frequencies. Defaults to
             False. If True, the frequencies are swept over the current 
             frequency plus/minus the frequencies argument.
-        esp (bool, optional): whether to enable excited state promotion for 
-            the calibration. Defaults to False.
-        heralding (bool, optional): whether to enable heralding for the 
-            calibraion. Defaults to True.
         raster_circuits (bool, optional): whether to raster through all
             circuits in a batch during measurement. Defaults to False. By
             default, all circuits in a batch will be measured n_shots times
@@ -1056,8 +1022,6 @@ def Frequency(
                 n_levels:        int = 2,
                 n_gates:         int = 1,
                 relative_freq:   bool = False,
-                esp:             bool = False,
-                heralding:       bool = True,
                 raster_circuits: bool = False,
                 **kwargs
             ) -> None:
@@ -1074,11 +1038,7 @@ def Frequency(
                 raster_circuits=raster_circuits,
                 **kwargs
             )
-            Calibration.__init__(self, 
-                config, 
-                esp=esp,
-                heralding=heralding
-            )
+            Calibration.__init__(self, config)
 
             self._qubits = qubit_pairs
             self._n_gates = n_gates
@@ -1321,8 +1281,6 @@ def Frequency(
         n_levels,
         n_gates,
         relative_freq,
-        esp,
-        heralding,
         raster_circuits,
         **kwargs
     )
@@ -1340,8 +1298,6 @@ def RelativeAmp(
         n_batches:       int = 1, 
         n_circs_per_seq: int = 1,
         n_levels:        int = 2,
-        esp:             bool = False,
-        heralding:       bool = True,
         raster_circuits: bool = False,
         **kwargs
     ) -> Callable:
@@ -1388,10 +1344,6 @@ def RelativeAmp(
         n_levels (int, optional): number of energy levels to be measured. 
             Defaults to 2. If n_levels = 3, this assumes that the
             measurement supports qutrit classification.
-        esp (bool, optional): whether to enable excited state promotion for 
-            the calibration. Defaults to False.
-        heralding (bool, optional): whether to enable heralding for the 
-            calibraion. Defaults to True.
         raster_circuits (bool, optional): whether to raster through all
             circuits in a batch during measurement. Defaults to False. By
             default, all circuits in a batch will be measured n_shots times
@@ -1421,8 +1373,6 @@ def RelativeAmp(
                 n_batches:       int = 1, 
                 n_circs_per_seq: int = 1,
                 n_levels:        int = 2, 
-                esp:             bool = False,
-                heralding:       bool = True,
                 raster_circuits: bool = False,
                 **kwargs
             ) -> None:
@@ -1439,11 +1389,7 @@ def RelativeAmp(
                 raster_circuits=raster_circuits,
                 **kwargs
             )
-            Calibration.__init__(self, 
-                config, 
-                esp=esp,
-                heralding=heralding
-            )
+            Calibration.__init__(self)
 
             self._qubits = qubit_pairs
 
@@ -1630,9 +1576,7 @@ def RelativeAmp(
         n_shots, 
         n_batches, 
         n_circs_per_seq,
-        n_levels, 
-        esp,
-        heralding,
+        n_levels,
         raster_circuits,
         **kwargs
     )
@@ -1650,8 +1594,6 @@ def RelativePhase(
         n_batches:       int = 1, 
         n_circs_per_seq: int = 1,
         n_levels:        int = 2,
-        esp:             bool = False,
-        heralding:       bool = True,
         raster_circuits: bool = False,
         **kwargs
     ) -> Callable:
@@ -1696,10 +1638,6 @@ def RelativePhase(
         n_levels (int, optional): number of energy levels to be measured. 
             Defaults to 2. If n_levels = 3, this assumes that the
             measurement supports qutrit classification.
-        esp (bool, optional): whether to enable excited state promotion for 
-            the calibration. Defaults to False.
-        heralding (bool, optional): whether to enable heralding for the 
-            calibraion. Defaults to True.
         raster_circuits (bool, optional): whether to raster through all
             circuits in a batch during measurement. Defaults to False. By
             default, all circuits in a batch will be measured n_shots times
@@ -1729,8 +1667,6 @@ def RelativePhase(
                 n_batches:       int = 1, 
                 n_circs_per_seq: int = 1,
                 n_levels:        int = 2, 
-                esp:             bool = False,
-                heralding:       bool = True,
                 raster_circuits: bool = False,
                 **kwargs
             ) -> None:
@@ -1747,14 +1683,9 @@ def RelativePhase(
                 raster_circuits=raster_circuits,
                 **kwargs
             )
-            Calibration.__init__(self, 
-                config, 
-                esp=esp,
-                heralding=heralding
-            )
+            Calibration.__init__(self, config)
 
             self._qubits = qubit_pairs
-            # self._qubits = list(set(chain.from_iterable(qubit_pairs)))
 
             if not isinstance(phases, dict):
                 self._phases = {pair: phases for pair in qubit_pairs}
@@ -1925,8 +1856,6 @@ def RelativePhase(
         n_batches, 
         n_circs_per_seq,
         n_levels, 
-        esp,
-        heralding,
         raster_circuits,
         **kwargs
     )
@@ -1944,8 +1873,6 @@ def LocalPhases(
         n_batches:       int = 1, 
         n_circs_per_seq: int = 1,
         n_levels:        int = 2,
-        esp:             bool = False,
-        heralding:       bool = True,
         raster_circuits: bool = False,
         **kwargs
     ) -> Callable:
@@ -1988,10 +1915,6 @@ def LocalPhases(
         n_levels (int, optional): number of energy levels to be measured. 
             Defaults to 2. If n_levels = 3, this assumes that the
             measurement supports qutrit classification.
-        esp (bool, optional): whether to enable excited state promotion for 
-            the calibration. Defaults to False.
-        heralding (bool, optional): whether to enable heralding for the 
-            calibraion. Defaults to True.
         raster_circuits (bool, optional): whether to raster through all
             circuits in a batch during measurement. Defaults to False. By
             default, all circuits in a batch will be measured n_shots times
@@ -2021,8 +1944,6 @@ def LocalPhases(
                 n_batches:       int = 1, 
                 n_circs_per_seq: int = 1,
                 n_levels:        int = 2, 
-                esp:             bool = False,
-                heralding:       bool = True,
                 raster_circuits: bool = False,
                 **kwargs
             ) -> None:
@@ -2039,11 +1960,7 @@ def LocalPhases(
                 raster_circuits=raster_circuits,
                 **kwargs
             )
-            Calibration.__init__(self, 
-                config, 
-                esp=esp,
-                heralding=heralding
-            )
+            Calibration.__init__(self, config)
 
             self._qubits = qubit_pairs
 
@@ -2466,8 +2383,6 @@ def LocalPhases(
         n_batches, 
         n_circs_per_seq,
         n_levels, 
-        esp,
-        heralding,
         raster_circuits,
         **kwargs
     )

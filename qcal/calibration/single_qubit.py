@@ -47,8 +47,6 @@ def Amplitude(
         n_circs_per_seq: int = 1, 
         n_gates:         int = 1,
         relative_amp:    bool = False,
-        esp:             bool = False,
-        heralding:       bool = True,
         raster_circuits: bool = False,
         **kwargs
     ) -> Callable:
@@ -96,10 +94,12 @@ def Amplitude(
             is defined relative to the existing pulse amplitude. Defaults to
             False. If True, the amplitudes are swept over the current amplitude
             times the amplitudes argument.
-        esp (bool, optional): whether to enable excited state promotion for 
-            the calibration. Defaults to False.
-        heralding (bool, optional): whether to enable heralding for the 
-            calibraion. Defaults to True.
+        raster_circuits (bool, optional): whether to raster through all
+            circuits in a batch during measurement. Defaults to False. By
+            default, all circuits in a batch will be measured n_shots times
+            one by one. If True, all circuits in a batch will be measured
+            back-to-back one shot at a time. This can help average out the 
+            effects of drift on the timescale of a measurement.
 
     Returns:
         Callable: Amplitude calibration class.
@@ -126,8 +126,6 @@ def Amplitude(
                 n_circs_per_seq: int = 1, 
                 n_gates:         int = 1,
                 relative_amp:    bool = False,
-                esp:             bool = False,
-                heralding:       bool = True,
                 raster_circuits: bool = False,
                 **kwargs
             ) -> None:
@@ -146,11 +144,7 @@ def Amplitude(
                 raster_circuits=raster_circuits,
                 **kwargs
             )
-            Calibration.__init__(self, 
-                config, 
-                esp=esp,
-                heralding=heralding
-            )
+            Calibration.__init__(self, config)
 
             self._qubits = qubits
             
@@ -352,8 +346,6 @@ def Amplitude(
         n_circs_per_seq, 
         n_gates,
         relative_amp,
-        esp,
-        heralding,
         raster_circuits,
         **kwargs
     )
@@ -373,8 +365,6 @@ def Frequency(
         n_shots:         int = 1024, 
         n_batches:       int = 1, 
         n_circs_per_seq: int = 1, 
-        esp:             bool = False,
-        heralding:       bool = True,
         raster_circuits: bool = False,
         **kwargs
     ) -> Callable:
@@ -414,10 +404,12 @@ def Frequency(
             Defaults to 1.
         n_circs_per_seq (int, optional): maximum number of circuits that
             can be measured per sequence. Defaults to 1.
-        esp (bool, optional): whether to enable excited state promotion for 
-            the calibration. Defaults to False.
-        heralding (bool, optional): whether to enable heralding for the 
-            calibraion. Defaults to True.
+        raster_circuits (bool, optional): whether to raster through all
+            circuits in a batch during measurement. Defaults to False. By
+            default, all circuits in a batch will be measured n_shots times
+            one by one. If True, all circuits in a batch will be measured
+            back-to-back one shot at a time. This can help average out the 
+            effects of drift on the timescale of a measurement.
 
     Returns:
         Callable: Frequency calibration class.
@@ -441,10 +433,8 @@ def Frequency(
                 classifier:      ClassificationManager = None,
                 n_elements:      int = 30,
                 n_shots:         int = 1024, 
-                n_batches:       int = 1, 
-                n_circs_per_seq: int = 1, 
-                esp:             bool = False,
-                heralding:       bool = True,
+                n_batches:       int = 1,
+                n_circs_per_seq: int = 1,
                 raster_circuits: bool = False,
                 **kwargs
             ) -> None:
@@ -463,11 +453,7 @@ def Frequency(
                 raster_circuits=raster_circuits,
                 **kwargs
             )
-            Calibration.__init__(self, 
-                config, 
-                esp=esp,
-                heralding=heralding
-            )
+            Calibration.__init__(self, config)
 
             self._qubits = qubits
             self._detunings = detunings
@@ -768,8 +754,6 @@ def Frequency(
         n_shots, 
         n_batches, 
         n_circs_per_seq, 
-        esp,
-        heralding,
         raster_circuits,
         **kwargs
     )
@@ -785,10 +769,8 @@ def Phase(
         transpiler:      Any | None = None,
         classifier:      ClassificationManager = None,
         n_shots:         int = 1024, 
-        n_batches:       int = 1, 
-        n_circs_per_seq: int = 1, 
-        esp:             bool = False,
-        heralding:       bool = True,
+        n_batches:       int = 1,
+        n_circs_per_seq: int = 1,
         raster_circuits: bool = False,
         **kwargs
     ) -> Callable:
@@ -831,10 +813,12 @@ def Phase(
             Defaults to 1.
         n_circs_per_seq (int, optional): maximum number of circuits that
             can be measured per sequence. Defaults to 1.
-        esp (bool, optional): whether to enable excited state promotion for 
-            the calibration. Defaults to False.
-        heralding (bool, optional): whether to enable heralding for the 
-            calibraion. Defaults to True.
+        raster_circuits (bool, optional): whether to raster through all
+            circuits in a batch during measurement. Defaults to False. By
+            default, all circuits in a batch will be measured n_shots times
+            one by one. If True, all circuits in a batch will be measured
+            back-to-back one shot at a time. This can help average out the 
+            effects of drift on the timescale of a measurement.
 
     Returns:
         Callable: Phases calibration class.
@@ -857,9 +841,7 @@ def Phase(
                 classifier:      ClassificationManager = None,
                 n_shots:         int = 1024, 
                 n_batches:       int = 1, 
-                n_circs_per_seq: int = 1, 
-                esp:             bool = False,
-                heralding:       bool = True,
+                n_circs_per_seq: int = 1,
                 raster_circuits: bool = False,
                 **kwargs
             ) -> None:
@@ -877,11 +859,7 @@ def Phase(
                 raster_circuits=raster_circuits,
                 **kwargs
             )
-            Calibration.__init__(self, 
-                config, 
-                esp=esp,
-                heralding=heralding
-            )
+            Calibration.__init__(self, config)
 
             self._qubits = qubits
 
@@ -1177,9 +1155,7 @@ def Phase(
         classifier,
         n_shots, 
         n_batches, 
-        n_circs_per_seq, 
-        esp,
-        heralding,
+        n_circs_per_seq,
         raster_circuits,
         **kwargs
     )

@@ -50,8 +50,6 @@ def ReadoutCalibration(
         n_batches:       int = 1, 
         n_circs_per_seq: int = 1, 
         n_levels:        int = 2,
-        esp:             bool = False,
-        heralding:       bool = False,
         raster_circuits: bool = False,
         **kwargs
     ) -> Callable:
@@ -90,10 +88,6 @@ def ReadoutCalibration(
             can be measured per sequence. Defaults to 1.
         n_levels (int, optional): number of energy levels to classify. 
             Defaults to 2.
-        esp (bool, optional): whether to enable excited state promotion for 
-            the calibration. Defaults to False.
-        heralding (bool, optional): whether to enable heralding for the 
-            calibraion. Defaults to False.
         raster_circuits (bool, optional): whether to raster through all
             circuits in a batch during measurement. Defaults to False. By
             default, all circuits in a batch will be measured n_shots times
@@ -124,8 +118,6 @@ def ReadoutCalibration(
                 n_batches:       int = 1, 
                 n_circs_per_seq: int = 1, 
                 n_levels:        int = 2,
-                esp:             bool = False,
-                heralding:       bool = False,
                 raster_circuits: bool = False,
                 **kwargs
             ) -> None:
@@ -141,10 +133,6 @@ def ReadoutCalibration(
             cm_kwargs = {
                 k: kwargs.pop(k) for k in dict(kwargs) if k in cm_args
             }
-
-            assert heralding is False, (
-                'Heralding must be disabled for readout calibration!'
-            )
             
             qpu.__init__(self,
                 config=config, 
@@ -158,11 +146,7 @@ def ReadoutCalibration(
                 raster_circuits=raster_circuits,
                 **qpu_kwargs
             )
-            Calibration.__init__(self, 
-                config, 
-                esp=False,
-                heralding=heralding
-            )
+            Calibration.__init__(self, config)
 
             if self._config['readout/esp/enable']:
                 self.set_param('readout/esp/enable', False)
@@ -282,18 +266,19 @@ def ReadoutCalibration(
 
         def save(self) -> None:
             """Save all circuits and data."""
-            qpu.save(self)
-            self.data_manager.save_to_pickle(
-                self._classifier, 
-                'ClassificationManager'
+            clear_output(wait=True)
+            self._data_manager._exp_id += (
+                f'_RCal_Q{"".join(str(q) for q in self._qubits)}'
             )
-            save_to_pickle(
-                self._classifier, 
-                os.path.join(
-                    os.path.dirname(self._config.filename), 
-                    'ClassificationManager'
+            if settings.Settings.save_data:
+                qpu.save(self)
+                save_to_pickle(
+                    self._classifier, 
+                    os.path.join(
+                        os.path.dirname(self._config.filename), 
+                        'ClassificationManager'
+                    )
                 )
-            )
 
         def plot(self, raw=False) -> None:
             """Plot the readout calibration results.
@@ -375,6 +360,9 @@ def ReadoutCalibration(
                             
                         ax.set_xlim([x_min, x_max])
                         ax.set_ylim([y_min, y_max])
+                        ax.ticklabel_format(
+                            axis='both', style='sci', scilimits=(0,0)
+                        )
                         ax.text(
                             0.05, 0.9, f'Q{q}', size=15, 
                             transform=ax.transAxes
@@ -424,19 +412,14 @@ def ReadoutCalibration(
                 self.set_param('readout/esp/enable', True)
             
             Calibration.final(self)
+            print(f"\nRuntime: {repr(self._runtime)[8:]}\n")
 
         def run(self):
             """Run all experimental methods and analyze results."""
             self.generate_circuits()
             qpu.run(self, self._circuits, save=False)
             self.analyze()
-            clear_output(wait=True)
-            self._data_manager._exp_id += (
-                f'_RCal_Q{"".join(str(q) for q in self._qubits)}'
-            )
-            if settings.Settings.save_data:
-                self.save()
-            print(f"\nRuntime: {repr(self._runtime)[8:]}\n")
+            self.save()
             self.plot()
             self.final()
 
@@ -453,8 +436,6 @@ def ReadoutCalibration(
         n_batches, 
         n_circs_per_seq, 
         n_levels,
-        esp,
-        heralding,
         raster_circuits,
         **kwargs
     )
@@ -474,8 +455,6 @@ def Fidelity(
         n_batches:       int = 1, 
         n_circs_per_seq: int = 1, 
         n_levels:        int = 2,
-        esp:             bool = False,
-        heralding:       bool = True,
         raster_circuits: bool = False,
         **kwargs
     ) -> Callable:
@@ -523,10 +502,6 @@ def Fidelity(
             can be measured per sequence. Defaults to 1.
         n_levels (int, optional): number of energy levels to classify. 
             Defaults to 2.
-        esp (bool, optional): whether to enable excited state promotion for 
-            the calibration. Defaults to False.
-        heralding (bool, optional): whether to enable heralding for the 
-            calibraion. Defaults to True.
         raster_circuits (bool, optional): whether to raster through all
             circuits in a batch during measurement. Defaults to False. By
             default, all circuits in a batch will be measured n_shots times
@@ -557,8 +532,6 @@ def Fidelity(
                 n_batches:       int = 1, 
                 n_circs_per_seq: int = 1, 
                 n_levels:        int = 2,
-                esp:             bool = False,
-                heralding:       bool = True,
                 raster_circuits: bool = False,
                 **kwargs
             ) -> None:
@@ -580,11 +553,7 @@ def Fidelity(
                 **kwargs
             )
 
-            Calibration.__init__(self, 
-                config, 
-                esp=esp,
-                heralding=heralding
-            )
+            Calibration.__init__(self, config)
 
             assert len(qubits) == len(params), (
                 "The number of qubits must be equal to the number of params!"
@@ -696,12 +665,6 @@ def Fidelity(
                         self._params[self._qubits.index(q)]
                     ] = self._cal_values[q]
 
-            if self._disable_esp:
-                self.set_param('readout/esp/enable', False)
-
-            if self._disable_heralding:
-                self.set_param('readout/herald', False)
-
             self._config.save()
             self._config.load()
 
@@ -741,8 +704,6 @@ def Fidelity(
         n_batches, 
         n_circs_per_seq, 
         n_levels,
-        esp,
-        heralding,
         raster_circuits,
         **kwargs
     )
@@ -764,8 +725,6 @@ def Separation(
         n_batches:       int = 1, 
         n_circs_per_seq: int = 1, 
         n_levels:        int = 2,
-        esp:             bool = False,
-        heralding:       bool = False,
         raster_circuits: bool = False,
         **kwargs
     ) -> Callable:
@@ -816,10 +775,6 @@ def Separation(
             can be measured per sequence. Defaults to 1.
         n_levels (int, optional): number of energy levels to classify. 
             Defaults to 2.
-        esp (bool, optional): whether to enable excited state promotion for 
-            the calibration. Defaults to False.
-        heralding (bool, optional): whether to enable heralding for the 
-            calibraion. Defaults to False.
         raster_circuits (bool, optional): whether to raster through all
             circuits in a batch during measurement. Defaults to False. By
             default, all circuits in a batch will be measured n_shots times
@@ -852,8 +807,6 @@ def Separation(
                 n_batches:       int = 1, 
                 n_circs_per_seq: int = 1, 
                 n_levels:        int = 2,
-                esp:             bool = False,
-                heralding:       bool = False,
                 raster_circuits: bool = False,
                 **kwargs
             ) -> None:
@@ -873,17 +826,11 @@ def Separation(
                 n_batches=n_batches, 
                 n_circs_per_seq=n_circs_per_seq, 
                 n_levels=n_levels,
-                esp=esp,
-                heralding=heralding,
                 raster_circuits=raster_circuits,
                 **kwargs
             )
 
-            Calibration.__init__(self, 
-                config, 
-                esp=esp,
-                heralding=heralding
-            )
+            Calibration.__init__(self, config)
 
             assert len(qubits) == len(params), (
                 "The number of qubits must be equal to the number of params!"
@@ -997,12 +944,6 @@ def Separation(
                         self._params[self._qubits.index(q)]
                     ] = self._cal_values[q]
 
-            if self._disable_esp:
-                self.set_param('readout/esp/enable', False)
-
-            if self._disable_heralding:
-                self.set_param('readout/herald', False)
-
             self._config.save()
             self._config.load()
 
@@ -1040,8 +981,6 @@ def Separation(
         n_batches, 
         n_circs_per_seq, 
         n_levels,
-        esp,
-        heralding,
         raster_circuits,
         **kwargs
     )

@@ -47,7 +47,7 @@ def transpile_cycle(cycle, gate_mapper: defaultdict) -> deque:
 def to_qcal(
         circuit, 
         gate_mapper:         defaultdict,
-        cycle_replacement:   Dict | defaultdict | None = None, 
+        cycle_replacement:   Cycle | Circuit | Dict | None = None, 
         barrier_between_all: bool = False
     ) -> Circuit:
     """Transpile a True-Q circuit to a qcal circuit.
@@ -55,7 +55,7 @@ def to_qcal(
     Args:
         circuit (trueq.Circuit): True-Q circuit.
         gate_mapper (defaultdict): map between True-Q to qcal gates.
-        cycle_replacement (Dict | defaultdcit | None, optional): dictionary
+        cycle_replacement (Cycle | Circuit | Dict | None, optional): dictionary
             which specifies how a marked cycle should be transpiled. 
             Defaults to None. For example, ```cycle_replacement = {'marker': 
             1, 'cycle': qc.Cycle({qc.MCM(0)})}```.
@@ -77,20 +77,13 @@ def to_qcal(
             cycle_replacement is not None and
             i < len(circuit) -1):
             # If a marker is specified, only replace the specified cycle
-            if isinstance(cycle_replacement, (dict, defaultdict)):
+            if isinstance(cycle_replacement, dict):
                 if cycle.marker in cycle_replacement.keys():
                     tcycle = cycle_replacement[cycle.marker]
                     if isinstance(tcycle, Cycle):
                         tcircuit.append(tcycle)
                     elif isinstance(tcycle, Circuit):
                         tcircuit.extend(tcycle)
-            # if cycle_replacement['marker']:
-            #     if cycle.marker == cycle_replacement['marker']:
-            #         tcycle = cycle_replacement['cycle']
-            #         if isinstance(tcycle, Cycle):
-            #             tcircuit.append(tcycle)
-            #         elif isinstance(tcycle, Circuit):
-            #             tcircuit.extend(tcycle)
                 else:
                     tcircuit.append(
                         transpile_cycle(cycle, gate_mapper)
@@ -98,7 +91,7 @@ def to_qcal(
 
             # If no marker is specified, replace every marked cycle
             else:
-                tcycle = cycle_replacement#['cycle']
+                tcycle = cycle_replacement
                 if isinstance(tcycle, Cycle):
                     tcircuit.append(tcycle)
                 elif isinstance(tcycle, Circuit):
@@ -128,7 +121,7 @@ class Transpiler(Transpiler):
     def __init__(
             self, 
             gate_mapper:         Dict | None = None,
-            cycle_replacement:   Dict | defaultdict | None = None, 
+            cycle_replacement:   Cycle | Circuit | Dict | None = None, 
             barrier_between_all: bool = False
         ) -> None:
         """Initialize with a gate_mapper.
@@ -136,10 +129,10 @@ class Transpiler(Transpiler):
         Args:
             gate_mapper (Dict | None, optional): dictionary which maps
                 TrueQ gates to Qubic gates. Defaults to None.
-            cycle_replacement (Dict | defaultdcit | None, optional): dictionary
-                which specifies how a marked cycle should be transpiled. 
-                Defaults to None. For example, ```cycle_replacement = {
-                'marker': 1, 'cycle': qc.Cycle({qc.MCM(0)})}```.
+            cycle_replacement (Cycle | Circuit | Dict | None, optional): 
+                dictionary which specifies how a marked cycle should be 
+                transpiled. Defaults to None. For example, ```cycle_replacement 
+                = {1: qc.Cycle({qc.MCM(0)})}```.
             barrier_between_all (bool, optional): whether to place a barrier
                 between all cycles. Defaults to False. This is useful for
                 benchmarking circuits to ensure that the circuit structure is

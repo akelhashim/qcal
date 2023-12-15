@@ -21,11 +21,7 @@ class Calibration:
     This class will handle basic calibration methods.
     """
 
-    def __init__(self, 
-            config:    Config, 
-            esp:       bool = False,
-            heralding: bool = True
-        ) -> None:
+    def __init__(self, config: Config) -> None:
         """Initialize the main Calibration class.
         
         Args:
@@ -46,23 +42,11 @@ class Calibration:
         self._cal_values = {}
         self._errors = {}
 
-        if esp or self._config['readout/esp/enable']:
+        if self._config['readout/esp/enable']:
             logger.warning(
                 ' Excited State Promotion is enabled!'
                 ' This can cause errors in calibration!'
             )
-
-        if esp and not self._config['readout/esp/enable']:
-            self.set_param('readout/esp/enable', True)
-            self._disable_esp = True
-        else:
-            self._disable_esp = False
-
-        if heralding and not self._config['readout/herald']:
-            self.set_param('readout/herald', True)
-            self._disable_heralding = True
-        else:
-            self._disable_heralding = False
 
     @property
     def calibrated_values(self) -> Dict:
@@ -181,12 +165,6 @@ class Calibration:
                             self.set_param(
                                 self._params[q], self._cal_values[q]
                             )
-
-        if self._disable_esp:
-            self.set_param('readout/esp/enable', False)
-
-        if self._disable_heralding:
-            self.set_param('readout/herald', False)
 
         self._config.save()
         self._config.load()

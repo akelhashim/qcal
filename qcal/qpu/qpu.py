@@ -396,6 +396,12 @@ class QPU:
         self._data_manager.save_to_csv(self._runtime, 'runtime')
         self._config.save(self._data_manager._save_path + 'config.yaml')
 
+        if self._classifier:
+            self._data_manager.save_to_pickle(
+                    self._classifier, 
+                    'ClassificationManager'
+                )
+
         logger.info(f" Data save location: {self._data_manager._save_path}\n")
 
     def run(self,
