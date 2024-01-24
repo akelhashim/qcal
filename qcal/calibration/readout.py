@@ -411,7 +411,6 @@ def ReadoutCalibration(
             if self._enable_esp:
                 self.set_param('readout/esp/enable', True)
             
-            Calibration.final(self)
             print(f"\nRuntime: {repr(self._runtime)[8:]}\n")
 
         def run(self):

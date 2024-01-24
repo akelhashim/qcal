@@ -120,7 +120,7 @@ class GMM(GaussianMixture):
     def calculate_snr(self) -> None:
         """Calculate the signal-to-noise between each pair of clusters."""
         for clusters in np.array(np.triu_indices(self.n_components, 1)).T:
-            dist = np.sqrt(np.sum(np.diff(self.means_[clusters], axis=1) ** 2))
+            dist = np.sqrt(np.sum(np.diff(self.means_[clusters], axis=0) ** 2))
             err = np.sum(np.sqrt(self.covariances_[clusters]) * 2)
             self._snr["{0}{1}".format(*clusters)] = dist / err
         
