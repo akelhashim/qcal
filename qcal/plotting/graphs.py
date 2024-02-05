@@ -42,7 +42,10 @@ def format_gate_text(gate: Gate):
     if bool(gate.properties['params']):
         for key, value in gate.properties['params'].items():
             if isinstance(value, float):
-                value = round(value, 5)
+                if value != 0 and value < 1e-2:
+                    value = '{:.2E}'.format(value)
+                else: 
+                    value = '{:.2f}'.format(value)
             text += f'{key}: {value}<br>'
 
     return text

@@ -270,7 +270,7 @@ class Layer(Cycle):
 
     __slots__ = ('_gates', '_qubits')
 
-    def __init__(self, gates: Set[Gate] = set()) -> None:
+    def __init__(self, gates: Set[Gate] = None) -> None:
         super().__init__(gates)
 
     def __copy__(self) -> Layer:
