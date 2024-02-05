@@ -46,10 +46,10 @@ def readout_time(config: Config, qubit: int) -> float:
 
 
 def add_reset(
-       config: Config, 
+       config:          Config, 
        qubits_or_reset: List | Tuple | Reset, 
-       circuit: List, 
-       pulses: defaultdict
+       circuit:         List, 
+       pulses:          defaultdict
     ) -> None:
     """Add active or passive reset to the beginning of a circuit.
 
@@ -67,18 +67,19 @@ def add_reset(
 
     if config['reset/active/enable'] or isinstance(qubits_or_reset, Reset):
         reset_circuit = []
-        for _ in range(config['reset/active/n_resets']):
+        for n in range(config['reset/active/n_resets']):
             for q in qubits:
                 if isinstance(qubits_or_reset, (list, tuple)):
                     add_measurement(config, q, reset_circuit, None, reset=True)
                 elif isinstance(qubits_or_reset, Reset):
-                    add_measurement(
-                        config, 
-                        qubits_or_reset.properties['params']['meas'], 
-                        reset_circuit, 
-                        None,
-                        reset=True
-                    )
+                    if n==0 and qubits_or_reset['params']['measure_first']:
+                        add_measurement(
+                            config, 
+                            qubits_or_reset.properties['params']['meas'], 
+                            reset_circuit, 
+                            None,
+                            reset=True
+                        )
 
                 # Reset pulse w/ qutrit reset
                 reset_q_pulse = []
