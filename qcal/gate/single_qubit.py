@@ -181,11 +181,11 @@ def u3(theta: float, phi: float, gamma: float) -> NDArray:
 class C(Gate):
     """Class for the axis cycling (C) gate."""
 
-    def __init__(self, qubit: int = 0) -> None:
+    def __init__(self, qubit: int) -> None:
         """Initialize using the rn function.
         
         Args:
-            qubit (int): qubit label. Defaults to 0.
+            qubit (int): qubit label.
         """
         super().__init__(rn(2*np.pi/3, (1, 1, 1)/np.sqrt(3)), qubit)
         self._properties['name'] = 'C'
@@ -198,11 +198,11 @@ class C(Gate):
 class H(Gate):
     """Class for the Hadamard (H) gate."""
 
-    def __init__(self, qubit: int = 0) -> None:
+    def __init__(self, qubit: int) -> None:
         """Initialize using the h gate.
         
         Args:
-            qubit (int): qubit label. Defaults to 0.
+            qubit (int): qubit label.
         """
         super().__init__(h, qubit)
         self._properties['alias'] = 'QFT'
@@ -212,11 +212,11 @@ class H(Gate):
 class Id(Gate):
     """Class for the identity gate."""
 
-    def __init__(self, qubit: int = 0) -> None:
+    def __init__(self, qubit: int) -> None:
         """Initialize using the id gate.
         
         Args:
-            qubit (int): qubit label. Defaults to 0.
+            qubit (int): qubit label.
         """
         super().__init__(id, qubit)
         self._properties['name'] = 'I'
@@ -229,11 +229,11 @@ class Id(Gate):
 class Idle(Gate):
     """Class for the idle gate."""
 
-    def __init__(self, qubit: int = 0, duration: float = 0*ns) -> None:
+    def __init__(self, qubit: int, duration: float = 0*ns) -> None:
         """Initialize using the id gate.
         
         Args:
-            qubit (int): qubit label. Defaults to 0.
+            qubit (int): qubit label.
             duration (float): idle duration. Defaults to 0 ns.
         """
         super().__init__(id, qubit)
@@ -248,11 +248,11 @@ class Idle(Gate):
 class Meas(Gate):
     """Class for a single-qubit measurement operation."""
 
-    def __init__(self, qubit: int = 0, basis: str = 'Z') -> None:
+    def __init__(self, qubit: int, basis: str = 'Z') -> None:
         """Initialize using the meas matrix.
         
         Args:
-            qubit (int): qubit label. Defaults to 0.
+            qubit (int): qubit label.
             basis (str): measurement basis. Defaults to Z.
         """
         super().__init__(meas, qubit)
@@ -284,7 +284,7 @@ class MCM(Gate):
         """Initialize using the meas matrix.
         
         Args:
-            qubit (int): qubit label. Defaults to 0.
+            qubit (int): qubit label.
             basis (str): measurement basis. Defaults to Z.
             apply (Dict): conditional gates to apply to another qubit depending
                 on the outcomes of the mid-circuit measurement. Defaults to {}.
@@ -317,15 +317,19 @@ class Reset(Gate):
 
     def __init__(
             self, 
-            qubit: int = 0, 
-            dd_qubits:   List | Tuple = [],
-            dd_method:   str = 'XY',
-            n_dd_pulses: int = 8,
+            qubit:         int,
+            measure_first: bool = True,
+            dd_qubits:     List | Tuple = [],
+            dd_method:     str = 'XY',
+            n_dd_pulses:   int = 8,
         ) -> None:
         """Initialize using the meas matrix.
 
         Args:
-            qubit (int, optional): qubit label. Defaults to 0.
+            qubit (int): qubit label.
+            measure_first (bool, optional): whether to measure before the
+                reset. Defauls to True. This is unnecessary if a previous
+                measurement was already made for a mid-circuit operation.
             dd_qubits (List | Tuple, optional): which qubits to dynamical 
                 decouple during a mid-circuit measurement. Defaults to [].
             dd_method (str): dynamical decoupling protocol. Defaults to 'XY'.
@@ -333,6 +337,7 @@ class Reset(Gate):
         """
         super().__init__(meas, qubit)
         self._properties['name'] = 'Reset'
+        self._properties['params']['measure_first'] = measure_first
         self._properties['params']['meas'] = MCM(
             qubit, 
             dd_qubits=dd_qubits, dd_method=dd_method, n_dd_pulses=n_dd_pulses
@@ -341,11 +346,11 @@ class Reset(Gate):
 class RandSU2(Gate):
     """Class for a random SU(2) gate."""
 
-    def __init__(self, qubit: int = 0) -> None:
+    def __init__(self, qubit: int) -> None:
         """Initialize using the rn function.
 
         Args:
-            qubit (int): qubit label. Defaults to 0.
+            qubit (int): qubit label.
         """
         vec = [gauss(0, 1) for i in range(3)]
         mag = sum(x**2 for x in vec) ** .5
@@ -370,16 +375,16 @@ class Rn(Gate):
     """
 
     def __init__(self,
+            qubit: int,
             theta: float, 
-            n: Union[List, Tuple, NDArray],
-            qubit: int = 0
+            n: Union[List, Tuple, NDArray]
         ) -> None:
         """Initialize using the rn function.
 
         Args:
-            theta (float): angle of rotation.
+            qubit (int):              qubit label.
+            theta (float):            angle of rotation.
             n (List, Tuple, NDArray): unit vector defining the rotation axis.
-            qubit (int): qubit label. Defaults to 0.
         """
         super().__init__(rn(theta, n), qubit)
         self._properties['name'] = 'Rn'
@@ -399,12 +404,12 @@ class Rx(Gate):
         rx.matrix  # Numpy array of the matrix
     """
 
-    def __init__(self, theta: float, qubit: int = 0) -> None:
+    def __init__(self, qubit: int, theta: float) -> None:
         """Initialize using the rx function.
 
         Args:
+            qubit (int):   qubit label.
             theta (float): angle of rotation.
-            qubit (int):   qubit label. Defaults to 0.
         """
         super().__init__(rx(theta), qubit)
         self._properties['name'] = 'Rx'
@@ -424,12 +429,12 @@ class Ry(Gate):
         ry.matrix  # Numpy array of the matrix
     """
 
-    def __init__(self, theta: float, qubit: int = 0) -> None:
+    def __init__(self, qubit: int, theta: float) -> None:
         """Initialize using the ry function.
 
         Args:
+            qubit (int):   qubit label.
             theta (float): angle of rotation.
-            qubit (int):   qubit label. Defaults to 0.
         """
         super().__init__(ry(theta), qubit)
         self._properties['name'] = 'Ry'
@@ -449,14 +454,14 @@ class Rz(Gate):
         rz.matrix  # Numpy array of the matrix
     """
 
-    def __init__(
-            self, theta: float, qubit: int = 0, subspace: str = 'GE'
+    def __init__(self,
+            qubit: int, theta: float, subspace: str = 'GE'
         ) -> None:
         """Initialize using the rz function.
 
         Args:
-            theta (float): angle of rotation.
-            qubit (int):   qubit label. Defaults to 0.
+            qubit (int):    qubit label.
+            theta (float):  angle of rotation.
             subspace (str): subspace within which the gate acts. Defaults to
                 GE.
         """
@@ -471,11 +476,11 @@ class Rz(Gate):
 class S(Gate):
     """Class for the phase S = sqrt(Z) gate."""
 
-    def __init__(self, qubit: int = 0) -> None:
+    def __init__(self, qubit: int) -> None:
         """Initialize using the Rz gate.
         
         Args:
-            qubit (int): qubit label. Defaults to 0.
+            qubit (int): qubit label.
         """
         super().__init__(rz(np.pi/2), qubit)
         self._properties['alias'] = 'sqrt(Z)\nZ90'
@@ -489,11 +494,11 @@ class S(Gate):
 class SX(Gate):
     """Class for the SX = X90 gate."""
 
-    def __init__(self, qubit: int = 0) -> None:
+    def __init__(self, qubit: int) -> None:
         """Initialize using the rx gate.
         
         Args:
-            qubit (int): qubit label. Defaults to 0.
+            qubit (int): qubit label.
         """
         super().__init__(rx(np.pi/2), qubit)
         self._properties['alias'] = 'V, X90'
@@ -507,11 +512,11 @@ class SX(Gate):
 class SY(Gate):
     """Class for the SY = Y90 gate."""
 
-    def __init__(self, qubit: int = 0) -> None:
+    def __init__(self, qubit: int) -> None:
         """Initialize using the ry gate.
         
         Args:
-            qubit (int): qubit label. Defaults to 0.
+            qubit (int): qubit label.
         """
         super().__init__(ry(np.pi/2), qubit)
         self._properties['alias'] = 'Y90'
@@ -525,11 +530,11 @@ class SY(Gate):
 class Sdag(Gate):
     """Class for the phase S^dagger gate."""
 
-    def __init__(self, qubit: int = 0) -> None:
+    def __init__(self, qubit: int) -> None:
         """Initialize using the Rz gate.
         
         Args:
-            qubit (int): qubit label. Defaults to 0.
+            qubit (int): qubit label.
         """
         super().__init__(rz(-np.pi/2), qubit)
         self._properties['alias'] = 'SqrtZdag\nZ-90'
@@ -543,11 +548,11 @@ class Sdag(Gate):
 class SXdag(Gate):
     """Class for the SXdag = X-90 gate."""
 
-    def __init__(self, qubit: int = 0) -> None:
+    def __init__(self, qubit: int) -> None:
         """Initialize using the rx gate.
         
         Args:
-            qubit (int): qubit label. Defaults to 0.
+            qubit (int): qubit label.
         """
         super().__init__(rx(-np.pi/2), qubit)
         self._properties['alias'] = 'Vdag, X-90'
@@ -561,11 +566,11 @@ class SXdag(Gate):
 class SYdag(Gate):
     """Class for the SYdag = Y-90 gate."""
 
-    def __init__(self, qubit: int = 0) -> None:
+    def __init__(self, qubit: int) -> None:
         """Initialize using the ry gate.
         
         Args:
-            qubit (int): qubit label. Defaults to 0.
+            qubit (int): qubit label.
         """
         super().__init__(ry(-np.pi/2), qubit)
         self._properties['alias'] = 'Y-90'
@@ -579,11 +584,11 @@ class SYdag(Gate):
 class T(Gate):
     """Class for the fourth-root of Z (T) gate."""
 
-    def __init__(self, qubit: int = 0) -> None:
+    def __init__(self, qubit: int) -> None:
         """Initialize using the t gate.
         
         Args:
-            qubit (int): qubit label. Defaults to 0.
+            qubit (int): qubit label.
         """
         super().__init__(t, qubit)
         self._properties['alias'] = 'Z^(1/4)'
@@ -597,11 +602,11 @@ class T(Gate):
 class Tdag(Gate):
     """Class for the inverse fourth-root of Z gate."""
 
-    def __init__(self, qubit: int = 0) -> None:
+    def __init__(self, qubit: int) -> None:
         """Initialize using the tdag gate.
         
         Args:
-            qubit (int): qubit label. Defaults to 0.
+            qubit (int): qubit label.
         """
         super().__init__(tdag, qubit)
         self._properties['alias'] = 'Z^(1/4)dag'
@@ -615,19 +620,16 @@ class Tdag(Gate):
 class U3(Gate):
     """Class for the U3 gate."""
 
-    def __init__(self, 
-            theta: float,
-            phi:   float,
-            gamma: float,
-            qubit: int = 0
+    def __init__(self,
+            qubit: int, theta: float, phi: float, gamma: float,
         ) -> None:
         """Initialize using the u3 function.
         
         Args:
+            qubit (int):   qubit label.
             theta (float): angle of rotation.
             phi (float):   first phase angle.
             gamma (float): second phase angle.
-            qubit (int):   qubit label.
         """
         super().__init__(u3(theta, phi, gamma), qubit)
         self._properties['name'] = 'U3'
@@ -641,11 +643,11 @@ class U3(Gate):
 class V(Gate):
     """Class for the V = X90 gate."""
 
-    def __init__(self, qubit: int = 0) -> None:
+    def __init__(self, qubit: int) -> None:
         """Initialize using the rx gate.
         
         Args:
-            qubit (int): qubit label. Defaults to 0.
+            qubit (int): qubit label.
         """
         super().__init__(rx(np.pi/2), qubit)
         self._properties['alias'] = 'SX, X90'
@@ -659,11 +661,11 @@ class V(Gate):
 class Vdag(Gate):
     """Class for the Vdag = X-90 gate."""
 
-    def __init__(self, qubit: int = 0) -> None:
+    def __init__(self, qubit: int) -> None:
         """Initialize using the rx gate.
         
         Args:
-            qubit (int): qubit label. Defaults to 0.
+            qubit (int): qubit label.
         """
         super().__init__(rx(-np.pi/2), qubit)
         self._properties['alias'] = 'SXdag, X-90'
@@ -677,14 +679,14 @@ class Vdag(Gate):
 class VirtualZ(Gate):
     """Class for virtual Z gate."""
 
-    def __init__(
-            self, theta: float, qubit: int = 0, subspace: str = 'GE'
+    def __init__(self,
+            qubit: int, theta: float, subspace: str = 'GE'
         ) -> None:
         """Initialize using the rz function.
 
         Args:
-            theta (float): angle of rotation.
-            qubit (int):   qubit label. Defaults to 0.
+            qubit (int):    qubit label.
+            theta (float):  angle of rotation.
             subspace (str): subspace within which the gate acts. Defaults to
                 GE.
         """
@@ -700,11 +702,11 @@ class VirtualZ(Gate):
 class X(Gate):
     """Class for the Pauli X gate."""
 
-    def __init__(self, qubit: int = 0, subspace: str = 'GE') -> None:
+    def __init__(self, qubit: int, subspace: str = 'GE') -> None:
         """Initialize using the x gate.
         
         Args:
-            qubit (int): qubit label. Defaults to 0.
+            qubit (int):    qubit label.
             subspace (str): subspace within which the gate acts. Defaults to
                 GE.
         """
@@ -720,11 +722,11 @@ class X(Gate):
 class X90(Gate):
     """Class for the X90 = sqrt(X) gate."""
 
-    def __init__(self, qubit: int = 0, subspace: str = 'GE') -> None:
+    def __init__(self, qubit: int, subspace: str = 'GE') -> None:
         """Initialize using the rx gate.
         
         Args:
-            qubit (int): qubit label. Defaults to 0.
+            qubit (int):    qubit label.
             subspace (str): subspace within which the gate acts. Defaults to
                 GE.
         """
@@ -741,11 +743,11 @@ class X90(Gate):
 class Y(Gate):
     """Class for the Pauli Y gate."""
 
-    def __init__(self, qubit: int = 0, subspace: str = 'GE') -> None:
+    def __init__(self, qubit: int, subspace: str = 'GE') -> None:
         """Initialize using the Y gate.
         
         Args:
-            qubit (int): qubit label. Defaults to 0.
+            qubit (int):    qubit label.
             subspace (str): subspace within which the gate acts. Defaults to
                 GE.
         """
@@ -755,16 +757,17 @@ class Y(Gate):
             'angle': np.pi,
             'axis':  'y',
         }
+        self._properties['subspace'] = subspace
     
 
 class Y90(Gate):
     """Class for the Y90 = sqrt(Y) gate."""
 
-    def __init__(self, qubit: int = 0, subspace: str = 'GE') -> None:
+    def __init__(self, qubit: int, subspace: str = 'GE') -> None:
         """Initialize using the ry gate.
         
         Args:
-            qubit (int): qubit label. Defaults to 0.
+            qubit (int): qubit label.
             subspace (str): subspace within which the gate acts. Defaults to
                 GE.
         """
@@ -774,16 +777,17 @@ class Y90(Gate):
             'angle': np.pi/2,
             'axis':  'y',
         }
+        self._properties['subspace'] = subspace
     
 
 class Z(Gate):
     """Class for the Pauli Z gate."""
 
-    def __init__(self, qubit: int = 0, subspace: str = 'GE') -> None:
+    def __init__(self, qubit: int, subspace: str = 'GE') -> None:
         """Initialize using the z gate.
         
         Args:
-            qubit (int): qubit label. Defaults to 0.
+            qubit (int): qubit label.
             subspace (str): subspace within which the gate acts. Defaults to
                 GE.
         """
@@ -793,6 +797,7 @@ class Z(Gate):
             'phase': np.pi,
             'axis':  'z',
         }
+        self._properties['subspace'] = subspace
 
 
 single_qubit_gates = defaultdict(lambda: 'Gate not currently supported!', {

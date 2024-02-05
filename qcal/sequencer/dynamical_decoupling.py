@@ -2,16 +2,16 @@
 
 """
 from qcal.calibration.utils import find_pulse_index
-from qcal.circuit import Barrier, Circuit, Cycle
+from qcal.circuit import Circuit, Cycle
 from qcal.config import Config
 from qcal.gate.single_qubit import Idle, X, Rz
 
 import logging
 import numpy as np
-import pandas as pd
+# import pandas as pd
 
 from collections import defaultdict
-from typing import Any, List
+# from typing import Any, List
 
 logger = logging.getLogger(__name__)
 
@@ -53,9 +53,9 @@ def XY(
         # Idle
         Cycle({Idle(qubit, duration=2 * idle_time)}),
         # Y
-        Cycle({Rz(np.pi/2, qubit)}),
+        Cycle({Rz(qubit, np.pi/2)}),
         Cycle({X(qubit)}),
-        Cycle({Rz(-np.pi/2, qubit)}),
+        Cycle({Rz(qubit, -np.pi/2)}),
         # Idle
         Cycle({Idle(qubit, duration=2 * idle_time)}),
         # X
@@ -63,9 +63,9 @@ def XY(
         # Idle
         Cycle({Idle(qubit, duration=2 * idle_time)}),
         # Y
-        Cycle({Rz(np.pi/2, qubit)}),
+        Cycle({Rz(qubit, np.pi/2)}),
         Cycle({X(qubit)}),
-        Cycle({Rz(-np.pi/2, qubit)}),
+        Cycle({Rz(qubit, -np.pi/2)}),
         # Idle
         Cycle({Idle(qubit, duration=idle_time)}),
         # Barrier((qubit,)),
