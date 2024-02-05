@@ -4,6 +4,9 @@ All results are stored in a Results object.
 """
 from __future__ import annotations
 
+from qcal.math.entropy import shannon_entropy
+from qcal.math.probability import total_variation_distance
+
 import itertools
 import logging
 import numpy as np
@@ -196,6 +199,15 @@ class Results:
         return self._results
 
     @property
+    def entropy(self) -> float:
+        """Shannon entropy of the results.
+
+        Returns:
+            float: entropy.
+        """
+        return shannon_entropy(self)
+
+    @property
     def n_shots(self) -> int:
         """Total number of shots.
 
@@ -203,6 +215,15 @@ class Results:
             int: number of shots.
         """
         return self.counts.sum()
+
+    @property
+    def n_qudits(self) -> int:
+        """Total number of qudits.
+
+        Returns:
+            int: number of qudits.
+        """
+        return len(self.states[0])
 
     @property
     def populations(self) ->  Dict:
@@ -337,4 +358,15 @@ class Results:
         if len(self.states[0]) > 5:
             fig.update_xaxes(tickangle=-45)
         fig.show()
+
+    def tvd(self, results: Results) -> float:
+        """Total Variation Distance
+
+        Args:
+            results (Results): other results.
+
+        Returns:
+            float: tvd.
+        """
+        return total_variation_distance(self, results)
                 
