@@ -119,6 +119,9 @@ def SRB(qpu:             QPU,
             from qcal.interface.trueq.compiler import Compiler
             from qcal.interface.trueq.transpiler import Transpiler
             
+            import trueq as tq
+            print(f"True-Q version: {tq.__version__}\n")
+
             self._qubit_labels = qubit_labels
             self._circuit_depths = circuit_depths
             self._n_circuits = n_circuits
