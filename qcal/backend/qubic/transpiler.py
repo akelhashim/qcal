@@ -422,8 +422,11 @@ def add_multi_qubit_gate(
 
     for pulse in config[f'two_qubit/{qubits}/{name}/pulse']:
 
-        if isinstance(pulse, str):
-            name = pulse.split('/')[-2] + pulse.split('/')[-3]
+        if isinstance(pulse, str):  # Pre- or post-pulse
+            mq_pulse.append(
+               {'name': 'barrier', 'qubit': [f'Q{q}' for q in qubits]},
+            )
+            pname = pulse.split('/')[-2] + pulse.split('/')[-3]
             freq = config['/'.join(pulse.split('/')[:-2]) +'/freq']
             for p in config[pulse]:
                 if p['env'] == 'virtualz':
@@ -436,7 +439,7 @@ def add_multi_qubit_gate(
                 else:
                     mq_pulse.append(
                         {'name':  'pulse',
-                         'tag':    name,
+                         'tag':    pname,
                          'dest':   p['channel'], 
                          'freq':   freq,
                          'amp':    clip_amplitude(p['kwargs']['amp']),
@@ -452,6 +455,9 @@ def add_multi_qubit_gate(
                                 )
                         }
                     )
+            mq_pulse.append(
+               {'name': 'barrier', 'qubit': [f'Q{q}' for q in qubits]},
+            )
         
         elif pulse['env'] == 'virtualz':
             mq_pulse.append(
@@ -570,46 +576,6 @@ def cycle_pulse(config: Config, cycle: Cycle) -> List:
             ])
 
         elif isinstance(gate, Meas):
-            # if config[f'readout/{qubit}/detuning']:
-            #     pulse.extend([
-            #         {'name':   'pulse',
-            #          'tag':    'CW ramp up',
-            #          'dest':   f'Q{qubit}.qdrv',
-            #          'freq':   (config[f'single_qubit/{qubit}/GE/freq'] + 
-            #                     config[f'readout/{qubit}/detuning']),
-            #          'amp':    0.2, 
-            #          'phase':  0.0,
-            #          'twidth': 10 * ns,
-            #          'env':    pulse_envelopes['linear'](
-            #                     10 * ns,
-            #                     config['hardware/DAC_sample_rate'],
-            #                )
-            #         },
-            #         {'name':   'pulse',
-            #          'tag':    'Stark Shift (CW)',
-            #          'dest':   f'Q{qubit}.qdrv',
-            #          'freq':   (config[f'single_qubit/{qubit}/GE/freq'] + 
-            #                     config[f'readout/{qubit}/detuning']),
-            #          'amp':    0.2, 
-            #          'phase':  0.0,
-            #          'twidth': config[f'readout/{qubit}/length'] - 20 * ns,
-            #          'env':    'cw'
-            #         },
-            #         {'name':   'pulse',
-            #          'tag':    'CW ramp down',
-            #          'dest':   f'Q{qubit}.qdrv',
-            #          'freq':   (config[f'single_qubit/{qubit}/GE/freq'] + 
-            #                     config[f'readout/{qubit}/detuning']),
-            #          'amp':    -0.2, 
-            #          'phase':  0.0,
-            #          'twidth': 10 * ns,
-            #          'env':    pulse_envelopes['linear'](
-            #                     10 * ns,
-            #                     config['hardware/DAC_sample_rate'],
-            #                )
-            #         },
-
-            #     ])
             pulse.extend([
                 {'name':   'pulse',
                  'tag':    'Readout',
