@@ -100,16 +100,26 @@ def draw_circuit(circuit: Circuit, show: bool = True):
             c -= n_barriers
             for gate in cycle.gates:
                 if gate.is_single_qubit:
-                    node_x.append(c)
-                    node_y.append(circuit.qubits.index(gate.qubits[0]))
-                    node_text.append(format_gate_text(gate))
-                    node_symbols.append(symbol_map[gate.name][0])
-                    gate_names.append(
-                        'M' if gate.name in ('Meas', 'MCM') else (
-                            gate.name if len(gate.name) < 3 else gate.name[:3]
+                    for q in gate.qubits:
+                        node_x.append(c)
+                        node_y.append(circuit.qubits.index(q))
+                    node_text.extend(
+                        [format_gate_text(gate)] * len(gate.qubits)
+                    )
+                    node_symbols.extend(
+                        [symbol_map[gate.name][0]] * len(gate.qubits)
+                    )
+                    gate_names.extend(
+                        ['M'] * len(gate.qubits) 
+                        if gate.name in ('Meas', 'MCM') else (
+                            [gate.name] * len(gate.qubits) 
+                            if len(gate.name) < 3 
+                            else [gate.name[:3]] * len(gate.qubits) 
                         )
                     )
-                    marker_colors.append(color_map[gate.name])
+                    marker_colors.extend(
+                        [color_map[gate.name]] * len(gate.qubits)
+                    )
                 elif gate.is_multi_qubit:
                     for q in gate.qubits:
                         node_x.append(c)

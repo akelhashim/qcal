@@ -85,8 +85,8 @@ def basis_rotation(meas):
         Gate: gate object.
     """
     basis_map = {
-        'X': Ry(-np.pi/2, meas.qubits[0]),
-        'Y': Rx(np.pi/2, meas.qubits[0]),
+        'X': Ry(meas.qubits[0], -np.pi/2),
+        'Y': Rx(meas.qubits[0], np.pi/2),
         'Z': Id(meas.qubits[0])
     }
     return basis_map[meas.properties['params']['basis'].upper()]
@@ -274,7 +274,7 @@ class MCM(Gate):
 
     def __init__(
             self, 
-            qubit:       int = 0, 
+            qubits:      int | Tuple[int], 
             basis:       str = 'Z',
             apply:       Dict = {}, 
             dd_qubits:   List | Tuple = [],
@@ -284,7 +284,7 @@ class MCM(Gate):
         """Initialize using the meas matrix.
         
         Args:
-            qubit (int): qubit label.
+            qubits (int | Tuple[int]): qubit label(s).
             basis (str): measurement basis. Defaults to Z.
             apply (Dict): conditional gates to apply to another qubit depending
                 on the outcomes of the mid-circuit measurement. Defaults to {}.
@@ -294,7 +294,7 @@ class MCM(Gate):
             dd_method (str): dynamical decoupling protocol. Defaults to 'XY'.
             n_dd_pulses (int): number of pulses for dd protocol. Defaults to 8.
         """
-        super().__init__(meas, qubit)
+        super().__init__(meas, qubits)
         self._properties['name'] = 'MCM'
         self._properties['params']['basis'] = basis
         self._properties['params']['apply'] = apply
@@ -308,6 +308,15 @@ class MCM(Gate):
 
         Returns:
             bool: measurement or not.
+        """
+        return True
+    
+    @property
+    def is_single_qubit(self) -> bool:
+        """Whether or not the gate acts on a single qubit.
+
+        Returns:
+            bool: single-qubit gate or not.
         """
         return True
 

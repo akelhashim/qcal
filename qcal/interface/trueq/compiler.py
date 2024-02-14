@@ -96,7 +96,7 @@ class Compiler:
             if gate in two_qubit_gates.keys():
                 factories_2q += f'\n        - {gate}:'
                 factories_2q += '\n            Matrix:'
-                for row in two_qubit_gates[gate]().matrix:
+                for row in two_qubit_gates[gate]((0, 1)).matrix:
                     factories_2q += f'\n            - {list(row)}'
                 factories_2q += '\n            Involving:'
             for qubit_pair in config.basis_gates['two_qubit'].keys():
