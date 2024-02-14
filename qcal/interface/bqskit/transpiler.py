@@ -83,7 +83,7 @@ def to_qcal(circuit, gate_mapper: defaultdict) -> Circuit:
             tcycle.append(
                 gate_mapper[str(op.gate)](tuple(op.location)) if 
                 len(op.params) == 0 else 
-                gate_mapper[str(op.gate)](op.params[0], tuple(op.location))
+                gate_mapper[str(op.gate)](tuple(op.location), op.params[0])
             )
     if tcycle.n_gates > 0:
         tcircuit.append(tcycle)
@@ -106,12 +106,11 @@ def transpilation_error(*args):
 class Transpiler(Transpiler):
     """BQSKit Transpiler."""
 
-    # __slots__ = ('_config', '_gate_mapper', '_to_bqskit', '_to_qcal')
+    __slots__ = ('_config', '_gate_mapper', '_to_bqskit')
 
     def __init__(self, 
             gate_mapper:  defaultdict | Dict | None = None,
-            to_bqskit:    bool = False,
-            to_qcal:      bool = False
+            to_bqskit:    bool = False
         ) -> None:
         """Initialize with gate_mapper.
 
@@ -120,17 +119,8 @@ class Transpiler(Transpiler):
                 maps str names of BQSKit gates to qcal gates. Defaults to None.
             to_bqskit (bool): whether to transpile from qcal to BSQKit.
                 Defaults to False.
-            to_qcal (bool): whether to transpile from BSQKit to qcal.
-                Defaults to False.
         """
-        assert any((to_bqskit, to_qcal)), (
-            "One of 'to_bqskit' or 'to_qcal' must be True!"
-        )
-        assert not all((to_bqskit, to_qcal)), (
-            "One of 'to_bqskit' or 'to_qcal' must be True (not both)!"
-        )
-        
-        if gate_mapper is None and to_qcal is True:
+        if gate_mapper is None and to_bqskit is False:
             self._gate_mapper = defaultdict(lambda: transpilation_error,
                 {'barrier':     Barrier,
                  'measurement': Meas,
@@ -146,7 +136,6 @@ class Transpiler(Transpiler):
         super().__init__(gate_mapper=self._gate_mapper)
 
         self._to_bqskit = to_bqskit
-        self._to_qcal = to_qcal
 
     def transpile(
             self, circuits: Circuit | CircuitSet | List
@@ -167,7 +156,7 @@ class Transpiler(Transpiler):
         for circuit in circuits:
             if self._to_bqskit:
                 tcircuits.append(to_bqskit(circuit))
-            elif self._to_qcal:
+            else:
                 tcircuits.append(to_qcal(circuit, self._gate_mapper))
     
         tcircuits = CircuitSet(circuits=tcircuits)

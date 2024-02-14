@@ -24,7 +24,7 @@ import copy
 import pandas as pd
 
 from collections import deque
-from typing import Any, Dict, List, Set, Tuple, Union
+from typing import Any, Dict, List, Set, Tuple
 
 import plotly.io as pio
 pio.renderers.default = 'colab'  # TODO: replace with settings
@@ -270,7 +270,7 @@ class Layer(Cycle):
 
     __slots__ = ('_gates', '_qubits')
 
-    def __init__(self, gates: Set[Gate] = set()) -> None:
+    def __init__(self, gates: Set[Gate] = None) -> None:
         super().__init__(gates)
 
     def __copy__(self) -> Layer:

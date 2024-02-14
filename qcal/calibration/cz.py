@@ -57,9 +57,9 @@ def tomography_circuits(
 
     circuit_C0_X = Circuit([
         # Y90 on target qubit
-        Cycle({VirtualZ(np.pi/2, p[1]) for p in qubit_pairs}),
+        Cycle({VirtualZ(p[1], np.pi/2) for p in qubit_pairs}),
         Cycle({X90(p[1]) for p in qubit_pairs}),
-        Cycle({VirtualZ(-np.pi/2, p[1]) for p in qubit_pairs}),
+        Cycle({VirtualZ(p[1], -np.pi/2) for p in qubit_pairs}),
         Barrier(qubits)
     ])
     for _ in range(n_gates):
@@ -69,9 +69,9 @@ def tomography_circuits(
         ])
     circuit_C0_X.extend([  
         # Y90 on target qubit
-        Cycle({VirtualZ(np.pi/2, p[1]) for p in qubit_pairs}),
+        Cycle({VirtualZ(p[1], np.pi/2) for p in qubit_pairs}),
         Cycle({X90(p[1]) for p in qubit_pairs}),
-        Cycle({VirtualZ(-np.pi/2, p[1]) for p in qubit_pairs}),
+        Cycle({VirtualZ(p[1], -np.pi/2) for p in qubit_pairs}),
     ])
     circuit_C0_X.measure()
 
@@ -81,9 +81,9 @@ def tomography_circuits(
         Cycle({X90(p[0]) for p in qubit_pairs}),
         Barrier(qubits),
         # Y90 on target qubit
-        Cycle({VirtualZ(np.pi/2, p[1]) for p in qubit_pairs}),
+        Cycle({VirtualZ(p[1], np.pi/2) for p in qubit_pairs}),
         Cycle({X90(p[1]) for p in qubit_pairs}),
-        Cycle({VirtualZ(-np.pi/2, p[1]) for p in qubit_pairs}),
+        Cycle({VirtualZ(p[1], -np.pi/2) for p in qubit_pairs}),
         Barrier(qubits)
     ])
     for _ in range(n_gates):
@@ -93,17 +93,17 @@ def tomography_circuits(
         ])
     circuit_C1_X.extend([
         # Y90 on target qubit
-        Cycle({VirtualZ(np.pi/2, p[1]) for p in qubit_pairs}),
+        Cycle({VirtualZ(p[1], np.pi/2) for p in qubit_pairs}),
         Cycle({X90(p[1]) for p in qubit_pairs}),
-        Cycle({VirtualZ(-np.pi/2, p[1]) for p in qubit_pairs}),
+        Cycle({VirtualZ(p[1], -np.pi/2) for p in qubit_pairs}),
     ])
     circuit_C1_X.measure()
 
     circuit_C0_Y = Circuit([
         # Y90 on target qubit
-        Cycle({VirtualZ(np.pi/2, p[1]) for p in qubit_pairs}),
+        Cycle({VirtualZ(p[1], np.pi/2) for p in qubit_pairs}),
         Cycle({X90(p[1]) for p in qubit_pairs}),
-        Cycle({VirtualZ(-np.pi/2, p[1]) for p in qubit_pairs}),
+        Cycle({VirtualZ(p[1], -np.pi/2) for p in qubit_pairs}),
         Barrier(qubits)
     ])
     for _ in range(n_gates):
@@ -123,9 +123,9 @@ def tomography_circuits(
         Cycle({X90(p[0]) for p in qubit_pairs}),
         Barrier(qubits),
         # Y90 on target qubit
-        Cycle({VirtualZ(np.pi/2, p[1]) for p in qubit_pairs}),
+        Cycle({VirtualZ(p[1], np.pi/2) for p in qubit_pairs}),
         Cycle({X90(p[1]) for p in qubit_pairs}),
-        Cycle({VirtualZ(-np.pi/2, p[1]) for p in qubit_pairs}),
+        Cycle({VirtualZ(p[1], -np.pi/2) for p in qubit_pairs}),
         Barrier(qubits)
     ])
     for _ in range(n_gates):
@@ -2030,17 +2030,17 @@ def LocalPhases(
 
             circuit_C0_X = Circuit([
                 # Y90 on target qubit
-                Cycle({VirtualZ(np.pi/2, p[1]) for p in qubit_pairs}),
+                Cycle({VirtualZ(p[1], np.pi/2) for p in qubit_pairs}),
                 Cycle({X90(p[1]) for p in qubit_pairs}),
-                Cycle({VirtualZ(-np.pi/2, p[1]) for p in qubit_pairs}),
+                Cycle({VirtualZ(p[1], -np.pi/2) for p in qubit_pairs}),
                 # CZ
                 Barrier(qubits),
                 Cycle({CZ(pair) for pair in qubit_pairs}),
                 Barrier(qubits),
                 # Y-90 on target qubit
-                Cycle({VirtualZ(-np.pi/2, p[1]) for p in qubit_pairs}),
+                Cycle({VirtualZ(p[1], -np.pi/2) for p in qubit_pairs}),
                 Cycle({X90(p[1]) for p in qubit_pairs}),
-                Cycle({VirtualZ(np.pi/2, p[1]) for p in qubit_pairs}),
+                Cycle({VirtualZ(p[1], np.pi/2) for p in qubit_pairs}),
             ])
             circuit_C0_X.measure()
 
@@ -2050,33 +2050,33 @@ def LocalPhases(
                 Cycle({X90(p[0]) for p in qubit_pairs}),
                 Barrier(qubits),
                 # Y90 on target qubit
-                Cycle({VirtualZ(np.pi/2, p[1]) for p in qubit_pairs}),
+                Cycle({VirtualZ(p[1], np.pi/2) for p in qubit_pairs}),
                 Cycle({X90(p[1]) for p in qubit_pairs}),
-                Cycle({VirtualZ(-np.pi/2, p[1]) for p in qubit_pairs}),
+                Cycle({VirtualZ(p[1], -np.pi/2) for p in qubit_pairs}),
                 # CZ
                 Barrier(qubits),
                 Cycle({CZ(pair) for pair in qubit_pairs}),
                 Barrier(qubits),
                 # Y-90 on target qubit
-                Cycle({VirtualZ(-np.pi/2, p[1]) for p in qubit_pairs}),
+                Cycle({VirtualZ(p[1], -np.pi/2) for p in qubit_pairs}),
                 Cycle({X90(p[1]) for p in qubit_pairs}),
-                Cycle({VirtualZ(np.pi/2, p[1]) for p in qubit_pairs}),
+                Cycle({VirtualZ(p[1], np.pi/2) for p in qubit_pairs}),
             ])
             circuit_C1_X.measure()
 
             circuit_T0_X = Circuit([
                 # Y90 on control qubit
-                Cycle({VirtualZ(np.pi/2, p[0]) for p in qubit_pairs}),
+                Cycle({VirtualZ(p[0], np.pi/2) for p in qubit_pairs}),
                 Cycle({X90(p[0]) for p in qubit_pairs}),
-                Cycle({VirtualZ(-np.pi/2, p[0]) for p in qubit_pairs}),
+                Cycle({VirtualZ(p[0], -np.pi/2) for p in qubit_pairs}),
                 # CZ
                 Barrier(qubits),
                 Cycle({CZ(pair) for pair in qubit_pairs}),
                 Barrier(qubits),
                 # Y-90 on control qubit
-                Cycle({VirtualZ(-np.pi/2, p[0]) for p in qubit_pairs}),
+                Cycle({VirtualZ(p[0], -np.pi/2) for p in qubit_pairs}),
                 Cycle({X90(p[0]) for p in qubit_pairs}),
-                Cycle({VirtualZ(np.pi/2, p[0]) for p in qubit_pairs}),
+                Cycle({VirtualZ(p[0], np.pi/2) for p in qubit_pairs}),
                 # Measure
                 Cycle(Meas(q) for q in qubits)
             ])
@@ -2088,17 +2088,17 @@ def LocalPhases(
                 Cycle({X90(p[1]) for p in qubit_pairs}),
                 Barrier(qubits),
                 # Y90 on control qubit
-                Cycle({VirtualZ(np.pi/2, p[0]) for p in qubit_pairs}),
+                Cycle({VirtualZ(p[0], np.pi/2) for p in qubit_pairs}),
                 Cycle({X90(p[0]) for p in qubit_pairs}),
-                Cycle({VirtualZ(-np.pi/2, p[0]) for p in qubit_pairs}),
+                Cycle({VirtualZ(p[0], -np.pi/2) for p in qubit_pairs}),
                 # CZ
                 Barrier(qubits),
                 Cycle({CZ(pair) for pair in qubit_pairs}),
                 Barrier(qubits),
                 # Y-90 on control qubit
-                Cycle({VirtualZ(-np.pi/2, p[0]) for p in qubit_pairs}),
+                Cycle({VirtualZ(p[0], -np.pi/2) for p in qubit_pairs}),
                 Cycle({X90(p[0]) for p in qubit_pairs}),
-                Cycle({VirtualZ(np.pi/2, p[0]) for p in qubit_pairs}),
+                Cycle({VirtualZ(p[0], np.pi/2) for p in qubit_pairs}),
             ])
             circuit_T1_X.measure()
 

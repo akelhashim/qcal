@@ -7,7 +7,6 @@ from qcal.gate.two_qubit import two_qubit_gates
 from qcal.transpilation.transpiler import Transpiler
 
 import logging
-import multiprocessing as mp
 import numpy as np
 
 from collections import defaultdict, deque
@@ -35,7 +34,7 @@ def transpile_cycle(cycle, gate_mapper: defaultdict) -> deque:
         elif gate.name == 'Rz':
             tcycle.append(
                 gate_mapper[gate.name](
-                    np.deg2rad(gate.parameters['phi']), q
+                    q, np.deg2rad(gate.parameters['phi'])
                 )
             )
         else:
