@@ -105,11 +105,11 @@ class Transpiler(Transpiler):
             }
         super().__init__(gate_mapper=gate_mapper)
 
-    def transpile(self, circuits: List | str) -> CircuitSet:
+    def transpile(self, circuits: List | str | CircuitSet) -> CircuitSet:
         """Transpile all circuits.
 
         Args:
-            circuits (List | str): circuits to transpile.
+            circuits (List | str | CircuitSet): circuits to transpile.
 
         Returns:
             CircuitSet: transpiled circuits.
@@ -120,6 +120,8 @@ class Transpiler(Transpiler):
             circuit_list = [circ.str for circ in circuits]
         elif isinstance(circuits, list):
             circuit_list = [circ.str for circ in circuits]
+        elif isinstance(circuits, CircuitSet):
+            circuit_list = circuits['pygsti_circuit']
 
         tcircuits = []
         for circuit in circuits:

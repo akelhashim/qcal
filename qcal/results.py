@@ -190,7 +190,7 @@ class Results:
         return self._df
 
     @property
-    def dictionary(self) -> defaultdict:
+    def dict(self) -> defaultdict:
         """Dictionary of bitstrings and counts.
 
         Returns:
