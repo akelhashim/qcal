@@ -26,8 +26,6 @@ class Compiler:
     )
     from bqskit.compiler import Compiler
 
-    __slots__ = ('_config',)
-
     def __init__(
             self, 
             config:             Config, 
