@@ -99,7 +99,16 @@ def add_reset(
                 if isinstance(qubits_or_reset, (list, tuple)):
                     add_measurement(config, q, reset_circuit, None, reset=True)
                 elif isinstance(qubits_or_reset, Reset):
-                    if n==0 and qubits_or_reset['params']['measure_first']:
+                    if (n==0 and 
+                        qubits_or_reset.properties['params']['measure_first']):
+                        add_measurement(
+                            config, 
+                            qubits_or_reset.properties['params']['meas'], 
+                            reset_circuit, 
+                            None,
+                            reset=True
+                        )
+                    elif n > 0:
                         add_measurement(
                             config, 
                             qubits_or_reset.properties['params']['meas'], 
@@ -108,23 +117,27 @@ def add_reset(
                             reset=True
                         )
 
-                # Reset pulse w/ qutrit reset
+                # Reset pulse w/ qutrit reset; TODO: add qutrit support
                 reset_q_pulse = []
-                # if (config.parameters['readout']['esp']['enable'] and
-                #     q in config.parameters['readout']['esp']['qubits']):
-                #     reset_q_pulse.extend(
-                #         cycle_pulse(config, Cycle({X(q, subspace='EF')}))
-                #     )
-                #     reset_q_pulse.extend(
-                #         cycle_pulse(config, Cycle({X(q, subspace='GE')}))
-                #     )
-                # else:
-                reset_q_pulse.extend(
-                    cycle_pulse(config, Cycle({X(q, subspace='GE')}))
-                )
-                # reset_q_pulse.extend(
-                #     cycle_pulse(config, Cycle({X(q, subspace='EF')}))
-                # )
+                if config.parameters['readout']['esp']['enable']:
+                    if q in config.parameters['readout']['esp']['qubits']:
+                        reset_q_pulse.extend(
+                            cycle_pulse(config, Cycle({X(q, subspace='EF')}))
+                        )
+                        reset_q_pulse.extend(
+                            cycle_pulse(config, Cycle({X(q, subspace='GE')}))
+                        )
+                    else:
+                        reset_q_pulse.extend(
+                            cycle_pulse(config, Cycle({X(q, subspace='GE')}))
+                        )
+                        reset_q_pulse.extend(
+                            cycle_pulse(config, Cycle({X(q, subspace='EF')}))
+                        )
+                else:
+                    reset_q_pulse.extend(
+                        cycle_pulse(config, Cycle({X(q, subspace='GE')}))
+                    )
 
                 reset_circuit.append({'name': 'barrier', 'scope': [f'Q{q}']})
                 reset_circuit.append(
@@ -322,13 +335,6 @@ def add_mcm_apply(config: Config, mcm: MCM, pulse: List) -> None:
                 if not isinstance(get_by_path(mcm_pulse, depth), dict):
                     set_by_path(mcm_pulse, depth, copy.deepcopy(branch_fproc))
             else:
-                # TODO: generalize the scope for each branch
-                # q_scope = [
-                #     f'Q{q}' for q in 
-                #     mcm.properties['params']['apply'][btstr].qubits
-                # ]
-                # set_by_path(mcm_pulse, depth[:-1] + ['scope'], q_scope)
-
                 apply = []
                 if isinstance(
                     mcm.properties['params']['apply'][btstr], Circuit):
@@ -342,6 +348,18 @@ def add_mcm_apply(config: Config, mcm: MCM, pulse: List) -> None:
                     )
                 set_by_path(mcm_pulse, depth, apply)
 
+    # Ensure that each 'true' and 'false' statements are followed by lists
+    for n in range(len(btstr), 0, -1):
+        for btstr in mcm.properties['params']['apply'].keys():
+            depth = []
+            for i, bit in enumerate(btstr[:n]):
+                depth.append(mapper[bit])
+            if not isinstance(get_by_path(mcm_pulse, depth), list):
+                set_by_path(
+                    mcm_pulse,
+                    depth,
+                    [get_by_path(mcm_pulse, depth)]
+                )
 
     # # Seqeuence to apply if 1 is measured
     # true_apply = []
