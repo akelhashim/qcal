@@ -535,7 +535,7 @@ def Frequency(
                     circuit.extend([
                         Cycle({Idle(q, duration=t) for q in self._qubits}),
                         Barrier(self._qubits),
-                        Cycle({VirtualZ(phase, q, subspace=self._subspace) 
+                        Cycle({VirtualZ(q, phase, subspace=self._subspace) 
                               for q in self._qubits}),
                         Barrier(self._qubits),
                     ])
@@ -920,7 +920,7 @@ def Phase(
             # Y180_X90
             circuit_Y180_X90.extend([
                 Cycle({
-                    VirtualZ(np.pi/2, q, subspace=level[self._n_levels])
+                    VirtualZ(q, np.pi/2, subspace=level[self._n_levels])
                     for q in self._qubits
                 }),
                 Cycle({
@@ -933,7 +933,7 @@ def Phase(
                     for q in self._qubits
                 }),
                 Cycle({
-                    VirtualZ(-np.pi/2, q, subspace=level[self._n_levels])
+                    VirtualZ(q, -np.pi/2, subspace=level[self._n_levels])
                     for q in self._qubits
                 }),
                 Barrier(self._qubits),
@@ -957,7 +957,7 @@ def Phase(
                 }),
                 Barrier(self._qubits),
                 Cycle({
-                    VirtualZ(np.pi/2, q, subspace=level[self._n_levels])
+                    VirtualZ(q, np.pi/2, subspace=level[self._n_levels])
                     for q in self._qubits
                 }),
                 Cycle({
@@ -965,7 +965,7 @@ def Phase(
                     for q in self._qubits
                 }),
                 Cycle({
-                    VirtualZ(-np.pi/2, q, subspace=level[self._n_levels])
+                    VirtualZ(q, -np.pi/2, subspace=level[self._n_levels])
                     for q in self._qubits
                 }),
             ])

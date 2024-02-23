@@ -4,6 +4,9 @@ All results are stored in a Results object.
 """
 from __future__ import annotations
 
+from qcal.math.entropy import shannon_entropy
+from qcal.math.probability import total_variation_distance
+
 import itertools
 import logging
 import numpy as np
@@ -187,13 +190,38 @@ class Results:
         return self._df
 
     @property
-    def dictionary(self) -> defaultdict:
+    def dict(self) -> defaultdict:
         """Dictionary of bitstrings and counts.
 
         Returns:
             defaultdict: dictionary of results.
         """
         return self._results
+
+    @property
+    def entropy(self) -> float:
+        """Shannon entropy of the results.
+
+        Returns:
+            float: entropy.
+        """
+        return shannon_entropy(self)
+    
+    @property
+    def ev(self) -> float:
+        """Expectation value of the measured observable.
+
+        Returns:
+            float: expectation value.
+        """
+        counts_p = 0
+        counts_m = 0
+        for state in self.states:
+            if state.count('1') % 2 == 1:
+                counts_m += self._results[state]
+            else:
+                counts_p += self._results[state]
+        return (counts_p - counts_m) / self.n_shots
 
     @property
     def n_shots(self) -> int:
@@ -203,6 +231,15 @@ class Results:
             int: number of shots.
         """
         return self.counts.sum()
+
+    @property
+    def n_qudits(self) -> int:
+        """Total number of qudits.
+
+        Returns:
+            int: number of qudits.
+        """
+        return len(self.states[0])
 
     @property
     def populations(self) ->  Dict:
@@ -319,7 +356,7 @@ class Results:
         fig.update_traces(marker_color='blue')
         fig.update_layout(
             autosize=False,
-            width=175 * len(self.states),
+            width=150 * len(self.states),
             height=400,
             xaxis=dict(
                 tickvals=[i for i in range(len(self.states))],
@@ -336,5 +373,27 @@ class Results:
         )
         if len(self.states[0]) > 5:
             fig.update_xaxes(tickangle=-45)
-        fig.show()
+
+        save_properties = {
+            'toImageButtonOptions': {
+                'format': 'png', # one of png, svg, jpeg, webp
+                'filename': 'results',
+                'height': 500,
+                'width': 1000,
+                'scale': 10 # Multiply title/legend/axis/canvas sizes by this factor
+            }
+        }
+
+        fig.show(config=save_properties)
+
+    def tvd(self, results: Results) -> float:
+        """Total Variation Distance
+
+        Args:
+            results (Results): other results.
+
+        Returns:
+            float: tvd.
+        """
+        return total_variation_distance(self, results)
                 

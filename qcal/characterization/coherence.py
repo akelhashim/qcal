@@ -452,7 +452,7 @@ def T2(qpu:             QPU,
                     circuit.extend([
                         Cycle({Idle(q, duration=t) for q in self._qubits}),
                         Barrier(self._qubits),
-                        Cycle({VirtualZ(phase, q, subspace=self._subspace) 
+                        Cycle({VirtualZ(q, phase, subspace=self._subspace) 
                                for q in self._qubits}),
                         Barrier(self._qubits),
                     ])
@@ -460,7 +460,7 @@ def T2(qpu:             QPU,
                     circuit.extend([
                         Cycle({Idle(q, duration=t/2) for q in self._qubits}),
                         Barrier(self._qubits),
-                        Cycle({VirtualZ(phase/2, q, subspace=self._subspace) 
+                        Cycle({VirtualZ(q, phase/2, subspace=self._subspace) 
                                for q in self._qubits}),
                         Barrier(self._qubits),
                         Cycle({X90(q, subspace=self._subspace) 
@@ -471,7 +471,7 @@ def T2(qpu:             QPU,
                         Barrier(self._qubits),
                         Cycle({Idle(q, duration=t/2) for q in self._qubits}),
                         Barrier(self._qubits),
-                        Cycle({VirtualZ(phase/2, q, subspace=self._subspace) 
+                        Cycle({VirtualZ(q, phase/2, subspace=self._subspace) 
                                for q in self._qubits}),
                         Barrier(self._qubits),
                     ])

@@ -26,8 +26,6 @@ class Compiler:
     )
     from bqskit.compiler import Compiler
 
-    # __slots__ = ('_config',)
-
     def __init__(
             self, 
             config:             Config, 
@@ -145,7 +143,7 @@ class Compiler:
         self._compiler_kwargs = compiler_kwargs
 
         self._to_bqskit = Transpiler(to_bqskit=True)
-        self._to_qcal = Transpiler(to_qcal=True)
+        self._to_qcal = Transpiler()
 
     @property
     def config(self) -> Config:

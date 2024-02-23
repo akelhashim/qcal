@@ -15,17 +15,44 @@ from qcal.gate.single_qubit import (
 from qcal.sequencer.dynamical_decoupling import dd_sequences
 from qcal.sequencer.pulse_envelopes import pulse_envelopes
 from qcal.sequencer.utils import clip_amplitude
-from qcal.units import ns
+# from qcal.units import ns
 
+import copy
 import logging
+import operator
 
 from collections import defaultdict
-from typing import Dict, List, Tuple
+from functools import reduce
+from typing import Any, Dict, List, Tuple
 
 logger = logging.getLogger(__name__)
 
 
 __all__ = ('to_qubic', 'Transpiler')
+
+
+def get_by_path(root: Dict | defaultdict, items: List[Any]) -> Any:
+    """Access a nested object in root by item sequence.
+
+    Args:
+        root ((Dict | defaultdict): nested dictionary.
+        items (List[Any]): list of keys.
+
+    Returns:
+        Any: item in the nested dictionary indexed by the list of keys.
+    """
+    return reduce(operator.getitem, items, root)
+
+
+def set_by_path(root: Dict | defaultdict, items: List[Any], value: Any):
+    """Set a value in a nested object in root by item sequence.
+
+    Args:
+        root (Dict | defaultdict): nested dictionary.
+        items (List[Any]): list of keys.
+        value (Any): value to set for root indexed by the list of keys.
+    """
+    get_by_path(root, items[:-1])[items[-1]] = value
 
 
 def readout_time(config: Config, qubit: int) -> float:
@@ -46,10 +73,10 @@ def readout_time(config: Config, qubit: int) -> float:
 
 
 def add_reset(
-       config: Config, 
+       config:          Config, 
        qubits_or_reset: List | Tuple | Reset, 
-       circuit: List, 
-       pulses: defaultdict
+       circuit:         List, 
+       pulses:          defaultdict
     ) -> None:
     """Add active or passive reset to the beginning of a circuit.
 
@@ -67,36 +94,50 @@ def add_reset(
 
     if config['reset/active/enable'] or isinstance(qubits_or_reset, Reset):
         reset_circuit = []
-        for _ in range(config['reset/active/n_resets']):
+        for n in range(config['reset/active/n_resets']):
             for q in qubits:
                 if isinstance(qubits_or_reset, (list, tuple)):
                     add_measurement(config, q, reset_circuit, None, reset=True)
                 elif isinstance(qubits_or_reset, Reset):
-                    add_measurement(
-                        config, 
-                        qubits_or_reset.properties['params']['meas'], 
-                        reset_circuit, 
-                        None,
-                        reset=True
-                    )
+                    if (n==0 and 
+                        qubits_or_reset.properties['params']['measure_first']):
+                        add_measurement(
+                            config, 
+                            qubits_or_reset.properties['params']['meas'], 
+                            reset_circuit, 
+                            None,
+                            reset=True
+                        )
+                    elif n > 0:
+                        add_measurement(
+                            config, 
+                            qubits_or_reset.properties['params']['meas'], 
+                            reset_circuit, 
+                            None,
+                            reset=True
+                        )
 
-                # Reset pulse w/ qutrit reset
+                # Reset pulse w/ qutrit reset; TODO: add qutrit support
                 reset_q_pulse = []
-                # if (config.parameters['readout']['esp']['enable'] and
-                #     q in config.parameters['readout']['esp']['qubits']):
-                #     reset_q_pulse.extend(
-                #         cycle_pulse(config, Cycle({X(q, subspace='EF')}))
-                #     )
-                #     reset_q_pulse.extend(
-                #         cycle_pulse(config, Cycle({X(q, subspace='GE')}))
-                #     )
-                # else:
-                reset_q_pulse.extend(
-                    cycle_pulse(config, Cycle({X(q, subspace='GE')}))
-                )
-                # reset_q_pulse.extend(
-                #     cycle_pulse(config, Cycle({X(q, subspace='EF')}))
-                # )
+                if config.parameters['readout']['esp']['enable']:
+                    if q in config.parameters['readout']['esp']['qubits']:
+                        reset_q_pulse.extend(
+                            cycle_pulse(config, Cycle({X(q, subspace='EF')}))
+                        )
+                        reset_q_pulse.extend(
+                            cycle_pulse(config, Cycle({X(q, subspace='GE')}))
+                        )
+                    else:
+                        reset_q_pulse.extend(
+                            cycle_pulse(config, Cycle({X(q, subspace='GE')}))
+                        )
+                        reset_q_pulse.extend(
+                            cycle_pulse(config, Cycle({X(q, subspace='EF')}))
+                        )
+                else:
+                    reset_q_pulse.extend(
+                        cycle_pulse(config, Cycle({X(q, subspace='GE')}))
+                    )
 
                 reset_circuit.append({'name': 'barrier', 'scope': [f'Q{q}']})
                 reset_circuit.append(
@@ -172,29 +213,38 @@ def add_measurement(
         qubits = (qubit,)
     elif isinstance(qubit_or_meas, Gate):
         qubits = qubit_or_meas.qubits
-        qubit = qubits[0]
+        # qubit = qubits[0]
 
     meas_pulse = []
     # Excited state promotion
     if config.parameters['readout']['esp']['enable'] and not reset:
-        if qubit in config.parameters['readout']['esp']['qubits']:
-            meas_pulse.extend(
-                cycle_pulse(config, Cycle({X(qubit, subspace='EF')}))
-            )
-        
-        else:
-            length = 0.
-            for pulse in config[f'single_qubit/{qubit}/EF/X/pulse']:
-                length += pulse['length']
-            meas_pulse.append(
-                {'name':  'delay',
-                 't':     length, 
-                 'qubit': [f'Q{qubit}']}
-            )
+        for qubit in qubits:
+            if qubit in config.parameters['readout']['esp']['qubits']:
+                meas_pulse.extend(
+                    cycle_pulse(config, Cycle({X(qubit, subspace='EF')}))
+                )
+            else:
+                length = 0.
+                for pulse in config[f'single_qubit/{qubit}/EF/X/pulse']:
+                    length += pulse['length']
+                meas_pulse.append(
+                    {'name':  'delay',
+                    't':     length, 
+                    'qubit': [f'Q{qubit}']}
+                )
 
-    meas_pulse.append({'name': 'barrier', 'qubit': [f'Q{qubit}']})
-    meas_pulse.extend(cycle_pulse(config, Cycle({Meas(qubit)})))
-    meas_pulse.append({'name': 'barrier', 'qubit': [f'Q{qubit}']})
+    # Barrier before readout
+    meas_pulse.append(
+        {'name': 'barrier', 'qubit': [f'Q{q}' for q in qubits]}
+    )
+
+    for qubit in qubits:
+        meas_pulse.extend(cycle_pulse(config, Cycle({Meas(qubit)})))
+
+    # Barrier after readout
+    meas_pulse.append(
+        {'name': 'barrier', 'qubit': [f'Q{q}' for q in qubits]}
+    )
 
     if isinstance(qubit_or_meas, Gate) and qubit_or_meas.name == 'MCM':
         for q in qubit_or_meas.properties['params']['dd_qubits']:
@@ -252,54 +302,103 @@ def add_mcm_apply(config: Config, mcm: MCM, pulse: List) -> None:
         mcm (MCM): mid-circuit measurement object.
         pulse (List): qubic pulse.
     """
-    q_meas = mcm.qubits[0]
-    q_cond = mcm.properties['params']['apply']['1'].qubits
+    q_meas = mcm.qubits
+    q_cond = set()
+    for btstr in mcm.properties['params']['apply'].keys():
+        q_cond.update( mcm.properties['params']['apply'][btstr].qubits)
+    q_cond = tuple(sorted(q_cond))
+    scope = sorted([f'Q{q}' for q in q_meas + q_cond])
+    branch_fproc = {
+        'name': 'branch_fproc', 
+        'alu_cond': 'eq', 
+        'cond_lhs': 1, 
+        'func_id': None, #f'Q{q_meas}.meas',
+        'scope': [f'Q{q}' for q in q_cond],
+        'true': [],
+        'false': []    
+    }
+    mapper = {'0': 'false', '1': 'true'}
 
     # Initial barrier
-    pulse.append(
-        {'name': 'barrier',
-         'scope': [f'Q{q}' for q in [q_meas] + [qc for qc in q_cond]]
-        }
-    )
+    pulse.append({'name': 'barrier', 'scope': scope})
 
-    # Seqeuence to apply if 1 is measured
-    true_apply = []
-    if isinstance(mcm.properties['params']['apply']['1'], Circuit):
-        for cycle in mcm.properties['params']['apply']['1']:
-            true_apply.extend(cycle_pulse(config, cycle))
-    else:
-        true_apply.extend(
-            cycle_pulse(config, mcm.properties['params']['apply']['1'])
-        )
+    mcm_pulse = copy.deepcopy(branch_fproc)
+    for btstr in mcm.properties['params']['apply'].keys():
+        depth = []
+        for i, bit in enumerate(btstr):
+            if get_by_path(mcm_pulse, depth + ['func_id']) is None:
+                set_by_path(
+                    mcm_pulse, depth + ['func_id'], f'Q{q_meas[i]}.meas'
+                )
+            depth.append(mapper[bit])
+            if i < len(btstr)-1:
+                if not isinstance(get_by_path(mcm_pulse, depth), dict):
+                    set_by_path(mcm_pulse, depth, copy.deepcopy(branch_fproc))
+            else:
+                apply = []
+                if isinstance(
+                    mcm.properties['params']['apply'][btstr], Circuit):
+                    for cycle in mcm.properties['params']['apply'][btstr]:
+                        apply.extend(cycle_pulse(config, cycle))
+                else:
+                    apply.extend(
+                        cycle_pulse(
+                            config, mcm.properties['params']['apply'][btstr]
+                        )
+                    )
+                set_by_path(mcm_pulse, depth, apply)
 
-    # Sequence to apply if 0 is measured
-    false_apply = []
-    if isinstance(mcm.properties['params']['apply']['0'], Circuit):
-        for cycle in mcm.properties['params']['apply']['0']:
-            false_apply.extend(cycle_pulse(config, cycle))
-    else:
-        false_apply.extend(
-            cycle_pulse(config, mcm.properties['params']['apply']['0'])
-        )
+    # Ensure that each 'true' and 'false' statements are followed by lists
+    for n in range(len(btstr), 0, -1):
+        for btstr in mcm.properties['params']['apply'].keys():
+            depth = []
+            for i, bit in enumerate(btstr[:n]):
+                depth.append(mapper[bit])
+            if not isinstance(get_by_path(mcm_pulse, depth), list):
+                set_by_path(
+                    mcm_pulse,
+                    depth,
+                    [get_by_path(mcm_pulse, depth)]
+                )
+
+    # # Seqeuence to apply if 1 is measured
+    # true_apply = []
+    # if isinstance(mcm.properties['params']['apply']['1'], Circuit):
+    #     for cycle in mcm.properties['params']['apply']['1']:
+    #         true_apply.extend(cycle_pulse(config, cycle))
+    # else:
+    #     true_apply.extend(
+    #         cycle_pulse(config, mcm.properties['params']['apply']['1'])
+    #     )
+
+    # # Sequence to apply if 0 is measured
+    # false_apply = []
+    # if isinstance(mcm.properties['params']['apply']['0'], Circuit):
+    #     for cycle in mcm.properties['params']['apply']['0']:
+    #         false_apply.extend(cycle_pulse(config, cycle))
+    # else:
+    #     false_apply.extend(
+    #         cycle_pulse(config, mcm.properties['params']['apply']['0'])
+    #     )
+
+    # # Conditional operation
+    # pulse.append(
+    #     {'name': 'branch_fproc', 
+    #      'alu_cond': 'eq', 
+    #      'cond_lhs': 1, 
+    #      'func_id': f'Q{q_meas}.meas',
+    #      'scope': [f'Q{q}' for q in [qc for qc in q_cond]],
+    #      'true': true_apply,
+    #      'false': false_apply
+    #     }
+    # )
 
     # Conditional operation
-    pulse.append(
-        {'name': 'branch_fproc', 
-         'alu_cond': 'eq', 
-         'cond_lhs': 1, 
-         'func_id': f'Q{q_meas}.meas',
-         'scope': [f'Q{q}' for q in [qc for qc in q_cond]],
-         'true': true_apply,
-         'false': false_apply
-        }
-    )
+    pulse.append(mcm_pulse)
 
     # Final barrier
-    pulse.append(
-        {'name': 'barrier', 
-         'scope': [f'Q{q}' for q in [q_meas] + [qc for qc in q_cond]]
-        }
-    )
+    pulse.append({'name': 'barrier', 'scope': scope})
+
 
 
 def add_delay(
@@ -422,8 +521,11 @@ def add_multi_qubit_gate(
 
     for pulse in config[f'two_qubit/{qubits}/{name}/pulse']:
 
-        if isinstance(pulse, str):
-            name = pulse.split('/')[-2] + pulse.split('/')[-3]
+        if isinstance(pulse, str):  # Pre- or post-pulse
+            mq_pulse.append(
+               {'name': 'barrier', 'qubit': [f'Q{q}' for q in qubits]},
+            )
+            pname = pulse.split('/')[-2] + pulse.split('/')[-3]
             freq = config['/'.join(pulse.split('/')[:-2]) +'/freq']
             for p in config[pulse]:
                 if p['env'] == 'virtualz':
@@ -436,7 +538,7 @@ def add_multi_qubit_gate(
                 else:
                     mq_pulse.append(
                         {'name':  'pulse',
-                         'tag':    name,
+                         'tag':    pname,
                          'dest':   p['channel'], 
                          'freq':   freq,
                          'amp':    clip_amplitude(p['kwargs']['amp']),
@@ -452,6 +554,9 @@ def add_multi_qubit_gate(
                                 )
                         }
                     )
+            mq_pulse.append(
+               {'name': 'barrier', 'qubit': [f'Q{q}' for q in qubits]},
+            )
         
         elif pulse['env'] == 'virtualz':
             mq_pulse.append(
@@ -570,46 +675,6 @@ def cycle_pulse(config: Config, cycle: Cycle) -> List:
             ])
 
         elif isinstance(gate, Meas):
-            # if config[f'readout/{qubit}/detuning']:
-            #     pulse.extend([
-            #         {'name':   'pulse',
-            #          'tag':    'CW ramp up',
-            #          'dest':   f'Q{qubit}.qdrv',
-            #          'freq':   (config[f'single_qubit/{qubit}/GE/freq'] + 
-            #                     config[f'readout/{qubit}/detuning']),
-            #          'amp':    0.2, 
-            #          'phase':  0.0,
-            #          'twidth': 10 * ns,
-            #          'env':    pulse_envelopes['linear'](
-            #                     10 * ns,
-            #                     config['hardware/DAC_sample_rate'],
-            #                )
-            #         },
-            #         {'name':   'pulse',
-            #          'tag':    'Stark Shift (CW)',
-            #          'dest':   f'Q{qubit}.qdrv',
-            #          'freq':   (config[f'single_qubit/{qubit}/GE/freq'] + 
-            #                     config[f'readout/{qubit}/detuning']),
-            #          'amp':    0.2, 
-            #          'phase':  0.0,
-            #          'twidth': config[f'readout/{qubit}/length'] - 20 * ns,
-            #          'env':    'cw'
-            #         },
-            #         {'name':   'pulse',
-            #          'tag':    'CW ramp down',
-            #          'dest':   f'Q{qubit}.qdrv',
-            #          'freq':   (config[f'single_qubit/{qubit}/GE/freq'] + 
-            #                     config[f'readout/{qubit}/detuning']),
-            #          'amp':    -0.2, 
-            #          'phase':  0.0,
-            #          'twidth': 10 * ns,
-            #          'env':    pulse_envelopes['linear'](
-            #                     10 * ns,
-            #                     config['hardware/DAC_sample_rate'],
-            #                )
-            #         },
-
-            #     ])
             pulse.extend([
                 {'name':   'pulse',
                  'tag':    'Readout',

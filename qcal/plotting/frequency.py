@@ -124,7 +124,7 @@ def plot_freq_spectrum(
                     line_width=5,
                     mode='lines',
                     name=f'R{q}',
-                    line=dict(color=colors[i], dash='dot')
+                    line=dict(color=colors[i], dash='dashdot')
                 )
             )
 
@@ -148,7 +148,7 @@ def plot_freq_spectrum(
                         line_width=5,
                         mode='lines',
                         name=f'{gate} {qp}',
-                        line=dict(color=colors_tq[i])
+                        line=dict(color=colors_tq[i], dash='dot')
                     )
                 )
 
@@ -169,7 +169,7 @@ def plot_freq_spectrum(
         yaxis_range=[0, 1],
         yaxis_hoverformat='',
         font=dict(size=20),
-        legend = dict(font = dict(size=17))
+        legend = dict(font = dict(size=15))
     )
 
     save_properties = {
