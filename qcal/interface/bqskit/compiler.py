@@ -9,6 +9,7 @@ from qcal.interface.bqskit.transpiler import Transpiler
 import logging
 import multiprocessing as mp
 
+from IPython.display import clear_output
 from typing import Any, Dict
 
 logger = logging.getLogger(__name__)
@@ -168,6 +169,7 @@ class Compiler:
         from bqskit import compile
         if not isinstance(circuits, CircuitSet):
             circuits = CircuitSet(circuits=circuits)
+        # circuits = circuits.copy()
 
         to_qcal = False
         if isinstance(circuits[0], Circuit):
@@ -259,4 +261,5 @@ class Compiler:
         else:
             ccircuits = CircuitSet(circuits=ccircuits)
 
+        clear_output(wait=True)
         return ccircuits
