@@ -120,7 +120,7 @@ def SRB(qpu:             QPU,
             from qcal.interface.trueq.transpiler import Transpiler
             
             import trueq as tq
-            logger.info(f"True-Q version: {tq.__version__}")
+            logger.info(f" True-Q version: {tq.__version__}")
 
             self._qubit_labels = qubit_labels
             self._circuit_depths = circuit_depths
@@ -165,7 +165,10 @@ def SRB(qpu:             QPU,
             """Analyze the SRB results."""
             logger.info(' Analyzing the results...')
             print('')
-            print(self._circuits.fit(analyze_dim=2))
+            try:
+                print(self._circuits.fit(analyze_dim=2))
+            except Exception:
+                logger.warning(' Unable to fit the estimate collection!')
 
         def plot(self) -> None:
             """Plot the SRB fit results."""
