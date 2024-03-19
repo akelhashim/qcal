@@ -152,13 +152,13 @@ class QuditCompiler:
 
         factories = [
             tq.config.GateFactory.from_matrix(
-                "X90", block_diag(tq.Gate.rx(90), 1)
+                "GEX90", block_diag(tq.Gate.rx(90), 1)
             ),
             tq.config.GateFactory.from_matrix(
                 "EFX90", block_diag(1, tq.Gate.rx(90))
             ),
             tq.config.GateFactory.from_matrix(
-                "Rz", [["exp(-1j * phi * pi/180)",0,0], [0,1,0], [0,0,1]]
+                "GERz", [["exp(-1j * phi * pi/180)",0,0], [0,1,0], [0,0,1]]
             ),
             tq.config.GateFactory.from_matrix(
                 "EFRz", [[1,0,0], [0,1,0], [0,0,"exp(1j * phi * pi/180)"]]
