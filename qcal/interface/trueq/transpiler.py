@@ -45,13 +45,20 @@ def transpile_cycle(cycle, gate_mapper: defaultdict) -> deque:
                 gate_name = gate.name
         
             if 'Rz' in gate.name:
-                tcycle.append(
-                    gate_mapper[gate_name](
-                        q, 
-                        np.deg2rad(gate.parameters['phi']), 
-                        subspace=subspace
+                if subspace is not None:
+                    tcycle.append(
+                        gate_mapper[gate_name](
+                            q, 
+                            np.deg2rad(gate.parameters['phi']), 
+                            subspace=subspace
+                        )
                     )
-                )
+                else:
+                    tcycle.append(
+                        gate_mapper[gate_name](
+                            q, np.deg2rad(gate.parameters['phi'])
+                        )
+                    )
             
             else:
                 if subspace is not None:
