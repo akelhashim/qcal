@@ -229,8 +229,8 @@ def add_measurement(
                     length += pulse['length']
                 meas_pulse.append(
                     {'name':  'delay',
-                    't':     length, 
-                    'qubit': [f'Q{qubit}']}
+                     't':     length, 
+                     'qubit': [f'Q{qubit}']}
                 )
 
     # Barrier before readout
@@ -258,8 +258,8 @@ def add_measurement(
             )
         if qubit_or_meas.properties['params']['apply']:
             add_mcm_apply(config, qubit_or_meas, meas_pulse)
-        if pulses is not None:
-            pulses[f'MCMGE:{qubits}'] = meas_pulse
+        # if pulses is not None:
+        #     pulses[f'MCMGE:{qubits}'] = meas_pulse
     
     else:
         if pulses is not None:
@@ -360,38 +360,6 @@ def add_mcm_apply(config: Config, mcm: MCM, pulse: List) -> None:
                     depth,
                     [get_by_path(mcm_pulse, depth)]
                 )
-
-    # # Seqeuence to apply if 1 is measured
-    # true_apply = []
-    # if isinstance(mcm.properties['params']['apply']['1'], Circuit):
-    #     for cycle in mcm.properties['params']['apply']['1']:
-    #         true_apply.extend(cycle_pulse(config, cycle))
-    # else:
-    #     true_apply.extend(
-    #         cycle_pulse(config, mcm.properties['params']['apply']['1'])
-    #     )
-
-    # # Sequence to apply if 0 is measured
-    # false_apply = []
-    # if isinstance(mcm.properties['params']['apply']['0'], Circuit):
-    #     for cycle in mcm.properties['params']['apply']['0']:
-    #         false_apply.extend(cycle_pulse(config, cycle))
-    # else:
-    #     false_apply.extend(
-    #         cycle_pulse(config, mcm.properties['params']['apply']['0'])
-    #     )
-
-    # # Conditional operation
-    # pulse.append(
-    #     {'name': 'branch_fproc', 
-    #      'alu_cond': 'eq', 
-    #      'cond_lhs': 1, 
-    #      'func_id': f'Q{q_meas}.meas',
-    #      'scope': [f'Q{q}' for q in [qc for qc in q_cond]],
-    #      'true': true_apply,
-    #      'false': false_apply
-    #     }
-    # )
 
     # Conditional operation
     pulse.append(mcm_pulse)
@@ -508,6 +476,11 @@ def add_multi_qubit_gate(
     # Add dynamical decoupling
     if config[f'two_qubit/{qubits}/{name}/dynamical_decoupling/enable']:
         sub_config = config[f'two_qubit/{qubits}/{name}/dynamical_decoupling']
+        mq_pulse.append(
+               {'name': 'barrier', 
+                'qubit': [f'Q{q}' for q in sub_config['qubits']]
+               },
+            )
         idx = find_pulse_index(config, f'two_qubit/{qubits}/{name}/pulse')
         for q in sub_config['qubits']:
             add_dynamical_decoupling(

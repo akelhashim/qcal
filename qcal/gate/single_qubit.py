@@ -480,6 +480,7 @@ class Rz(Gate):
             'phase': theta,
             'axis':  'z',
         }
+        self._properties['subspace'] = subspace
     
 
 class S(Gate):

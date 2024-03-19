@@ -23,10 +23,10 @@ def load_circuits(circuits: List | str) -> CircuitSet:
     Returns:
         CircuitSet: set of pyGSTi circuits.
     """
-    from pygsti.io import load_circuit_list
+    from pygsti.io import read_circuit_list
 
     if isinstance(circuits, str):
-        circuits = load_circuit_list(circuits)
+        circuits = read_circuit_list(circuits)
         circuit_list = [circ.str for circ in circuits]
     elif isinstance(circuits, list):
         circuit_list = [circ.str for circ in circuits]
