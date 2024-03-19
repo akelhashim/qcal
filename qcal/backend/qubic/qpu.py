@@ -1,6 +1,8 @@
 """Custom QPU submodule for QubiC
 
 """
+import qcal.settings as settings
+
 # from qcal.circuit import CircuitSet
 from .post_process import post_process
 from .transpiler import Transpiler
@@ -155,14 +157,14 @@ class QubicQPU(QPU):
             hardware_vz_qubits=hardware_vz_qubits
         )
         self._gmm_manager = gmm_manager if gmm_manager is not None else (
-            os.path.join(os.path.dirname(__file__), 'gmm_manager.pkl')
+            os.path.join(settings.Settings.config_path, 'gmm_manager.pkl')
         )
         self._fpga_config = FPGAConfig()
         self._channel_config = load_channel_configs(
-            os.path.join(os.path.dirname(__file__), 'channel_config.json')
+            os.path.join(settings.Settings.config_path, 'channel_config.json')
         )
         self._qchip = QChip(
-            os.path.join(os.path.dirname(__file__), 'qubic_cfg.json')
+            os.path.join(settings.Settings.config_path, 'qubic_cfg.json')
         )
         self._runner = rpc_client.CircuitRunnerClient(
             ip=rpc_ip_address, port=port
