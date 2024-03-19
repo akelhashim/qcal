@@ -95,7 +95,11 @@ def SRB(qpu:             QPU,
 
     class SRB(qpu):
         """True-Q SRB protocol."""
-        import trueq as tq
+        try:
+            import trueq as tq
+            logger.info(f" True-Q version: {tq.__version__}")
+        except ImportError:
+            logger.warning(' Unable to import trueq!')
 
         def __init__(self,
                 qpu:             QPU,
@@ -119,9 +123,12 @@ def SRB(qpu:             QPU,
             from qcal.interface.trueq.compiler import Compiler
             from qcal.interface.trueq.transpiler import Transpiler
             
-            import trueq as tq
-            logger.info(f" True-Q version: {tq.__version__}")
-
+            try:
+                import trueq as tq
+                logger.info(f" True-Q version: {tq.__version__}")
+            except ImportError:
+                logger.warning(' Unable to import trueq!')
+            
             self._qubit_labels = qubit_labels
             self._circuit_depths = circuit_depths
             self._n_circuits = n_circuits

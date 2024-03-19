@@ -156,6 +156,7 @@ class Transpiler(Transpiler):
             CircuitSet: transpiled circuits.
         """
         import trueq as tq
+
         if not isinstance(circuits, tq.CircuitCollection):
             circuits = tq.CircuitCollection(circuits)
 
