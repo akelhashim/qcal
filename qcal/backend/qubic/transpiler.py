@@ -426,9 +426,48 @@ def add_single_qubit_gate(
     subspace = gate.subspace
     sq_pulse = []
     for pulse in (
-        config[f'single_qubit/{qubit}/{subspace}/{name}/pulse']):
+        config[f'single_qubit/{qubit}/{subspace}/{name}/pulse']
+        ):
 
-        if pulse['env'] == 'virtualz':
+        if isinstance(pulse, str):  # Pre- or post-pulse
+            add_pre_post_pulse(config, gate.qubits, pulse, sq_pulse)
+            # sq_pulse.append(
+            #    {'name': 'barrier', 'qubit': [f'Q{qubit}']},
+            # )
+            # pname = pulse.split('/')[-2] + pulse.split('/')[-3]
+            # freq = config['/'.join(pulse.split('/')[:-2]) +'/freq']
+            # for p in config[pulse]:
+            #     if p['env'] == 'virtualz':
+            #         sq_pulse.append(
+            #             {'name':  'virtual_z',
+            #              'freq':  freq,
+            #              'phase': p['kwargs']['phase']
+            #             }
+            #         )
+            #     else:
+            #         sq_pulse.append(
+            #             {'name':  'pulse',
+            #              'tag':    pname,
+            #              'dest':   p['channel'], 
+            #              'freq':   freq,
+            #              'amp':    clip_amplitude(p['kwargs']['amp']),
+            #              'phase':  p['kwargs']['phase'],
+            #              'twidth': p['length'], 
+            #              'env':    pulse_envelopes[p['env']](
+            #                         p['length'],
+            #                         config['hardware/DAC_sample_rate'],
+            #                         **{key: val for key, val 
+            #                            in p['kwargs'].items() 
+            #                            if key not in ['amp', 'phase']
+            #                           }
+            #                     )
+            #             }
+            #         )
+            # sq_pulse.append(
+            #    {'name': 'barrier', 'qubit': [f'Q{qubit}']},
+            # )
+
+        elif pulse['env'] == 'virtualz':
             sq_pulse.append(
                 {'name':  'virtual_z',
                  'freq':  config[f'single_qubit/{qubit}/{subspace}/freq'],
@@ -495,41 +534,42 @@ def add_multi_qubit_gate(
     for pulse in config[f'two_qubit/{qubits}/{name}/pulse']:
 
         if isinstance(pulse, str):  # Pre- or post-pulse
-            mq_pulse.append(
-               {'name': 'barrier', 'qubit': [f'Q{q}' for q in qubits]},
-            )
-            pname = pulse.split('/')[-2] + pulse.split('/')[-3]
-            freq = config['/'.join(pulse.split('/')[:-2]) +'/freq']
-            for p in config[pulse]:
-                if p['env'] == 'virtualz':
-                    mq_pulse.append(
-                        {'name':  'virtual_z',
-                         'freq':  freq,
-                         'phase': p['kwargs']['phase']
-                        }
-                    )
-                else:
-                    mq_pulse.append(
-                        {'name':  'pulse',
-                         'tag':    pname,
-                         'dest':   p['channel'], 
-                         'freq':   freq,
-                         'amp':    clip_amplitude(p['kwargs']['amp']),
-                         'phase':  p['kwargs']['phase'],
-                         'twidth': p['length'], 
-                         'env':    pulse_envelopes[p['env']](
-                                    p['length'],
-                                    config['hardware/DAC_sample_rate'],
-                                    **{key: val for key, val 
-                                       in p['kwargs'].items() 
-                                       if key not in ['amp', 'phase']
-                                      }
-                                )
-                        }
-                    )
-            mq_pulse.append(
-               {'name': 'barrier', 'qubit': [f'Q{q}' for q in qubits]},
-            )
+            add_pre_post_pulse(config, qubits, pulse, mq_pulse)
+            # mq_pulse.append(
+            #    {'name': 'barrier', 'qubit': [f'Q{q}' for q in qubits]},
+            # )
+            # pname = pulse.split('/')[-2] + pulse.split('/')[-3]
+            # freq = config['/'.join(pulse.split('/')[:-2]) +'/freq']
+            # for p in config[pulse]:
+            #     if p['env'] == 'virtualz':
+            #         mq_pulse.append(
+            #             {'name':  'virtual_z',
+            #              'freq':  freq,
+            #              'phase': p['kwargs']['phase']
+            #             }
+            #         )
+            #     else:
+            #         mq_pulse.append(
+            #             {'name':  'pulse',
+            #              'tag':    pname,
+            #              'dest':   p['channel'], 
+            #              'freq':   freq,
+            #              'amp':    clip_amplitude(p['kwargs']['amp']),
+            #              'phase':  p['kwargs']['phase'],
+            #              'twidth': p['length'], 
+            #              'env':    pulse_envelopes[p['env']](
+            #                         p['length'],
+            #                         config['hardware/DAC_sample_rate'],
+            #                         **{key: val for key, val 
+            #                            in p['kwargs'].items() 
+            #                            if key not in ['amp', 'phase']
+            #                           }
+            #                     )
+            #             }
+            #         )
+            # mq_pulse.append(
+            #    {'name': 'barrier', 'qubit': [f'Q{q}' for q in qubits]},
+            # )
         
         elif pulse['env'] == 'virtualz':
             mq_pulse.append(
@@ -561,6 +601,55 @@ def add_multi_qubit_gate(
     circuit.extend(mq_pulse)
 
 
+def add_pre_post_pulse(
+        config: Config, qubits: Tuple, pulse: str, gate_pulse: List
+    ) -> None:
+    """Add a pre-pulse or post-pulse to a gate pulse.
+
+    Args:
+        config (Config):   qcal Config object.
+        qubits (Tuple):    qubits involved in the gate.
+        pulse (str):       pulse reference in the config.
+        gate_pulse (List): pulse definition of a gate.
+    """
+    gate_pulse.append(
+        {'name': 'barrier', 'qubit': [f'Q{q}' for q in qubits]},
+    )
+    pname = pulse.split('/')[-2] + pulse.split('/')[-3]
+    freq = config['/'.join(pulse.split('/')[:-2]) +'/freq']
+    for p in config[pulse]:
+        if p['env'] == 'virtualz':
+            gate_pulse.append(
+                {'name':  'virtual_z',
+                    'freq':  freq,
+                    'phase': p['kwargs']['phase']
+                }
+            )
+        else:
+            gate_pulse.append(
+                {'name':  'pulse',
+                    'tag':    pname,
+                    'dest':   p['channel'], 
+                    'freq':   freq,
+                    'amp':    clip_amplitude(p['kwargs']['amp']),
+                    'phase':  p['kwargs']['phase'],
+                    'twidth': p['length'], 
+                    'env':    pulse_envelopes[p['env']](
+                            p['length'],
+                            config['hardware/DAC_sample_rate'],
+                            **{key: val for key, val 
+                                in p['kwargs'].items() 
+                                if key not in ['amp', 'phase']
+                                }
+                        )
+                }
+            )
+    gate_pulse.append(
+        {'name': 'barrier', 'qubit': [f'Q{q}' for q in qubits]},
+    )
+
+
+
 def cycle_pulse(config: Config, cycle: Cycle) -> List:
     """Generate a pulse from a cycle of operations.
 
@@ -568,7 +657,7 @@ def cycle_pulse(config: Config, cycle: Cycle) -> List:
 
     Args:
         config (Config): qcal Config object.
-        cycle (Cycle): cycle of gates.
+        cycle (Cycle):   cycle of gates.
 
     Returns:
         List: pulse.
