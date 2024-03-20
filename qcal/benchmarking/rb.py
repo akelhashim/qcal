@@ -95,11 +95,7 @@ def SRB(qpu:             QPU,
 
     class SRB(qpu):
         """True-Q SRB protocol."""
-        try:
-            import trueq as tq
-            logger.info(f" True-Q version: {tq.__version__}")
-        except ImportError:
-            logger.warning(' Unable to import trueq!')
+        import trueq as tq
 
         def __init__(self,
                 qpu:             QPU,
