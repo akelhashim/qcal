@@ -200,6 +200,6 @@ class Gate:
         """The qubit(s) that the gate acts on.
 
         Returns:
-            tupe: qubit label(s).
+            tuple: qubit label(s).
         """
         return self._properties['qubits']

@@ -99,7 +99,16 @@ def add_reset(
                 if isinstance(qubits_or_reset, (list, tuple)):
                     add_measurement(config, q, reset_circuit, None, reset=True)
                 elif isinstance(qubits_or_reset, Reset):
-                    if n==0 and qubits_or_reset['params']['measure_first']:
+                    if (n==0 and 
+                        qubits_or_reset.properties['params']['measure_first']):
+                        add_measurement(
+                            config, 
+                            qubits_or_reset.properties['params']['meas'], 
+                            reset_circuit, 
+                            None,
+                            reset=True
+                        )
+                    elif n > 0:
                         add_measurement(
                             config, 
                             qubits_or_reset.properties['params']['meas'], 
@@ -108,23 +117,27 @@ def add_reset(
                             reset=True
                         )
 
-                # Reset pulse w/ qutrit reset
+                # Reset pulse w/ qutrit reset; TODO: add qutrit support
                 reset_q_pulse = []
-                # if (config.parameters['readout']['esp']['enable'] and
-                #     q in config.parameters['readout']['esp']['qubits']):
-                #     reset_q_pulse.extend(
-                #         cycle_pulse(config, Cycle({X(q, subspace='EF')}))
-                #     )
-                #     reset_q_pulse.extend(
-                #         cycle_pulse(config, Cycle({X(q, subspace='GE')}))
-                #     )
-                # else:
-                reset_q_pulse.extend(
-                    cycle_pulse(config, Cycle({X(q, subspace='GE')}))
-                )
-                # reset_q_pulse.extend(
-                #     cycle_pulse(config, Cycle({X(q, subspace='EF')}))
-                # )
+                if config.parameters['readout']['esp']['enable']:
+                    if q in config.parameters['readout']['esp']['qubits']:
+                        reset_q_pulse.extend(
+                            cycle_pulse(config, Cycle({X(q, subspace='EF')}))
+                        )
+                        reset_q_pulse.extend(
+                            cycle_pulse(config, Cycle({X(q, subspace='GE')}))
+                        )
+                    else:
+                        reset_q_pulse.extend(
+                            cycle_pulse(config, Cycle({X(q, subspace='GE')}))
+                        )
+                        reset_q_pulse.extend(
+                            cycle_pulse(config, Cycle({X(q, subspace='EF')}))
+                        )
+                else:
+                    reset_q_pulse.extend(
+                        cycle_pulse(config, Cycle({X(q, subspace='GE')}))
+                    )
 
                 reset_circuit.append({'name': 'barrier', 'scope': [f'Q{q}']})
                 reset_circuit.append(
@@ -216,8 +229,8 @@ def add_measurement(
                     length += pulse['length']
                 meas_pulse.append(
                     {'name':  'delay',
-                    't':     length, 
-                    'qubit': [f'Q{qubit}']}
+                     't':     length, 
+                     'qubit': [f'Q{qubit}']}
                 )
 
     # Barrier before readout
@@ -245,8 +258,8 @@ def add_measurement(
             )
         if qubit_or_meas.properties['params']['apply']:
             add_mcm_apply(config, qubit_or_meas, meas_pulse)
-        if pulses is not None:
-            pulses[f'MCMGE:{qubits}'] = meas_pulse
+        # if pulses is not None:
+        #     pulses[f'MCMGE:{qubits}'] = meas_pulse
     
     else:
         if pulses is not None:
@@ -322,13 +335,6 @@ def add_mcm_apply(config: Config, mcm: MCM, pulse: List) -> None:
                 if not isinstance(get_by_path(mcm_pulse, depth), dict):
                     set_by_path(mcm_pulse, depth, copy.deepcopy(branch_fproc))
             else:
-                # TODO: generalize the scope for each branch
-                # q_scope = [
-                #     f'Q{q}' for q in 
-                #     mcm.properties['params']['apply'][btstr].qubits
-                # ]
-                # set_by_path(mcm_pulse, depth[:-1] + ['scope'], q_scope)
-
                 apply = []
                 if isinstance(
                     mcm.properties['params']['apply'][btstr], Circuit):
@@ -342,38 +348,18 @@ def add_mcm_apply(config: Config, mcm: MCM, pulse: List) -> None:
                     )
                 set_by_path(mcm_pulse, depth, apply)
 
-
-    # # Seqeuence to apply if 1 is measured
-    # true_apply = []
-    # if isinstance(mcm.properties['params']['apply']['1'], Circuit):
-    #     for cycle in mcm.properties['params']['apply']['1']:
-    #         true_apply.extend(cycle_pulse(config, cycle))
-    # else:
-    #     true_apply.extend(
-    #         cycle_pulse(config, mcm.properties['params']['apply']['1'])
-    #     )
-
-    # # Sequence to apply if 0 is measured
-    # false_apply = []
-    # if isinstance(mcm.properties['params']['apply']['0'], Circuit):
-    #     for cycle in mcm.properties['params']['apply']['0']:
-    #         false_apply.extend(cycle_pulse(config, cycle))
-    # else:
-    #     false_apply.extend(
-    #         cycle_pulse(config, mcm.properties['params']['apply']['0'])
-    #     )
-
-    # # Conditional operation
-    # pulse.append(
-    #     {'name': 'branch_fproc', 
-    #      'alu_cond': 'eq', 
-    #      'cond_lhs': 1, 
-    #      'func_id': f'Q{q_meas}.meas',
-    #      'scope': [f'Q{q}' for q in [qc for qc in q_cond]],
-    #      'true': true_apply,
-    #      'false': false_apply
-    #     }
-    # )
+    # Ensure that each 'true' and 'false' statements are followed by lists
+    for n in range(len(btstr), 0, -1):
+        for btstr in mcm.properties['params']['apply'].keys():
+            depth = []
+            for i, bit in enumerate(btstr[:n]):
+                depth.append(mapper[bit])
+            if not isinstance(get_by_path(mcm_pulse, depth), list):
+                set_by_path(
+                    mcm_pulse,
+                    depth,
+                    [get_by_path(mcm_pulse, depth)]
+                )
 
     # Conditional operation
     pulse.append(mcm_pulse)
@@ -440,9 +426,48 @@ def add_single_qubit_gate(
     subspace = gate.subspace
     sq_pulse = []
     for pulse in (
-        config[f'single_qubit/{qubit}/{subspace}/{name}/pulse']):
+        config[f'single_qubit/{qubit}/{subspace}/{name}/pulse']
+        ):
 
-        if pulse['env'] == 'virtualz':
+        if isinstance(pulse, str):  # Pre- or post-pulse
+            add_pre_post_pulse(config, gate.qubits, pulse, sq_pulse)
+            # sq_pulse.append(
+            #    {'name': 'barrier', 'qubit': [f'Q{qubit}']},
+            # )
+            # pname = pulse.split('/')[-2] + pulse.split('/')[-3]
+            # freq = config['/'.join(pulse.split('/')[:-2]) +'/freq']
+            # for p in config[pulse]:
+            #     if p['env'] == 'virtualz':
+            #         sq_pulse.append(
+            #             {'name':  'virtual_z',
+            #              'freq':  freq,
+            #              'phase': p['kwargs']['phase']
+            #             }
+            #         )
+            #     else:
+            #         sq_pulse.append(
+            #             {'name':  'pulse',
+            #              'tag':    pname,
+            #              'dest':   p['channel'], 
+            #              'freq':   freq,
+            #              'amp':    clip_amplitude(p['kwargs']['amp']),
+            #              'phase':  p['kwargs']['phase'],
+            #              'twidth': p['length'], 
+            #              'env':    pulse_envelopes[p['env']](
+            #                         p['length'],
+            #                         config['hardware/DAC_sample_rate'],
+            #                         **{key: val for key, val 
+            #                            in p['kwargs'].items() 
+            #                            if key not in ['amp', 'phase']
+            #                           }
+            #                     )
+            #             }
+            #         )
+            # sq_pulse.append(
+            #    {'name': 'barrier', 'qubit': [f'Q{qubit}']},
+            # )
+
+        elif pulse['env'] == 'virtualz':
             sq_pulse.append(
                 {'name':  'virtual_z',
                  'freq':  config[f'single_qubit/{qubit}/{subspace}/freq'],
@@ -490,6 +515,11 @@ def add_multi_qubit_gate(
     # Add dynamical decoupling
     if config[f'two_qubit/{qubits}/{name}/dynamical_decoupling/enable']:
         sub_config = config[f'two_qubit/{qubits}/{name}/dynamical_decoupling']
+        mq_pulse.append(
+               {'name': 'barrier', 
+                'qubit': [f'Q{q}' for q in sub_config['qubits']]
+               },
+            )
         idx = find_pulse_index(config, f'two_qubit/{qubits}/{name}/pulse')
         for q in sub_config['qubits']:
             add_dynamical_decoupling(
@@ -503,36 +533,43 @@ def add_multi_qubit_gate(
 
     for pulse in config[f'two_qubit/{qubits}/{name}/pulse']:
 
-        if isinstance(pulse, str):
-            name = pulse.split('/')[-2] + pulse.split('/')[-3]
-            freq = config['/'.join(pulse.split('/')[:-2]) +'/freq']
-            for p in config[pulse]:
-                if p['env'] == 'virtualz':
-                    mq_pulse.append(
-                        {'name':  'virtual_z',
-                         'freq':  freq,
-                         'phase': p['kwargs']['phase']
-                        }
-                    )
-                else:
-                    mq_pulse.append(
-                        {'name':  'pulse',
-                         'tag':    name,
-                         'dest':   p['channel'], 
-                         'freq':   freq,
-                         'amp':    clip_amplitude(p['kwargs']['amp']),
-                         'phase':  p['kwargs']['phase'],
-                         'twidth': p['length'], 
-                         'env':    pulse_envelopes[p['env']](
-                                    p['length'],
-                                    config['hardware/DAC_sample_rate'],
-                                    **{key: val for key, val 
-                                       in p['kwargs'].items() 
-                                       if key not in ['amp', 'phase']
-                                      }
-                                )
-                        }
-                    )
+        if isinstance(pulse, str):  # Pre- or post-pulse
+            add_pre_post_pulse(config, qubits, pulse, mq_pulse)
+            # mq_pulse.append(
+            #    {'name': 'barrier', 'qubit': [f'Q{q}' for q in qubits]},
+            # )
+            # pname = pulse.split('/')[-2] + pulse.split('/')[-3]
+            # freq = config['/'.join(pulse.split('/')[:-2]) +'/freq']
+            # for p in config[pulse]:
+            #     if p['env'] == 'virtualz':
+            #         mq_pulse.append(
+            #             {'name':  'virtual_z',
+            #              'freq':  freq,
+            #              'phase': p['kwargs']['phase']
+            #             }
+            #         )
+            #     else:
+            #         mq_pulse.append(
+            #             {'name':  'pulse',
+            #              'tag':    pname,
+            #              'dest':   p['channel'], 
+            #              'freq':   freq,
+            #              'amp':    clip_amplitude(p['kwargs']['amp']),
+            #              'phase':  p['kwargs']['phase'],
+            #              'twidth': p['length'], 
+            #              'env':    pulse_envelopes[p['env']](
+            #                         p['length'],
+            #                         config['hardware/DAC_sample_rate'],
+            #                         **{key: val for key, val 
+            #                            in p['kwargs'].items() 
+            #                            if key not in ['amp', 'phase']
+            #                           }
+            #                     )
+            #             }
+            #         )
+            # mq_pulse.append(
+            #    {'name': 'barrier', 'qubit': [f'Q{q}' for q in qubits]},
+            # )
         
         elif pulse['env'] == 'virtualz':
             mq_pulse.append(
@@ -564,6 +601,55 @@ def add_multi_qubit_gate(
     circuit.extend(mq_pulse)
 
 
+def add_pre_post_pulse(
+        config: Config, qubits: Tuple, pulse: str, gate_pulse: List
+    ) -> None:
+    """Add a pre-pulse or post-pulse to a gate pulse.
+
+    Args:
+        config (Config):   qcal Config object.
+        qubits (Tuple):    qubits involved in the gate.
+        pulse (str):       pulse reference in the config.
+        gate_pulse (List): pulse definition of a gate.
+    """
+    gate_pulse.append(
+        {'name': 'barrier', 'qubit': [f'Q{q}' for q in qubits]},
+    )
+    pname = pulse.split('/')[-2] + pulse.split('/')[-3]
+    freq = config['/'.join(pulse.split('/')[:-2]) +'/freq']
+    for p in config[pulse]:
+        if p['env'] == 'virtualz':
+            gate_pulse.append(
+                {'name':  'virtual_z',
+                    'freq':  freq,
+                    'phase': p['kwargs']['phase']
+                }
+            )
+        else:
+            gate_pulse.append(
+                {'name':  'pulse',
+                    'tag':    pname,
+                    'dest':   p['channel'], 
+                    'freq':   freq,
+                    'amp':    clip_amplitude(p['kwargs']['amp']),
+                    'phase':  p['kwargs']['phase'],
+                    'twidth': p['length'], 
+                    'env':    pulse_envelopes[p['env']](
+                            p['length'],
+                            config['hardware/DAC_sample_rate'],
+                            **{key: val for key, val 
+                                in p['kwargs'].items() 
+                                if key not in ['amp', 'phase']
+                                }
+                        )
+                }
+            )
+    gate_pulse.append(
+        {'name': 'barrier', 'qubit': [f'Q{q}' for q in qubits]},
+    )
+
+
+
 def cycle_pulse(config: Config, cycle: Cycle) -> List:
     """Generate a pulse from a cycle of operations.
 
@@ -571,7 +657,7 @@ def cycle_pulse(config: Config, cycle: Cycle) -> List:
 
     Args:
         config (Config): qcal Config object.
-        cycle (Cycle): cycle of gates.
+        cycle (Cycle):   cycle of gates.
 
     Returns:
         List: pulse.

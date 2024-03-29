@@ -1973,6 +1973,9 @@ def LocalPhases(
             self._params = {}
             for pair in qubit_pairs:
                 idx = find_pulse_index(config, f'two_qubit/{pair}/CZ/pulse')
+                if isinstance(  # Check for post-pulse
+                    config[f'two_qubit/{pair}/CZ/pulse/{idx+2}'], str):
+                    idx += 1
                 self._params[pair] = (
                     f'two_qubit/{pair}/CZ/pulse/{idx+2}/kwargs/phase',
                     f'two_qubit/{pair}/CZ/pulse/{idx+3}/kwargs/phase'

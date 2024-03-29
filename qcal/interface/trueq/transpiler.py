@@ -29,17 +29,43 @@ def transpile_cycle(cycle, gate_mapper: defaultdict) -> deque:
 
     tcycle = deque()
     for q, gate in cycle:
+
         if isinstance(gate, tq.Meas):
             tcycle.append(gate_mapper['Meas'](q))
-        elif gate.name == 'Rz':
-            tcycle.append(
-                gate_mapper[gate.name](
-                    q, np.deg2rad(gate.parameters['phi'])
-                )
-            )
-        else:
-            tcycle.append(gate_mapper[gate.name](q))
 
+        else:
+            if 'GE' in gate.name:
+                subspace = 'GE'
+                gate_name = gate.name.replace('GE', '')
+            elif 'EF' in gate.name:
+                subspace = 'EF'
+                gate_name = gate.name.replace('EF', '')
+            else:
+                subspace = None
+                gate_name = gate.name
+        
+            if 'Rz' in gate.name:
+                if subspace is not None:
+                    tcycle.append(
+                        gate_mapper[gate_name](
+                            q, 
+                            np.deg2rad(gate.parameters['phi']), 
+                            subspace=subspace
+                        )
+                    )
+                else:
+                    tcycle.append(
+                        gate_mapper[gate_name](
+                            q, np.deg2rad(gate.parameters['phi'])
+                        )
+                    )
+            
+            else:
+                if subspace is not None:
+                    tcycle.append(gate_mapper[gate_name](q, subspace=subspace))
+                else: 
+                    tcycle.append(gate_mapper[gate_name](q))
+            
     return tcycle
 
 
@@ -156,6 +182,7 @@ class Transpiler(Transpiler):
             CircuitSet: transpiled circuits.
         """
         import trueq as tq
+
         if not isinstance(circuits, tq.CircuitCollection):
             circuits = tq.CircuitCollection(circuits)
 

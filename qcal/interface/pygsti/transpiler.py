@@ -15,6 +15,9 @@ from typing import Dict, List
 logger = logging.getLogger(__name__)
 
 
+__all__ = ('Transpiler',)
+
+
 def to_qcal(
         circuit, 
         gate_mapper: Dict | defaultdict,
@@ -53,7 +56,9 @@ def to_qcal(
                         )
                         if gate.name == 'Gzr':
                             tlayer.append(
-                                gate_mapper['Gzr'](gqubits, gate.args[0])
+                                gate_mapper['Gzr'](
+                                    gqubits, float(gate.args[0])
+                                )
                             )
                         # elif gate.name == 'Gypi2':
                         #     layer.extend()
@@ -70,7 +75,9 @@ def to_qcal(
                 )
                 if layer.name == 'Gzr':
                     tcircuit.append(
-                        Layer({gate_mapper['Gzr'](gqubits, layer.args[0])})
+                        Layer(
+                            {gate_mapper['Gzr'](gqubits, float(layer.args[0]))}
+                        )
                     )
                 else:
                     tcircuit.append(Layer({gate_mapper[layer.name](gqubits)}))
@@ -114,9 +121,9 @@ class Transpiler(Transpiler):
         Returns:
             CircuitSet: transpiled circuits.
         """
-        from pygsti.io import load_circuit_list
+        from pygsti.io import read_circuit_list
         if isinstance(circuits, str):
-            circuits = load_circuit_list(circuits)
+            circuits = read_circuit_list(circuits)
             circuit_list = [circ.str for circ in circuits]
         elif isinstance(circuits, list):
             circuit_list = [circ.str for circ in circuits]

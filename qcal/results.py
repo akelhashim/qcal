@@ -206,6 +206,22 @@ class Results:
             float: entropy.
         """
         return shannon_entropy(self)
+    
+    @property
+    def ev(self) -> float:
+        """Expectation value of the measured observable.
+
+        Returns:
+            float: expectation value.
+        """
+        counts_p = 0
+        counts_m = 0
+        for state in self.states:
+            if state.count('1') % 2 == 1:
+                counts_m += self._results[state]
+            else:
+                counts_p += self._results[state]
+        return (counts_p - counts_m) / self.n_shots
 
     @property
     def n_shots(self) -> int:
@@ -340,7 +356,7 @@ class Results:
         fig.update_traces(marker_color='blue')
         fig.update_layout(
             autosize=False,
-            width=175 * len(self.states),
+            width=150 * len(self.states),
             height=400,
             xaxis=dict(
                 tickvals=[i for i in range(len(self.states))],
@@ -357,7 +373,18 @@ class Results:
         )
         if len(self.states[0]) > 5:
             fig.update_xaxes(tickangle=-45)
-        fig.show()
+
+        save_properties = {
+            'toImageButtonOptions': {
+                'format': 'png', # one of png, svg, jpeg, webp
+                'filename': 'results',
+                'height': 500,
+                'width': 1000,
+                'scale': 10 # Multiply title/legend/axis/canvas sizes by this factor
+            }
+        }
+
+        fig.show(config=save_properties)
 
     def tvd(self, results: Results) -> float:
         """Total Variation Distance
