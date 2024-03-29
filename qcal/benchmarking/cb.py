@@ -254,14 +254,32 @@ def CB(qpu:                  QPU,
                 ref_subset = self._circuits.subset(
                         cycles=[(tq.Cycle(self._cycle),)]
                 )
-                print(cycle_subset.fit(analyze_dim=2))
-                print(ref_subset.fit(analyze_dim=2))
-
-                e_C, err = compute_cycle_infidelity(cycle_subset, ref_subset)
-                print(f'Interleaved cycle infidelity: e_C = {e_C} ({err})\n')
+                try:
+                    print(cycle_subset.fit(analyze_dim=2))
+                    print(ref_subset.fit(analyze_dim=2))
+                    e_C, err = compute_cycle_infidelity(
+                        cycle_subset, ref_subset
+                    )
+                    print(
+                        f'Interleaved cycle infidelity: e_C = {e_C} ({err})\n'
+                    )
+                except Exception:
+                    logger.warning(' Unable to fit the estimate collection!')
 
             else:
-                print(self._circuits.fit(analyze_dim=2))
+                try:
+                    print(self._circuits.fit(analyze_dim=2))
+                except Exception:
+                    logger.warning(' Unable to fit the estimate collection!')
+
+        def save(self):
+            """Save all circuits and data."""
+            clear_output(wait=True)
+            self._data_manager._exp_id += (
+                f'_CB_Q{"".join(str(q) for q in self._circuits.labels)}'
+            )
+            if settings.Settings.save_data:
+                qpu.save(self) 
 
         def plot(self) -> None:
             """Plot the CB fit results."""
@@ -321,20 +339,18 @@ def CB(qpu:                  QPU,
                     )
                 plt.show()
 
+        def final(self) -> None:
+            """Final benchmarking method."""
+            print(f"\nRuntime: {repr(self._runtime)[8:]}\n")
+
         def run(self):
             """Run all experimental methods and analyze results."""
             self.generate_circuits()
             qpu.run(self, self._circuits, save=False)
-            clear_output(wait=True)
-            self._data_manager._exp_id += (
-                f'_CB_Q{"".join(str(q) for q in self._circuits.labels)}'
-            )
-            if settings.Settings.save_data:
-                self.save() 
             self.analyze()
+            self.save() 
             self.plot()
-            print(f"\nRuntime: {repr(self._runtime)[8:]}\n")
-
+            self.final()
 
     return CB(
         qpu,

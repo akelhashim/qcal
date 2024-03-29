@@ -98,7 +98,6 @@ def SRB(qpu:             QPU,
         import trueq as tq
 
         def __init__(self,
-                qpu:             QPU,
                 config:          Config,
                 qubit_labels:    Iterable[int],
                 circuit_depths:  List[int] | Tuple[int],
@@ -165,7 +164,19 @@ def SRB(qpu:             QPU,
             """Analyze the SRB results."""
             logger.info(' Analyzing the results...')
             print('')
-            print(self._circuits.fit(analyze_dim=2))
+            try:
+                print(self._circuits.fit(analyze_dim=2))
+            except Exception:
+                logger.warning(' Unable to fit the estimate collection!')
+
+        def save(self):
+            """Save all circuits and data."""
+            clear_output(wait=True)
+            self._data_manager._exp_id += (
+                f'_SRB_Q{"".join(str(q) for q in self._circuits.labels)}'
+            )
+            if settings.Settings.save_data:
+                qpu.save(self) 
 
         def plot(self) -> None:
             """Plot the SRB fit results."""
@@ -237,23 +248,20 @@ def SRB(qpu:             QPU,
                 )
             plt.show()
 
+        def final(self) -> None:
+            """Final benchmarking method."""
+            print(f"\nRuntime: {repr(self._runtime)[8:]}\n")
+
         def run(self):
             """Run all experimental methods and analyze results."""
             self.generate_circuits()
             qpu.run(self, self._circuits, save=False)
-            clear_output(wait=True)
-            self._data_manager._exp_id += (
-                f'_SRB_Q{"".join(str(q) for q in self._circuits.labels)}'
-            )
-            if settings.Settings.save_data:
-                self.save() 
             self.analyze()
+            self.save() 
             self.plot()
-            print(f"\nRuntime: {repr(self._runtime)[8:]}\n")
-
+            self.final()
 
     return SRB(
-        qpu,
         config,
         qubit_labels,
         circuit_depths,
