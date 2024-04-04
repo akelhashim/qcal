@@ -12,8 +12,8 @@ logger = logging.getLogger(__name__)
 __all__ = ('generate_pygsti_report',)
 
 
-def generate_pygsti_report(circuits: CircuitSet, fileloc: str):
-    """Generate a pyGSTi report from circuit results.
+def generate_pygsti_dataset(circuits: CircuitSet, fileloc: str):
+    """Generate a pyGSTi dataset from circuit results.
 
     Args:
         circuits (CircuitSet): measured circuits

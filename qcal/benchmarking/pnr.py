@@ -251,8 +251,8 @@ def KNR(qpu:                  QPU,
             """Run all experimental methods and analyze results."""
             self.generate_circuits()
             qpu.run(self, self._circuits, save=False)
-            self.analyze()
             self.save()
+            self.analyze()
             self.plot()
             self.final()
 
