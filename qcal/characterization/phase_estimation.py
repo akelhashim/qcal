@@ -10,7 +10,6 @@ import qcal.settings as settings
 
 from qcal.characterization.characterize import Characterize
 from qcal.config import Config
-from qcal.interface.pygsti.transpiler import Transpiler
 from qcal.managers.classification_manager import ClassificationManager
 from qcal.math.utils import round_to_order_error
 from qcal.qpu.qpu import QPU
@@ -52,7 +51,7 @@ def X90(theta):
 def CZ(theta_iz: float, theta_zi: float, theta_zz: float) -> NDArray:
     """Definition of a CZ gate.
 
-    diag([1,1,1,-1]) == CZ(np.pi, np.pi, -np.pi) (up to phase).
+    diag([1,1,1,-1]) == CZ(np.pi/2, np.pi/2, -np.pi/2) (up to phase).
 
     Args:
         theta_iz (float): IZ angle.
@@ -67,7 +66,7 @@ def CZ(theta_iz: float, theta_zi: float, theta_zz: float) -> NDArray:
     except ImportError:
         logger.warning('Unable to import pyGSTi!')
 
-    return scipy.linalg.expm(-1j /4 * (theta_iz * pygsti.sigmaiz + 
+    return scipy.linalg.expm(-1j /2 * (theta_iz * pygsti.sigmaiz + 
                                        theta_zi * pygsti.sigmazi + 
                                        theta_zz * pygsti.sigmazz))
 
@@ -92,7 +91,8 @@ def make_x90_circuits(circuit_depths: List[int], qubits: Tuple[int]):
         [make_x90_sin_circ(d, qubits) for d in circuit_depths]
     )
 
-    return pygsti.remove_duplicates_in_place(circuits)
+    return pygsti.remove_duplicates(circuits)
+
 
 def make_x90_cos_circ(d: int, qubits: Tuple[int] | List[int]):
     """Make the cosine circuit for X90 RPE.
@@ -198,7 +198,7 @@ def make_cz_cos_circ(
     if state_pair in [(0, 1), (1, 0)]:
        circ = (
            pygsti.circuits.Circuit(
-               [[('Gxpi2', qp[1]) for qp in qubit_pairs]], 
+               [[('Gypi2', qp[1]) for qp in qubit_pairs]], 
                line_labels=line_labels
            ) +
            pygsti.circuits.Circuit(
@@ -344,12 +344,12 @@ def make_cz_sin_circ(
     return circ
 
 
-def analyze_x90(dataset, qubit: int, circuit_depths: List[int]) -> Tuple:
+def analyze_x90(dataset, qubits: List[int], circuit_depths: List[int]) -> Tuple:
     """Analyze RPE dataset for the X90 gate.
 
     Args:
         dataset (pygsti.data.dataset): pyGSTi dataset.
-        qubit (int): qubit label.
+        qubits (List[int]): qubit labels.
         circuit_depths (List[int]): circuit depths.
 
     Returns:
@@ -363,8 +363,8 @@ def analyze_x90(dataset, qubit: int, circuit_depths: List[int]) -> Tuple:
 
     target_x = np.pi/2
 
-    cos_circs = {d: make_x90_cos_circ(d, [qubit]) for d in circuit_depths}
-    sin_circs = {d: make_x90_sin_circ(d, [qubit]) for d in circuit_depths}
+    cos_circs = {d: make_x90_cos_circ(d, qubits) for d in circuit_depths}
+    sin_circs = {d: make_x90_sin_circ(d, qubits) for d in circuit_depths}
 
     experiment = Q()
     for d in circuit_depths:
@@ -393,12 +393,14 @@ def analyze_x90(dataset, qubit: int, circuit_depths: List[int]) -> Tuple:
     return (angle_estimates, angle_errors, last_good_idx)
         
 
-def analyze_cz(dataset, qubit_pair: Tuple, circuit_depths: List[int]) -> Tuple:
+def analyze_cz(
+        dataset, qubit_pairs: List[Tuple[int]], circuit_depths: List[int]
+    ) -> Tuple:
     """Analyze RPE dataset for the CZ gate.
 
     Args:
         dataset (pygsti.data.dataset): pyGSTi dataset.
-        qubit_pair (int): qubit labels.
+        qubit_pairs (List[Tuple[int]]): qubit labels.
         circuit_depths (List[int]): circuit depths.
 
     Returns:
@@ -410,7 +412,7 @@ def analyze_cz(dataset, qubit_pair: Tuple, circuit_depths: List[int]) -> Tuple:
     except ImportError:
         logger.warning(' Unable to import pyRPE!')
 
-    target_zz = -np.pi
+    target_zz = -np.pi/2
     target_iz = target_zi = np.pi/2
 
     state_pairs = [(0, 1), (2, 3), (3, 1)]
@@ -431,14 +433,14 @@ def analyze_cz(dataset, qubit_pair: Tuple, circuit_depths: List[int]) -> Tuple:
     sin_dict = {
         state_pair: {
             d: make_cz_sin_circ(
-                d, state_pair, [qubit_pair]
+                d, state_pair, qubit_pairs
             ) for d in circuit_depths
         } for state_pair in state_pairs
     }
     cos_dict = {
         state_pair: {
             d: make_cz_cos_circ(
-                d, state_pair, [qubit_pair]
+                d, state_pair, qubit_pairs
             ) for d in circuit_depths
         } for state_pair in state_pairs
     }
@@ -475,20 +477,19 @@ def analyze_cz(dataset, qubit_pair: Tuple, circuit_depths: List[int]) -> Tuple:
         else:
             analyses[state_pair].angle_estimates_rectified = [
                 theta for theta in analyses[state_pair].angle_estimates
-            ]            
+            ]    
 
     # Turn lin. comb. estimates into direct phase estimates
-    zz_estimates = (
+    zz_estimates = 0.5 * (
         np.array(analyses[(0, 1)].angle_estimates_rectified) - 
         np.array(analyses[(2, 3)].angle_estimates_rectified)
     )
-    iz_estimates = (
+    iz_estimates = 0.5 * (
         np.array(analyses[(0, 1)].angle_estimates_rectified) + 
         np.array(analyses[(2, 3)].angle_estimates_rectified)
     )
     zi_estimates = (
-        2 * np.array(analyses[(3, 1)].angle_estimates_rectified) + 
-        zz_estimates
+        np.array(analyses[(3, 1)].angle_estimates_rectified) + zz_estimates
     )
     angle_estimates = {
         'ZZ': zz_estimates,
@@ -515,7 +516,7 @@ def analyze_cz(dataset, qubit_pair: Tuple, circuit_depths: List[int]) -> Tuple:
 
 
 def rectify_angle(theta: float) -> float:
-    """Constain an angle to be within pi.
+    """Constrain an angle to be within pi.
 
     Args:
         theta (float): angle
@@ -577,11 +578,10 @@ def RPE(qpu:             QPU,
         Callable: RPE class instance.
     """
 
-    class RPE(qpu, Characterize):
+    class RPE(qpu):
         """pyRPE protocol."""
 
         def __init__(self,
-                qpu:             QPU,
                 config:          Config,
                 qubit_labels:    Iterable[int],
                 gate:            str,
@@ -595,20 +595,21 @@ def RPE(qpu:             QPU,
                 raster_circuits: bool = False,
                 **kwargs
             ) -> None:
+            from qcal.interface.pygsti.transpiler import Transpiler
+
             try:
                 import pygsti
                 from pygsti.modelpacks import smq2Q_XXYYII
                 from pygsti.modelpacks import smq2Q_XYICPHASE
-                print(f"pyGSTi version: {pygsti.__version__}\n")
+                logger.info(f" pyGSTi version: {pygsti.__version__}\n")
             except ImportError:
                 logger.warning(' Unable to import pyGSTi!')
 
-            Characterize.__init__(self, config)
+            self._config = config
 
             assert gate.upper() in ('X90', 'CZ'), (
                 'Only X90 and CZ gates are currently supported!'
             )
-
             self._qubit_labels = qubit_labels
             self._gate = gate.upper()
             self._circuit_depths = circuit_depths
@@ -666,7 +667,7 @@ def RPE(qpu:             QPU,
             Returns:
                 Dict: angle estimates.
             """
-            self._angle_estimates
+            return self._angle_estimates
 
         @property
         def angle_errors(self) -> Dict:
@@ -675,7 +676,16 @@ def RPE(qpu:             QPU,
             Returns:
                 Dict: angle errors.
             """
-            self._angle_errors
+            return self._angle_errors
+
+        @property
+        def gate(self) -> str:
+            """Gate being characterized.
+
+            Returns:
+                str: name of gate.
+            """
+            return self._gate
 
         @property
         def last_good_index(self) -> Dict:
@@ -684,25 +694,40 @@ def RPE(qpu:             QPU,
             Returns:
                 Dict: last good index.
             """
-            self._last_good_idx
+            return self._last_good_idx
 
         def generate_circuits(self):
             """Generate all RPE circuits."""
-            logger.info(' Generating circuits from pyGSTi...')
-            self._circuits = self._make_circuits[self._gate]
+            from qcal.interface.pygsti.circuits import load_circuits
 
-        def generate_pygsti_report(self):
-            """Generate a pyGSTi report for each qubit label."""
+            logger.info(' Generating circuits from pyGSTi...')
+            circuits = self._make_circuits[self._gate](
+                self._circuit_depths, self._qubit_labels
+            )
+            self._circuits = load_circuits(circuits)
+
+        def save(self):
+            """Save all circuits and data."""
+            self._data_manager._exp_id += (
+                f'_RPE_Q{"".join(str(q) for q in self._qubit_labels)}'
+            )
+
+            if settings.Settings.save_data:
+                logger.info(' Saving the circuits...')
+                qpu.save(self)
+                
+        def generate_pygsti_dataset(self):
+            """Generate a pyGSTi dataset for each qubit label."""
             logger.info(' Generating pyGSTi reports...')
             
             circuits = self._transpiled_circuits
             fileloc = self.data_manager.save_path
             for ql in self._qubit_labels:
                 if isinstance(ql, Iterable):
-                    q_index = (self._qubits.index(q) for q in ql)
+                    q_index = tuple([self._qubits.index(q) for q in ql])
                     qs = ''.join(str(q) for q in ql)
                 else:
-                    q_index = (self._qubits.index(ql),)
+                    q_index = tuple([self._qubits.index(ql)])
                     qs = str(ql)
 
                 results_dfs = []
@@ -717,6 +742,7 @@ def RPE(qpu:             QPU,
                 results_df = results_df.fillna(0).astype(int).rename(
                     columns=lambda col: col + ' count'
                 )
+                self._df = results_df
 
                 with open(f'{fileloc}dataset_{qs}.txt', 'w') as f:
                     f.write(
@@ -738,51 +764,41 @@ def RPE(qpu:             QPU,
             clear_output(wait=True)
             for ql in self._qubit_labels:
                 if isinstance(ql, Iterable):
-                    print(f'\nQubit pair: {ql}')
                     qs = ''.join(str(q) for q in ql)
                 else:
-                    print(f'\nQubit: {ql}')
                     qs = str(ql)
                 
                 dataset = pygsti.io.read_dataset(
-                    self.data_manager.save_path + f'_dataset{qs}.txt'
+                    self.data_manager.save_path + f'dataset_{qs}.txt'
                 )
                 self._datasets[ql] = dataset
 
                 results = self._analyze_results[self._gate](
-                    dataset, ql, self._circuit_depths
+                    dataset, self._qubit_labels, self._circuit_depths
                 )
                 angle_estimates, angle_errors, last_good_idx = results
                 self._angle_estimates[ql] = angle_estimates
                 self._angle_errors[ql] = angle_errors
                 self._last_good_idx[ql] = last_good_idx
 
-                print(f'Last good depth: L = {2**last_good_idx})')
-                for angle, errors in angle_errors.items():
-                    error = errors[last_good_idx]
-                    unc = np.pi / (2 * 2**last_good_idx)
+            for ql in self._qubit_labels:
+                if isinstance(ql, Iterable):
+                    print(f'\nQubit pair: {ql}')
+                else:
+                    print(f'\nQubit: {ql}')
+
+                print(f'Last good depth: L = {2**self._last_good_idx[ql]}')
+                for angle, errors in self._angle_errors[ql].items():
+                    error = errors[self._last_good_idx[ql]]
+                    unc = np.pi / (2 * 2**self._last_good_idx[ql])
                     error, unc = round_to_order_error(error, unc)
+                    error_deg, unc_deg = round_to_order_error(
+                        error * 180 / np.pi, unc * 180 / np.pi
+                    )
                     print(
                         f'{angle} error = {error} ({unc}) rad., '
-                        f'{error * 180 / np.pi} ({unc * 180 / np.pi}) deg.'
+                        f'{error_deg} ({unc_deg}) deg.'
                     )
-
-        def save(self):
-            """Save all circuits and data."""
-            self._data_manager._exp_id += (
-                f'_RPE_Q{"".join(str(q) for q in self._circuits.labels)}'
-            )
-            if settings.Settings.save_data:
-                qpu.save(self)
-                self._data_manager.save_to_csv(
-                    pd.DataFrame([self._angle_estimates]), 'angle_estimates'
-                )
-                self._data_manager.save_to_csv(
-                    pd.DataFrame([self._angle_errors]), 'angle_errors'
-                )
-                self._data_manager.save_to_csv(
-                    pd.DataFrame([self._last_good_idx]), 'last_good_idx'
-                )
 
         def plot(self) -> None:
             """Plot the RPE results."""
@@ -812,18 +828,20 @@ def RPE(qpu:             QPU,
                                 self._circuit_depths, errors, 'o-', label=angle
                             )
                         ax.axvline(
-                            2**self._last_good_depth[ql], 
-                            label='Last good depth'
+                            2**self._last_good_idx[ql], 
+                            ls='--',
+                            c='k',
+                            label='Last good depth',
                         )
 
                         ax.set_title(f'Q{ql}', fontsize=20)
                         ax.set_xlabel('Circuit Depth', fontsize=15)
-                        ax.set_ylabel('Angle Error')
+                        ax.set_ylabel('Angle Error (rad.)', fontsize=15)
                         ax.tick_params(
                             axis='both', which='major', labelsize=12
                         )
                         ax.set_xscale('log')
-                        ax.set_yscale('log')
+                        # ax.set_yscale('log')
                         ax.legend(prop=dict(size=12))
                         ax.grid(True)
 
@@ -840,15 +858,27 @@ def RPE(qpu:             QPU,
 
         def final(self) -> None:
             """Final method."""
+            if settings.Settings.save_data:
+                self._data_manager.save_to_csv(
+                    pd.DataFrame([self._angle_estimates]), 'angle_estimates'
+                )
+                self._data_manager.save_to_csv(
+                    pd.DataFrame([self._angle_errors]), 'angle_errors'
+                )
+                self._data_manager.save_to_csv(
+                    pd.DataFrame([self._last_good_idx]), 'last_good_idx'
+                )
+            
             print(f"\nRuntime: {repr(self._runtime)[8:]}\n")
 
         def run(self):
             """Run all experimental methods and analyze results."""
             self.generate_circuits()
             qpu.run(self, self._circuits, save=False)
+            self.save()
+            self.generate_pygsti_dataset()
             self.analyze()
             self.plot()
-            self.save()
             self.final()
 
     return RPE(
