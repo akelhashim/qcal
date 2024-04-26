@@ -156,16 +156,14 @@ class QubicQPU(QPU):
             reload_pulse=reload_pulse,
             hardware_vz_qubits=hardware_vz_qubits
         )
-        self._gmm_manager = gmm_manager if gmm_manager is not None else (
-            os.path.join(settings.Settings.config_path, 'gmm_manager.pkl')
-        )
+        self._gmm_manager = gmm_manager
         self._fpga_config = FPGAConfig()
         self._channel_config = load_channel_configs(
             os.path.join(settings.Settings.config_path, 'channel_config.json')
         )
-        self._qchip = QChip(
-            os.path.join(settings.Settings.config_path, 'qubic_cfg.json')
-        )
+        # self._qchip = QChip(
+        #     os.path.join(settings.Settings.config_path, 'qubic_cfg.json')
+        # )
         self._runner = rpc_client.CircuitRunnerClient(
             ip=rpc_ip_address, port=port
         )
@@ -179,16 +177,16 @@ class QubicQPU(QPU):
         self._compiled_program = None
 
         # Overwrite qubit and readout frequencies:
-        for q in self._config.qubits:
-            self._qchip.qubits[f'Q{q}'].freq = (
-                self._config[f'single_qubit/{q}/GE/freq']
-            )
-            self._qchip.qubits[f'Q{q}'].freq_ef = (
-                self._config[f'single_qubit/{q}/EF/freq']
-            )
-            self._qchip.qubits[f'Q{q}'].readfreq = (
-                self._config[f'readout/{q}/freq']
-            )
+        # for q in self._config.qubits:
+        #     self._qchip.qubits[f'Q{q}'].freq = (
+        #         self._config[f'single_qubit/{q}/GE/freq']
+        #     )
+        #     self._qchip.qubits[f'Q{q}'].freq_ef = (
+        #         self._config[f'single_qubit/{q}/EF/freq']
+        #     )
+        #     self._qchip.qubits[f'Q{q}'].readfreq = (
+        #         self._config[f'readout/{q}/freq']
+        #     )
 
     @property
     def fpga_config(self):
