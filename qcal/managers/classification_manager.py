@@ -7,7 +7,7 @@ from qcal.machine_learning.clustering import GMM
 import logging
 
 from numpy.typing import ArrayLike, NDArray
-from typing import Any, Dict, List, Tuple
+from typing import Any, List, Tuple
 
 logger = logging.getLogger(__name__)
 

@@ -156,9 +156,7 @@ class QubicQPU(QPU):
             reload_pulse=reload_pulse,
             hardware_vz_qubits=hardware_vz_qubits
         )
-        self._gmm_manager = gmm_manager if gmm_manager is not None else (
-            os.path.join(settings.Settings.config_path, 'gmm_manager.pkl')
-        )
+        self._gmm_manager = gmm_manager
         self._fpga_config = FPGAConfig()
         self._channel_config = load_channel_configs(
             os.path.join(settings.Settings.config_path, 'channel_config.json')

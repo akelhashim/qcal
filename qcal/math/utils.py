@@ -53,7 +53,7 @@ def round_to_order_error(
         Tuple[float]: rounded value, rounded error
     """
     if abs(err) >= abs(val):
-        logger.warning("Uncertainty greater than value!")
+        logger.warning(" Uncertainty greater than value!")
         val_precision = 0
     else:
         order_val = np.log10(abs(val))  # exponent of order

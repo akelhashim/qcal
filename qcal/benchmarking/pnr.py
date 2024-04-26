@@ -178,8 +178,20 @@ def KNR(qpu:                  QPU,
             """Analyze the KNR results."""
             logger.info(' Analyzing the results...')
             print('')
-            for fit in self._circuits.fit(analyze_dim=2):
-                print(fit)
+            try:
+                for fit in self._circuits.fit(analyze_dim=2):
+                    print(fit)
+            except Exception:
+                logger.warning(' Unable to fit the estimate collection!')
+
+        def save(self):
+            """Save all circuits and data."""
+            clear_output(wait=True)
+            self._data_manager._exp_id += (
+                f'_KNR_Q{"".join(str(q) for q in self._circuits.labels)}'
+            )
+            if settings.Settings.save_data:
+                qpu.save(self) 
 
         def plot(self) -> None:
             """Plot the KNR fit results."""
@@ -231,20 +243,18 @@ def KNR(qpu:                  QPU,
                 )
             plt.show()
 
+        def final(self) -> None:
+            """Final benchmarking method."""
+            print(f"\nRuntime: {repr(self._runtime)[8:]}\n")
+
         def run(self):
             """Run all experimental methods and analyze results."""
             self.generate_circuits()
             qpu.run(self, self._circuits, save=False)
-            clear_output(wait=True)
-            self._data_manager._exp_id += (
-                f'_KNR_Q{"".join(str(q) for q in self._circuits.labels)}'
-            )
-            if settings.Settings.save_data:
-                self.save() 
+            self.save()
             self.analyze()
             self.plot()
-            print(f"\nRuntime: {repr(self._runtime)[8:]}\n")
-
+            self.final()
 
     return KNR(
         qpu,
