@@ -41,10 +41,13 @@ def compute_cycle_infidelity(circs_D, circs_ref) -> Tuple:
     err_D = circs_D.fit(analyze_dim=2)[0].e_F.std
     err_ref = circs_ref.fit(analyze_dim=2)[0].e_F.std
 
-    e_C = (1 - F_D/F_ref) * (d - 1)/d
+    f_D = (d**2 * F_D - 1) / d**2
+    f_ref = (d**2 * F_ref - 1) / d**2
+
+    e_C = (d**2 - 1)/d**2 * (1 - f_D/f_ref)
     err = np.sqrt( 
-        (err_D/F_D)**2 + (err_ref/F_ref)**2 
-    ) * (F_D/F_ref) * (d - 1)/d
+        (err_D/f_D)**2 + (err_ref/f_ref)**2 
+    ) * (f_D/f_ref) * (d**2 - 1)/d**2
 
     e_C, err = round_to_order_error(e_C, err)
 
@@ -307,13 +310,13 @@ def CB(qpu:                  QPU,
                 # ax.legend(prop=dict(size=12))
                 ax.grid(True)
 
-                fig.set_tight_layout(True)
-                if settings.Settings.save_data:
-                    fig.savefig(
-                        self._data_manager._save_path + 'CB_decays.png', 
-                        dpi=300
-                    )
-                plt.show()
+            fig.set_tight_layout(True)
+            if settings.Settings.save_data:
+                fig.savefig(
+                    self._data_manager._save_path + 'CB_decays.png', 
+                    dpi=300
+                )
+            plt.show()
 
             # Plot the CB infidelities
             nrows = 2 if self._include_ref_cycle else 1
@@ -334,13 +337,13 @@ def CB(qpu:                  QPU,
                 ax.legend(prop=dict(size=12))
                 ax.grid(True)
 
-                fig.set_tight_layout(True)
-                if settings.Settings.save_data:
-                    fig.savefig(
-                        self._data_manager._save_path + 'CB_infidelities.png', 
-                        dpi=300
-                    )
-                plt.show()
+            fig.set_tight_layout(True)
+            if settings.Settings.save_data:
+                fig.savefig(
+                    self._data_manager._save_path + 'CB_infidelities.png', 
+                    dpi=300
+                )
+            plt.show()
 
         def final(self) -> None:
             """Final benchmarking method."""
