@@ -44,7 +44,8 @@ __all__ = (
     'X90',
     'Y',
     'Y90',
-    'Z'
+    'Z',
+    'Z90'
 )
 
 
@@ -810,6 +811,25 @@ class Z(Gate):
         self._properties['subspace'] = subspace
 
 
+class Z90(Gate):
+    """Class for the Z90 = sqrt(Z) gate."""
+
+    def __init__(self, qubit: int, subspace: str = 'GE') -> None:
+        """Initialize using the Rz gate.
+        
+        Args:
+            qubit (int): qubit label.
+        """
+        super().__init__(rz(np.pi/2), qubit)
+        self._properties['alias'] = 'sqrt(Z)\nS'
+        self._properties['name'] = 'Z90'
+        self._properties['params'] = {
+            'phase': np.pi/2,
+            'axis':  'z',
+        }
+        self._properties['subspace'] = subspace
+
+
 single_qubit_gates = defaultdict(lambda: 'Gate not currently supported!', {
     'C':        C,
     'H':        H,
@@ -839,5 +859,6 @@ single_qubit_gates = defaultdict(lambda: 'Gate not currently supported!', {
     'X90':      X90,
     'Y':        Y, 
     'Y90':      Y90,
-    'Z':        Z
+    'Z':        Z,
+    'Z90':      Z90
 })

@@ -108,6 +108,7 @@ class Transpiler(Transpiler):
                 'Gidle':   single_qubit_gates['Id'],
                 'Gxpi2':   single_qubit_gates['X90'], 
                 'Gypi2':   single_qubit_gates['Y90'],
+                'Gzpi2':   single_qubit_gates['Z90'],
                 'Gzr':     single_qubit_gates['Rz']
             }
         super().__init__(gate_mapper=gate_mapper)
