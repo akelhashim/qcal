@@ -4,7 +4,8 @@
 import logging
 import numpy as np
 
-from typing import Tuple
+from numpy.typing import NDArray
+from typing import List, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -67,6 +68,18 @@ def round_to_order_error(
         np.format_float_scientific(err, precision=error_precision)
     )
     return val_rounded, err_rounded
+
+
+def uncertainty_of_sum(errors: List | NDArray) -> float:
+    """Computes the quadrature sum of errors from a list/array of errors.
+
+    Args:
+        errors (List | NDArray): list/array of errors.
+
+    Returns:
+        float: error for sum of terms.
+    """
+    return np.sqrt(np.sum(np.array([err ** 2 for err in errors])))
 
 
 def wrap_phase(phase: float) -> float:
