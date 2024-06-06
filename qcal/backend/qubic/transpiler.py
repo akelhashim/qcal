@@ -876,6 +876,7 @@ class Transpiler:
                  'Tdag':     add_virtualz_gate,
                  'VirtualZ': add_virtualz_gate,
                  'Z':        add_virtualz_gate,
+                 'Z90':      add_virtualz_gate,
                  'Y':        add_single_qubit_gate,
                  'Y90':      add_single_qubit_gate,
                 }
