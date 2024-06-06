@@ -176,6 +176,9 @@ def post_process(
                     meas for meas in reorg_measurements
                 ])
 
+    else:
+        measurement = {}
+
     if measurement:
         all_results = []
         for i, circuit in enumerate(circuits):

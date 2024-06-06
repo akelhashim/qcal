@@ -257,7 +257,7 @@ def T1(qpu:             QPU,
 
         def plot(self):
             """Plot the data."""
-            Characterize.plot(
+            Characterize.plot(self,
                 xlabel=r'Time ($\mu$s)',
                 ylabel=(
                     r'$|2\rangle$ Population' if self._subspace == 'EF' else
@@ -269,7 +269,7 @@ def T1(qpu:             QPU,
 
         def final(self):
             """Final experimental method."""
-            Characterize.final()
+            Characterize.final(self)
             print(f"\nRuntime: {repr(self._runtime)[8:]}\n")
 
         def run(self):
@@ -562,7 +562,7 @@ def T2(qpu:             QPU,
 
         def plot(self):
             """Plot the data."""
-            Characterize.plot(
+            Characterize.plot(self,
                 xlabel=r'Time ($\mu$s)',
                 ylabel=(
                 r'$|2\rangle$ Population' if self._subspace == 'EF' else
@@ -574,7 +574,7 @@ def T2(qpu:             QPU,
 
         def final(self):
             """Final experimental method."""
-            Characterize.final()
+            Characterize.final(self)
             print(f"\nRuntime: {repr(self._runtime)[8:]}\n")
 
         def run(self):
