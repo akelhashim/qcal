@@ -42,7 +42,8 @@ def post_process(
         measure_qubits:   List[str] | None = None,
         n_reads_per_shot: int | dict | None = None,
         classifier:       ClassificationManager | None = None, 
-        raster_circuits:  bool = False
+        raster_circuits:  bool = False,
+        save_raw_data:    bool = False
     ) -> None:
     """Post-process measurement results from QubiC.
 
@@ -68,6 +69,8 @@ def post_process(
             one by one. If True, all circuits in a batch will be measured
             back-to-back one shot at a time. This can help average out the 
             effects of drift on the timescale of a measurement.
+        save_raw_data (bool, optional): whether to save raw IQ data for each
+                qubit in the CircuitSet. Defaults to False.
     """
     outputs = list(measurements[0].keys())
 
@@ -120,7 +123,7 @@ def post_process(
                     iq for iq in reorg_raw_iqs
                 ])
 
-        if isinstance(circuits, CircuitSet):
+        if isinstance(circuits, CircuitSet) and save_raw_data:
             for q, meas in raw_iq.items():
                 circuits[f'{q}: iq_data'] = [
                     m[:, -1].reshape(-1, 1) for m in meas

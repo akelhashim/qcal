@@ -15,7 +15,6 @@ from qcal.gate.single_qubit import (
 from qcal.sequencer.dynamical_decoupling import dd_sequences
 from qcal.sequencer.pulse_envelopes import pulse_envelopes
 from qcal.sequencer.utils import clip_amplitude
-# from qcal.units import ns
 
 import copy
 import logging
@@ -308,12 +307,12 @@ def add_mcm_apply(config: Config, mcm: MCM, pulse: List) -> None:
     for btstr in mcm.properties['params']['apply'].keys():
         q_cond.update( mcm.properties['params']['apply'][btstr].qubits)
     q_cond = tuple(sorted(q_cond))
-    scope = sorted([f'Q{q}' for q in q_meas + q_cond])
+    scope = sorted(list(set([f'Q{q}' for q in q_meas + q_cond])))
     branch_fproc = {
         'name': 'branch_fproc', 
         'alu_cond': 'eq', 
-        'cond_lhs': 1, 
-        'func_id': None, #f'Q{q_meas}.meas',
+        'cond_lhs': 1,  # 1 == 'Q.meas', 1 = LHS of 'eq'
+        'func_id': None,  # f'Q{q_meas}.meas',
         'scope': [f'Q{q}' for q in q_cond],
         'true': [],
         'false': []    

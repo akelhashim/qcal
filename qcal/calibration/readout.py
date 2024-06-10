@@ -385,7 +385,7 @@ def ReadoutCalibration(
                                 fontsize=12,
                                 loc=0
                             )
-                        for lh in leg.legendHandles:
+                        for lh in leg.legend_handles:
                             lh.set_alpha(1)
 
                     else:
