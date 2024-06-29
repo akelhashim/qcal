@@ -136,3 +136,5 @@ data/Q7/Y_train.npy
 data/Q7/Y.npy
 
 logs/06_10_2024.log/06_10_2024.log
+
+*.log

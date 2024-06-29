@@ -47,7 +47,6 @@ def T1(qpu:             QPU,
     """T1 coherence characterization.
 
     Basic example useage:
-
     ```
     exp = T1(
         CustomQPU, 
@@ -80,6 +79,12 @@ def T1(qpu:             QPU,
             Defaults to 1.
         n_circs_per_seq (int, optional): maximum number of circuits that
             can be measured per sequence. Defaults to 1.
+        raster_circuits (bool, optional): whether to raster through all
+            circuits in a batch during measurement. Defaults to False. By
+            default, all circuits in a batch will be measured n_shots times
+            one by one. If True, all circuits in a batch will be measured
+            back-to-back one shot at a time. This can help average out the 
+            effects of drift on the timescale of a measurement.
 
     Returns:
         Callable: T1 class.
@@ -356,6 +361,12 @@ def T2(qpu:             QPU,
             Defaults to 1.
         n_circs_per_seq (int, optional): maximum number of circuits that
             can be measured per sequence. Defaults to 1.
+        raster_circuits (bool, optional): whether to raster through all
+            circuits in a batch during measurement. Defaults to False. By
+            default, all circuits in a batch will be measured n_shots times
+            one by one. If True, all circuits in a batch will be measured
+            back-to-back one shot at a time. This can help average out the 
+            effects of drift on the timescale of a measurement.
 
     Returns:
         Callable: T2 class.
@@ -643,6 +654,12 @@ def ParityOscillations(
             Defaults to 1.
         n_circs_per_seq (int, optional): maximum number of circuits that
             can be measured per sequence. Defaults to 1.
+        raster_circuits (bool, optional): whether to raster through all
+            circuits in a batch during measurement. Defaults to False. By
+            default, all circuits in a batch will be measured n_shots times
+            one by one. If True, all circuits in a batch will be measured
+            back-to-back one shot at a time. This can help average out the 
+            effects of drift on the timescale of a measurement.
 
     Returns:
         Callable: ParityOscillations class.

@@ -213,7 +213,6 @@ def add_measurement(
         qubits = (qubit,)
     elif isinstance(qubit_or_meas, Gate):
         qubits = qubit_or_meas.qubits
-        # qubit = qubits[0]
 
     meas_pulse = []
     # Excited state promotion

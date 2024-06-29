@@ -304,27 +304,31 @@ class QubicQPU(QPU):
         )
 
         if len(self._compiled_circuits) > 1:
-            self._compiled_circuits['results'] = self._circuits['results']
-            # post_process(
-            #     self._config, 
-            #     self._measurements,
-            #     self._compiled_circuits,
-            #     measure_qubits=self._measure_qubits,
-            #     n_reads_per_shot=self._n_reads_per_shot,
-            #     classifier=self._classifier, 
-            #     raster_circuits=self._raster_circuits,
-            #     save_raw_data=self._save_raw_data
-            # )
+            if isinstance(self._circuits, CircuitSet):
+                self._compiled_circuits['results'] = self._circuits['results']
+            else:
+                post_process(
+                    self._config, 
+                    self._measurements,
+                    self._compiled_circuits,
+                    measure_qubits=self._measure_qubits,
+                    n_reads_per_shot=self._n_reads_per_shot,
+                    classifier=self._classifier, 
+                    raster_circuits=self._raster_circuits,
+                    save_raw_data=self._save_raw_data
+                )
 
         if len(self._transpiled_circuits) > 1:
-            self._transpiled_circuits['results'] = self._circuits['results']
-            # post_process(
-            #     self._config,
-            #     self._measurements,
-            #     self._transpiled_circuits,
-            #     measure_qubits=self._measure_qubits,
-            #     n_reads_per_shot=self._n_reads_per_shot,
-            #     classifier=self._classifier, 
-            #     raster_circuits=self._raster_circuits,
-            #     save_raw_data=self._save_raw_data
-            # )
+            if isinstance(self._circuits, CircuitSet):
+                self._transpiled_circuits['results'] = self._circuits['results']
+            else:
+                post_process(
+                    self._config,
+                    self._measurements,
+                    self._transpiled_circuits,
+                    measure_qubits=self._measure_qubits,
+                    n_reads_per_shot=self._n_reads_per_shot,
+                    classifier=self._classifier, 
+                    raster_circuits=self._raster_circuits,
+                    save_raw_data=self._save_raw_data
+                )
