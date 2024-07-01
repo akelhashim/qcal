@@ -6,6 +6,7 @@ import qcal.settings as settings
 from .post_process import post_process
 from .transpiler import Transpiler
 from .utils import calculate_n_reads
+from qcal.circuit import CircuitSet
 from qcal.config import Config
 from qcal.managers.classification_manager import ClassificationManager
 from qcal.qpu.qpu import QPU
@@ -53,7 +54,6 @@ class QubicQPU(QPU):
                 zero_between_reload: bool = True,
                 save_raw_data:       bool = False,
                 gmm_manager:         GMMManager = None,
-                sd_param:            Dict | None = None,
                 rpc_ip_address:      str = '192.168.1.122',
                 port:                int = 9095
         ) -> None:
@@ -122,10 +122,6 @@ class QubicQPU(QPU):
             gmm_manager (GMMManager, optional): QubiC GMMManager object.
                 Defaults to None. If None, this is loaded from a previously 
                 saved manager object: 'gmm_manager.pkl'.
-            sd_param (Dict | None, optional): parameters for ML state 
-                discrimination. Defaults to None. If not None, this will load 
-                the sd params onto the hardware and will set 
-                ```return_sd = True``` in the jobman.
             rpc_ip_address (str, optional): IP address for RPC server.
                 Defaults to '192.168.1.25'.
             port (int, option): port for RPC server. Defaults to 9096.
@@ -199,17 +195,6 @@ class QubicQPU(QPU):
             self._qchip.qubits[f'Q{q}'].readfreq = (
                 self._config[f'readout/{q}/freq']
             )
-
-        self._sd_param = sd_param
-        if sd_param:
-            for q in sd_param:
-                ch = self._config['readout'][int(q.replace('Q', ''))]['channel']
-                self._runner.write_mem_buf(
-                    name=f"sdpara{ch}", value=sd_param[q]
-                )
-                self._fpga_config.fproc_channels[f'{q}.meas'].hold_nclks += 33
-            self._runner.write_reg('paraload_start', 1)
-            self._runner.write_reg('sd_sw', 1)
 
     @property
     def fpga_config(self):
@@ -285,8 +270,7 @@ class QubicQPU(QPU):
             reload_cmd=self._reload_cmd,
             reload_freq=self._reload_freq,
             reload_env=self._reload_env,
-            zero_between_reload=self._zero_between_reload,
-            return_sd=True if self._sd_param else False
+            zero_between_reload=self._zero_between_reload
         )
         self._measurements.append(measurement)
 

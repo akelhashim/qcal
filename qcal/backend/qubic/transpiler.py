@@ -611,7 +611,6 @@ def add_pre_post_pulse(
     )
 
 
-
 def cycle_pulse(config: Config, cycle: Cycle) -> List:
     """Generate a pulse from a cycle of operations.
 
