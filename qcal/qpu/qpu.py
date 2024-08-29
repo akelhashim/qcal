@@ -108,6 +108,9 @@ class QPU:
         self._n_circs_per_seq = n_circs_per_seq
         self._raster_circuits = raster_circuits
 
+        if self._classifier is None:
+            logger.warning(' No classifier has been instantiated!')
+
         assert n_levels <= 3, 'n_levels > is not currently supported!'
         self._n_levels = n_levels
 

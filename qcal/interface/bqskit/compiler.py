@@ -169,7 +169,8 @@ class Compiler:
         from bqskit import compile
         if not isinstance(circuits, CircuitSet):
             circuits = CircuitSet(circuits=circuits)
-        # circuits = circuits.copy()
+        # Copy so we don't mutate the original circuits
+        circuits = circuits.copy()
 
         to_qcal = False
         if isinstance(circuits[0], Circuit):

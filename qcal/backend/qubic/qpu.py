@@ -290,6 +290,8 @@ class QubicQPU(QPU):
         if len(self._compiled_circuits) > 1:
             if isinstance(self._circuits, CircuitSet):
                 self._compiled_circuits['results'] = self._circuits['results']
+                for i, results in enumerate(self._circuits['results']):
+                    self._compiled_circuits[i].results = results
             else:
                 post_process(
                     self._config, 
@@ -305,6 +307,8 @@ class QubicQPU(QPU):
         if len(self._transpiled_circuits) > 1:
             if isinstance(self._circuits, CircuitSet):
                 self._transpiled_circuits['results'] = self._circuits['results']
+                for i, results in enumerate(self._circuits['results']):
+                    self._transpiled_circuits[i].results = results
             else:
                 post_process(
                     self._config,
