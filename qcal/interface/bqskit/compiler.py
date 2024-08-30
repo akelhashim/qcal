@@ -60,11 +60,11 @@ class Compiler:
                 as native gates. See :class:`MachineModel` for information
                 on loading a preset model or creating a custom one.
             gate_mapper (Dict, optional): dictionary mapping the names of the
-                basis gates in config.basis_gates['set'] to the equivalent
+                natives gates in config.native_gates['set'] to the equivalent
                 BQSKit gates. This is only used if a :class:`MachineModel`
                 instance is not passed. Defaults to {'Rz': RZGate(), 
                 'X': XGate(), 'X90': SqrtXGate(), 'CNOT': CNOTGate(),
-                CX': CNOTGate(), 'CZ': CZGate()}
+                CX': CNOTGate(), 'CZ': CZGate()}.
             optimization_level (int): the degree of optimization in the 
                 workflow. The workflow will produce shorter depth circuits at 
                 the cost of performance with a higher number. An 
@@ -118,15 +118,15 @@ class Compiler:
         if model is None:
             from bqskit import MachineModel
             from bqskit.ir.gates import RZGate
-            basis_gates = {
-                gate_mapper[gate] for gate in config.basis_gates['set']
+            native_gates = {
+                gate_mapper[gate] for gate in config.native_gates['set']
             }
-            basis_gates.add(RZGate())
+            native_gates.add(RZGate())
             self._gate_mapper = gate_mapper
             self._model = MachineModel(
                 config.n_qubits,
                 config.qubit_pairs,
-                basis_gates
+                native_gates
             )
         else:
             self._model = model

@@ -878,7 +878,7 @@ class Transpiler:
                  'Y90':      add_single_qubit_gate,
                 }
             )
-            for gate in config.basis_gates['set']:
+            for gate in config.native_gates['set']:
                 if gate in qcal.gate.single_qubit.__all__:
                     self._gate_mapper[gate] = add_single_qubit_gate
                 else:

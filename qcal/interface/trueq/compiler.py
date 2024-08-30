@@ -96,15 +96,15 @@ class Compiler:
         qubits = {f'({q},)': '()' for q in config.qubits}
 
         factories_2q = ''
-        for gate in config.basis_gates['set']:
+        for gate in config.native_gates['set']:
             if gate in two_qubit_gates.keys():
                 factories_2q += f'\n        - {gate}:'
                 factories_2q += '\n            Matrix:'
                 for row in two_qubit_gates[gate]((0, 1)).matrix:
                     factories_2q += f'\n            - {list(row)}'
                 factories_2q += '\n            Involving:'
-            for qubit_pair in config.basis_gates['two_qubit'].keys():
-                if gate in config.basis_gates['two_qubit'][qubit_pair]:
+            for qubit_pair in config.native_gates['two_qubit'].keys():
+                if gate in config.native_gates['two_qubit'][qubit_pair]:
                     factories_2q += f'\n                {qubit_pair}: ()'
 
         _config = f"""
