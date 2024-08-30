@@ -284,7 +284,8 @@ def TruthTable(
             if self._fidelity is not None:
                 fidelity = self._fidelity['val']
                 error = self._fidelity['err']
-                print(f'\nTruth Table Fidelity = {fidelity} ({error})')
+                print(f'\nTruth table fidelity = {fidelity} ({error})')
+
             print(f"\nRuntime: {repr(self._runtime)[8:]}\n")
 
         def run(self):

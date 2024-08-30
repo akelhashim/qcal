@@ -770,7 +770,7 @@ def ParityOscillations(
             logger.info(' Analyzing the data...')
 
             q_index = tuple([
-                self._qubits.index(q) for q in self._circuit.qubits
+                self._circuit.qubits.index(q) for q in self._qubits
             ])
 
             # Populations
@@ -780,14 +780,14 @@ def ParityOscillations(
             pop1 = self._circuits[0].results.marginalize(q_index).populations[
                 '1' * len(self._qubits)
             ]
-            uncertainties = [
+            errors = [
                 1/np.sqrt(
                     self._circuits[0].results.marginalize(q_index).n_shots
                 )
             ] * 2
 
             # Parity
-            for circuit in self._circuits[1:]:
+            for circuit in self._circuits[1:].circuit:
                 results = circuit.results.marginalize(q_index)
                 self._evs.append(results.ev)
 
@@ -797,15 +797,14 @@ def ParityOscillations(
                 p0=(max(self._evs), 1.0/((len(self._qubits)-1) * np.pi), 0, 0)
             )
             assert self._fit.fit_success, 'Cosine fit was unsuccessful!'
-            uncertainties.append(self._fit.error[0])
+            errors.append(self._fit.error[0])
 
-            fidelity = (pop0 + pop1 + self._fit[0]) / 2
-            error = uncertainty_of_sum(uncertainties)
+            fidelity = (pop0 + pop1 + abs(self._fit.fit_params[0])) / 2
+            error = uncertainty_of_sum(errors)
             fidelity, error = round_to_order_error(fidelity, error)
             self._fidelity = {
                 'val': fidelity, 'err': error
             }
-            print(f'\nFidelity = {fidelity} ({error})')
 
         def save(self):
             """Save all circuits and data."""
@@ -826,23 +825,26 @@ def ParityOscillations(
             """Plot the parity oscillations."""
 
             q_index = tuple([
-                self._qubits.index(q) for q in self._circuit.qubits
+                self._circuit.qubits.index(q) for q in self._qubits
             ])
 
-            fig, ax = plt.subplots(1, 4, figsize=(10,4))
+            fig, ax = plt.subplots(1, 2, figsize=(10,4))
 
             ax[0].bar(
-                self._circuits[0].results.marginalize(q_index).states, 
+                [0, 1, 2, 3],
                 list(
                    self._circuits[0].results.marginalize(q_index).probabilities
                 ), 
                 color='blue'
             )
+            ax[0].set_xticks([0, 1, 2, 3])
+            ax[0].set_xticklabels(
+                self._circuits[0].results.marginalize(q_index).states
+            )
             ax[0].set_ylabel('Probability', fontsize=15)
             ax[0].tick_params(axis='both', which='major', labelsize=12)
-            # ax[0].set_ylim((0,0.55))
 
-            ax[1].plot(self._phases, self._evs, fmt='o', ms=6, color='blue')
+            ax[1].plot(self._phases, self._evs, 'o', ms=6, color='blue')
             ax[1].plot(
                 self._phases, self._fit.predict(self._phases), color='k'
             )
@@ -866,10 +868,16 @@ def ParityOscillations(
                 fig.savefig(
                     self._data_manager._save_path + 'parity_oscillations.pdf', 
                 )
+                fig.savefig(
+                    self._data_manager._save_path + 'parity_oscillations.svg', 
+                )
             plt.show()
 
         def final(self):
             """Final experimental method."""
+            fidelity = self._fidelity['val']
+            error = self._fidelity['err']
+            print(f'\nFidelity = {fidelity} ({error})')
             print(f"\nRuntime: {repr(self._runtime)[8:]}\n")
 
         def run(self):

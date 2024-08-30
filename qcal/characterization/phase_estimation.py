@@ -1004,6 +1004,12 @@ def RPE(qpu:             QPU,
                     self._data_manager._save_path + 'RPE.png', 
                     dpi=300
                 )
+                fig.savefig(
+                    self._data_manager._save_path + 'RPE.pdf'
+                )
+                fig.savefig(
+                    self._data_manager._save_path + 'RPE.svg'
+                )
             plt.show()
 
         def final(self) -> None:

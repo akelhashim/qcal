@@ -225,7 +225,13 @@ def SRB(qpu:             QPU,
             if settings.Settings.save_data:
                 fig.savefig(
                     self._data_manager._save_path + 'SRB_decays.png', 
-                    dpi=300
+                    dpi=600
+                )
+                fig.savefig(
+                    self._data_manager._save_path + 'SRB_decays.pdf'
+                )
+                fig.savefig(
+                    self._data_manager._save_path + 'SRB_decays.svg'
                 )
             plt.show()
 

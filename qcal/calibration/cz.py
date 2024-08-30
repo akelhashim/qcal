@@ -508,7 +508,13 @@ def AmpFreqSweep(
                 if settings.Settings.save_data:
                     fig.savefig(
                         self._data_manager._save_path + 'amp_freq_sweep.png', 
-                        dpi=300
+                        dpi=600
+                    )
+                    fig.savefig(
+                        self._data_manager._save_path + 'amp_freq_sweep.pdf'
+                    )
+                    fig.savefig(
+                        self._data_manager._save_path + 'amp_freq_sweep.svg'
                     )
                 plt.show()
 
@@ -526,7 +532,6 @@ def AmpFreqSweep(
             self.plot()
             self.final()
             
-
     return AmpFreqSweep(
         config,
         qubit_pairs,
@@ -892,7 +897,13 @@ def Amplitude(
             if settings.Settings.save_data:
                 fig.savefig(
                     self._data_manager._save_path + 'calibration_results.png', 
-                    dpi=300
+                    dpi=600
+                )
+                fig.savefig(
+                    self._data_manager._save_path + 'calibration_results.pdf'
+                )
+                fig.savefig(
+                    self._data_manager._save_path + 'calibration_results.svg'
                 )
             plt.show()
 
@@ -1250,7 +1261,13 @@ def Frequency(
             if settings.Settings.save_data:
                 fig.savefig(
                     self._data_manager._save_path + 'calibration_results.png', 
-                    dpi=300
+                    dpi=600
+                )
+                fig.savefig(
+                    self._data_manager._save_path + 'calibration_results.pdf'
+                )
+                fig.savefig(
+                    self._data_manager._save_path + 'calibration_results.svg'
                 )
             plt.show()
 
@@ -2358,6 +2375,12 @@ def LocalPhases(
                 fig.savefig(
                     self._data_manager._save_path + 'freq_calibration.png', 
                     dpi=300
+                )
+                fig.savefig(
+                    self._data_manager._save_path + 'freq_calibration.pdf'
+                )
+                fig.savefig(
+                    self._data_manager._save_path + 'freq_calibration.svg'
                 )
             plt.show()
 

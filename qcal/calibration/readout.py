@@ -399,11 +399,28 @@ def ReadoutCalibration(
                         'readout_calibration_raw.png', 
                         dpi=300
                     )
+                    fig.savefig(
+                        self._data_manager._save_path + 
+                        'readout_calibration_raw.pdf'
+                    )
+                    fig.savefig(
+                        self._data_manager._save_path + 
+                        'readout_calibration_raw.svg'
+                    )
                 else:
                     fig.savefig(
-                    self._data_manager._save_path + 'readout_calibration.png', 
-                    dpi=300
-                )
+                        self._data_manager._save_path + 
+                        'readout_calibration.png', 
+                        dpi=300
+                    )
+                    fig.savefig(
+                        self._data_manager._save_path + 
+                        'readout_calibration.pdf'
+                    )
+                    fig.savefig(
+                        self._data_manager._save_path + 
+                        'readout_calibration.svg'
+                    )
             plt.show()
 
         def final(self):
@@ -933,6 +950,12 @@ def Separation(
                 fig.savefig(
                    self._rcal._data_manager._save_path + 'sep_calibration.png', 
                    dpi=300
+                )
+                fig.savefig(
+                   self._rcal._data_manager._save_path + 'sep_calibration.pdf'
+                )
+                fig.savefig(
+                   self._rcal._data_manager._save_path + 'sep_calibration.svg'
                 )
             plt.show()
 
