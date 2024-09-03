@@ -8,7 +8,6 @@ Relevant pyRPE code: https://gitlab.com/quapack/pyrpe
 """
 import qcal.settings as settings
 
-from qcal.characterization.characterize import Characterize
 from qcal.config import Config
 from qcal.managers.classification_manager import ClassificationManager
 from qcal.math.utils import round_to_order_error
@@ -71,8 +70,22 @@ def CZ(theta_iz: float, theta_zi: float, theta_zz: float) -> NDArray:
                                        theta_zz * pygsti.sigmazz))
 
 
+def interleaved_circuit_depths(circuit_depths: List[int]) -> List[int]:
+    """Circuit depths for interleaved X90 sequences.
+
+    Args:
+        circuit_depths (List[int]): circuit depths.
+
+    Returns:
+        List[int]: circuit depths with 1/4 the maximum depth.
+    """
+    max_depth = int(max(circuit_depths) / 4)
+    idx = circuit_depths.index(max_depth)
+    return circuit_depths[:idx+1]
+
+
 def make_x90_circuits(circuit_depths: List[int], qubits: Tuple[int]):
-    """Generate the X90 RPE circuits.
+    """Generate the axis X90 RPE circuits.
 
     Args:
         circuit_depths (List[int]): circuit depths.
@@ -83,12 +96,16 @@ def make_x90_circuits(circuit_depths: List[int], qubits: Tuple[int]):
     except ImportError:
         logger.warning('Unable to import pyGSTi!')
 
-    # cos_circs = {k: make_x90_cos_circ(k) for k in max_depths}
-    # sin_circs = {k: make_x90_sin_circ(k) for k in max_depths}
-
+    # i_circuit_depths = interleaved_circuit_depths(circuit_depths)
+    # circuits = (
+    #     [make_x90_cos_circ(d, qubits) for d in circuit_depths] +
+    #     [make_x90_sin_circ(d, qubits) for d in circuit_depths]
+    # )
     circuits = (
         [make_x90_cos_circ(d, qubits) for d in circuit_depths] +
-        [make_x90_sin_circ(d, qubits) for d in circuit_depths]
+        [make_x90_sin_circ(d, qubits) for d in circuit_depths] +
+        [make_interleaved_cos_circ(d, qubits) for d in circuit_depths] +
+        [make_interleaved_sin_circ(d, qubits) for d in circuit_depths]
     )
 
     return pygsti.remove_duplicates(circuits)
@@ -109,7 +126,10 @@ def make_x90_cos_circ(d: int, qubits: Tuple[int] | List[int]):
     except ImportError:
         logger.warning('Unable to import pyGSTi!')
 
-    return pygsti.circuits.Circuit([[('Gxpi2', q) for q in qubits]]) * d
+    # return pygsti.circuits.Circuit([[('Gxpi2', q) for q in qubits]]) * d
+    return pygsti.circuits.Circuit(
+        [[('Gxpi2', q) for q in qubits]], line_labels=qubits
+    ) * d
 
 
 def make_x90_sin_circ(d: int, qubits: Tuple[int] | List[int]):
@@ -127,7 +147,64 @@ def make_x90_sin_circ(d: int, qubits: Tuple[int] | List[int]):
     except ImportError:
         logger.warning('Unable to import pyGSTi!')
 
-    return pygsti.circuits.Circuit([[('Gxpi2', q) for q in qubits]]) * (d + 1)
+    # return pygsti.circuits.Circuit([[('Gxpi2', q) for q in qubits]]) * (d + 1)
+    return pygsti.circuits.Circuit(
+        [[('Gxpi2', q) for q in qubits]], line_labels=qubits
+    ) * (d + 1)
+
+
+def make_interleaved_cos_circ(d: int, qubits: Tuple[int] | List[int]):
+    """Make the interleaved cosine circuit for X90 axis error RPE.
+
+    Args:
+        d (int): circuit depth.
+        qubits (Tuple[int] | List[int]): qubit labels.
+
+    Returns:
+       pygsti.circuits.Circuit: pyGSTi circuit.
+    """
+    try:
+        import pygsti
+    except ImportError:
+        logger.warning('Unable to import pyGSTi!')
+
+    Gz_layer = pygsti.circuits.Circuit(
+        [[('Gzpi2', q) for q in qubits]], line_labels=qubits
+    )
+    Gx_layer = pygsti.circuits.Circuit(
+        [[('Gxpi2', q) for q in qubits]], line_labels=qubits
+    )
+    return (
+        Gz_layer + Gx_layer + Gx_layer + Gz_layer + Gz_layer + Gx_layer + 
+        Gx_layer + Gz_layer
+    ) * d
+
+
+def make_interleaved_sin_circ(d: int, qubits: Tuple[int] | List[int]):
+    """Make the interleaved sine circuit for X90 axis error RPE.
+
+    Args:
+        d (int): circuit depth.
+        qubits (Tuple[int] | List[int]): qubit labels.
+
+    Returns:
+       pygsti.circuits.Circuit: pyGSTi circuit.
+    """
+    try:
+        import pygsti
+    except ImportError:
+        logger.warning('Unable to import pyGSTi!')
+
+    Gz_layer = pygsti.circuits.Circuit(
+        [[('Gzpi2', q) for q in qubits]], line_labels=qubits
+    )
+    Gx_layer = pygsti.circuits.Circuit(
+        [[('Gxpi2', q) for q in qubits]], line_labels=qubits
+    )
+    return (
+        Gz_layer + Gx_layer + Gx_layer + Gz_layer + Gz_layer + Gx_layer + 
+        Gx_layer + Gz_layer
+    ) * d + Gx_layer
 
 
 def make_cz_circuits(
@@ -344,16 +421,22 @@ def make_cz_sin_circ(
     return circ
 
 
-def analyze_x90(dataset, qubits: List[int], circuit_depths: List[int]) -> Tuple:
+def analyze_x90(
+        dataset, 
+        qubits: List[int], 
+        circuit_depths: List[int], 
+        estimator_type: str = 'linearized'
+    ) -> Tuple:
     """Analyze RPE dataset for the X90 gate.
 
     Args:
         dataset (pygsti.data.dataset): pyGSTi dataset.
         qubits (List[int]): qubit labels.
         circuit_depths (List[int]): circuit depths.
+        estimator_type (str): type of estimator. Defaults to 'linearized'.
 
     Returns:
-        Tuple: angle estimates, angle errors, and last good depth
+        Tuple: angle estimates, angle errors, and index of last good depth
     """
     try:
         from quapack.pyRPE import RobustPhaseEstimation
@@ -361,33 +444,96 @@ def analyze_x90(dataset, qubits: List[int], circuit_depths: List[int]) -> Tuple:
     except ImportError:
         logger.warning(' Unable to import pyRPE!')
 
-    target_x = np.pi/2
+    target_x = np.pi / 2
 
-    cos_circs = {d: make_x90_cos_circ(d, qubits) for d in circuit_depths}
-    sin_circs = {d: make_x90_sin_circ(d, qubits) for d in circuit_depths}
+    direct_cos_circs = {
+        d: make_x90_cos_circ(d, qubits) for d in circuit_depths
+    }
+    direct_sin_circs = {
+        d: make_x90_sin_circ(d, qubits) for d in circuit_depths
+    }
 
+    interleaved_cos_circs = {
+        d: make_interleaved_cos_circ(d, qubits) for d in circuit_depths
+    }
+    interleaved_sin_circs = {
+        d: make_interleaved_sin_circ(d, qubits) for d in circuit_depths
+    }
+
+    # Direct angle estimates
     experiment = Q()
     for d in circuit_depths:
-        cos_circ = cos_circs[d]
-        sin_circ = sin_circs[d]
+        direct_cos_counts = dataset[direct_cos_circs[d]].counts
+        direct_sin_counts = dataset[direct_sin_circs[d]].counts
         experiment.process_cos(d,
-            (int(dataset[cos_circ]['0']), int(dataset[cos_circ]['1']))
+            (int(direct_cos_counts['0']), int(direct_cos_counts['1']))
         )
         experiment.process_sin(d,
-            (int(dataset[sin_circ]['1']), int(dataset[sin_circ]['0']))
+            (int(direct_sin_counts['1']), int(direct_sin_counts['0']))
         )
-        
     analysis = RobustPhaseEstimation(experiment)
+    direct_angle_estimates = analysis.angle_estimates
+    direct_angle_estimates = np.array([
+        rectify_angle(angle) for angle in direct_angle_estimates
+    ])
+    direct_last_good_idx = analysis.check_unif_local(historical=True)
+
+    # Interleaved angle estimates
+    experiment = Q()
+    for d in circuit_depths:  #interleaved_circuit_depths(circuit_depths):
+        interleaved_cos_counts = dataset[interleaved_cos_circs[d]].counts
+        interleaved_sin_counts = dataset[interleaved_sin_circs[d]].counts
+        experiment.process_cos(d,
+            (int(interleaved_cos_counts['0']), 
+             int(interleaved_cos_counts['1'])
+            )
+        )
+        experiment.process_sin(d,
+            (int(interleaved_sin_counts['1']), 
+             int(interleaved_sin_counts['0'])
+            )
+        )
+    analysis = RobustPhaseEstimation(experiment)
+    interleaved_angle_estimates = analysis.angle_estimates
+    interleaved_angle_estimates = np.array([
+        rectify_angle(angle) for angle in interleaved_angle_estimates
+    ])
+    interleaved_last_good_idx = analysis.check_unif_local(historical=True)
+
+    if estimator_type == 'linearized':
+        epsilon_estimates = direct_angle_estimates / (np.pi/2) - 1
+        theta_estimates = np.array([
+            np.sin(interleaved_angle_estimates[i]/2) / 
+            (2 * np.cos(np.pi * epsilon_estimates[i]/2)) 
+            # (2 * np.cos(np.pi * epsilon_estimates[direct_last_good_idx]/2)) 
+            for i in range(len(direct_angle_estimates))
+        ])
+
+    # angle_estimates = {
+    #     'rotation': target_x*(1+epsilon_estimates),
+    #     'off axis': theta_estimates
+    # }
     angle_estimates = {
-        'X': analysis.angle_estimates,
+        'X': target_x * (1 + epsilon_estimates) * np.cos(theta_estimates),
+        'Z': target_x * (1 + epsilon_estimates) * np.sin(theta_estimates),
+        # 'X': target_x * (
+        #         1 + epsilon_estimates[direct_last_good_idx]
+        #     ) * np.cos(theta_estimates),
+        # 'Z': target_x * (
+        #         1 + epsilon_estimates[direct_last_good_idx]
+        #     ) * np.sin(theta_estimates),
     }
 
     # Extract the last "trusted" RPE angle estimate
-    last_good_idx = analysis.check_unif_local(historical=True)
-    # last_good_depth = 2**last_good_idx
-    
+    last_good_idx = min([direct_last_good_idx, interleaved_last_good_idx])
+
+    # angle_errors = {
+    #     'rotation': target_x * epsilon_estimates,
+    #     'off axis': theta_estimates
+    # }
     angle_errors = {
-        'X': analysis.angle_estimates - target_x
+        'X': angle_estimates['X'] - target_x,
+        'Z': angle_estimates['Z']
     }
 
     return (angle_estimates, angle_errors, last_good_idx)
@@ -404,7 +550,7 @@ def analyze_cz(
         circuit_depths (List[int]): circuit depths.
 
     Returns:
-        Tuple: angle estimates, angle errors, and last good depth
+        Tuple: angle estimates, angle errors, and index of last good depth
     """
     try:
         from quapack.pyRPE import RobustPhaseEstimation
@@ -516,7 +662,7 @@ def analyze_cz(
 
 
 def rectify_angle(theta: float) -> float:
-    """Constrain an angle to be within pi.
+    """Rectify the angle to be in [-pi, pi].
 
     Args:
         theta (float): angle
@@ -524,9 +670,10 @@ def rectify_angle(theta: float) -> float:
     Returns:
         float: rectified angle
     """
-    if theta > np.pi:
-        theta -= 2 * np.pi
-    return theta
+    # if theta > np.pi:
+    #     theta -= 2 * np.pi
+    # return theta
+    return (theta + np.pi) % (2 * np.pi) - np.pi
 
 
 def RPE(qpu:             QPU,
@@ -825,7 +972,10 @@ def RPE(qpu:             QPU,
 
                         for angle, errors in self._angle_errors[ql].items():
                             ax.plot(
-                                self._circuit_depths, errors, 'o-', label=angle
+                                self._circuit_depths[:len(errors)], 
+                                errors, 
+                                'o-',
+                                label=angle
                             )
                         ax.axvline(
                             2**self._last_good_idx[ql], 
@@ -853,6 +1003,12 @@ def RPE(qpu:             QPU,
                 fig.savefig(
                     self._data_manager._save_path + 'RPE.png', 
                     dpi=300
+                )
+                fig.savefig(
+                    self._data_manager._save_path + 'RPE.pdf'
+                )
+                fig.savefig(
+                    self._data_manager._save_path + 'RPE.svg'
                 )
             plt.show()
 

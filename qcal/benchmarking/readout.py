@@ -163,7 +163,7 @@ def ReadoutFidelity(
                 circuits.append(circuit)
 
             self._circuits = CircuitSet(circuits)
-            self._circuits['Prep state'] = [n for n in range(self._n_levels)]
+            self._circuits['prep state'] = [n for n in range(self._n_levels)]
 
         def analyze(self):
             """Analyze the data and generate confusion matrices."""

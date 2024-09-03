@@ -41,17 +41,19 @@ def compute_cycle_infidelity(circs_D, circs_ref) -> Tuple:
     err_D = circs_D.fit(analyze_dim=2)[0].e_F.std
     err_ref = circs_ref.fit(analyze_dim=2)[0].e_F.std
 
-    f_D = (d**2 * F_D - 1) / d**2
-    f_ref = (d**2 * F_ref - 1) / d**2
+    f_D = (d**2 * F_D - 1) / (d**2 - 1)
+    f_ref = (d**2 * F_ref - 1) / (d**2 - 1)
+    err_f_D = d**2 * err_D / (d**2 - 1)
+    err_f_ref = d**2 * err_ref / (d**2 - 1)
 
     e_C = (d**2 - 1)/d**2 * (1 - f_D/f_ref)
-    err = np.sqrt( 
-        (err_D/f_D)**2 + (err_ref/f_ref)**2 
-    ) * (f_D/f_ref) * (d**2 - 1)/d**2
+    err_C = np.sqrt( 
+        (err_f_D/f_D)**2 + (err_f_ref/f_ref)**2 
+    ) * e_C
 
-    e_C, err = round_to_order_error(e_C, err)
+    e_C, err_C = round_to_order_error(e_C, err_C)
 
-    return (e_C, err)
+    return (e_C, err_C)
 
 
 def CB(qpu:                  QPU,
@@ -341,7 +343,13 @@ def CB(qpu:                  QPU,
             if settings.Settings.save_data:
                 fig.savefig(
                     self._data_manager._save_path + 'CB_infidelities.png', 
-                    dpi=300
+                    dpi=600
+                )
+                fig.savefig(
+                    self._data_manager._save_path + 'CB_infidelities.pdf'
+                )
+                fig.savefig(
+                    self._data_manager._save_path + 'CB_infidelities.svg'
                 )
             plt.show()
 

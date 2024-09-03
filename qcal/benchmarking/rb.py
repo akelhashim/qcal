@@ -23,7 +23,244 @@ from typing import Any, Callable, List, Tuple, Iterable
 logger = logging.getLogger(__name__)
 
 
-# TODO: add leakage
+def CRB(qpu:             QPU,
+        config:          Config,
+        qubits:          List[int] | Tuple[int],
+        circuit_depths:  List[int] | Tuple[int],
+        n_circuits:      int = 30,
+        native_gates:    List[str] = ['X90', 'Y90'],
+        pspec:           Any | None = None,
+        randomizeout:    bool = True,
+        citerations:     int = 20,  
+        **kwargs
+    ) -> Callable:
+    """Clifford Randomized Benchmarking.
+
+    This is a pyGSTi protocol and requires pyGSTi to be installed.
+
+    Args:
+        qpu (QPU): custom QPU object.
+        config (Config): qcal Config object.
+        qubits (Iterable[int, Iterable[int]]): a list specifying the qubit
+            labels.
+        circuit_depths (List[int] | Tuple[int]):  a list of integers >= 0. The 
+            CRB depth is the number of Cliffords in the circuit - 2 before 
+            each Clifford is compiled into the native gate-set.
+        n_circuits (int, optional): The number of (possibly) different CRB 
+            circuits sampled at each depth. Defaults to 30.
+        native_gates (List[str], optional): a list of the native gates. Defaults 
+            to ['X90', 'Y90']. All Cliffords will be decomposed in terms of 
+            these gates. If a custom pspec is passed, this list will be ignored.
+        pspec (QubitProcessorSpec | None, optional): pyGSTi qubit processor 
+            spec. Defaults to None. If None, a processor spec will be 
+            automatically generated based on the native_gates and the qubit 
+            labels.
+        randomizeout (bool, optional): whether or not a random Pauli is compiled
+            into the output layer of the circuit. Defaults to True. If False, 
+            the ideal output of the circuits (the "success" or "survival" 
+            outcome) is always the all-zeros bit string. If True, the ideal 
+            output a circuit is randomized to a uniformly random bit-string.
+        citerations (int, optional): some of the Clifford compilation algorithms 
+            in pyGSTi (including the default algorithm) are randomized, and the 
+            lowest-cost circuit is chosen from all the circuit generated in the
+            iterations of the algorithm. This is the number of iterations used. 
+            Defaults to 20. The time required to generate a CRB circuit is 
+            linear in `citerations * (CRB length + 2)`. Lower-depth / lower 
+            2-qubit gate count compilations of the Cliffords are important in 
+            order to successfully implement CRB on more qubits.
+
+    Returns:
+        Callable: CRB class instance.
+    """
+
+    class CRB(qpu):
+        """pyGSTi Clifford RB protocol."""
+
+        def __init__(self,
+                config:          Config,
+                qubits:          List[int] | Tuple[int],
+                circuit_depths:  List[int] | Tuple[int],
+                n_circuits:      int = 30,
+                native_gates:    List[str] = ['X90', 'Y90'],
+                pspec:           Any | None = None,
+                randomizeout:    bool = True,
+                citerations:     int = 20,
+                **kwargs
+            ) -> None:
+
+            try:
+                import pygsti
+                from pygsti.processors import CliffordCompilationRules as CCR
+                from qcal.interface.pygsti.transpiler import Transpiler
+                logger.info(f" pyGSTi version: {pygsti.__version__}\n")
+            except ImportError:
+                logger.warning(' Unable to import pyGSTi!')
+            
+            self._qubits = qubits
+            self._circuit_depths = circuit_depths
+            self._n_circuits = n_circuits
+            self._native_gates = native_gates
+            self._pspec = pspec
+            self._randomizeout = randomizeout
+            self._citerations = citerations
+
+            transpiler = kwargs.get('transpiler', Transpiler())
+            kwargs.pop('transpiler', None)
+            qpu.__init__(self,
+                config=config, 
+                transpiler=transpiler,
+                **kwargs
+            )
+
+            if pspec is None:
+                from qcal.interface.pygsti.processor_spec import pygsti_pspec
+                self._pspec = pygsti_pspec(config, qubits, native_gates)
+
+            self._compilations = {
+                'absolute': CCR.create_standard(
+                    self._pspec, 'absolute', 
+                    ('paulis', '1Qcliffords'), 
+                    verbosity=0
+                ),            
+                'paulieq': CCR.create_standard(
+                    self._pspec, 'paulieq', 
+                    ('1Qcliffords', 'allcnots'), 
+                    verbosity=0
+                )
+            }
+
+            self._protocol = pygsti.protocols.RB() 
+            self._edesign = None
+            self._data = None
+            self._results = None
+
+        @property
+        def pspec(self):
+            """pyGSTi processor spec."""
+            return self._pspec
+        
+        @property
+        def protocol(self):
+            """pyGSTi protocol."""
+            return self._protocol
+        
+        @property
+        def edesign(self):
+            """pyGSTi edesign."""
+            return self._edesign
+        
+        @property
+        def data(self):
+            """pyGSTi data object."""
+            return self._data
+        
+        @property
+        def results(self):
+            """pyGSTi results object."""
+            return self._results
+
+        def generate_circuits(self):
+            """Generate all pyGSTi clifford RB circuits."""
+            logger.info(' Generating circuits from pyGSTi...')
+            import pygsti
+            from qcal.interface.pygsti.circuits import load_circuits
+
+            self._edesign = pygsti.protocols.CliffordRBDesign(
+                pspec=self._pspec,
+                clifford_compilations=self._compilations, 
+                depths=self._circuit_depths, 
+                circuits_per_depth=self._n_circuits, 
+                qubit_labels=self._pspec.qubit_labels, 
+                randomizeout=self._randomizeout,
+                citerations=self._citerations
+                )
+            
+            # Save an empty dataset file of all the circuits
+            self._data_manager._exp_id += (
+                f'_CRB_Q{"".join(str(q) for q in self._qubits)}'
+            )
+            self._data_manager.create_data_path()
+            pygsti.io.write_empty_protocol_data(
+                self._data_manager._save_path, 
+                self._edesign, 
+                sparse=True,
+                clobber_ok=True
+            )
+
+            self._circuits = load_circuits(
+                self._data_manager._save_path + 'data/dataset.txt'
+            )
+
+        def save(self):
+            """Save all circuits and data."""
+            clear_output(wait=True)
+            from qcal.interface.pygsti.datasets import generate_pygsti_dataset
+            generate_pygsti_dataset(
+                self._transpiled_circuits,
+                self._data_manager._save_path + 'data/'
+            )
+            if settings.Settings.save_data:
+                qpu.save(self, create_data_path=False)
+
+        def analyze(self):
+            """Analyze the CRB results."""
+            # logger.info(' Analyzing the results...')
+            import pygsti
+            try:
+                self._data = pygsti.io.read_data_from_dir(
+                     self._data_manager._save_path
+                )
+                self._results = self._protocol.run(self._data)
+                r = self._results.fits['full'].estimates['r']
+                rstd = self._results.fits['full'].stds['r']
+                rAfix = self._results.fits['A-fixed'].estimates['r']
+                rAfixstd = self._results.fits['A-fixed'].stds['r']
+                print(
+                    f"e_F = {r:1.2e} ({rstd:1.2e}) (fit with a free asymptote)"
+                )
+                print(
+                    f"e_F = {rAfix:1.2e} ({rAfixstd:1.2e}) (fit with the "
+                    "asymptote fixed to 1/2^n)"
+                )
+            except Exception:
+                logger.warning(' Unable to fit the RB data!')
+
+        def plot(self) -> None:
+            """Plot the CRB fit results."""
+            if self._results is not None:
+                if settings.Settings.save_data:
+                    self._results.plot(
+                        figpath=self._data_manager._save_path + 'CRB_decay.png'
+                    )
+                else:
+                    self._results.plot()
+
+        def final(self) -> None:
+            """Final benchmarking method."""
+            print(f"\nRuntime: {repr(self._runtime)[8:]}\n")
+
+        def run(self):
+            """Run all experimental methods and analyze results."""
+            self.generate_circuits()
+            qpu.run(self, self._circuits, save=False)
+            self.save()
+            self.analyze() 
+            self.plot()
+            self.final()
+
+    return CRB(
+        config,
+        qubits,
+        circuit_depths,
+        n_circuits,
+        native_gates,
+        pspec,
+        randomizeout,
+        citerations,
+        **kwargs
+    )
+
+
 def SRB(qpu:             QPU,
         config:          Config,
         qubit_labels:    Iterable[int],
@@ -225,7 +462,13 @@ def SRB(qpu:             QPU,
             if settings.Settings.save_data:
                 fig.savefig(
                     self._data_manager._save_path + 'SRB_decays.png', 
-                    dpi=300
+                    dpi=600
+                )
+                fig.savefig(
+                    self._data_manager._save_path + 'SRB_decays.pdf'
+                )
+                fig.savefig(
+                    self._data_manager._save_path + 'SRB_decays.svg'
                 )
             plt.show()
 

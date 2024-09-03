@@ -1,15 +1,14 @@
 """Submodule for handling transpilation from PyGSTi to qcal circuits.
 
 """
-from qcal.circuit import Barrier, Layer, Circuit, CircuitSet
+from qcal.circuit import Layer, Circuit, CircuitSet
 from qcal.gate.single_qubit import single_qubit_gates
 from qcal.gate.two_qubit import two_qubit_gates
 from qcal.transpilation.transpiler import Transpiler
 
 import logging
-import numpy as np
 
-from collections import defaultdict, deque
+from collections import defaultdict
 from typing import Dict, List
 
 logger = logging.getLogger(__name__)
@@ -108,6 +107,7 @@ class Transpiler(Transpiler):
                 'Gidle':   single_qubit_gates['Id'],
                 'Gxpi2':   single_qubit_gates['X90'], 
                 'Gypi2':   single_qubit_gates['Y90'],
+                'Gzpi2':   single_qubit_gates['Z90'],
                 'Gzr':     single_qubit_gates['Rz']
             }
         super().__init__(gate_mapper=gate_mapper)

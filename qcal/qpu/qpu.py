@@ -108,6 +108,9 @@ class QPU:
         self._n_circs_per_seq = n_circs_per_seq
         self._raster_circuits = raster_circuits
 
+        if self._classifier is None:
+            logger.warning(' No classifier has been instantiated!')
+
         assert n_levels <= 3, 'n_levels > is not currently supported!'
         self._n_levels = n_levels
 
@@ -307,7 +310,7 @@ class QPU:
             logger.info(' Compiling circuits...')
             t0 = timeit.default_timer()
             self.compile()
-            self._runtime['Compile'].iloc[0] += round(
+            self._runtime['Compile'] += round(
                     timeit.default_timer() - t0, 1
                 )
 
@@ -315,28 +318,28 @@ class QPU:
             logger.info(' Transpiling circuits...')
             t0 = timeit.default_timer()
             self.transpile()
-            self._runtime['Transpile'].iloc[0] += round(
+            self._runtime['Transpile'] += round(
                     timeit.default_timer() - t0, 1
                 )
         
         logger.info(' Generating sequences...')
         t0 = timeit.default_timer()
         self.generate_sequence()
-        self._runtime['Sequencing'].iloc[0] += round(
+        self._runtime['Sequencing'] += round(
             timeit.default_timer() - t0, 1
         )
 
         logger.info(' Writing sequences...')
         t0 = timeit.default_timer()
         self.write()
-        self._runtime['Write'].iloc[0] += round(
+        self._runtime['Write'] += round(
             timeit.default_timer() - t0, 1
         )
 
         logger.info(' Measuring...')
         t0 = timeit.default_timer()
         self.acquire()
-        self._runtime['Measure'].iloc[0] += round(
+        self._runtime['Measure'] += round(
                 timeit.default_timer() - t0, 1
             )
         
@@ -368,13 +371,19 @@ class QPU:
         logger.info(' Processing...')
         t0 = timeit.default_timer()
         self.process()
-        self._runtime['Process'][0] += round(
+        self._runtime['Process'] += round(
                 timeit.default_timer() - t0, 1
             )
 
-    def save(self) -> None:
-        """Save all circuits."""
-        self._data_manager.create_data_path()
+    def save(self, create_data_path: bool = True) -> None:
+        """Save all circuits and data.
+
+        Args:
+            create_data_path (bool, optional): whether to create a data save 
+                path. Defaults to True.
+        """
+        if create_data_path:
+            self._data_manager.create_data_path()
 
         if len(self._circuits) > 0:
             self._circuits.save(
@@ -425,7 +434,9 @@ class QPU:
         t_start = timeit.default_timer()
         self.initialize(circuits, n_shots, n_batches)
         self.batch_measurements()
-        self._runtime['Total'][0] += round(timeit.default_timer() - t_start, 1)
+        self._runtime['Total'] += round(
+            timeit.default_timer() - t_start, 1
+        )
 
         clear_output(wait=True)
         if settings.Settings.save_data and save:

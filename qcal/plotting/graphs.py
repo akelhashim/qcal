@@ -42,7 +42,7 @@ def format_gate_text(gate: Gate):
     if bool(gate.properties['params']):
         for key, value in gate.properties['params'].items():
             if isinstance(value, float):
-                if value != 0 and value < 1e-2:
+                if value != 0 and abs(value) < 1e-2:
                     value = '{:.2E}'.format(value)
                 else: 
                     value = '{:.2f}'.format(value)

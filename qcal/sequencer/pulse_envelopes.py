@@ -14,7 +14,9 @@ __all__ = [
     'linear',
     'gaussian',
     'sine',
-    'square'
+    'square',
+    'virtualz',
+    # 'zz_DRAG'
 ]
 
 
@@ -52,7 +54,7 @@ def cosine_square(
 
 
 def DRAG(
-        length: float, sample_rate: float, alpha: float = 1.0, 
+        length: float, sample_rate: float, alpha: float = 0.0, 
         amp: float = 1.0, anh: float = -270e6, df: float = 0.0,
         n_sigma: int = 3, phase: float = 0.0
     ) -> NDArray:
@@ -66,7 +68,7 @@ def DRAG(
     Args:
         length (float): pulse length in seconds.
         sample_rate (float): sample rate in Hz.
-        alpha (float, optional): DRAG parameter. Defaults to 1.0. For phase
+        alpha (float, optional): DRAG parameter. Defaults to 0.0. For phase
             errors, alpha should be 0.5. For leakage errors, alpha should be 1.
         amp (float, optional): pulse amplitude. Defaults to 1.0.
         anh (float, optional): qubit anharmonicity. Defaults to -270e6.
@@ -77,8 +79,8 @@ def DRAG(
     Returns:
         NDArray: DRAG envelope.
     """
-    df = 2 * np.pi * df / sample_rate
-    delta = 2 * np.pi * anh / sample_rate - df
+    df /= sample_rate
+    delta = 2 * np.pi * (anh / sample_rate + df)
     n_points = int(round(length * sample_rate))
     sigma = n_points / (2. * n_sigma)
     x = np.arange(0, n_points)
@@ -115,7 +117,7 @@ def linear(
 
 def gaussian(
         length: float, sample_rate: float, amp: float = 1.0,
-         n_sigma: Union[float, int] = 3, phase: float = 0.0
+        n_sigma: Union[float, int] = 3, phase: float = 0.0
     ) -> NDArray:
     """Gaussian pulse envelope.
 
@@ -218,7 +220,7 @@ def virtualz(
         length: float = 0, sample_rate: float = 0, 
         amp: float = 1.0, phase: float= 0.0
     ) -> np.complex64:
-    """_summary_
+    """Virtual-z phase.
 
     Args:
         length (float): pulse length in seconds. Defaults to 0.
@@ -232,6 +234,56 @@ def virtualz(
     return np.exp(1j*phase).astype(np.complex64)
 
 
+# def zz_DRAG(
+#         length: float, sample_rate: float, alpha: float = 0.0, amp: float = 1.0, 
+#         df: float = 0.0, phase: float = 0.0
+#     ) -> NDArray:
+#     """ZZ-Interaction-Free pulse.
+
+#     The a0 and a2 parameters are optimized for a 40 ns pulse.
+    
+#     Reference: https://arxiv.org/pdf/2309.13927
+
+#     Args:
+#         length (float): pulse length in seconds.
+#         sample_rate (float): sample rate in Hz.
+#         alpha (float, optional): DRAG parameter. Defaults to 0.0. For phase
+#             errors, alpha should be 0.5. For leakage errors, alpha should be 1.
+#         amp (float, optional): pulse amplitude. Defaults to 1.0.
+#         df (float, optional): frequency detuning. Defaults to 0.0.
+#         phase (float, optional): pulse phase. Defaults to 0.0.
+
+#     Returns:
+#         NDArray: ZZ DRAG envelope.
+#     """
+#     a0 = 0.31831
+#     a2 = -0.00515
+#     amp /= a0  # Rescale to a maximum of 1.0
+
+#     n_points = int(round(length * sample_rate))
+#     # t = np.arange(0, n_points).astype(np.complex64)
+#     t = np.linspace(0, length, n_points).astype(np.complex64)
+#     cos = np.cos((np.pi/length) * (t - length/2))
+#     env = a0 * cos**2 + a2 * (t - length/2)**2 * cos**2
+
+#     # DRAG correction
+#     sin = np.sin((np.pi/length) * (t - length/2))
+#     c = -2 * np.pi / length
+#     env_DRAG = 1.j * alpha * (
+#         c * a0 * cos * sin + 
+#         2 * a2 * (t - length/2) * cos**2 + 
+#         c * a2 * (t - length/2)**2 * cos * sin
+#     )
+#     env += env_DRAG
+
+#     # Detuning df offset
+#     df /= sample_rate
+#     x = np.linspace(0, length, n_points).astype(np.complex64)
+#     env *= np.exp(2 * np.pi * 1j * df * x)
+
+#     return np.array(amp * env * np.exp(1j * phase))
+
+
 pulse_envelopes = defaultdict(lambda: 'Pulse envelope not available!', {
     'cosine_square': cosine_square, 
     'DRAG':     DRAG, 
@@ -239,5 +291,6 @@ pulse_envelopes = defaultdict(lambda: 'Pulse envelope not available!', {
     'gaussian': gaussian, 
     'sine':     sine, 
     'square':   square,
-    'virtualz': virtualz
+    'virtualz': virtualz,
+    # 'zz_DRAG':  zz_DRAG
 })

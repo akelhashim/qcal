@@ -3,19 +3,18 @@
 """
 import qcal.settings as settings
 
-# from qcal.circuit import CircuitSet
 from .post_process import post_process
 from .transpiler import Transpiler
 from .utils import calculate_n_reads
+from qcal.circuit import CircuitSet
 from qcal.config import Config
 from qcal.managers.classification_manager import ClassificationManager
 from qcal.qpu.qpu import QPU
 
 import logging
 import os
-# import sys
 
-from typing import Any, List
+from typing import Any, Dict, List
 
 logger = logging.getLogger(__name__)
 
@@ -53,6 +52,7 @@ class QubicQPU(QPU):
                 reload_freq:         bool = True,
                 reload_env:          bool = True,
                 zero_between_reload: bool = True,
+                save_raw_data:       bool = False,
                 gmm_manager:         GMMManager = None,
                 rpc_ip_address:      str = '192.168.1.122',
                 port:                int = 9095
@@ -117,6 +117,8 @@ class QubicQPU(QPU):
                 buffers before loading a new circuit. Defaults to True. If all
                 of the circuits in a batch use the same qubits, this can be set
                 to False to save execution time.
+            save_raw_data (bool, optional): whether to save raw IQ data for each
+                qubit in the CircuitSet. Defaults to False.
             gmm_manager (GMMManager, optional): QubiC GMMManager object.
                 Defaults to None. If None, this is loaded from a previously 
                 saved manager object: 'gmm_manager.pkl'.
@@ -135,14 +137,19 @@ class QubicQPU(QPU):
             n_levels=n_levels,
             raster_circuits=raster_circuits
         )
-        from qubic import rpc_client, job_manager
-        from qubic.rfsoc.hwconfig import FPGAConfig, load_channel_configs
-        from qubic.state_disc import GMMManager
-        from qubitconfig.qchip import QChip
 
-        # self._n_reads_per_shot = (calculate_n_reads(config) 
-        #     if n_reads_per_shot is None else n_reads_per_shot
-        # )
+        try:
+            from qubic import rpc_client, job_manager
+            from qubic.rfsoc.hwconfig import FPGAConfig, load_channel_configs
+            from qubic.state_disc import GMMManager
+        except ImportError:
+            logger.warning(' Unable to import qubic!')
+
+        try:
+            from qubitconfig.qchip import QChip
+        except ImportError:
+            logger.warning(' Unable to import qubitconfig!')
+
         self._n_reads_per_shot = n_reads_per_shot
         self._outputs = outputs
         self._measure_qubits = measure_qubits
@@ -150,6 +157,7 @@ class QubicQPU(QPU):
         self._reload_freq = reload_freq
         self._reload_env = reload_env
         self._zero_between_reload = zero_between_reload
+        self._save_raw_data = save_raw_data
         
         self._qubic_transpiler = Transpiler(
             config, 
@@ -275,27 +283,40 @@ class QubicQPU(QPU):
             measure_qubits=self._measure_qubits,
             n_reads_per_shot=self._n_reads_per_shot,
             classifier=self._classifier, 
-            raster_circuits=self._raster_circuits
+            raster_circuits=self._raster_circuits,
+            save_raw_data=self._save_raw_data
         )
 
         if len(self._compiled_circuits) > 1:
-            post_process(
-                self._config, 
-                self._measurements,
-                self._compiled_circuits,
-                measure_qubits=self._measure_qubits,
-                n_reads_per_shot=self._n_reads_per_shot,
-                classifier=self._classifier, 
-                raster_circuits=self._raster_circuits
-            )
+            if isinstance(self._circuits, CircuitSet):
+                self._compiled_circuits['results'] = self._circuits['results']
+                for i, results in enumerate(self._circuits['results']):
+                    self._compiled_circuits[i].results = results
+            else:
+                post_process(
+                    self._config, 
+                    self._measurements,
+                    self._compiled_circuits,
+                    measure_qubits=self._measure_qubits,
+                    n_reads_per_shot=self._n_reads_per_shot,
+                    classifier=self._classifier, 
+                    raster_circuits=self._raster_circuits,
+                    save_raw_data=self._save_raw_data
+                )
 
         if len(self._transpiled_circuits) > 1:
-            post_process(
-                self._config,
-                self._measurements,
-                self._transpiled_circuits,
-                measure_qubits=self._measure_qubits,
-                n_reads_per_shot=self._n_reads_per_shot,
-                classifier=self._classifier, 
-                raster_circuits=self._raster_circuits
-            )
+            if isinstance(self._circuits, CircuitSet):
+                self._transpiled_circuits['results'] = self._circuits['results']
+                for i, results in enumerate(self._circuits['results']):
+                    self._transpiled_circuits[i].results = results
+            else:
+                post_process(
+                    self._config,
+                    self._measurements,
+                    self._transpiled_circuits,
+                    measure_qubits=self._measure_qubits,
+                    n_reads_per_shot=self._n_reads_per_shot,
+                    classifier=self._classifier, 
+                    raster_circuits=self._raster_circuits,
+                    save_raw_data=self._save_raw_data
+                )

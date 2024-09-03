@@ -174,14 +174,14 @@ class Config:
         return str(self._parameters)
     
     @property
-    def basis_gates(self) -> Dict:
-        """Basis gates for each qubit (subspace) and qubit pair.
+    def native_gates(self) -> Dict:
+        """Native gates for each qubit (subspace) and qubit pair.
 
         Returns:
-            Dict: basis gates.
+            Dict: native gates.
         """
-        basis_gates = dict()
-        basis_set = set()
+        native_gates = dict()
+        native_set = set()
 
         single_qubit = dict()
         for q in self.qubits:
@@ -191,10 +191,10 @@ class Config:
                 for k, v in self.parameters['single_qubit'][q][sbsp].items():
                     if isinstance(v, dict) and 'pulse' in v.keys():
                         gates.append(k)
-                        basis_set.add(k)
+                        native_set.add(k)
                 subspace[sbsp] = gates
             single_qubit[q] = subspace
-        basis_gates['single_qubit'] = single_qubit
+        native_gates['single_qubit'] = single_qubit
 
         two_qubit = dict()
         for p in self.qubit_pairs:
@@ -202,13 +202,13 @@ class Config:
             for k, v in self.parameters['two_qubit'][str(p)].items():
                 if isinstance(v, dict) and 'pulse' in v.keys():
                         gates.append(k)
-                        basis_set.add(k)
+                        native_set.add(k)
             two_qubit[p] = gates
-        basis_gates['two_qubit'] = two_qubit
+        native_gates['two_qubit'] = two_qubit
 
-        basis_gates['set'] = basis_set
+        native_gates['set'] = native_set
 
-        return basis_gates
+        return native_gates
 
     @property
     def filename(self) -> str:

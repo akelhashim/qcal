@@ -196,7 +196,9 @@ class Characterize:
             
         fig.set_tight_layout(True)
         if settings.Settings.save_data:
-            fig.savefig(save_path + 'characterization_results.png', dpi=300)
+            fig.savefig(save_path + 'characterization_results.png', dpi=600)
+            fig.savefig(save_path + 'characterization_results.pdf')
+            fig.savefig(save_path + 'characterization_results.svg')
         plt.show()
     
     def set_param(self, param: str, newvalue: Any) -> None:

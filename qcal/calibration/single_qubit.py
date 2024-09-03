@@ -724,6 +724,12 @@ def Frequency(
                     self._data_manager._save_path + 'freq_calibration.png', 
                     dpi=300
                 )
+                fig.savefig(
+                    self._data_manager._save_path + 'freq_calibration.pdf'
+                )
+                fig.savefig(
+                    self._data_manager._save_path + 'freq_calibration.svg'
+                )
             plt.show()
 
         def run(self):
@@ -1127,6 +1133,12 @@ def Phase(
                 fig.savefig(
                     self._data_manager._save_path + 'calibration_results.png', 
                     dpi=300
+                )
+                fig.savefig(
+                    self._data_manager._save_path + 'calibration_results.pdf'
+                )
+                fig.savefig(
+                    self._data_manager._save_path + 'calibration_results.svg'
                 )
             plt.show()
 

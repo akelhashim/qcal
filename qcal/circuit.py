@@ -828,6 +828,14 @@ class CircuitSet:
         for i in range(0, len(self), batch_size):
             yield CircuitSet(self._df.iloc[i:i + batch_size])
 
+    def copy(self) -> CircuitSet:
+        """Deep copy of the CircuitSet.
+
+        Returns:
+            CircuitSet: copy of the CircuitSet.
+        """
+        return self.__copy__()
+
     def save(self, path: str):
         """Save the CircuitSet dataframe.
 

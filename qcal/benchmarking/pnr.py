@@ -227,7 +227,13 @@ def KNR(qpu:                  QPU,
             if settings.Settings.save_data:
                 fig.savefig(
                     self._data_manager._save_path + 'KNR_infidelities.png', 
-                    dpi=300
+                    dpi=600
+                )
+                fig.savefig(
+                    self._data_manager._save_path + 'KNR_infidelities.pdf'
+                )
+                fig.savefig(
+                    self._data_manager._save_path + 'KNR_infidelities.svg'
                 )
             plt.show()
 
@@ -240,6 +246,12 @@ def KNR(qpu:                  QPU,
                 fig.savefig(
                     self._data_manager._save_path + 'KNR_heatmap.png', 
                     dpi=300
+                )
+                fig.savefig(
+                    self._data_manager._save_path + 'KNR_heatmap.pdf'
+                )
+                fig.savefig(
+                    self._data_manager._save_path + 'KNR_heatmap.svg'
                 )
             plt.show()
 
