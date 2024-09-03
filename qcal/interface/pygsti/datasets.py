@@ -9,7 +9,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-__all__ = ('generate_pygsti_report',)
+__all__ = 'generate_pygsti_report'
 
 
 def generate_pygsti_dataset(circuits: CircuitSet, fileloc: str):
@@ -33,9 +33,9 @@ def generate_pygsti_dataset(circuits: CircuitSet, fileloc: str):
     )
 
     logger.info(" Saving the pyGSTi results...")
-    with open(f'{fileloc}_dataset.txt', 'w') as f:  # Write the header
+    with open(f'{fileloc}dataset.txt', 'w') as f:  # Write the header
         f.write('## Columns = ' + ', '.join(results_df.columns) + "\n")
         f.close()
     results_df.to_csv(
-        f'{fileloc}_dataset.txt', sep=' ', mode='a', header=False
+        f'{fileloc}dataset.txt', sep=' ', mode='a', header=False
     )

@@ -375,9 +375,15 @@ class QPU:
                 timeit.default_timer() - t0, 1
             )
 
-    def save(self) -> None:
-        """Save all circuits."""
-        self._data_manager.create_data_path()
+    def save(self, create_data_path: bool = True) -> None:
+        """Save all circuits and data.
+
+        Args:
+            create_data_path (bool, optional): whether to create a data save 
+                path. Defaults to True.
+        """
+        if create_data_path:
+            self._data_manager.create_data_path()
 
         if len(self._circuits) > 0:
             self._circuits.save(
