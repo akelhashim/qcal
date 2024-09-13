@@ -66,7 +66,7 @@ def plot_freq_spectrum(
 
     n_points = 0
     for qp in config.qubit_pairs:
-        n_points += len(config.basis_gates['two_qubit'][qp])
+        n_points += len(config.native_gates['two_qubit'][qp])
     colors_tq = px.colors.sample_colorscale(
         'RdBu',
         [n/(n_points - 1) for n in range(n_points)]
@@ -138,7 +138,7 @@ def plot_freq_spectrum(
     if plot_two_qubit:
         i = -1
         for qp in qubit_pairs:
-            for gate in config.basis_gates['two_qubit'][qp]:
+            for gate in config.native_gates['two_qubit'][qp]:
                 i += 1
                 fig.add_trace(
                     go.Scatter(
