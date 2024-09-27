@@ -43,6 +43,7 @@ def post_process(
         n_reads_per_shot: int | dict | None = None,
         classifier:       ClassificationManager | None = None, 
         raster_circuits:  bool = False,
+        rcorr_cmat:       pd.DataFrame | None = None,
         save_raw_data:    bool = False
     ) -> None:
     """Post-process measurement results from QubiC.
@@ -69,6 +70,10 @@ def post_process(
             one by one. If True, all circuits in a batch will be measured
             back-to-back one shot at a time. This can help average out the 
             effects of drift on the timescale of a measurement.
+        rcorr_cmat (pd.DataFrame | None, optional): confusion matrix for
+            readout correction. Defaults to None. If passed, the readout
+            correction will be applied to the raw bit strings in 
+            post-processing.
         save_raw_data (bool, optional): whether to save raw IQ data for each
                 qubit in the CircuitSet. Defaults to False.
     """
@@ -216,6 +221,15 @@ def post_process(
             # Assign results as a circuit attribute
             try:
                 circuit.results = results
+                if rcorr_cmat is not None:
+                    try:
+                        circuit.results.apply_readout_correction(rcorr_cmat)
+                    except Exception:
+                        if i == 0:
+                            logger.warning(
+                                f'Cannot perform readout correction!'
+                            )
+
             except Exception:
                 if i == 0:
                     logger.warning(

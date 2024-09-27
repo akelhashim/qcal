@@ -71,7 +71,8 @@ class QPU:
             n_batches:       int = 1,
             n_circs_per_seq: int = 1,
             n_levels:        int = 2,
-            raster_circuits: bool = False
+            raster_circuits: bool = False,
+            rcorr_cmat:      pd.DataFrame | None = None,
         ) -> None:
         """Initialize an instance of the Quantum Processing Unit.
 
@@ -98,6 +99,10 @@ class QPU:
                 one by one. If True, all circuits in a batch will be measured
                 back-to-back one shot at a time. This can help average out the 
                 effects of drift on the timescale of a measurement.
+            rcorr_cmat (pd.DataFrame | None, optional): confusion matrix for
+                readout correction. Defaults to None. If passed, the readout
+                correction will be applied to the raw bit strings in 
+                post-processing.
         """
         self._config = config
         self._compiler = compiler
@@ -107,6 +112,7 @@ class QPU:
         self._n_batches = n_batches
         self._n_circs_per_seq = n_circs_per_seq
         self._raster_circuits = raster_circuits
+        self._rcorr_cmat = rcorr_cmat
 
         if self._classifier is None:
             logger.warning(' No classifier has been instantiated!')

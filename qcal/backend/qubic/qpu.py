@@ -13,6 +13,7 @@ from qcal.qpu.qpu import QPU
 
 import logging
 import os
+import pandas as pd
 
 from typing import Any, Dict, List
 
@@ -44,6 +45,7 @@ class QubicQPU(QPU):
                 n_levels:            int = 2,
                 n_reads_per_shot:    int | dict | None = None,
                 raster_circuits:     bool = False,
+                rcorr_cmat:          pd.DataFrame | None = None,
                 outputs:             List[str] = ['s11'],
                 hardware_vz_qubits:  List[str] = [],
                 measure_qubits:      List[str] | None = None,
@@ -86,6 +88,10 @@ class QubicQPU(QPU):
                 one by one. If True, all circuits in a batch will be measured
                 back-to-back one shot at a time. This can help average out the 
                 effects of drift on the timescale of a measurement.
+            rcorr_cmat (pd.DataFrame | None, optional): confusion matrix for
+                readout correction. Defaults to None. If passed, the readout
+                correction will be applied to the raw bit strings in 
+                post-processing.
             outputs (List[str]): what output data is desired for each
                 measurement. Defaults to ['s11', 'shots', 'counts']. 's11'
                 is to the integrated IQ data; 'shots' is the classified data
@@ -135,7 +141,8 @@ class QubicQPU(QPU):
             n_batches=n_batches,
             n_circs_per_seq=n_circs_per_seq,
             n_levels=n_levels,
-            raster_circuits=raster_circuits
+            raster_circuits=raster_circuits,
+            rcorr_cmat=rcorr_cmat
         )
 
         try:
@@ -284,6 +291,7 @@ class QubicQPU(QPU):
             n_reads_per_shot=self._n_reads_per_shot,
             classifier=self._classifier, 
             raster_circuits=self._raster_circuits,
+            rcorr_cmat=self._rcorr_cmat,
             save_raw_data=self._save_raw_data
         )
 
@@ -301,6 +309,7 @@ class QubicQPU(QPU):
                     n_reads_per_shot=self._n_reads_per_shot,
                     classifier=self._classifier, 
                     raster_circuits=self._raster_circuits,
+                    rcorr_cmat=self._rcorr_cmat,
                     save_raw_data=self._save_raw_data
                 )
 
@@ -318,5 +327,6 @@ class QubicQPU(QPU):
                     n_reads_per_shot=self._n_reads_per_shot,
                     classifier=self._classifier, 
                     raster_circuits=self._raster_circuits,
+                    rcorr_cmat=self._rcorr_cmat,
                     save_raw_data=self._save_raw_data
                 )
