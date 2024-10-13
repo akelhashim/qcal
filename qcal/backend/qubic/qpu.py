@@ -43,7 +43,6 @@ class QubicQPU(QPU):
                 n_batches:           int = 1, 
                 n_circs_per_seq:     int = 1,
                 n_levels:            int = 2,
-                n_reads_per_shot:    int | dict | None = None,
                 raster_circuits:     bool = False,
                 rcorr_cmat:          pd.DataFrame | None = None,
                 outputs:             List[str] = ['s11'],
@@ -56,6 +55,7 @@ class QubicQPU(QPU):
                 zero_between_reload: bool = True,
                 save_raw_data:       bool = False,
                 gmm_manager:         GMMManager = None,
+                sd_param:            Dict | None = None,
                 rpc_ip_address:      str = '192.168.1.122',
                 port:                int = 9095
         ) -> None:
@@ -78,10 +78,6 @@ class QubicQPU(QPU):
             n_levels (int, optional): number of energy levels to be measured. 
                 Defaults to 2. If n_levels = 3, this assumes that the
                 measurement supports qutrit classification.
-            n_reads_per_shot (int | dict | None, optional): number of reads per 
-                shot per circuit. Defaults to None. If None, this will be 
-                computed from the number of reads per channel in the compiled
-                program.
             raster_circuits (bool, optional): whether to raster through all
                 circuits in a batch during measurement. Defaults to False. By
                 default, all circuits in a batch will be measured n_shots times
@@ -128,6 +124,8 @@ class QubicQPU(QPU):
             gmm_manager (GMMManager, optional): QubiC GMMManager object.
                 Defaults to None. If None, this is loaded from a previously 
                 saved manager object: 'gmm_manager.pkl'.
+            sd_param (Dict | None, optional): this kwarg is unused and only
+                included for compatiblity with qcal-pro. Defaults to None.
             rpc_ip_address (str, optional): IP address for RPC server.
                 Defaults to '192.168.1.25'.
             port (int, option): port for RPC server. Defaults to 9096.
@@ -157,7 +155,7 @@ class QubicQPU(QPU):
         except ImportError:
             logger.warning(' Unable to import qubitconfig!')
 
-        self._n_reads_per_shot = n_reads_per_shot
+        self._n_reads_per_shot = None
         self._outputs = outputs
         self._measure_qubits = measure_qubits
         self._reload_cmd = reload_cmd
@@ -165,13 +163,14 @@ class QubicQPU(QPU):
         self._reload_env = reload_env
         self._zero_between_reload = zero_between_reload
         self._save_raw_data = save_raw_data
+        self._gmm_manager = gmm_manager
+        self._sd_param = sd_param
         
         self._qubic_transpiler = Transpiler(
             config, 
             reload_pulse=reload_pulse,
             hardware_vz_qubits=hardware_vz_qubits
         )
-        self._gmm_manager = gmm_manager
         self._fpga_config = FPGAConfig()
         self._channel_config = load_channel_configs(
             os.path.join(settings.Settings.config_path, 'channel_config.json')
@@ -263,10 +262,9 @@ class QubicQPU(QPU):
 
     def acquire(self) -> None:
         """Measure all circuits."""
-        if self._n_reads_per_shot is None:
-            self._n_reads_per_shot = calculate_n_reads(
-                self._config, self._compiled_program[0]
-            )
+        self._n_reads_per_shot = calculate_n_reads(
+            self._config, self._compiled_program[0]
+        )
 
         measurement = self._jobman.build_and_run_circuits(
             self._sequence, 
