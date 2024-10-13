@@ -367,7 +367,6 @@ def add_mcm_apply(config: Config, mcm: MCM, pulse: List) -> None:
     pulse.append({'name': 'barrier', 'scope': scope})
 
 
-
 def add_delay(
         config: Config, gate: Gate, circuit: List, pulses: defaultdict
     ) -> None:
@@ -748,19 +747,15 @@ def to_qubic(
         circuit:            Circuit, 
         gate_mapper:        defaultdict,
         pulses:             defaultdict,
-        qubit_reset:        bool = True,
         hardware_vz_qubits: List[str] = [],
     ) -> List:
     """Compile a qcal circuit to a qubic circuit.
 
     Args:
-        config (Config):           config object.
-        circuit (Circuit):         qcal circuit.
+        config (Config): config object.
+        circuit (Circuit): qcal circuit.
         gate_mapper (defaultdict): map between qcal to QubiC gates.
-        pulses (defaultdict):      pulses that have been stored for reuse.
-        qubit_reset (bool):        whether to reset the qubits before a 
-            circuit. Defaults to True. This can be set to False when adding
-            subcircuits like mid-circuit measurement.
+        pulses (defaultdict): pulses that have been stored for reuse.
         hardware_vz_qubits (List[str], optional): list of qubit labels
             specifying for which qubits should the virtualz gates be done
             on hardware (as opposed to software). Defaults to None. This is
@@ -789,12 +784,11 @@ def to_qubic(
         ])
 
     # Add reset to the beginning of the circuit
-    if qubit_reset:
-        add_reset(config, circuit.qubits, qubic_circuit, pulses)
+    add_reset(config, circuit.qubits, qubic_circuit, pulses)
 
-        # Add (optional) readout heralding
-        if config.parameters['readout']['herald']:
-            add_heralding(config, circuit.qubits, qubic_circuit, pulses)
+    # Add (optional) readout heralding
+    if config.parameters['readout']['herald']:
+        add_heralding(config, circuit.qubits, qubic_circuit, pulses)
 
     for cycle in circuit.cycles:
 
@@ -827,15 +821,10 @@ def to_qubic(
 class Transpiler:
     """qcal to QubiC Transpiler."""
 
-    # __slots__ = (
-    #     '_config', '_gate_mapper', '_reload_pulse', '_qubit_reset', '_pulses'
-    # )
-
     def __init__(self, 
             config:             Config, 
             gate_mapper:        defaultdict | None = None,
             reload_pulse:       bool = True,
-            qubit_reset:        bool = True,
             hardware_vz_qubits: List[str] = [],
         ) -> None:
         """Initialize with a qcal Config object.
@@ -846,9 +835,6 @@ class Transpiler:
                 circuit gates to QubiC gates. Defaults to None.
             reload_pulse (bool): reloads the stored pulses when compiling each
                 circuit. Defaults to True.
-            qubit_reset (bool): whether to reset the qubits before a circuit.
-                Defaults to True. This can be set to False when adding
-                subcircuits like mid-circuit measurement.
             hardware_vz_qubits (List[str], optional): list of qubit labels
                 specifying for which qubits should the virtualz gates be done
                 on hardware (as opposed to software). Defaults to None. This is
@@ -887,7 +873,6 @@ class Transpiler:
             self._gate_mapper = gate_mapper
 
         self._reload_pulse = reload_pulse
-        self._qubit_reset = qubit_reset
         self._hardware_vz_qubits = hardware_vz_qubits
         self._pulses = defaultdict(lambda: False, {})
 
@@ -933,12 +918,11 @@ class Transpiler:
             
             transpiled_circuits.append(
                 to_qubic(
-                    self._config, 
-                    circuit, 
-                    self._gate_mapper, 
-                    self._pulses,
-                    self._qubit_reset,
-                    self._hardware_vz_qubits
+                    config=self._config, 
+                    circuit=circuit, 
+                    gate_mapper=self._gate_mapper, 
+                    pulses=self._pulses,
+                    hardware_vz_qubits=self._hardware_vz_qubits
                 )
             )
               

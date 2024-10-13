@@ -7,6 +7,7 @@ from __future__ import annotations
 from qcal.math.entropy import shannon_entropy
 from qcal.math.probability import total_variation_distance
 
+import copy
 import itertools
 import logging
 import numpy as np
@@ -89,7 +90,7 @@ def readout_correction(results: Results, confusion_matrix: DataFrame) -> Dict:
                 corrected_value += coeff * results[btstr].counts
 
             corrected_results[obsrv] = max(0, int(corrected_value))
-
+            
         return corrected_results
 
 
@@ -121,6 +122,8 @@ class Results:
             results = dict()
         
         self._results = results
+        self.__raw_results = copy.deepcopy(results)
+        self._confusion_matrix = None
         self._df = pd.DataFrame([results], index=['counts'], dtype='object')
         self._df = pd.concat(
             [self._df,
@@ -293,18 +296,20 @@ class Results:
             confusion_matrix (DataFrame): confusion matrix measured using the
                 ```qcal.benchmarking.fidelity.ReadoutFidelity``` module.
         """
-        self._raw_results = self._results.copy()
         self._confusion_matrix = confusion_matrix
-        self._results = readout_correction(self, confusion_matrix)
-        self._df = pd.DataFrame(
-            [self._results], index=['counts'], dtype='object'
-        )
-        self._df = pd.concat(
-            [self._df,
-             pd.DataFrame([self.populations], index=['probabilities'])
-            ],
-            join='inner'
-        )
+        try:
+            self._results = readout_correction(self, confusion_matrix)
+            self._df = pd.DataFrame(
+                [self._results], index=['counts'], dtype='object'
+            )
+            self._df = pd.concat(
+                [self._df,
+                pd.DataFrame([self.populations], index=['probabilities'])
+                ],
+                join='inner'
+            )
+        except Exception:
+            self._results = copy.deepcopy(self.__raw_results)
 
     def marginalize(self, idx: int | Tuple[int]):
         """Marginalize the results over a given bistring index.
