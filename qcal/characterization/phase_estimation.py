@@ -653,9 +653,9 @@ def analyze_cz(
     # last_good_depth = 2**last_good_idx
     
     angle_errors = {
-        'ZZ': zz_estimates - target_zz,
-        'IZ': iz_estimates - target_iz,
-        'ZI': zi_estimates - target_zi,
+        'ZZ': target_zz - zz_estimates,
+        'IZ': target_iz - iz_estimates,
+        'ZI': target_zi - zi_estimates,
     }
 
     return (angle_estimates, angle_errors, last_good_idx)
