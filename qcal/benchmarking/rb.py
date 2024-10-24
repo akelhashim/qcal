@@ -263,20 +263,12 @@ def CRB(qpu:             QPU,
 
 def SRB(qpu:             QPU,
         config:          Config,
-        qubit_labels:    Iterable[int],
+        qubit_labels:    List[int | Tuple[int]],
         circuit_depths:  List[int] | Tuple[int],
-        tq_config:       str | Any = None,
-        compiler:        Any | None = None, 
-        transpiler:      Any | None = None,
-        classifier:      ClassificationManager = None,
         n_circuits:      int = 30,
-        n_shots:         int = 1024, 
-        n_batches:       int = 1, 
-        n_circs_per_seq: int = 1,
-        n_levels:        int = 2,
+        tq_config:       str | Any = None,
         compiled_pauli:  bool = True,
         include_rcal:    bool = False,
-        raster_circuits: bool = False,
         **kwargs
     ) -> Callable:
     """Streamlined Randomized Benchmarking.
@@ -286,32 +278,17 @@ def SRB(qpu:             QPU,
     Args:
         qpu (QPU): custom QPU object.
         config (Config): qcal Config object.
-        qubit_labels (Iterable[int, Iterable[int]]): a list specifying sets of 
+        qubit_labels (List[int | Tuple[int]]): a list specifying sets of 
             system labels to be twirled together by Clifford gates in each 
             circuit. For example, [0, 1, (2, 3)] would perform single-qubit RB
             on 0 and 1, and two-qubit RB on (2, 3).
         circuit_depths (List[int] | Tuple[int]): a list of positive integers 
             specifying how many cycles of random Clifford gates to generate for
             RB, for example, [4, 64, 256].
-        tq_config (str | Any, optional): True-Q config yaml file or config
-            object. Defaults to None.
-        compiler (Any | Compiler | None, optional): custom compiler to compile
-            the True-Q circuits. Defaults to None.
-        transpiler (Any | None, optional): custom transpiler to transpile
-            the True-Q circuits to experimental circuits. Defaults to None.
-        classifier (ClassificationManager, optional): manager used for 
-            classifying raw data. Defaults to None.
         n_circuits (int, optional): the number of circuits for each circuit 
             depth. Defaults to 30.
-        n_shots (int, optional): number of measurements per circuit. 
-                Defaults to 1024.
-        n_batches (int, optional): number of batches of measurements. Defaults
-            to 1.
-        n_circs_per_seq (int, optional): maximum number of circuits that can be
-            measured per sequence. Defaults to 1.
-        n_levels (int, optional): number of energy levels to be measured. 
-            Defaults to 2. If n_levels = 3, this assumes that the
-            measurement supports qutrit classification.
+        tq_config (str | Any, optional): True-Q config yaml file or config
+            object. Defaults to None.
         compiled_pauli (bool, optional): whether or not to compile a random 
             Pauli gate for each qubit in the cycle preceding a measurement 
             operation. Defaults to True.
@@ -319,12 +296,6 @@ def SRB(qpu:             QPU,
             same circuit collection as the SRB circuit. Defaults to False. If
             True, readout correction will be apply to the fit results 
             automatically.
-        raster_circuits (bool, optional): whether to raster through all
-            circuits in a batch during measurement. Defaults to False. By
-            default, all circuits in a batch will be measured n_shots times
-            one by one. If True, all circuits in a batch will be measured
-            back-to-back one shot at a time. This can help average out the 
-            effects of drift on the timescale of a measurement.
 
     Returns:
         Callable: SRB class instance.
@@ -336,24 +307,16 @@ def SRB(qpu:             QPU,
 
         def __init__(self,
                 config:          Config,
-                qubit_labels:    Iterable[int],
+                qubit_labels:    List[int | Tuple[int]],
                 circuit_depths:  List[int] | Tuple[int],
-                tq_config:       str | tq.Config = None,
-                compiler:        Any | None = None, 
-                transpiler:      Any | None = None,
-                classifier:      ClassificationManager = None,
                 n_circuits:      int = 30,
-                n_shots:         int = 1024,
-                n_batches:       int = 1, 
-                n_circs_per_seq: int = 1,
-                n_levels:        int = 2,
+                tq_config:       str | tq.Config = None,
                 compiled_pauli:  bool = True,
                 include_rcal:    bool = False,
-                raster_circuits: bool = False,
                 **kwargs
             ) -> None:
-            from qcal.interface.trueq.compiler import Compiler
-            from qcal.interface.trueq.transpiler import Transpiler
+            from qcal.interface.trueq.compiler import TrueqCompiler
+            from qcal.interface.trueq.transpiler import TrueqTranspiler
             
             try:
                 import trueq as tq
@@ -366,22 +329,20 @@ def SRB(qpu:             QPU,
             self._n_circuits = n_circuits
             self._compiled_pauli = compiled_pauli
             self._include_rcal = include_rcal
-            
-            if compiler is None:
-                compiler = Compiler(config if tq_config is None else tq_config)
-            if transpiler is None:
-                transpiler = Transpiler()
+
+            compiler = kwargs.get(
+                'compiler', 
+                TrueqCompiler(config if tq_config is None else tq_config)
+            )
+            kwargs.pop('compiler', None)
+
+            transpiler = kwargs.get('transpiler', TrueqTranspiler())
+            kwargs.pop('transpiler', None)
                 
             qpu.__init__(self,
                 config=config, 
                 compiler=compiler, 
                 transpiler=transpiler,
-                classifier=classifier,
-                n_shots=n_shots, 
-                n_batches=n_batches, 
-                n_circs_per_seq=n_circs_per_seq, 
-                n_levels=n_levels,
-                raster_circuits=raster_circuits,
                 **kwargs
             )
 
@@ -511,17 +472,9 @@ def SRB(qpu:             QPU,
         config,
         qubit_labels,
         circuit_depths,
-        tq_config,
-        compiler,
-        transpiler,
-        classifier,
         n_circuits,
-        n_shots,
-        n_batches,
-        n_circs_per_seq,
-        n_levels,
+        tq_config,
         compiled_pauli,
         include_rcal,
-        raster_circuits,
         **kwargs
     )

@@ -4,7 +4,6 @@ See: https://github.com/BQSKit/bqskit
 """
 from qcal.circuit import Barrier, Circuit, CircuitSet
 from qcal.config import Config
-from qcal.interface.bqskit.transpiler import BQSKitTranspiler
 
 import logging
 import multiprocessing as mp
@@ -113,6 +112,8 @@ class BQSKitCompiler:
                 can speed up the compilation process if there are many
                 circuits and/or long circuit depths.
         """
+        from qcal.interface.bqskit.transpiler import BQSKitTranspiler
+        
         self._config = config
 
         if model is None:

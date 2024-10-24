@@ -8,7 +8,6 @@ import qcal.settings as settings
 from .calibration import Calibration
 from .utils import find_pulse_index, in_range
 from qcal.circuit import Barrier, Cycle, Circuit, CircuitSet
-from qcal.compilation.compiler import Compiler
 from qcal.config import Config
 from qcal.fitting.fit import (
     # FitAbsoluteValue, FitDecayingCosine, 
@@ -555,16 +554,8 @@ def Amplitude(
         config:          Config,
         qubit_pairs:     List[Tuple],
         amplitudes:      ArrayLike | NDArray | Dict[ArrayLike | NDArray],
-        compiler:        Any | Compiler | None = None, 
-        transpiler:      Any | None = None,
-        classifier:      ClassificationManager = None,
-        n_shots:         int = 1024, 
-        n_batches:       int = 1, 
-        n_circs_per_seq: int = 1,
-        n_levels:        int = 2,
         n_gates:         int = 1,
         relative_amp:    bool = False,
-        raster_circuits: bool = False,
         **kwargs
     ) -> Callable:
     """Amplitude calibration for CZ gate.
@@ -594,33 +585,12 @@ def Amplitude(
             These amplitudes are swept over both the control and target qubit
             lines. If calibrating multiple gates at the same time, this should 
             be a dictionary mapping two arrays to each qubit pair label.
-        compiler (Any | Compiler | None, optional): custom compiler to
-            compile the experimental circuits. Defaults to None.
-        transpiler (Any | None, optional): custom transpiler to 
-            transpile the experimental circuits. Defaults to None.
-        classifier (ClassificationManager, optional): manager used for 
-            classifying raw data. Defaults to None.
-        n_shots (int, optional): number of measurements per circuit. 
-            Defaults to 1024.
-        n_batches (int, optional): number of batches of measurements. 
-            Defaults to 1.
-        n_circs_per_seq (int, optional): maximum number of circuits that
-            can be measured per sequence. Defaults to 1.
-        n_levels (int, optional): number of energy levels to be measured. 
-            Defaults to 2. If n_levels = 3, this assumes that the
-            measurement supports qutrit classification.
         n_gates (int, optional): number of gates for pulse repetition.
             Defaults to 1.
         relative_amp (bool, optional): whether or not the amplitudes argument
             is defined relative to the existing pulse amplitude. Defaults to
             False. If True, the amplitudes are swept over the current amplitude
             times the amplitudes argument.
-        raster_circuits (bool, optional): whether to raster through all
-            circuits in a batch during measurement. Defaults to False. By
-            default, all circuits in a batch will be measured n_shots times
-            one by one. If True, all circuits in a batch will be measured
-            back-to-back one shot at a time. This can help average out the 
-            effects of drift on the timescale of a measurement.
 
     Returns:
         Callable: Amplitude calibration class.
@@ -637,31 +607,12 @@ def Amplitude(
                 config:          Config,
                 qubit_pairs:     List[Tuple],
                 amplitudes:      ArrayLike | Dict[ArrayLike],
-                compiler:        Any | Compiler | None = None, 
-                transpiler:      Any | None = None,
-                classifier:      ClassificationManager = None,
-                n_shots:         int = 1024, 
-                n_batches:       int = 1, 
-                n_circs_per_seq: int = 1,
-                n_levels:        int = 2,
                 n_gates:         int = 1,
                 relative_amp:    bool = False,
-                raster_circuits: bool = False,
                 **kwargs
             ) -> None:
             """Initialize the Amplitude class within the function."""
-            qpu.__init__(self,
-                config=config, 
-                compiler=compiler, 
-                transpiler=transpiler,
-                classifier=classifier,
-                n_shots=n_shots, 
-                n_batches=n_batches, 
-                n_circs_per_seq=n_circs_per_seq, 
-                n_levels=n_levels,
-                raster_circuits=raster_circuits,
-                **kwargs
-            )
+            qpu.__init__(self, config=config, **kwargs)
             Calibration.__init__(self, config)
 
             self._qubits = qubit_pairs
@@ -925,16 +876,8 @@ def Amplitude(
         config,
         qubit_pairs,
         amplitudes,
-        compiler, 
-        transpiler,
-        classifier,
-        n_shots, 
-        n_batches, 
-        n_circs_per_seq,
-        n_levels,
         n_gates,
         relative_amp,
-        raster_circuits,
         **kwargs
     )
 
@@ -944,16 +887,8 @@ def Frequency(
         config:          Config,
         qubit_pairs:     List[Tuple],
         frequencies:     ArrayLike | NDArray | Dict[ArrayLike | NDArray],
-        compiler:        Any | Compiler | None = None, 
-        transpiler:      Any | None = None,
-        classifier:      ClassificationManager = None,
-        n_shots:         int = 1024, 
-        n_batches:       int = 1, 
-        n_circs_per_seq: int = 1,
-        n_levels:        int = 2,
         n_gates:         int = 1,
         relative_freq:   bool = False,
-        raster_circuits: bool = False,
         **kwargs
     ) -> Callable:
     """Frequency calibration for CZ gate.
@@ -981,33 +916,12 @@ def Frequency(
             frequencies to sweep over for calibrating the two-qubit CZ gate. 
             If calibrating multiple gates at the same time, this should be a 
             dictionary mapping an array to each qubit pair label.
-        compiler (Any | Compiler | None, optional): custom compiler to
-            compile the experimental circuits. Defaults to None.
-        transpiler (Any | None, optional): custom transpiler to 
-            transpile the experimental circuits. Defaults to None.
-        classifier (ClassificationManager, optional): manager used for 
-            classifying raw data. Defaults to None.
-        n_shots (int, optional): number of measurements per circuit. 
-            Defaults to 1024.
-        n_batches (int, optional): number of batches of measurements. 
-            Defaults to 1.
-        n_circs_per_seq (int, optional): maximum number of circuits that
-            can be measured per sequence. Defaults to 1.
-        n_levels (int, optional): number of energy levels to be measured. 
-            Defaults to 2. If n_levels = 3, this assumes that the
-            measurement supports qutrit classification.
         n_gates (int, optional): number of gates for pulse repetition.
             Defaults to 1.
         relative_freq (bool, optional): whether or not the frequencies argument
             is defined relative to the existing pulse frequencies. Defaults to
             False. If True, the frequencies are swept over the current 
             frequency plus/minus the frequencies argument.
-        raster_circuits (bool, optional): whether to raster through all
-            circuits in a batch during measurement. Defaults to False. By
-            default, all circuits in a batch will be measured n_shots times
-            one by one. If True, all circuits in a batch will be measured
-            back-to-back one shot at a time. This can help average out the 
-            effects of drift on the timescale of a measurement.
 
     Returns:
         Callable: Frequency calibration class.
@@ -1024,31 +938,12 @@ def Frequency(
                 config:          Config,
                 qubit_pairs:     List[Tuple],
                 frequencies:     ArrayLike | Dict[ArrayLike],
-                compiler:        Any | Compiler | None = None, 
-                transpiler:      Any | None = None,
-                classifier:      ClassificationManager = None,
-                n_shots:         int = 1024, 
-                n_batches:       int = 1, 
-                n_circs_per_seq: int = 1,
-                n_levels:        int = 2,
                 n_gates:         int = 1,
                 relative_freq:   bool = False,
-                raster_circuits: bool = False,
                 **kwargs
             ) -> None:
             """Initialize the Amplitude class within the function."""
-            qpu.__init__(self,
-                config=config, 
-                compiler=compiler, 
-                transpiler=transpiler,
-                classifier=classifier,
-                n_shots=n_shots, 
-                n_batches=n_batches, 
-                n_circs_per_seq=n_circs_per_seq, 
-                n_levels=n_levels,
-                raster_circuits=raster_circuits,
-                **kwargs
-            )
+            qpu.__init__(self, config=config, **kwargs)
             Calibration.__init__(self, config)
 
             self._qubits = qubit_pairs
@@ -1289,16 +1184,8 @@ def Frequency(
         config,
         qubit_pairs,
         frequencies,
-        compiler, 
-        transpiler,
-        classifier,
-        n_shots, 
-        n_batches, 
-        n_circs_per_seq,
-        n_levels,
         n_gates,
         relative_freq,
-        raster_circuits,
         **kwargs
     )
 
@@ -1308,14 +1195,6 @@ def RelativeAmp(
         config:          Config,
         qubit_pairs:     List[Tuple],
         amplitudes:      ArrayLike | NDArray | Dict[ArrayLike | NDArray],
-        compiler:        Any | Compiler | None = None, 
-        transpiler:      Any | None = None,
-        classifier:      ClassificationManager = None,
-        n_shots:         int = 1024, 
-        n_batches:       int = 1, 
-        n_circs_per_seq: int = 1,
-        n_levels:        int = 2,
-        raster_circuits: bool = False,
         **kwargs
     ) -> Callable:
     """Relative amplitude calibration for CZ gate.
@@ -1346,27 +1225,6 @@ def RelativeAmp(
             relative to the amplitude on the control qubit line. If calibrating 
             multiple gates at the same time, this should be a dictionary  
             mapping an array to a qubit pair label.
-        compiler (Any | Compiler | None, optional): custom compiler to
-            compile the experimental circuits. Defaults to None.
-        transpiler (Any | None, optional): custom transpiler to 
-            transpile the experimental circuits. Defaults to None.
-        classifier (ClassificationManager, optional): manager used for 
-            classifying raw data. Defaults to None.
-        n_shots (int, optional): number of measurements per circuit. 
-            Defaults to 1024.
-        n_batches (int, optional): number of batches of measurements. 
-            Defaults to 1.
-        n_circs_per_seq (int, optional): maximum number of circuits that
-            can be measured per sequence. Defaults to 1.
-        n_levels (int, optional): number of energy levels to be measured. 
-            Defaults to 2. If n_levels = 3, this assumes that the
-            measurement supports qutrit classification.
-        raster_circuits (bool, optional): whether to raster through all
-            circuits in a batch during measurement. Defaults to False. By
-            default, all circuits in a batch will be measured n_shots times
-            one by one. If True, all circuits in a batch will be measured
-            back-to-back one shot at a time. This can help average out the 
-            effects of drift on the timescale of a measurement.
 
     Returns:
         Callable: RelativeAmp calibration class.
@@ -1383,30 +1241,11 @@ def RelativeAmp(
                 config:          Config,
                 qubit_pairs:     List[Tuple],
                 amplitudes:      ArrayLike | Dict[ArrayLike],
-                compiler:        Any | Compiler | None = None, 
-                transpiler:      Any | None = None,
-                classifier:      ClassificationManager = None,
-                n_shots:         int = 1024, 
-                n_batches:       int = 1, 
-                n_circs_per_seq: int = 1,
-                n_levels:        int = 2, 
-                raster_circuits: bool = False,
                 **kwargs
             ) -> None:
-            """Initialize the RelativePhase class within the function."""
-            qpu.__init__(self,
-                config=config, 
-                compiler=compiler, 
-                transpiler=transpiler,
-                classifier=classifier,
-                n_shots=n_shots, 
-                n_batches=n_batches, 
-                n_circs_per_seq=n_circs_per_seq, 
-                n_levels=n_levels,
-                raster_circuits=raster_circuits,
-                **kwargs
-            )
-            Calibration.__init__(self)
+            """Initialize the RelativeAmp class within the function."""
+            qpu.__init__(self, config=config, **kwargs)
+            Calibration.__init__(self, config)
 
             self._qubits = qubit_pairs
 
@@ -1587,14 +1426,6 @@ def RelativeAmp(
         config,
         qubit_pairs,
         amplitudes,
-        compiler, 
-        transpiler,
-        classifier,
-        n_shots, 
-        n_batches, 
-        n_circs_per_seq,
-        n_levels,
-        raster_circuits,
         **kwargs
     )
 
@@ -1604,14 +1435,6 @@ def RelativePhase(
         config:          Config,
         qubit_pairs:     List[Tuple],
         phases:          ArrayLike | NDArray | Dict[ArrayLike | NDArray],
-        compiler:        Any | Compiler | None = None, 
-        transpiler:      Any | None = None,
-        classifier:      ClassificationManager = None,
-        n_shots:         int = 1024, 
-        n_batches:       int = 1, 
-        n_circs_per_seq: int = 1,
-        n_levels:        int = 2,
-        raster_circuits: bool = False,
         **kwargs
     ) -> Callable:
     """Relative phase calibration for CZ gate.
@@ -1640,27 +1463,6 @@ def RelativePhase(
             phases to sweep over for calibrating the two-qubit gate 
             phases. If calibrating multiple gates at the same time, this 
             should be a dictionary mapping an array to a qubit pair label.
-        compiler (Any | Compiler | None, optional): custom compiler to
-            compile the experimental circuits. Defaults to None.
-        transpiler (Any | None, optional): custom transpiler to 
-            transpile the experimental circuits. Defaults to None.
-        classifier (ClassificationManager, optional): manager used for 
-            classifying raw data. Defaults to None.
-        n_shots (int, optional): number of measurements per circuit. 
-            Defaults to 1024.
-        n_batches (int, optional): number of batches of measurements. 
-            Defaults to 1.
-        n_circs_per_seq (int, optional): maximum number of circuits that
-            can be measured per sequence. Defaults to 1.
-        n_levels (int, optional): number of energy levels to be measured. 
-            Defaults to 2. If n_levels = 3, this assumes that the
-            measurement supports qutrit classification.
-        raster_circuits (bool, optional): whether to raster through all
-            circuits in a batch during measurement. Defaults to False. By
-            default, all circuits in a batch will be measured n_shots times
-            one by one. If True, all circuits in a batch will be measured
-            back-to-back one shot at a time. This can help average out the 
-            effects of drift on the timescale of a measurement.
 
     Returns:
         Callable: RelativePhase calibration calss.
@@ -1677,29 +1479,10 @@ def RelativePhase(
                 config:          Config,
                 qubit_pairs:     List[Tuple],
                 phases:          ArrayLike | Dict[ArrayLike],
-                compiler:        Any | Compiler | None = None, 
-                transpiler:      Any | None = None,
-                classifier:      ClassificationManager = None,
-                n_shots:         int = 1024, 
-                n_batches:       int = 1, 
-                n_circs_per_seq: int = 1,
-                n_levels:        int = 2, 
-                raster_circuits: bool = False,
                 **kwargs
             ) -> None:
             """Initialize the RelativePhase class within the function."""
-            qpu.__init__(self,
-                config=config, 
-                compiler=compiler, 
-                transpiler=transpiler,
-                classifier=classifier,
-                n_shots=n_shots, 
-                n_batches=n_batches, 
-                n_circs_per_seq=n_circs_per_seq, 
-                n_levels=n_levels,
-                raster_circuits=raster_circuits,
-                **kwargs
-            )
+            qpu.__init__(self, config=config, **kwargs)
             Calibration.__init__(self, config)
 
             self._qubits = qubit_pairs
@@ -1866,14 +1649,6 @@ def RelativePhase(
         config,
         qubit_pairs,
         phases,
-        compiler, 
-        transpiler,
-        classifier,
-        n_shots, 
-        n_batches, 
-        n_circs_per_seq,
-        n_levels, 
-        raster_circuits,
         **kwargs
     )
 
@@ -1883,14 +1658,6 @@ def LocalPhases(
         config:          Config,
         qubit_pairs:     List[Tuple],
         phases:          NDArray | Dict = np.pi * np.linspace(-1, 1, 21),
-        compiler:        Any | Compiler | None = None, 
-        transpiler:      Any | None = None,
-        classifier:      ClassificationManager = None,
-        n_shots:         int = 1024, 
-        n_batches:       int = 1, 
-        n_circs_per_seq: int = 1,
-        n_levels:        int = 2,
-        raster_circuits: bool = False,
         **kwargs
     ) -> Callable:
     """Relative phase calibration for CZ gate.
@@ -1914,30 +1681,10 @@ def LocalPhases(
         qubit_pairs (List[Tuple]): pairs of qubit labels for the two-qubit gate
             calibration.
         phases (NDArray | Dict, optional): array of phases to sweep over for 
-            calibrating the local phases of the gate. If calibrating multiple 
-            gates at the same time, this should be a dictionary mapping an 
-            array to a qubit pair label.
-        compiler (Any | Compiler | None, optional): custom compiler to
-            compile the experimental circuits. Defaults to None.
-        transpiler (Any | None, optional): custom transpiler to 
-            transpile the experimental circuits. Defaults to None.
-        classifier (ClassificationManager, optional): manager used for 
-            classifying raw data. Defaults to None.
-        n_shots (int, optional): number of measurements per circuit. 
-            Defaults to 1024.
-        n_batches (int, optional): number of batches of measurements. 
-            Defaults to 1.
-        n_circs_per_seq (int, optional): maximum number of circuits that
-            can be measured per sequence. Defaults to 1.
-        n_levels (int, optional): number of energy levels to be measured. 
-            Defaults to 2. If n_levels = 3, this assumes that the
-            measurement supports qutrit classification.
-        raster_circuits (bool, optional): whether to raster through all
-            circuits in a batch during measurement. Defaults to False. By
-            default, all circuits in a batch will be measured n_shots times
-            one by one. If True, all circuits in a batch will be measured
-            back-to-back one shot at a time. This can help average out the 
-            effects of drift on the timescale of a measurement.
+            calibrating the local phases of the gate. Defaults to ```np.pi * 
+            np.linspace(-1, 1, 21)```. If calibrating multiple gates at the same 
+            time, this should be a dictionary mapping an array to a qubit pair 
+            label.
 
     Returns:
         Callable: LocalPhases calibration calss.
@@ -1954,29 +1701,10 @@ def LocalPhases(
                 config:          Config,
                 qubit_pairs:     List[Tuple],
                 phases:          NDArray | Dict = np.pi*np.linspace(-1, 1, 21),
-                compiler:        Any | Compiler | None = None, 
-                transpiler:      Any | None = None,
-                classifier:      ClassificationManager = None,
-                n_shots:         int = 1024, 
-                n_batches:       int = 1, 
-                n_circs_per_seq: int = 1,
-                n_levels:        int = 2, 
-                raster_circuits: bool = False,
                 **kwargs
             ) -> None:
             """Initialize the RelativePhase class within the function."""
-            qpu.__init__(self,
-                config=config, 
-                compiler=compiler, 
-                transpiler=transpiler,
-                classifier=classifier,
-                n_shots=n_shots, 
-                n_batches=n_batches, 
-                n_circs_per_seq=n_circs_per_seq, 
-                n_levels=n_levels,
-                raster_circuits=raster_circuits,
-                **kwargs
-            )
+            qpu.__init__(self, config=config, **kwargs)
             Calibration.__init__(self, config)
 
             self._qubits = qubit_pairs
@@ -2402,13 +2130,5 @@ def LocalPhases(
         config,
         qubit_pairs,
         phases,
-        compiler, 
-        transpiler,
-        classifier,
-        n_shots, 
-        n_batches, 
-        n_circs_per_seq,
-        n_levels, 
-        raster_circuits,
         **kwargs
     )

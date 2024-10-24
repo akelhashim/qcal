@@ -22,20 +22,12 @@ def KNR(qpu:                  QPU,
         cycle:                Dict,
         circuit_depths:       List[int] | Tuple[int],
         tq_config:            str | Any = None,
-        compiler:             Any | None = None, 
-        transpiler:           Any | None = None,
-        classifier:           ClassificationManager = None,
         n_circuits:           int = 30,
         n_subsystems:         int = 2,
-        n_shots:              int = 1024, 
-        n_batches:            int = 1, 
-        n_circs_per_seq:      int = 1,
-        n_levels:             int = 2,
         twirl:                str = 'P',
         propogate_correction: bool = False,
         compiled_pauli:       bool = True,
         include_rcal:         bool = False,
-        raster_circuits:      bool = False,
         **kwargs
     ) -> Callable:
     """K-body Noise Reconstruction.
@@ -51,26 +43,11 @@ def KNR(qpu:                  QPU,
             random Pauli operators to generate, for example, [4, 16, 64].
         tq_config (str | Any, optional): True-Q config yaml file or config
             object. Defaults to None.
-        compiler (Any | Compiler | None, optional): custom compiler to compile
-            the True-Q circuits. Defaults to None.
-        transpiler (Any | None, optional): custom transpiler to transpile
-            the True-Q circuits to experimental circuits. Defaults to None.
-        classifier (ClassificationManager, optional): manager used for 
-            classifying raw data. Defaults to None.
         n_circuits (int, optional): the number of circuits for each circuit 
             depth. Defaults to 30.
         n_subsystems (int, optional): a positive integer specifying the number
             of body errors to estimate on the subset of qubits in the cycle. 
             Defaults to 2.
-        n_shots (int, optional): number of measurements per circuit. 
-                Defaults to 1024.
-        n_batches (int, optional): number of batches of measurements. Defaults
-            to 1.
-        n_circs_per_seq (int, optional): maximum number of circuits that can be
-            measured per sequence. Defaults to 1.
-        n_levels (int, optional): number of energy levels to be measured. 
-            Defaults to 2. If n_levels = 3, this assumes that the
-            measurement supports qutrit classification.
         twirl (tq.Twirl, str, optional): The Twirl to use in this protocol. 
             Defaults to 'P'. You can also specify a twirling group that will be 
             used to automatically instantiate a twirl based on the labels in 
@@ -86,12 +63,6 @@ def KNR(qpu:                  QPU,
             same circuit collection as the SRB circuit. Defaults to False. If
             True, readout correction will be apply to the fit results 
             automatically.
-        raster_circuits (bool, optional): whether to raster through all
-            circuits in a batch during measurement. Defaults to False. By
-            default, all circuits in a batch will be measured n_shots times
-            one by one. If True, all circuits in a batch will be measured
-            back-to-back one shot at a time. This can help average out the 
-            effects of drift on the timescale of a measurement.
 
     Returns:
         Callable: KNR class instance.
@@ -107,24 +78,16 @@ def KNR(qpu:                  QPU,
                 cycle:                Dict,
                 circuit_depths:       List[int] | Tuple[int],
                 tq_config:            str | Any = None,
-                compiler:             Any | None = None, 
-                transpiler:           Any | None = None,
-                classifier:           ClassificationManager = None,
                 n_circuits:           int = 30,
                 n_subsystems:         int = 2,
-                n_shots:              int = 1024, 
-                n_batches:            int = 1, 
-                n_circs_per_seq:      int = 1,
-                n_levels:             int = 2,
                 twirl:                str = 'P',
                 propogate_correction: bool = False,
                 compiled_pauli:       bool = True,
                 include_rcal:         bool = False,
-                raster_circuits:      bool = False,
                 **kwargs
             ) -> None:
-            from qcal.interface.trueq.compiler import Compiler
-            from qcal.interface.trueq.transpiler import Transpiler
+            from qcal.interface.trueq.compiler import TrueqCompiler
+            from qcal.interface.trueq.transpiler import TrueqTranspiler
             
             import trueq as tq
             print(f"True-Q version: {tq.__version__}\n")
@@ -138,21 +101,19 @@ def KNR(qpu:                  QPU,
             self._compiled_pauli = compiled_pauli
             self._include_rcal = include_rcal
             
-            if compiler is None:
-                compiler = Compiler(config if tq_config is None else tq_config)
-            if transpiler is None:
-                transpiler = Transpiler()
+            compiler = kwargs.get(
+                'compiler', 
+                TrueqCompiler(config if tq_config is None else tq_config)
+            )
+            kwargs.pop('compiler', None)
+
+            transpiler = kwargs.get('transpiler', TrueqTranspiler())
+            kwargs.pop('transpiler', None)
                 
             qpu.__init__(self,
                 config=config, 
                 compiler=compiler, 
                 transpiler=transpiler,
-                classifier=classifier,
-                n_shots=n_shots, 
-                n_batches=n_batches, 
-                n_circs_per_seq=n_circs_per_seq, 
-                n_levels=n_levels,
-                raster_circuits=raster_circuits,
                 **kwargs
             )
 
@@ -274,19 +235,11 @@ def KNR(qpu:                  QPU,
         cycle,
         circuit_depths,
         tq_config,
-        compiler,
-        transpiler,
-        classifier,
         n_circuits,
         n_subsystems,
-        n_shots,
-        n_batches,
-        n_circs_per_seq,
-        n_levels,
         twirl,
         propogate_correction,
         compiled_pauli,
         include_rcal,
-        raster_circuits,
         **kwargs
     )

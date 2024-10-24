@@ -7,7 +7,6 @@ Basic example useage:
     qpu = QPU(config)
     qpu.run(circuit)
 """
-from qcal.compilation.compiler import Compiler
 from qcal.config import Config
 from qcal.circuit import CircuitSet
 from qcal.managers.classification_manager import ClassificationManager
@@ -64,7 +63,7 @@ class QPU:
     def __init__(
             self,
             config:          Config,
-            compiler:        Any | Compiler | None = None,
+            compiler:        Any | None = None,
             transpiler:      Any | None = None,
             classifier:      ClassificationManager = None,
             n_shots:         int = 1024,

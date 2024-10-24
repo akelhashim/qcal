@@ -5,7 +5,6 @@ import qcal.settings as settings
 
 from qcal.characterization.characterize import Characterize
 from qcal.circuit import Cycle, Circuit, CircuitSet
-from qcal.compilation.compiler import Compiler
 from qcal.config import Config
 from qcal.gate.single_qubit import Id, X90
 from qcal.managers.classification_manager import ClassificationManager
@@ -34,14 +33,6 @@ def TruthTable(
         circuit:         Circuit,
         qubits:          List | Tuple | None = None,
         ideal_unitary:   NDArray | None = None,
-        compiler:        Any | Compiler | None = None, 
-        transpiler:      Any | None = None,
-        classifier:      ClassificationManager = None,
-        n_shots:         int = 1024, 
-        n_batches:       int = 1, 
-        n_circs_per_seq: int = 1,
-        n_levels:        int = 2,
-        raster_circuits: bool = False,
         **kwargs
     ) -> Callable:
     """Truth Table tomography.
@@ -53,27 +44,6 @@ def TruthTable(
         qubits (List | Tuple | None): qubits to measure. Defaults to None.
         ideal_unitary (NDArray| None): unitary for ideal gate. Defaults to None.
             If not None, it will be used to compute the truth table fidelity.
-        compiler (Any | Compiler | None, optional): custom compiler to
-            compile the experimental circuits. Defaults to None.
-        transpiler (Any | None, optional): custom transpiler to 
-            transpile the experimental circuits. Defaults to None.
-        classifier (ClassificationManager, optional): manager used for 
-            classifying raw data. Defaults to None.
-        n_shots (int, optional): number of measurements per circuit. 
-            Defaults to 1024.
-        n_batches (int, optional): number of batches of measurements. 
-            Defaults to 1.
-        n_circs_per_seq (int, optional): maximum number of circuits that
-            can be measured per sequence. Defaults to 1.
-        n_levels (int, optional): number of energy levels to be measured. 
-                Defaults to 2. If n_levels = 3, this assumes that the
-                measurement supports qutrit classification.
-        raster_circuits (bool, optional): whether to raster through all
-            circuits in a batch during measurement. Defaults to False. By
-            default, all circuits in a batch will be measured n_shots times
-            one by one. If True, all circuits in a batch will be measured
-            back-to-back one shot at a time. This can help average out the 
-            effects of drift on the timescale of a measurement.
 
     Returns:
         Callable: TruthTable class.
@@ -91,28 +61,12 @@ def TruthTable(
                 circuit:         Circuit,
                 qubits:          List | Tuple = None,
                 ideal_unitary:   NDArray | None = None,
-                compiler:        Any | Compiler | None = None, 
-                transpiler:      Any | None = None,
-                classifier:      ClassificationManager = None,
-                n_shots:         int = 1024, 
-                n_batches:       int = 1, 
-                n_circs_per_seq: int = 1,
-                n_levels:        int = 2,
-                raster_circuits: bool = False,
                 **kwargs
             ) -> None:
             """Initialize the TruthTable class within the function."""
 
             qpu.__init__(self,
                 config=config, 
-                compiler=compiler, 
-                transpiler=transpiler,
-                classifier=classifier,
-                n_shots=n_shots, 
-                n_batches=n_batches, 
-                n_circs_per_seq=n_circs_per_seq,
-                n_levels=n_levels,
-                raster_circuits=raster_circuits,
                 **kwargs
             )
             Characterize.__init__(self, config)
@@ -302,13 +256,5 @@ def TruthTable(
         circuit,
         qubits,
         ideal_unitary,
-        compiler, 
-        transpiler,
-        classifier,
-        n_shots, 
-        n_batches,
-        n_circs_per_seq, 
-        n_levels,
-        raster_circuits,
         **kwargs
     )

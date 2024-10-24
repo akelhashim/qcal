@@ -6,7 +6,6 @@ import qcal.settings as settings
 from .calibration import Calibration
 from qcal.benchmarking.readout import ReadoutFidelity
 from qcal.circuit import Barrier, Cycle, Circuit, CircuitSet
-from qcal.compilation.compiler import Compiler
 from qcal.config import Config
 from qcal.machine_learning.clustering import GaussianMixture
 from qcal.managers.classification_manager import ClassificationManager
@@ -43,14 +42,8 @@ def ReadoutCalibration(
         method:          str = 'pi_pulse',
         gate:            str = 'X90',
         model:           str = 'gmm',
-        compiler:        Any | Compiler | None = None, 
-        transpiler:      Any | None = None,
         classifier:      ClassificationManager = None,
-        n_shots:         int = 1024, 
-        n_batches:       int = 1, 
-        n_circs_per_seq: int = 1, 
         n_levels:        int = 2,
-        raster_circuits: bool = False,
         **kwargs
     ) -> Callable:
     """Readout calibration
@@ -74,26 +67,10 @@ def ReadoutCalibration(
         gate (str, optional): native gate to calibrate. Defaults 
             to 'X90'.
         model (str, optional): classification algorithm. Defaults to 'gmm'.
-        compiler (Any | Compiler | None, optional): custom compiler to
-            compile the experimental circuits. Defaults to None.
-        transpiler (Any | None, optional): custom transpiler to 
-            transpile the experimental circuits. Defaults to None.
         classifier (ClassificationManager, optional): manager used for 
             classifying raw data. Defaults to None.
-        n_shots (int, optional): number of measurements per circuit. 
-            Defaults to 1024.
-        n_batches (int, optional): number of batches of measurements. 
-            Defaults to 1.
-        n_circs_per_seq (int, optional): maximum number of circuits that
-            can be measured per sequence. Defaults to 1.
         n_levels (int, optional): number of energy levels to classify. 
             Defaults to 2.
-        raster_circuits (bool, optional): whether to raster through all
-            circuits in a batch during measurement. Defaults to False. By
-            default, all circuits in a batch will be measured n_shots times
-            one by one. If True, all circuits in a batch will be measured
-            back-to-back one shot at a time. This can help average out the 
-            effects of drift on the timescale of a measurement.
 
     Returns:
         Callable: ReadoutCalibration class.
@@ -111,14 +88,8 @@ def ReadoutCalibration(
                 method:          str = 'pi_pulse',
                 gate:            str = 'X90',
                 model:           str = 'gmm',
-                compiler:        Any | Compiler | None = None, 
-                transpiler:      Any | None = None,
                 classifier:      ClassificationManager = None,
-                n_shots:         int = 1024, 
-                n_batches:       int = 1, 
-                n_circs_per_seq: int = 1, 
                 n_levels:        int = 2,
-                raster_circuits: bool = False,
                 **kwargs
             ) -> None:
             """Initialize the readout calibration class within the function.
@@ -136,14 +107,8 @@ def ReadoutCalibration(
             
             qpu.__init__(self,
                 config=config, 
-                compiler=compiler, 
-                transpiler=transpiler,
                 classifier=None,
-                n_shots=n_shots, 
-                n_batches=n_batches, 
-                n_circs_per_seq=n_circs_per_seq, 
                 n_levels=n_levels,
-                raster_circuits=raster_circuits,
                 **qpu_kwargs
             )
             Calibration.__init__(self, config)
@@ -445,14 +410,8 @@ def ReadoutCalibration(
         method,
         gate,
         model,
-        compiler, 
-        transpiler,
-        classifier,
-        n_shots, 
-        n_batches, 
-        n_circs_per_seq, 
+        classifier, 
         n_levels,
-        raster_circuits,
         **kwargs
     )
 
@@ -464,14 +423,7 @@ def Fidelity(
         params:          List[str],
         param_sweep:     ArrayLike | List[ArrayLike],
         gate:            str = 'X90',
-        compiler:        Any | Compiler | None = None, 
-        transpiler:      Any | None = None,
-        classifier:      ClassificationManager = None,
-        n_shots:         int = 1024, 
-        n_batches:       int = 1, 
-        n_circs_per_seq: int = 1, 
         n_levels:        int = 2,
-        raster_circuits: bool = False,
         **kwargs
     ) -> Callable:
     """Fidelity calibration.
@@ -504,26 +456,8 @@ def Fidelity(
         param_sweep (ArrayLike | List[ArrayLike]): value sweep for each param.
         gate (str, optional): native gate to used to prepare states. Defaults 
             to 'X90'.
-        compiler (Any | Compiler | None, optional): custom compiler to
-            compile the experimental circuits. Defaults to None.
-        transpiler (Any | None, optional): custom transpiler to 
-            transpile the experimental circuits. Defaults to None.
-        classifier (ClassificationManager, optional): manager used for 
-            classifying raw data. Defaults to None.
-        n_shots (int, optional): number of measurements per circuit. 
-            Defaults to 1024.
-        n_batches (int, optional): number of batches of measurements. 
-            Defaults to 1.
-        n_circs_per_seq (int, optional): maximum number of circuits that
-            can be measured per sequence. Defaults to 1.
         n_levels (int, optional): number of energy levels to classify. 
             Defaults to 2.
-        raster_circuits (bool, optional): whether to raster through all
-            circuits in a batch during measurement. Defaults to False. By
-            default, all circuits in a batch will be measured n_shots times
-            one by one. If True, all circuits in a batch will be measured
-            back-to-back one shot at a time. This can help average out the 
-            effects of drift on the timescale of a measurement.
 
     Returns:
         Callable: Fidelity class.
@@ -541,14 +475,7 @@ def Fidelity(
                 params:          List[str],
                 param_sweep:     ArrayLike | List[ArrayLike],
                 gate:            str = 'X90',
-                compiler:        Any | Compiler | None = None, 
-                transpiler:      Any | None = None,
-                classifier:      ClassificationManager = None,
-                n_shots:         int = 1024, 
-                n_batches:       int = 1, 
-                n_circs_per_seq: int = 1, 
                 n_levels:        int = 2,
-                raster_circuits: bool = False,
                 **kwargs
             ) -> None:
             """Initialize the Fidelity calibration class within the function.
@@ -558,14 +485,7 @@ def Fidelity(
                 config=config,
                 qubits=qubits,
                 gate=gate,
-                compiler=compiler, 
-                transpiler=transpiler,
-                classifier=classifier,
-                n_shots=n_shots, 
-                n_batches=n_batches, 
-                n_circs_per_seq=n_circs_per_seq, 
                 n_levels=n_levels,
-                raster_circuits=raster_circuits,
                 **kwargs
             )
 
@@ -713,14 +633,7 @@ def Fidelity(
         params,
         param_sweep,
         gate,
-        compiler, 
-        transpiler,
-        classifier,
-        n_shots, 
-        n_batches, 
-        n_circs_per_seq, 
         n_levels,
-        raster_circuits,
         **kwargs
     )
 
@@ -734,14 +647,7 @@ def Separation(
         method:          str = 'pi_pulse',
         gate:            str = 'X90',
         model:           str = 'gmm',
-        compiler:        Any | Compiler | None = None, 
-        transpiler:      Any | None = None,
-        classifier:      ClassificationManager = None,
-        n_shots:         int = 1024, 
-        n_batches:       int = 1, 
-        n_circs_per_seq: int = 1, 
         n_levels:        int = 2,
-        raster_circuits: bool = False,
         **kwargs
     ) -> Callable:
     """Separation calibration.
@@ -777,26 +683,8 @@ def Separation(
         gate (str, optional): native gate used for state preparation. Defaults 
             to 'X90'.
         model (str, optional): classification algorithm. Defaults to 'gmm'.
-        compiler (Any | Compiler | None, optional): custom compiler to
-            compile the experimental circuits. Defaults to None.
-        transpiler (Any | None, optional): custom transpiler to 
-            transpile the experimental circuits. Defaults to None.
-        classifier (ClassificationManager, optional): manager used for 
-            classifying raw data. Defaults to None.
-        n_shots (int, optional): number of measurements per circuit. 
-            Defaults to 1024.
-        n_batches (int, optional): number of batches of measurements. 
-            Defaults to 1.
-        n_circs_per_seq (int, optional): maximum number of circuits that
-            can be measured per sequence. Defaults to 1.
         n_levels (int, optional): number of energy levels to classify. 
             Defaults to 2.
-        raster_circuits (bool, optional): whether to raster through all
-            circuits in a batch during measurement. Defaults to False. By
-            default, all circuits in a batch will be measured n_shots times
-            one by one. If True, all circuits in a batch will be measured
-            back-to-back one shot at a time. This can help average out the 
-            effects of drift on the timescale of a measurement.
 
     Returns:
         Callable: Separation class.
@@ -816,14 +704,7 @@ def Separation(
                 method:          str = 'pi_pulse',
                 gate:            str = 'X90',
                 model:           str = 'gmm',
-                compiler:        Any | Compiler | None = None, 
-                transpiler:      Any | None = None,
-                classifier:      ClassificationManager = None,
-                n_shots:         int = 1024, 
-                n_batches:       int = 1, 
-                n_circs_per_seq: int = 1, 
                 n_levels:        int = 2,
-                raster_circuits: bool = False,
                 **kwargs
             ) -> None:
             """Initialize the Amplitude calibration class within the function.
@@ -834,15 +715,8 @@ def Separation(
                 qubits=qubits,
                 method=method,
                 gate=gate,
-                model=model,
-                compiler=compiler, 
-                transpiler=transpiler,
-                classifier=classifier,
-                n_shots=n_shots, 
-                n_batches=n_batches, 
-                n_circs_per_seq=n_circs_per_seq, 
+                model=model, 
                 n_levels=n_levels,
-                raster_circuits=raster_circuits,
                 **kwargs
             )
 
@@ -996,13 +870,6 @@ def Separation(
         method,
         gate,
         model,
-        compiler, 
-        transpiler,
-        classifier,
-        n_shots, 
-        n_batches, 
-        n_circs_per_seq, 
         n_levels,
-        raster_circuits,
         **kwargs
     )
