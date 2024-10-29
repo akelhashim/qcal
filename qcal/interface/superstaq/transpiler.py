@@ -59,9 +59,7 @@ def qiskit_to_qcal(circuit, gate_mapper: defaultdict) -> Circuit:
     tcircuit = Circuit()
     tlayer = Layer()
     for instr in circuit:
-        qubits = tuple([
-            eval(str(q).split('(')[2].split(',')[-1][:-1]) for q in instr.qubits
-        ])
+        qubits = tuple([circuit.find_bit(q).index for q in instr.qubits])
         gate = instr.operation.name
         
         if any(q in tlayer.qubits for q in qubits):
