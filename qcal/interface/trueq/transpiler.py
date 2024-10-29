@@ -137,7 +137,7 @@ def to_qcal(
     return tcircuit
 
 
-class Transpiler(Transpiler):
+class TrueqTranspiler(Transpiler):
     """True-Q to qcal Transpiler."""
     import trueq as tq
 

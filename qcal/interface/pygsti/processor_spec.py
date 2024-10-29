@@ -8,6 +8,7 @@ from qcal.config import Config
 from qcal.gate.single_qubit import single_qubit_gates
 from qcal.gate.two_qubit import two_qubit_gates
 
+import itertools
 import logging
 
 from typing import Dict, List, Tuple
@@ -59,6 +60,7 @@ def pygsti_pspec(
 
     num_qubits = len(qubits)
     qubit_labels = [f'Q{q}' for q in qubits]
+    pairings = list(itertools.combinations(qubits, 2))
     gate_names = [
         GATE_MAPPER[gate] if gate in GATE_MAPPER.keys() else gate 
         for gate in native_gates
@@ -66,16 +68,18 @@ def pygsti_pspec(
     
     if availability is None:
         availability = {}
-        for gate in native_gates:  # This will break if formatted as a pygsti gate
+        for gate in native_gates:# This will break if formatted as a pygsti gate
             if gate in single_qubit_gates:
                 availability[GATE_MAPPER[gate]] = [(f'Q{q}',) for q in qubits]
             
             elif gate in two_qubit_gates:
                 qubit_pairs = []
                 for qubit_pair in config.native_gates['two_qubit'].keys():
-                    if all(q in qubits for q in qubit_pair):
+                    if qubit_pair in pairings:
                         if gate in config.native_gates['two_qubit'][qubit_pair]:
-                            qubit_pairs.append((f'Q{q}' for q in qubit_pair))
+                            qubit_pairs.append(
+                                tuple(f'Q{q}' for q in qubit_pair)
+                            )
                 availability[GATE_MAPPER[gate]] = qubit_pairs
 
     pspec = QubitProcessorSpec(

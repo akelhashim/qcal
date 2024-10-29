@@ -8,7 +8,6 @@ import qcal.settings as settings
 from .calibration import Calibration
 from .utils import find_pulse_index, in_range
 from qcal.circuit import Barrier, Cycle, Circuit, CircuitSet
-from qcal.compilation.compiler import Compiler
 from qcal.config import Config
 from qcal.fitting.fit import (
     FitAbsoluteValue, FitCosine, FitDecayingCosine, FitParabola
@@ -39,15 +38,8 @@ def Amplitude(
         amplitudes:      ArrayLike | NDArray | Dict[ArrayLike | NDArray],
         gate:            str = 'X90',
         subspace:        str = 'GE',
-        compiler:        Any | Compiler | None = None, 
-        transpiler:      Any | None = None,
-        classifier:      ClassificationManager = None,
-        n_shots:         int = 1024, 
-        n_batches:       int = 1, 
-        n_circs_per_seq: int = 1, 
         n_gates:         int = 1,
         relative_amp:    bool = False,
-        raster_circuits: bool = False,
         **kwargs
     ) -> Callable:
     """Amplitude calibration for single-qubit gates.
@@ -76,30 +68,12 @@ def Amplitude(
             to 'X90'.
         subspace (str, optional): qubit subspace for the defined gate.
             Defaults to 'GE'.
-        compiler (Any | Compiler | None, optional): custom compiler to
-            compile the experimental circuits. Defaults to None.
-        transpiler (Any | None, optional): custom transpiler to 
-            transpile the experimental circuits. Defaults to None.
-        classifier (ClassificationManager, optional): manager used for 
-            classifying raw data. Defaults to None.
-        n_shots (int, optional): number of measurements per circuit. 
-            Defaults to 1024.
-        n_batches (int, optional): number of batches of measurements. 
-            Defaults to 1.
-        n_circs_per_seq (int, optional): maximum number of circuits that
-            can be measured per sequence. Defaults to 1.
         n_gates (int, optional): number of gates for pulse repetition.
             Defaults to 1.
         relative_amp (bool, optional): whether or not the amplitudes argument
             is defined relative to the existing pulse amplitude. Defaults to
             False. If True, the amplitudes are swept over the current amplitude
             times the amplitudes argument.
-        raster_circuits (bool, optional): whether to raster through all
-            circuits in a batch during measurement. Defaults to False. By
-            default, all circuits in a batch will be measured n_shots times
-            one by one. If True, all circuits in a batch will be measured
-            back-to-back one shot at a time. This can help average out the 
-            effects of drift on the timescale of a measurement.
 
     Returns:
         Callable: Amplitude calibration class.
@@ -118,32 +92,14 @@ def Amplitude(
                 amplitudes:      ArrayLike | NDArray | Dict,
                 gate:            str = 'X90',
                 subspace:        str = 'GE',
-                compiler:        Any | Compiler | None = None, 
-                transpiler:      Any | None = None,
-                classifier:      ClassificationManager = None,
-                n_shots:         int = 1024, 
-                n_batches:       int = 1, 
-                n_circs_per_seq: int = 1, 
                 n_gates:         int = 1,
                 relative_amp:    bool = False,
-                raster_circuits: bool = False,
                 **kwargs
             ) -> None:
             """Initialize the Amplitude calibration class within the function.
             """
             n_levels = 3 if subspace == 'EF' else 2
-            qpu.__init__(self,
-                config=config, 
-                compiler=compiler, 
-                transpiler=transpiler,
-                classifier=classifier,
-                n_shots=n_shots, 
-                n_batches=n_batches, 
-                n_circs_per_seq=n_circs_per_seq, 
-                n_levels=n_levels,
-                raster_circuits=raster_circuits,
-                **kwargs
-            )
+            qpu.__init__(self, config=config, n_levels=n_levels, **kwargs)
             Calibration.__init__(self, config)
 
             self._qubits = qubits
@@ -338,15 +294,8 @@ def Amplitude(
         amplitudes,
         gate,
         subspace,
-        compiler, 
-        transpiler,
-        classifier,
-        n_shots, 
-        n_batches, 
-        n_circs_per_seq, 
         n_gates,
         relative_amp,
-        raster_circuits,
         **kwargs
     )
 
@@ -358,14 +307,7 @@ def Frequency(
         t_max:           float = 2*us,
         detunings:       NDArray = np.array([-2, -1, 1, 2])*MHz,
         subspace:        str = 'GE',
-        compiler:        Any | Compiler | None = None, 
-        transpiler:      Any | None = None,
-        classifier:      ClassificationManager = None,
         n_elements:      int = 30,
-        n_shots:         int = 1024, 
-        n_batches:       int = 1, 
-        n_circs_per_seq: int = 1, 
-        raster_circuits: bool = False,
         **kwargs
     ) -> Callable:
     """Frequency calibration for single qubits.
@@ -390,26 +332,8 @@ def Frequency(
             frequency. Defaults to np.array([-2, -1, 1, 2])*MHz.
         subspace (str, optional): qubit subspace for frequency calibration.
             Defaults to 'GE'.
-        compiler (Any | Compiler | None, optional): custom compiler to
-            compile the experimental circuits. Defaults to None.
-        transpiler (Any | None, optional): custom transpiler to 
-            transpile the experimental circuits. Defaults to None.
-        classifier (ClassificationManager, optional): manager used for 
-            classifying raw data. Defaults to None.
         n_elements (int, optional): number of delays starting from 0 to t_max.
             Defaults to 30.
-        n_shots (int, optional): number of measurements per circuit. 
-            Defaults to 1024.
-        n_batches (int, optional): number of batches of measurements. 
-            Defaults to 1.
-        n_circs_per_seq (int, optional): maximum number of circuits that
-            can be measured per sequence. Defaults to 1.
-        raster_circuits (bool, optional): whether to raster through all
-            circuits in a batch during measurement. Defaults to False. By
-            default, all circuits in a batch will be measured n_shots times
-            one by one. If True, all circuits in a batch will be measured
-            back-to-back one shot at a time. This can help average out the 
-            effects of drift on the timescale of a measurement.
 
     Returns:
         Callable: Frequency calibration class.
@@ -428,31 +352,13 @@ def Frequency(
                 t_max:           float = 2*us,
                 detunings:       NDArray = np.array([-2, -1, 1, 2])*MHz,
                 subspace:        str = 'GE',
-                compiler:        Any | Compiler | None = None, 
-                transpiler:      Any | None = None,
-                classifier:      ClassificationManager = None,
                 n_elements:      int = 30,
-                n_shots:         int = 1024, 
-                n_batches:       int = 1,
-                n_circs_per_seq: int = 1,
-                raster_circuits: bool = False,
                 **kwargs
             ) -> None:
             """Initialize the Frequency experiment class within the function.
             """
             n_levels = 3 if subspace == 'EF' else 2
-            qpu.__init__(self,
-                config=config, 
-                compiler=compiler, 
-                transpiler=transpiler,
-                classifier=classifier,
-                n_shots=n_shots, 
-                n_batches=n_batches, 
-                n_circs_per_seq=n_circs_per_seq, 
-                n_levels=n_levels,
-                raster_circuits=raster_circuits,
-                **kwargs
-            )
+            qpu.__init__(self, config=config, **kwargs)
             Calibration.__init__(self, config)
 
             self._qubits = qubits
@@ -753,14 +659,7 @@ def Frequency(
         t_max,
         detunings,
         subspace,
-        compiler, 
-        transpiler,
-        classifier,
-        n_elements, 
-        n_shots, 
-        n_batches, 
-        n_circs_per_seq, 
-        raster_circuits,
+        n_elements,
         **kwargs
     )
 
@@ -771,13 +670,6 @@ def Phase(
         qubits:          List | Tuple,
         phases:          ArrayLike | NDArray | Dict[ArrayLike | NDArray],
         subspace:        str = 'GE',
-        compiler:        Any | Compiler | None = None, 
-        transpiler:      Any | None = None,
-        classifier:      ClassificationManager = None,
-        n_shots:         int = 1024, 
-        n_batches:       int = 1,
-        n_circs_per_seq: int = 1,
-        raster_circuits: bool = False,
         **kwargs
     ) -> Callable:
     """Phase calibration for single-qubit gates.
@@ -807,24 +699,6 @@ def Phase(
             should be a dictionary mapping an array to a qubit label.
         subspace (str, optional): qubit subspace for the defined gate.
             Defaults to 'GE'.
-        compiler (Any | Compiler | None, optional): custom compiler to
-            compile the experimental circuits. Defaults to None.
-        transpiler (Any | None, optional): custom transpiler to 
-            transpile the experimental circuits. Defaults to None.
-        classifier (ClassificationManager, optional): manager used for 
-            classifying raw data. Defaults to None.
-        n_shots (int, optional): number of measurements per circuit. 
-            Defaults to 1024.
-        n_batches (int, optional): number of batches of measurements. 
-            Defaults to 1.
-        n_circs_per_seq (int, optional): maximum number of circuits that
-            can be measured per sequence. Defaults to 1.
-        raster_circuits (bool, optional): whether to raster through all
-            circuits in a batch during measurement. Defaults to False. By
-            default, all circuits in a batch will be measured n_shots times
-            one by one. If True, all circuits in a batch will be measured
-            back-to-back one shot at a time. This can help average out the 
-            effects of drift on the timescale of a measurement.
 
     Returns:
         Callable: Phases calibration class.
@@ -842,29 +716,11 @@ def Phase(
                 qubits:          List | Tuple,
                 phases:          ArrayLike | NDArray | Dict,
                 subspace:        str = 'GE',
-                compiler:        Any | Compiler | None = None, 
-                transpiler:      Any | None = None,
-                classifier:      ClassificationManager = None,
-                n_shots:         int = 1024, 
-                n_batches:       int = 1, 
-                n_circs_per_seq: int = 1,
-                raster_circuits: bool = False,
                 **kwargs
             ) -> None:
             """Initialize the Phase calibration class within the function."""
             n_levels = 3 if subspace == 'EF' else 2
-            qpu.__init__(self,
-                config=config, 
-                compiler=compiler, 
-                transpiler=transpiler,
-                classifier=classifier,
-                n_shots=n_shots, 
-                n_batches=n_batches, 
-                n_circs_per_seq=n_circs_per_seq, 
-                n_levels=n_levels,
-                raster_circuits=raster_circuits,
-                **kwargs
-            )
+            qpu.__init__(self, config=config, n_levels=n_levels, **kwargs)
             Calibration.__init__(self, config)
 
             self._qubits = qubits
@@ -1162,12 +1018,5 @@ def Phase(
         qubits,
         phases,
         subspace,
-        compiler, 
-        transpiler,
-        classifier,
-        n_shots, 
-        n_batches, 
-        n_circs_per_seq,
-        raster_circuits,
         **kwargs
     )

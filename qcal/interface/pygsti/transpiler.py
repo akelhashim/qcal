@@ -1,4 +1,4 @@
-"""Submodule for handling transpilation from PyGSTi to qcal circuits.
+"""Submodule for handling transpilation from pyGSTi to qcal circuits.
 
 """
 from qcal.circuit import Layer, Circuit, CircuitSet
@@ -21,11 +21,11 @@ def to_qcal(
         circuit, 
         gate_mapper: Dict | defaultdict,
     ) -> Circuit:
-    """Transpile a PyGSTi circuit to a qcal circuit.
+    """Transpile a pyGSTi circuit to a qcal circuit.
 
     Args:
-        circuit (pygsti.circuits.circuit.Circuit): PyGSTi circuit.
-        gate_mapper (Dict | defaultdict): map between PyGSTi to qcal gates.
+        circuit (pygsti.circuits.circuit.Circuit): pyGSTi circuit.
+        gate_mapper (Dict | defaultdict): map between pyGSTi to qcal gates.
 
     Returns:
         Circuit: qcal circuit.
@@ -85,10 +85,10 @@ def to_qcal(
     return tcircuit
 
 
-class Transpiler(Transpiler):
-    """PyGSTi to qcal Transpiler."""
+class PyGSTiTranspiler(Transpiler):
+    """pyGSTi to qcal Transpiler."""
 
-    # __slots__ = ('_gate_mapper')
+    __slots__ = ('_gate_mapper',)
 
     def __init__(
             self, 
@@ -98,7 +98,7 @@ class Transpiler(Transpiler):
 
         Args:
             gate_mapper (Dict | None, optional): dictionary which maps
-                PyGSTi gates to qcal gates. Defaults to None.
+                pyGSTi gates to qcal gates. Defaults to None.
         """
         if gate_mapper is None:
             gate_mapper = {

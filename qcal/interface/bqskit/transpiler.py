@@ -97,16 +97,15 @@ def transpilation_error(*args):
     Raises:
         Exception: transpilation error for non-native gate.
     """
-    print(args)
     raise Exception(
         f'Cannot transpile {str(args)} (non-native gate)!'
     ) 
 
 
-class Transpiler(Transpiler):
+class BQSKitTranspiler(Transpiler):
     """BQSKit Transpiler."""
 
-    __slots__ = ('_config', '_gate_mapper', '_to_bqskit')
+    __slots__ = ('_gate_mapper', '_to_bqskit')
 
     def __init__(self, 
             gate_mapper:  defaultdict | Dict | None = None,

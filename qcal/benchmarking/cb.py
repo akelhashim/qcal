@@ -61,22 +61,14 @@ def CB(qpu:                  QPU,
        cycle:                Dict,
        circuit_depths:       List[int] | Tuple[int],
        tq_config:            str | Any = None,
-       compiler:             Any | None = None, 
-       transpiler:           Any | None = None,
-       classifier:           ClassificationManager = None,
        n_circuits:           int = 30,
        n_decays:             int = 20,
-       n_shots:              int = 1024, 
-       n_batches:            int = 1, 
-       n_circs_per_seq:      int = 1,
-       n_levels:             int = 2,
        targeted_errors:      Iterable[str] | None = None,
        twirl:                str = 'P',
        propogate_correction: bool = False,
        compiled_pauli:       bool = True,
        include_ref_cycle:    bool = False,
        include_rcal:         bool = False,
-       raster_circuits:      bool = False,
        **kwargs
     ) -> Callable:
     """Cycle Benchmarking.
@@ -92,12 +84,6 @@ def CB(qpu:                  QPU,
             random Pauli operators to generate, for example, [4, 16, 64].
         tq_config (str | Any, optional): True-Q config yaml file or config
             object. Defaults to None.
-        compiler (Any | Compiler | None, optional): custom compiler to compile
-            the True-Q circuits. Defaults to None.
-        transpiler (Any | None, optional): custom transpiler to transpile
-            the True-Q circuits to experimental circuits. Defaults to None.
-        classifier (ClassificationManager, optional): manager used for 
-            classifying raw data. Defaults to None.
         n_circuits (int, optional): the number of circuits for each circuit 
             depth. Defaults to 30.
         n_decays (int, optional): an integer specifying the total number of 
@@ -107,15 +93,6 @@ def CB(qpu:                  QPU,
             may result in a biased estimate of the process fidelity, and 
             setting this value lower than min(40, 4 ** n_qubits - 1) may result 
             in a biased estimate of the probability for non-identity errors.
-        n_shots (int, optional): number of measurements per circuit. 
-                Defaults to 1024.
-        n_batches (int, optional): number of batches of measurements. Defaults
-            to 1.
-        n_circs_per_seq (int, optional): maximum number of circuits that can be
-            measured per sequence. Defaults to 1.
-        n_levels (int, optional): number of energy levels to be measured. 
-            Defaults to 2. If n_levels = 3, this assumes that the
-            measurement supports qutrit classification.
         targeted_errors (tq.Weyls, Iterable[str], None, optional): A True-Q  
             Weyls instance, where each row specifies an error to measure. 
             Defaults to None. The identity Pauli will always be added to the 
@@ -142,12 +119,6 @@ def CB(qpu:                  QPU,
             same circuit collection as the SRB circuit. Defaults to False. If
             True, readout correction will be apply to the fit results 
             automatically.
-        raster_circuits (bool, optional): whether to raster through all
-            circuits in a batch during measurement. Defaults to False. By
-            default, all circuits in a batch will be measured n_shots times
-            one by one. If True, all circuits in a batch will be measured
-            back-to-back one shot at a time. This can help average out the 
-            effects of drift on the timescale of a measurement.
 
     Returns:
         Callable: CB class instance.
@@ -163,26 +134,18 @@ def CB(qpu:                  QPU,
                 cycle:                Dict,
                 circuit_depths:       List[int] | Tuple[int],
                 tq_config:            str | Any = None,
-                compiler:             Any | None = None, 
-                transpiler:           Any | None = None,
-                classifier:           ClassificationManager = None,
                 n_circuits:           int = 30,
                 n_decays:             int = 20,
-                n_shots:              int = 1024, 
-                n_batches:            int = 1, 
-                n_circs_per_seq:      int = 1,
-                n_levels:             int = 2,
                 targeted_errors:      Iterable[str] | None = None,
                 twirl:                str = 'P',
                 propogate_correction: bool = False,
                 compiled_pauli:       bool = True,
                 include_ref_cycle:    bool = False,
                 include_rcal:         bool = False,
-                raster_circuits:      bool = False,
                 **kwargs
             ) -> None:
-            from qcal.interface.trueq.compiler import Compiler
-            from qcal.interface.trueq.transpiler import Transpiler
+            from qcal.interface.trueq.compiler import TrueqCompiler
+            from qcal.interface.trueq.transpiler import TrueqTranspiler
             
             try:
                 import trueq as tq
@@ -201,21 +164,19 @@ def CB(qpu:                  QPU,
             self._include_ref_cycle = include_ref_cycle
             self._include_rcal = include_rcal
             
-            if compiler is None:
-                compiler = Compiler(config if tq_config is None else tq_config)
-            if transpiler is None:
-                transpiler = Transpiler()
+            compiler = kwargs.get(
+                'compiler', 
+                TrueqCompiler(config if tq_config is None else tq_config)
+            )
+            kwargs.pop('compiler', None)
+
+            transpiler = kwargs.get('transpiler', TrueqTranspiler())
+            kwargs.pop('transpiler', None)
                 
             qpu.__init__(self,
                 config=config, 
                 compiler=compiler, 
                 transpiler=transpiler,
-                classifier=classifier,
-                n_shots=n_shots, 
-                n_batches=n_batches, 
-                n_circs_per_seq=n_circs_per_seq, 
-                n_levels=n_levels,
-                raster_circuits=raster_circuits,
                 **kwargs
             )
 
@@ -372,21 +333,13 @@ def CB(qpu:                  QPU,
         cycle,
         circuit_depths,
         tq_config,
-        compiler,
-        transpiler,
-        classifier,
         n_circuits,
         n_decays,
-        n_shots,
-        n_batches,
-        n_circs_per_seq,
-        n_levels,
         targeted_errors,
         twirl,
         propogate_correction,
         compiled_pauli,
         include_ref_cycle,
         include_rcal,
-        raster_circuits,
         **kwargs
     )

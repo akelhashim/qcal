@@ -5,7 +5,6 @@ import qcal.settings as settings
 
 from qcal.characterization.characterize import Characterize
 from qcal.circuit import Barrier, Cycle, Circuit, CircuitSet
-from qcal.compilation.compiler import Compiler
 from qcal.config import Config
 from qcal.fitting.fit import FitCosine, FitDecayingCosine, FitExponential
 from qcal.gate.single_qubit import Idle, Rz, VirtualZ, X90, X
@@ -34,14 +33,7 @@ def T1(qpu:             QPU,
        t_max:           float = 500*us,
        gate:            str = 'X90',
        subspace:        str = 'GE',
-       compiler:        Any | Compiler | None = None, 
-       transpiler:      Any | None = None,
-       classifier:      ClassificationManager = None,
        n_elements:      int = 50,
-       n_shots:         int = 1024, 
-       n_batches:       int = 1, 
-       n_circs_per_seq: int = 1, 
-       raster_circuits: bool = False,
        **kwargs
     ) -> Callable:
     """T1 coherence characterization.
@@ -65,26 +57,8 @@ def T1(qpu:             QPU,
             to 'X90'.
         subspace (str, optional): qubit subspace for T1 measurement.
             Defaults to 'GE'.
-        compiler (Any | Compiler | None, optional): custom compiler to
-            compile the experimental circuits. Defaults to None.
-        transpiler (Any | None, optional): custom transpiler to 
-            transpile the experimental circuits. Defaults to None.
-        classifier (ClassificationManager, optional): manager used for 
-            classifying raw data. Defaults to None.
         n_elements (int, optional): number of delays starting from 0 to t_max.
             Defaults to 50.
-        n_shots (int, optional): number of measurements per circuit. 
-            Defaults to 1024.
-        n_batches (int, optional): number of batches of measurements. 
-            Defaults to 1.
-        n_circs_per_seq (int, optional): maximum number of circuits that
-            can be measured per sequence. Defaults to 1.
-        raster_circuits (bool, optional): whether to raster through all
-            circuits in a batch during measurement. Defaults to False. By
-            default, all circuits in a batch will be measured n_shots times
-            one by one. If True, all circuits in a batch will be measured
-            back-to-back one shot at a time. This can help average out the 
-            effects of drift on the timescale of a measurement.
 
     Returns:
         Callable: T1 class.
@@ -103,31 +77,13 @@ def T1(qpu:             QPU,
                 t_max:           float = 500*us,
                 gate:            str = 'X90',
                 subspace:        str = 'GE',
-                compiler:        Any | Compiler | None = None, 
-                transpiler:      Any | None = None,
-                classifier:      ClassificationManager = None,
                 n_elements:      int = 50,
-                n_shots:         int = 1024, 
-                n_batches:       int = 1, 
-                n_circs_per_seq: int = 1, 
-                raster_circuits: bool = False,
                 **kwargs
             ) -> None:
             """Initialize the T1 experiment class within the function."""
 
             n_levels = 3 if subspace == 'EF' else 2
-            qpu.__init__(self,
-                config=config, 
-                compiler=compiler, 
-                transpiler=transpiler,
-                classifier=classifier,
-                n_shots=n_shots, 
-                n_batches=n_batches, 
-                n_circs_per_seq=n_circs_per_seq,
-                n_levels=n_levels,
-                raster_circuits=raster_circuits,
-                **kwargs
-            )
+            qpu.__init__(self, config=config, n_levels=n_levels, **kwargs)
             Characterize.__init__(self, config)
 
             self._qubits = qubits
@@ -292,14 +248,7 @@ def T1(qpu:             QPU,
         t_max,
         gate,
         subspace,
-        compiler, 
-        transpiler,
-        classifier,
         n_elements, 
-        n_shots, 
-        n_batches, 
-        n_circs_per_seq, 
-        raster_circuits,
         **kwargs
     )
 
@@ -311,14 +260,7 @@ def T2(qpu:             QPU,
        detuning:        float = 0.05 * MHz,
        echo:            bool = False,
        subspace:        str = 'GE',
-       compiler:        Any | Compiler | None = None, 
-       transpiler:      Any | None = None,
-       classifier:      ClassificationManager = None,
        n_elements:      int = 50,
-       n_shots:         int = 1024, 
-       n_batches:       int = 1, 
-       n_circs_per_seq: int = 1, 
-       raster_circuits: bool = False,
        **kwargs
     ) -> Callable:
     """T2 coherence characterization.
@@ -347,26 +289,8 @@ def T2(qpu:             QPU,
             Defaults to False.
         subspace (str, optional): qubit subspace for T2 measurement.
             Defaults to 'GE'.
-        compiler (Any | Compiler | None, optional): custom compiler to
-            compile the experimental circuits. Defaults to None.
-        transpiler (Any | None, optional): custom transpiler to 
-            transpile the experimental circuits. Defaults to None.
-        classifier (ClassificationManager, optional): manager used for
-            classifying raw data. Defaults to None.
         n_elements (int, optional): number of delays starting from 0 to t_max.
             Defaults to 50.
-        n_shots (int, optional): number of measurements per circuit. 
-            Defaults to 1024.
-        n_batches (int, optional): number of batches of measurements. 
-            Defaults to 1.
-        n_circs_per_seq (int, optional): maximum number of circuits that
-            can be measured per sequence. Defaults to 1.
-        raster_circuits (bool, optional): whether to raster through all
-            circuits in a batch during measurement. Defaults to False. By
-            default, all circuits in a batch will be measured n_shots times
-            one by one. If True, all circuits in a batch will be measured
-            back-to-back one shot at a time. This can help average out the 
-            effects of drift on the timescale of a measurement.
 
     Returns:
         Callable: T2 class.
@@ -386,31 +310,13 @@ def T2(qpu:             QPU,
                 detuning:        float = 0.05 * MHz,
                 echo:            bool = False,
                 subspace:        str = 'GE',
-                compiler:        Any | Compiler | None = None, 
-                transpiler:      Any | None = None,
-                classifier:      ClassificationManager = None,
                 n_elements:      int = 50,
-                n_shots:         int = 1024, 
-                n_batches:       int = 1, 
-                n_circs_per_seq: int = 1, 
-                raster_circuits: bool = False,
                 **kwargs
             ) -> None:
             """Initialize the T2 experiment class within the function."""
 
             n_levels = 3 if subspace == 'EF' else 2
-            qpu.__init__(self,
-                config=config, 
-                compiler=compiler, 
-                transpiler=transpiler,
-                classifier=classifier,
-                n_shots=n_shots, 
-                n_batches=n_batches, 
-                n_circs_per_seq=n_circs_per_seq,
-                n_levels=n_levels,
-                raster_circuits=raster_circuits,
-                **kwargs
-            )
+            qpu.__init__(self, config=config, n_levels=n_levels, **kwargs)
             Characterize.__init__(self, config)
 
             self._qubits = qubits
@@ -604,14 +510,7 @@ def T2(qpu:             QPU,
         detuning,
         echo,
         subspace,
-        compiler, 
-        transpiler,
-        classifier,
         n_elements, 
-        n_shots, 
-        n_batches, 
-        n_circs_per_seq, 
-        raster_circuits,
         **kwargs
     )
 
@@ -621,14 +520,7 @@ def ParityOscillations(
         config:          Config,
         circuit:         Circuit,
         qubits:          List | Tuple = None,
-        compiler:        Any | Compiler | None = None, 
-        transpiler:      Any | None = None,
-        classifier:      ClassificationManager = None,
         n_elements:      int = 31,
-        n_shots:         int = 1024, 
-        n_batches:       int = 1, 
-        n_circs_per_seq: int = 1, 
-        raster_circuits: bool = False,
         **kwargs
     ) -> Callable:
     """Parity oscillations coherence characterization.
@@ -640,26 +532,8 @@ def ParityOscillations(
         config (Config): qcal Config object.
         cicuit (Circuit): qcal Circuit.
         qubits (List | Tuple): qubits to measure. Defaults to None.
-        compiler (Any | Compiler | None, optional): custom compiler to
-            compile the experimental circuits. Defaults to None.
-        transpiler (Any | None, optional): custom transpiler to 
-            transpile the experimental circuits. Defaults to None.
-        classifier (ClassificationManager, optional): manager used for 
-            classifying raw data. Defaults to None.
         n_elements (int, optional): number of phases between 0 and pi.
             Defaults to 31.
-        n_shots (int, optional): number of measurements per circuit. 
-            Defaults to 1024.
-        n_batches (int, optional): number of batches of measurements. 
-            Defaults to 1.
-        n_circs_per_seq (int, optional): maximum number of circuits that
-            can be measured per sequence. Defaults to 1.
-        raster_circuits (bool, optional): whether to raster through all
-            circuits in a batch during measurement. Defaults to False. By
-            default, all circuits in a batch will be measured n_shots times
-            one by one. If True, all circuits in a batch will be measured
-            back-to-back one shot at a time. This can help average out the 
-            effects of drift on the timescale of a measurement.
 
     Returns:
         Callable: ParityOscillations class.
@@ -676,29 +550,12 @@ def ParityOscillations(
                 config:          Config,
                 circuit:         Circuit,
                 qubits:          List | Tuple = None,
-                compiler:        Any | Compiler | None = None, 
-                transpiler:      Any | None = None,
-                classifier:      ClassificationManager = None,
                 n_elements:      int = 31,
-                n_shots:         int = 1024, 
-                n_batches:       int = 1, 
-                n_circs_per_seq: int = 1, 
-                raster_circuits: bool = False,
                 **kwargs
             ) -> None:
             """Initialize the ParityOscillations class within the function."""
 
-            qpu.__init__(self,
-                config=config, 
-                compiler=compiler, 
-                transpiler=transpiler,
-                classifier=classifier,
-                n_shots=n_shots, 
-                n_batches=n_batches, 
-                n_circs_per_seq=n_circs_per_seq,
-                raster_circuits=raster_circuits,
-                **kwargs
-            )
+            qpu.__init__(self, config=config, **kwargs)
             Characterize.__init__(self, config)
 
             self._circuit = circuit
@@ -893,13 +750,6 @@ def ParityOscillations(
         config,
         circuit,
         qubits,
-        compiler, 
-        transpiler,
-        classifier,
         n_elements,
-        n_shots, 
-        n_batches, 
-        n_circs_per_seq, 
-        raster_circuits,
         **kwargs
     )

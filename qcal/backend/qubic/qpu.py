@@ -293,7 +293,7 @@ class QubicQPU(QPU):
             save_raw_data=self._save_raw_data
         )
 
-        if len(self._compiled_circuits) > 1:
+        if len(self._compiled_circuits) > 0:
             if isinstance(self._circuits, CircuitSet):
                 self._compiled_circuits['results'] = self._circuits['results']
                 for i, results in enumerate(self._circuits['results']):
@@ -311,7 +311,7 @@ class QubicQPU(QPU):
                     save_raw_data=self._save_raw_data
                 )
 
-        if len(self._transpiled_circuits) > 1:
+        if len(self._transpiled_circuits) > 0:
             if isinstance(self._circuits, CircuitSet):
                 self._transpiled_circuits['results'] = self._circuits['results']
                 for i, results in enumerate(self._circuits['results']):

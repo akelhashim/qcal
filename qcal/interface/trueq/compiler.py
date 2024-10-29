@@ -12,7 +12,7 @@ from typing import List, Tuple
 
 logger = logging.getLogger(__name__)
 
-class Compiler:
+class TrueqCompiler:
     """True-Q compiler.
 
     The compiler can be created from a True-Q config file, or automatically
@@ -32,7 +32,8 @@ class Compiler:
         Args:
             config (Config | tq.Config | str): qcal Config object or True-Q yaml.
             passes (tq.Compiler.passes, optional): True-Q compiler passes. 
-                Defaults to None. If None, 
+                Defaults to None. If None, this will default to the
+                HARDWARE_PASSES.
         """
         import trueq as tq
 

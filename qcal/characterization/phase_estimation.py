@@ -681,13 +681,6 @@ def RPE(qpu:             QPU,
         qubit_labels:    Iterable[int],
         gate:            str,
         circuit_depths:  List[int] = [1, 2, 4, 8, 16, 32, 64, 128, 256],
-        compiler:        Any | None = None, 
-        transpiler:      Any | None = None,
-        classifier:      ClassificationManager = None,
-        n_shots:         int = 1024, 
-        n_batches:       int = 1, 
-        n_circs_per_seq: int = 1,
-        raster_circuits: bool = False,
         **kwargs
     ) -> Callable:
     """Robust Phase Estimation.
@@ -700,8 +693,9 @@ def RPE(qpu:             QPU,
         qubit_labels (Iterable[int]): a list specifying sets of system labels 
             on which to perform RPE for a given gate.
         gate (str): gate on which to perform RPE.
-        circuit_depths (List[int]): a list of positive integers specifying the 
-            circuit depths.
+        circuit_depths (List[int], optional): a list of positive integers 
+            specifying the circuit depths. Defaults to ```[1, 2, 4, 8, 16, 32, 
+            64, 128, 256]```.
         compiler (Any | Compiler | None, optional): custom compiler to compile
             the True-Q circuits. Defaults to None.
         transpiler (Any | None, optional): custom transpiler to transpile
@@ -732,17 +726,10 @@ def RPE(qpu:             QPU,
                 config:          Config,
                 qubit_labels:    Iterable[int],
                 gate:            str,
-                circuit_depths:  circuit_depths,
-                compiler:        Any | None = None,
-                transpiler:      Any | None = None,
-                classifier:      ClassificationManager = None,
-                n_shots:         int = 1024,
-                n_batches:       int = 1,
-                n_circs_per_seq: int = 1,
-                raster_circuits: bool = False,
+                circuit_depths:  List[int] = [1, 2, 4, 8, 16, 32, 64, 128, 256],
                 **kwargs
             ) -> None:
-            from qcal.interface.pygsti.transpiler import Transpiler
+            from qcal.interface.pygsti.transpiler import PyGSTiTranspiler
 
             try:
                 import pygsti
@@ -792,20 +779,9 @@ def RPE(qpu:             QPU,
             self._angle_errors = {}
             self._last_good_idx = {}
 
-            if transpiler is None:
-                transpiler = Transpiler()
-
-            qpu.__init__(self,
-                config=config, 
-                compiler=compiler, 
-                transpiler=transpiler,
-                classifier=classifier,
-                n_shots=n_shots, 
-                n_batches=n_batches, 
-                n_circs_per_seq=n_circs_per_seq, 
-                raster_circuits=raster_circuits,
-                **kwargs
-            )
+            transpiler = kwargs.get('transpiler', PyGSTiTranspiler())
+            kwargs.pop('transpiler', None)
+            qpu.__init__(self, config=config, transpiler=transpiler, **kwargs)
 
         @property
         def angle_estimates(self) -> Dict:
@@ -1042,12 +1018,5 @@ def RPE(qpu:             QPU,
         qubit_labels,
         gate,   
         circuit_depths,
-        compiler, 
-        transpiler,
-        classifier,
-        n_shots, 
-        n_batches, 
-        n_circs_per_seq,
-        raster_circuits,
         **kwargs
     )

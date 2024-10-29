@@ -1,23 +1,24 @@
 """Submodule for RB routines.
 
+For CRB, see:
+https://github.com/sandialabs/pyGSTi/blob/master/jupyter_notebooks/Tutorials/algorithms/RB-CliffordRB.ipynb
+
 For SRB, see:
 https://trueq.quantumbenchmark.com/guides/error_diagnostics/srb.html
-
-
 """
 import qcal.settings as settings
 
 from qcal.config import Config
-from qcal.managers.classification_manager import ClassificationManager
 from qcal.qpu.qpu import QPU
 from qcal.plotting.utils import calculate_nrows_ncols
+from qcal.utils import flatten
 
 import logging
 import matplotlib.pyplot as plt
 import numpy as np
 
 from IPython.display import clear_output
-from typing import Any, Callable, List, Tuple, Iterable
+from typing import Any, Callable, List, Tuple
 
 
 logger = logging.getLogger(__name__)
@@ -25,10 +26,10 @@ logger = logging.getLogger(__name__)
 
 def CRB(qpu:             QPU,
         config:          Config,
-        qubits:          List[int] | Tuple[int],
+        qubit_labels:    List[int | Tuple[int]],
         circuit_depths:  List[int] | Tuple[int],
         n_circuits:      int = 30,
-        native_gates:    List[str] = ['X90', 'Y90'],
+        native_gates:    List[str] = [],
         pspec:           Any | None = None,
         randomizeout:    bool = True,
         citerations:     int = 20,  
@@ -41,16 +42,18 @@ def CRB(qpu:             QPU,
     Args:
         qpu (QPU): custom QPU object.
         config (Config): qcal Config object.
-        qubits (Iterable[int, Iterable[int]]): a list specifying the qubit
-            labels.
+        qubit_labels (List[int | Tuple[int]]): a list specifying sets of 
+            qubit labels to be twirled together. For example, [0, 1, (2, 3)] 
+            would perform single-qubit RB on 0 and 1, and two-qubit RB on 
+            (2, 3).
         circuit_depths (List[int] | Tuple[int]):  a list of integers >= 0. The 
             CRB depth is the number of Cliffords in the circuit - 2 before 
             each Clifford is compiled into the native gate-set.
         n_circuits (int, optional): The number of (possibly) different CRB 
             circuits sampled at each depth. Defaults to 30.
-        native_gates (List[str], optional): a list of the native gates. Defaults 
-            to ['X90', 'Y90']. All Cliffords will be decomposed in terms of 
-            these gates. If a custom pspec is passed, this list will be ignored.
+        native_gates (List[str], optional): a list of the native gates. Example: 
+            ['X90', 'Y90']. All Cliffords will be decomposed in terms of these
+            gates. If a custom pspec is passed, this list will be ignored.
         pspec (QubitProcessorSpec | None, optional): pyGSTi qubit processor 
             spec. Defaults to None. If None, a processor spec will be 
             automatically generated based on the native_gates and the qubit 
@@ -78,10 +81,10 @@ def CRB(qpu:             QPU,
 
         def __init__(self,
                 config:          Config,
-                qubits:          List[int] | Tuple[int],
+                qubit_labels:    List[int | Tuple[int]],
                 circuit_depths:  List[int] | Tuple[int],
                 n_circuits:      int = 30,
-                native_gates:    List[str] = ['X90', 'Y90'],
+                native_gates:    List[str] = [],
                 pspec:           Any | None = None,
                 randomizeout:    bool = True,
                 citerations:     int = 20,
@@ -91,12 +94,13 @@ def CRB(qpu:             QPU,
             try:
                 import pygsti
                 from pygsti.processors import CliffordCompilationRules as CCR
-                from qcal.interface.pygsti.transpiler import Transpiler
+                from qcal.interface.pygsti.transpiler import PyGSTiTranspiler
                 logger.info(f" pyGSTi version: {pygsti.__version__}\n")
             except ImportError:
                 logger.warning(' Unable to import pyGSTi!')
             
-            self._qubits = qubits
+            self._qubit_labels = qubit_labels
+            self._qubits = list(flatten(qubit_labels))
             self._circuit_depths = circuit_depths
             self._n_circuits = n_circuits
             self._native_gates = native_gates
@@ -104,17 +108,26 @@ def CRB(qpu:             QPU,
             self._randomizeout = randomizeout
             self._citerations = citerations
 
-            transpiler = kwargs.get('transpiler', Transpiler())
+            multiQ = False
+            if not self._native_gates:
+                self._native_gates = ['X90', 'Y90']
+                for ql in self._qubit_labels:
+                    if isinstance(ql, (list, tuple)):
+                        multiQ = True
+                        self._native_gates.extend(
+                            config.native_gates['two_qubit'][tuple(ql)]
+                        )
+                self._native_gates = list(set(self._native_gates))
+
+            transpiler = kwargs.get('transpiler', PyGSTiTranspiler())
             kwargs.pop('transpiler', None)
-            qpu.__init__(self,
-                config=config, 
-                transpiler=transpiler,
-                **kwargs
-            )
+            qpu.__init__(self, config=config, transpiler=transpiler, **kwargs)
 
             if pspec is None:
                 from qcal.interface.pygsti.processor_spec import pygsti_pspec
-                self._pspec = pygsti_pspec(config, qubits, native_gates)
+                self._pspec = pygsti_pspec(
+                    config, self._qubits, self._native_gates
+                )
 
             self._compilations = {
                 'absolute': CCR.create_standard(
@@ -124,12 +137,16 @@ def CRB(qpu:             QPU,
                 ),            
                 'paulieq': CCR.create_standard(
                     self._pspec, 'paulieq', 
-                    ('1Qcliffords', 'allcnots'), 
+                    ('1Qcliffords', 'allcnots') if multiQ else ('1Qcliffords',), 
                     verbosity=0
                 )
             }
 
-            self._protocol = pygsti.protocols.RB() 
+            self._sim_RB = True if len(self._qubit_labels) > 1 else False
+            self._protocol = (
+                pygsti.protocols.DefaultRunner() if self._sim_RB else
+                pygsti.protocols.RB() 
+            )
             self._edesign = None
             self._data = None
             self._results = None
@@ -165,19 +182,39 @@ def CRB(qpu:             QPU,
             import pygsti
             from qcal.interface.pygsti.circuits import load_circuits
 
-            self._edesign = pygsti.protocols.CliffordRBDesign(
-                pspec=self._pspec,
-                clifford_compilations=self._compilations, 
-                depths=self._circuit_depths, 
-                circuits_per_depth=self._n_circuits, 
-                qubit_labels=self._pspec.qubit_labels, 
-                randomizeout=self._randomizeout,
-                citerations=self._citerations
+            if not self._sim_RB:
+                self._edesign = pygsti.protocols.CliffordRBDesign(
+                        pspec=self._pspec,
+                        clifford_compilations=self._compilations, 
+                        depths=self._circuit_depths, 
+                        circuits_per_depth=self._n_circuits, 
+                        qubit_labels=[f'Q{q}' for q in self._qubits], 
+                        randomizeout=self._randomizeout,
+                        citerations=self._citerations,
+                    )
+            
+            elif self._sim_RB:
+                edesigns = []
+                for ql in self._qubit_labels:
+                    qubits = list(flatten([ql]))
+                    edesigns.append(pygsti.protocols.CliffordRBDesign(
+                            pspec=self._pspec,
+                            clifford_compilations=self._compilations, 
+                            depths=self._circuit_depths, 
+                            circuits_per_depth=self._n_circuits, 
+                            qubit_labels=[f'Q{q}' for q in qubits], 
+                            randomizeout=self._randomizeout,
+                            citerations=self._citerations,
+                            add_default_protocol=True
+                        )
+                    )
+                self._edesign = pygsti.protocols.SimultaneousExperimentDesign(
+                    edesigns
                 )
             
             # Save an empty dataset file of all the circuits
             self._data_manager._exp_id += (
-                f'_CRB_Q{"".join(str(q) for q in self._qubits)}'
+                f'_CRB_{"".join("Q"+str(q) for q in self._qubits)}'
             )
             self._data_manager.create_data_path()
             pygsti.io.write_empty_protocol_data(
@@ -206,35 +243,80 @@ def CRB(qpu:             QPU,
             """Analyze the CRB results."""
             # logger.info(' Analyzing the results...')
             import pygsti
-            try:
-                self._data = pygsti.io.read_data_from_dir(
+            
+            self._data = pygsti.io.read_data_from_dir(
                      self._data_manager._save_path
                 )
-                self._results = self._protocol.run(self._data)
-                r = self._results.fits['full'].estimates['r']
-                rstd = self._results.fits['full'].stds['r']
-                rAfix = self._results.fits['A-fixed'].estimates['r']
-                rAfixstd = self._results.fits['A-fixed'].stds['r']
-                print(
-                    f"e_F = {r:1.2e} ({rstd:1.2e}) (fit with a free asymptote)"
-                )
-                print(
-                    f"e_F = {rAfix:1.2e} ({rAfixstd:1.2e}) (fit with the "
-                    "asymptote fixed to 1/2^n)"
-                )
-            except Exception:
-                logger.warning(' Unable to fit the RB data!')
+            self._results = self._protocol.run(self._data)
+            if not self._sim_RB:
+                try:
+                    r = self._results.fits['full'].estimates['r']
+                    rstd = self._results.fits['full'].stds['r']
+                    rA = self._results.fits['A-fixed'].estimates['r']
+                    rAstd = self._results.fits['A-fixed'].stds['r']
+                    print(f'\n{self._qubit_labels[0]}:')
+                    print(
+                        f"Process infidelity: r = {r:1.2e} ({rstd:1.2e}) "
+                        "(fit with a free asymptote)"
+                    )
+                    print(
+                        f"Process infidelity: r = {rA:1.2e} ({rAstd:1.2e}) "
+                        "(fit with the asymptote fixed to 1/2^n)"
+                    )
+                except Exception:
+                    logger.warning(' Unable to fit the RB data!')
+                
+            elif self._sim_RB:
+                for ql in self._qubit_labels:
+                    if isinstance(ql, (list, tuple)):
+                        qtup = (f'Q{q}' for q in ql)
+                    else:
+                        qtup = (f'Q{ql}',)
+                    results = self._results[qtup].for_protocol['RB']
+                    try:
+                        r = results.fits['full'].estimates['r']
+                        rstd = results.fits['full'].stds['r']
+                        rA = results.fits['A-fixed'].estimates['r']
+                        rAstd = results.fits['A-fixed'].stds['r']
+                        print(f'\n{qtup}:')
+                        print(
+                            f"Process infidelity: r = {r:1.2e} ({rstd:1.2e}) "
+                            "(fit with a free asymptote)"
+                        )
+                        print(
+                            f"Process infidelity: r = {rA:1.2e} ({rAstd:1.2e}) "
+                            "(fit with the asymptote fixed to 1/2^n)"
+                        )
+                    except Exception:
+                        logger.warning(' Unable to fit the RB data!')
 
         def plot(self) -> None:
             """Plot the CRB fit results."""
-            if self._results is not None:
-                if settings.Settings.save_data:
-                    self._results.plot(
-                        figpath=self._data_manager._save_path + 'CRB_decay.png'
-                    )
-                else:
-                    self._results.plot()
+            if not self._sim_RB:
+                if self._results is not None:
+                    if settings.Settings.save_data:
+                        self._results.plot(
+                            figpath=self._data_manager._save_path + 
+                            'CRB_decay.png'
+                        )
+                    else:
+                        self._results.plot()
 
+            elif self._sim_RB:
+                for ql in self._qubit_labels:
+                    if isinstance(ql, (list, tuple)):
+                        qtup = (f'Q{q}' for q in ql)
+                    else:
+                        qtup = (f'Q{ql}',)
+                    if self._results[qtup] is not None:
+                        if settings.Settings.save_data:
+                            self._results[qtup].for_protocol['RB'].plot(
+                                figpath=self._data_manager._save_path + 
+                                f'{"".join(qtup)}_CRB_decay.png'
+                            )
+                        else:
+                            self._results[qtup].for_protocol['RB'].plot()
+            
         def final(self) -> None:
             """Final benchmarking method."""
             print(f"\nRuntime: {repr(self._runtime)[8:]}\n")
@@ -250,7 +332,7 @@ def CRB(qpu:             QPU,
 
     return CRB(
         config,
-        qubits,
+        qubit_labels,
         circuit_depths,
         n_circuits,
         native_gates,
@@ -263,20 +345,12 @@ def CRB(qpu:             QPU,
 
 def SRB(qpu:             QPU,
         config:          Config,
-        qubit_labels:    Iterable[int],
+        qubit_labels:    List[int | Tuple[int]],
         circuit_depths:  List[int] | Tuple[int],
-        tq_config:       str | Any = None,
-        compiler:        Any | None = None, 
-        transpiler:      Any | None = None,
-        classifier:      ClassificationManager = None,
         n_circuits:      int = 30,
-        n_shots:         int = 1024, 
-        n_batches:       int = 1, 
-        n_circs_per_seq: int = 1,
-        n_levels:        int = 2,
+        tq_config:       str | Any = None,
         compiled_pauli:  bool = True,
         include_rcal:    bool = False,
-        raster_circuits: bool = False,
         **kwargs
     ) -> Callable:
     """Streamlined Randomized Benchmarking.
@@ -286,32 +360,17 @@ def SRB(qpu:             QPU,
     Args:
         qpu (QPU): custom QPU object.
         config (Config): qcal Config object.
-        qubit_labels (Iterable[int, Iterable[int]]): a list specifying sets of 
+        qubit_labels (List[int | Tuple[int]]): a list specifying sets of 
             system labels to be twirled together by Clifford gates in each 
             circuit. For example, [0, 1, (2, 3)] would perform single-qubit RB
             on 0 and 1, and two-qubit RB on (2, 3).
         circuit_depths (List[int] | Tuple[int]): a list of positive integers 
             specifying how many cycles of random Clifford gates to generate for
             RB, for example, [4, 64, 256].
-        tq_config (str | Any, optional): True-Q config yaml file or config
-            object. Defaults to None.
-        compiler (Any | Compiler | None, optional): custom compiler to compile
-            the True-Q circuits. Defaults to None.
-        transpiler (Any | None, optional): custom transpiler to transpile
-            the True-Q circuits to experimental circuits. Defaults to None.
-        classifier (ClassificationManager, optional): manager used for 
-            classifying raw data. Defaults to None.
         n_circuits (int, optional): the number of circuits for each circuit 
             depth. Defaults to 30.
-        n_shots (int, optional): number of measurements per circuit. 
-                Defaults to 1024.
-        n_batches (int, optional): number of batches of measurements. Defaults
-            to 1.
-        n_circs_per_seq (int, optional): maximum number of circuits that can be
-            measured per sequence. Defaults to 1.
-        n_levels (int, optional): number of energy levels to be measured. 
-            Defaults to 2. If n_levels = 3, this assumes that the
-            measurement supports qutrit classification.
+        tq_config (str | Any, optional): True-Q config yaml file or config
+            object. Defaults to None.
         compiled_pauli (bool, optional): whether or not to compile a random 
             Pauli gate for each qubit in the cycle preceding a measurement 
             operation. Defaults to True.
@@ -319,12 +378,6 @@ def SRB(qpu:             QPU,
             same circuit collection as the SRB circuit. Defaults to False. If
             True, readout correction will be apply to the fit results 
             automatically.
-        raster_circuits (bool, optional): whether to raster through all
-            circuits in a batch during measurement. Defaults to False. By
-            default, all circuits in a batch will be measured n_shots times
-            one by one. If True, all circuits in a batch will be measured
-            back-to-back one shot at a time. This can help average out the 
-            effects of drift on the timescale of a measurement.
 
     Returns:
         Callable: SRB class instance.
@@ -336,24 +389,16 @@ def SRB(qpu:             QPU,
 
         def __init__(self,
                 config:          Config,
-                qubit_labels:    Iterable[int],
+                qubit_labels:    List[int | Tuple[int]],
                 circuit_depths:  List[int] | Tuple[int],
-                tq_config:       str | tq.Config = None,
-                compiler:        Any | None = None, 
-                transpiler:      Any | None = None,
-                classifier:      ClassificationManager = None,
                 n_circuits:      int = 30,
-                n_shots:         int = 1024,
-                n_batches:       int = 1, 
-                n_circs_per_seq: int = 1,
-                n_levels:        int = 2,
+                tq_config:       str | tq.Config = None,
                 compiled_pauli:  bool = True,
                 include_rcal:    bool = False,
-                raster_circuits: bool = False,
                 **kwargs
             ) -> None:
-            from qcal.interface.trueq.compiler import Compiler
-            from qcal.interface.trueq.transpiler import Transpiler
+            from qcal.interface.trueq.compiler import TrueqCompiler
+            from qcal.interface.trueq.transpiler import TrueqTranspiler
             
             try:
                 import trueq as tq
@@ -366,22 +411,20 @@ def SRB(qpu:             QPU,
             self._n_circuits = n_circuits
             self._compiled_pauli = compiled_pauli
             self._include_rcal = include_rcal
-            
-            if compiler is None:
-                compiler = Compiler(config if tq_config is None else tq_config)
-            if transpiler is None:
-                transpiler = Transpiler()
+
+            compiler = kwargs.get(
+                'compiler', 
+                TrueqCompiler(config if tq_config is None else tq_config)
+            )
+            kwargs.pop('compiler', None)
+
+            transpiler = kwargs.get('transpiler', TrueqTranspiler())
+            kwargs.pop('transpiler', None)
                 
             qpu.__init__(self,
                 config=config, 
                 compiler=compiler, 
                 transpiler=transpiler,
-                classifier=classifier,
-                n_shots=n_shots, 
-                n_batches=n_batches, 
-                n_circs_per_seq=n_circs_per_seq, 
-                n_levels=n_levels,
-                raster_circuits=raster_circuits,
                 **kwargs
             )
 
@@ -413,7 +456,7 @@ def SRB(qpu:             QPU,
             """Save all circuits and data."""
             clear_output(wait=True)
             self._data_manager._exp_id += (
-                f'_SRB_Q{"".join(str(q) for q in self._circuits.labels)}'
+                f'_SRB_{"".join("Q"+str(q) for q in self._circuits.labels)}'
             )
             if settings.Settings.save_data:
                 qpu.save(self) 
@@ -511,17 +554,9 @@ def SRB(qpu:             QPU,
         config,
         qubit_labels,
         circuit_depths,
-        tq_config,
-        compiler,
-        transpiler,
-        classifier,
         n_circuits,
-        n_shots,
-        n_batches,
-        n_circs_per_seq,
-        n_levels,
+        tq_config,
         compiled_pauli,
         include_rcal,
-        raster_circuits,
         **kwargs
     )
