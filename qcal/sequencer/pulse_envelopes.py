@@ -10,6 +10,7 @@ from typing import Union
 
 __all__ = [
     'cosine_square',
+    'custom',
     'DRAG',
     'linear',
     'gaussian',
@@ -51,6 +52,20 @@ def cosine_square(
         (cos[:n_points_cos], square, cos[n_points_cos:])
     )
     return np.array(amp * cos_square * np.exp(1j * phase)).astype(np.complex64)
+
+
+def custom(length: float, sample_rate: float, filename: str) -> NDArray:
+    """Load a custom pulse envelope.
+
+    Args:
+        length (float): pulse length in seconds. This argument is unused.
+        sample_rate (float): sample rate in Hz. This argument is unused.
+        filename (str): filename where the custom pulse envelope is saved.
+
+    Returns:
+        NDArray: custom pulse envelope.
+    """
+    return np.load(filename).astype(np.complex64)
 
 
 def DRAG(
@@ -285,12 +300,13 @@ def virtualz(
 
 
 pulse_envelopes = defaultdict(lambda: 'Pulse envelope not available!', {
-    'cosine_square': cosine_square, 
-    'DRAG':     DRAG, 
-    'linear':   linear, 
-    'gaussian': gaussian, 
-    'sine':     sine, 
-    'square':   square,
-    'virtualz': virtualz,
-    # 'zz_DRAG':  zz_DRAG
+    'cosine_square': cosine_square,
+    'custom':        custom,
+    'DRAG':          DRAG, 
+    'linear':        linear, 
+    'gaussian':      gaussian, 
+    'sine':          sine, 
+    'square':        square,
+    'virtualz':      virtualz,
+    # 'zz_DRAG':       zz_DRAG
 })

@@ -185,7 +185,7 @@ def add_heralding(
 
     circuit.extend((
             {'name':  'delay',
-             't':     config['readout/reset'],
+             't':     config['readout/resonator_reset'],
              'qubit': [f'Q{q}' for q in qubits]},
             {'name': 'barrier', 'qubit': [f'Q{q}' for q in qubits]}
          ))
@@ -704,26 +704,29 @@ def cycle_pulse(config: Config, cycle: Cycle) -> List:
                  'freq':   config[f'readout/{qubit}/freq'],
                  'amp':    config[f'readout/{qubit}/amp'], 
                  'phase':  0.0,
-                 'twidth': config[f'readout/{qubit}/length'],
-                 'env':    pulse_envelopes[config.readout[qubit].env](
-                                config[f'readout/{qubit}/length'],
-                                config['readout/sample_rate']
+                 'twidth': config[f'readout/{qubit}/time'],
+                 'env':    pulse_envelopes[config[f'readout/{qubit}/env']](
+                                config[f'readout/{qubit}/time'],
+                                config['readout/sample_rate'],
+                                **config[f'readout/{qubit}/kwargs']
                            )
                 },
                 {'name': 'delay',
-                 't':     config[f'readout/{qubit}/delay'],
+                 't':     config[f'readout/{qubit}/demod/delay'],
                  'qubit': [f'Q{qubit}.rdlo']
                 },
                 {'name':   'pulse',
                  'tag':    'Demodulation',
                  'dest':   f'Q{qubit}.rdlo',
                  'freq':   config[f'readout/{qubit}/freq'],
-                 'amp':    1.0,
-                 'phase':  config[f'readout/{qubit}/phase'],  # Rotation in IQ plane
-                 'twidth': config[f'readout/{qubit}/demod_time'],
-                 'env':    pulse_envelopes[config.readout[qubit].env](
-                                config[f'readout/{qubit}/demod_time'],
-                                config['readout/sample_rate']
+                #  'amp':    1.0,
+                 'phase':  config[f'readout/{qubit}/demod/phase'],
+                 'twidth': config[f'readout/{qubit}/demod/time'],
+                 'env':    pulse_envelopes[
+                           config[f'readout/{qubit}/demod/env']](
+                                config[f'readout/{qubit}/demod/time'],
+                                config['readout/sample_rate'],
+                                **config[f'readout/{qubit}/demod/kwargs']
                            )
                 }
             ])

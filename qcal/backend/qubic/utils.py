@@ -11,34 +11,6 @@ import pandas as pd
 logger = logging.getLogger(__name__)
 
 
-# def calculate_n_reads(config: Config) -> int:
-#     """Calculate the number of reads per circuit from a config.
-
-#     The number of reads will depend on:
-#     1) number of active resets
-#     2) heralding
-#     3) readout at the end of the circuit
-
-#     This function assumes that there is no mid-circuit measurement, and that
-#     there is always a readout at the end of a circuit.
-
-#     Args:
-#         config (Config): config object.
-
-#     Returns:
-#         int: number of reads per circuit.
-#     """
-#     n_reads = 1  # Measurement at the end of the circuit
-    
-#     if config.parameters['reset']['active']['enable']:
-#         n_reads += config.parameters['reset']['active']['n_resets']
-    
-#     if config.parameters['readout']['herald']:
-#         n_reads += 1
-
-#     return n_reads
-
-
 def calculate_n_reads(config: Config, compiled_program) -> dict:
     """Calculate the number of reads per qubit per circuit.
 
@@ -61,7 +33,7 @@ def calculate_n_reads(config: Config, compiled_program) -> dict:
     
     n_reads = {}
     for q in qubits:
-        n_reads[str(int(config.readout[int(q.strip('Q'))].channel))] = (
+        n_reads[str(int(config[f"readout/{q.strip('Q')}/channel"]))] = (
             sum(seq[q] == 'Readout')
         )
 
