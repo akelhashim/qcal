@@ -81,7 +81,8 @@ def post_process(
 
     chanmap = {}
     chanmap_r = {}
-    for q, ch in config.readout.loc['channel'].items():
+    for q in config.qubits:
+        ch = config[f'readout/{q}/channel']
         chanmap[str(int(ch))] = f'Q{q}'
         chanmap_r[f'Q{q}'] = str(int(ch))
 

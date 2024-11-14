@@ -264,8 +264,12 @@ class Config:
                             ] for q in self.qubits]
                         ))),
                     columns=self.qubits,
-                    index=self.parameters['readout'][self.qubits[0]].keys()
-                    )
+                    index=[
+                        item[0] for item in recursive_items(
+                            self.parameters['readout'][self.qubits[0]]
+                        )
+                    ]
+                )
         )
                 
         for key, value in self.parameters['readout'].items():

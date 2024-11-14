@@ -94,6 +94,7 @@ def CRB(qpu:             QPU,
             try:
                 import pygsti
                 from pygsti.processors import CliffordCompilationRules as CCR
+                from qcal.interface.pygsti.processor_spec import pygsti_pspec
                 from qcal.interface.pygsti.transpiler import PyGSTiTranspiler
                 logger.info(f" pyGSTi version: {pygsti.__version__}\n")
             except ImportError:
@@ -103,44 +104,66 @@ def CRB(qpu:             QPU,
             self._qubits = list(flatten(qubit_labels))
             self._circuit_depths = circuit_depths
             self._n_circuits = n_circuits
-            self._native_gates = native_gates
             self._pspec = pspec
             self._randomizeout = randomizeout
             self._citerations = citerations
 
-            multiQ = False
-            if not self._native_gates:
-                self._native_gates = ['X90', 'Y90']
-                for ql in self._qubit_labels:
-                    if isinstance(ql, (list, tuple)):
-                        multiQ = True
-                        self._native_gates.extend(
-                            config.native_gates['two_qubit'][tuple(ql)]
+            self._pspec = {}
+            self._compilations = {}
+
+            for ql in self._qubit_labels:
+                qubits = list(flatten([ql]))
+                if not native_gates:
+                    ql_native_gates = ['X90', 'Y90']
+                else:
+                    ql_native_gates = native_gates
+
+                if isinstance(ql, (list, tuple)):  # Multi-qubit gates
+                    if not native_gates:
+                        for i in range(len(ql) - 1):  # E.g., (1, 2, 3)
+                            ql_native_gates.extend(  # Assumes linear connect.
+                                config.native_gates['two_qubit'][
+                                    (ql[i], ql[i+1])  
+                                ]
+                            )
+                    if pspec is None:
+                        self._pspec[ql] = pygsti_pspec(
+                            config, qubits, ql_native_gates
                         )
-                self._native_gates = list(set(self._native_gates))
+                    self._compilations[ql] = {
+                        'absolute': CCR.create_standard(
+                            self._pspec[ql], 'absolute', 
+                            ('paulis', '1Qcliffords'), 
+                            verbosity=0
+                        ),            
+                        'paulieq': CCR.create_standard(
+                            self._pspec[ql], 'paulieq', 
+                            ('1Qcliffords', 'allcnots'),
+                            verbosity=0
+                        )
+                    }
+
+                else:
+                    if pspec is None:
+                        self._pspec[ql] = pygsti_pspec(
+                            config, qubits, ql_native_gates
+                        )
+                    self._compilations[ql] = {
+                        'absolute': CCR.create_standard(
+                            self._pspec[ql], 'absolute', 
+                            ('paulis', '1Qcliffords'), 
+                            verbosity=0
+                        ),            
+                        'paulieq': CCR.create_standard(
+                            self._pspec[ql], 'paulieq', 
+                            ('1Qcliffords',),
+                            verbosity=0
+                        )
+                    }
 
             transpiler = kwargs.get('transpiler', PyGSTiTranspiler())
             kwargs.pop('transpiler', None)
             qpu.__init__(self, config=config, transpiler=transpiler, **kwargs)
-
-            if pspec is None:
-                from qcal.interface.pygsti.processor_spec import pygsti_pspec
-                self._pspec = pygsti_pspec(
-                    config, self._qubits, self._native_gates
-                )
-
-            self._compilations = {
-                'absolute': CCR.create_standard(
-                    self._pspec, 'absolute', 
-                    ('paulis', '1Qcliffords'), 
-                    verbosity=0
-                ),            
-                'paulieq': CCR.create_standard(
-                    self._pspec, 'paulieq', 
-                    ('1Qcliffords', 'allcnots') if multiQ else ('1Qcliffords',), 
-                    verbosity=0
-                )
-            }
 
             self._sim_RB = True if len(self._qubit_labels) > 1 else False
             self._protocol = (
@@ -183,9 +206,10 @@ def CRB(qpu:             QPU,
             from qcal.interface.pygsti.circuits import load_circuits
 
             if not self._sim_RB:
+                ql = self._qubit_labels[0]
                 self._edesign = pygsti.protocols.CliffordRBDesign(
-                        pspec=self._pspec,
-                        clifford_compilations=self._compilations, 
+                        pspec=self._pspec[ql],
+                        clifford_compilations=self._compilations[ql], 
                         depths=self._circuit_depths, 
                         circuits_per_depth=self._n_circuits, 
                         qubit_labels=[f'Q{q}' for q in self._qubits], 
@@ -198,8 +222,8 @@ def CRB(qpu:             QPU,
                 for ql in self._qubit_labels:
                     qubits = list(flatten([ql]))
                     edesigns.append(pygsti.protocols.CliffordRBDesign(
-                            pspec=self._pspec,
-                            clifford_compilations=self._compilations, 
+                            pspec=self._pspec[ql],
+                            clifford_compilations=self._compilations[ql], 
                             depths=self._circuit_depths, 
                             circuits_per_depth=self._n_circuits, 
                             qubit_labels=[f'Q{q}' for q in qubits], 
