@@ -945,12 +945,14 @@ def RPE(qpu:             QPU,
 
                     if k < len(self._qubit_labels):
                         ql = self._qubit_labels[k]
-
                         for angle, errors in self._angle_errors[ql].items():
-                            ax.plot(
+                            ax.errorbar(
                                 self._circuit_depths[:len(errors)], 
-                                errors, 
-                                'o-',
+                                errors,
+                                yerr=np.pi/(2*np.array(
+                                    self._circuit_depths[:len(errors)]
+                                )),
+                                fmt='o-',
                                 label=angle
                             )
                         ax.axvline(
@@ -959,6 +961,11 @@ def RPE(qpu:             QPU,
                             c='k',
                             label='Last good depth',
                         )
+
+                        maxval = np.abs(np.concatenate(
+                            [err for err in self._angle_errors[ql].values()]
+                        )).max()
+                        ax.set_ylim((-1.1 * maxval, 1.1 * maxval))
 
                         ax.set_title(f'Q{ql}', fontsize=20)
                         ax.set_xlabel('Circuit Depth', fontsize=15)
