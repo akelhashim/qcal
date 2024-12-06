@@ -467,7 +467,8 @@ def add_single_qubit_gate(
                  'twidth': pulse['length'],
                  'env':    pulse_envelopes[pulse['env']](
                             pulse['length'],
-                            config['hardware/DAC_sample_rate'],
+                            config['hardware/sample_rate/DAC'] / 
+                                config['hardware/interpolation_ratio/qdrv'],
                             **{key: val for key, val in pulse['kwargs'].items() 
                             if key not in ['amp', 'phase']}
                         )
@@ -551,7 +552,8 @@ def add_multi_qubit_gate(
                  'twidth': pulse['length'], 
                  'env':    pulse_envelopes[pulse['env']](
                             pulse['length'],
-                            config['hardware/DAC_sample_rate'],
+                            config['hardware/sample_rate/DAC'] / 
+                                config['hardware/interpolation_ratio/qdrv'],
                             **{key: val for key, val in pulse['kwargs'].items() 
                             if key not in ['amp', 'phase']}
                         )
@@ -597,7 +599,8 @@ def add_pre_post_pulse(
                     'twidth': p['length'], 
                     'env':    pulse_envelopes[p['env']](
                             p['length'],
-                            config['hardware/DAC_sample_rate'],
+                            config['hardware/sample_rate/DAC'] / 
+                                config['hardware/interpolation_ratio/qdrv'],
                             **{key: val for key, val 
                                 in p['kwargs'].items() 
                                 if key not in ['amp', 'phase']
@@ -670,7 +673,10 @@ def cycle_pulse(config: Config, cycle: Cycle) -> List:
                          'twidth': p['length'],
                          'env':    pulse_envelopes[p['env']](
                                      p['length'],
-                                     config['hardware/DAC_sample_rate'],
+                                     config['hardware/sample_rate/DAC'] / 
+                                        config[
+                                            'hardware/interpolation_ratio/qdrv'
+                                        ],
                                      **{key: val for key, val in 
                                         p['kwargs'].items() if key not in 
                                         ['amp', 'phase']
@@ -690,7 +696,8 @@ def cycle_pulse(config: Config, cycle: Cycle) -> List:
                  'twidth': p['length'],
                  'env':    pulse_envelopes[p['env']](
                                 p['length'],
-                                config['hardware/DAC_sample_rate'],
+                                config['hardware/sample_rate/DAC'] / 
+                                    config['hardware/interpolation_ratio/qdrv'],
                                 **{key: val for key, val in p['kwargs'].items() 
                                 if key not in ['amp', 'phase']}
                 )} for p in config[f'single_qubit/{qubit}/{subspace}/X/pulse']
@@ -707,7 +714,8 @@ def cycle_pulse(config: Config, cycle: Cycle) -> List:
                  'twidth': config[f'readout/{qubit}/time'],
                  'env':    pulse_envelopes[config[f'readout/{qubit}/env']](
                                 config[f'readout/{qubit}/time'],
-                                config['readout/sample_rate'],
+                                config['hardware/sample_rate/DAC'] /
+                                    config['hardware/interpolation_ratio/rdrv'],
                                 **config[f'readout/{qubit}/kwargs']
                            )
                 },
@@ -719,13 +727,13 @@ def cycle_pulse(config: Config, cycle: Cycle) -> List:
                  'tag':    'Demodulation',
                  'dest':   f'Q{qubit}.rdlo',
                  'freq':   config[f'readout/{qubit}/freq'],
-                #  'amp':    1.0,
                  'phase':  config[f'readout/{qubit}/demod/phase'],
                  'twidth': config[f'readout/{qubit}/demod/time'],
                  'env':    pulse_envelopes[
                            config[f'readout/{qubit}/demod/env']](
                                 config[f'readout/{qubit}/demod/time'],
-                                config['readout/sample_rate'],
+                                config['hardware/sample_rate/ADC'] /
+                                    config['hardware/interpolation_ratio/rdlo'],
                                 **config[f'readout/{qubit}/demod/kwargs']
                            )
                 }
