@@ -79,24 +79,14 @@ def post_process(
     """
     outputs = list(measurements[0].keys())
 
-    chanmap = {}
-    chanmap_r = {}
-    for q in config.qubits:
-        ch = config[f'readout/{q}/channel']
-        chanmap[str(int(ch))] = f'Q{q}'
-        chanmap_r[f'Q{q}'] = str(int(ch))
-
     meas_qubits = set()
     if measure_qubits is not None:
         for q in measure_qubits:
             meas_qubits.add(q)
     else:
         for meas in measurements:
-            if 'shots' in outputs:
-                meas_qubits |= set(meas['shots'].keys())
-            elif 's11' in outputs:
-                for ch in meas['s11'].keys():
-                    meas_qubits.add(chanmap[ch])
+            for q in meas['s11'].keys():  # 'Q0.rdlo
+                meas_qubits.add(q.replace('.rdlo', ''))
     meas_qubits = sorted(meas_qubits)
 
     if 's11' in outputs:  # Might not work with rastering
@@ -104,7 +94,7 @@ def post_process(
         # (n circuits, n shots, n reads)}
         raw_iq = { 
             q: np.vstack([
-                meas['s11'][chanmap_r[q]] for meas in measurements
+                meas['s11'][f'{q}.rdlo'] for meas in measurements
             ]) for q in meas_qubits
         }
         if raster_circuits:
@@ -112,7 +102,7 @@ def post_process(
             for q in meas_qubits:
                 if isinstance(n_reads_per_shot, dict):
                     n_reads = int(
-                        n_reads_per_shot[chanmap_r[q]] / len(circuits)
+                        n_reads_per_shot[q] / len(circuits)
                     )
                 elif isinstance(n_reads_per_shot, int):
                     n_reads = int(n_reads_per_shot / len(circuits))
@@ -155,36 +145,6 @@ def post_process(
                     circ_results.append(np.hstack(circ_reads))
                 
                 measurement[q] = np.array(circ_results)
-    
-    elif 'shots' in outputs:
-        measurement = {
-            q: np.vstack([
-                meas['shots'][q] for meas in measurements
-            ]) for q in meas_qubits
-        }
-
-        if raster_circuits:
-            assert n_reads_per_shot is not None
-            for q in meas_qubits:
-                if isinstance(n_reads_per_shot, dict):
-                    n_reads = int(
-                        n_reads_per_shot[chanmap_r[q]] / len(circuits)
-                    )
-                elif isinstance(n_reads_per_shot, int):
-                    n_reads = int(n_reads_per_shot / len(circuits))
-                
-                reorg_measurements = []
-                for i in range(measurement[q].shape[0]):
-                    reorg_measurement = np.vstack([
-                        [measurement[q][i, :, j:j+n_reads] for j in range(
-                            0, measurement[q].shape[-1], n_reads
-                        )]
-                    ])
-                    reorg_measurements.append(reorg_measurement)
-                measurement[q] = np.vstack([
-                    meas for meas in reorg_measurements
-                ])
-
     else:
         measurement = {}
 
@@ -197,7 +157,7 @@ def post_process(
             )
 
             # Subsort shots by those which pass heralding
-            if config.parameters['readout']['herald']:
+            if config['readout/herald']:
                 herald_idx = find_herald_idx(config)
                 pass_herald = pd.DataFrame(      # Boolean series
                     {q: measurement[q][i][:,herald_idx] for q in meas_qubits}
@@ -205,7 +165,7 @@ def post_process(
                 results = results[pass_herald]
 
             # Relable all 2s as 1s for excited state promotion
-            if config.parameters['readout']['esp']['enable']:
+            if config['readout/esp/enable']:
                 results = results.replace(2, 1)
 
             # Compute the counts for all unique combinations of 0s and 1s
