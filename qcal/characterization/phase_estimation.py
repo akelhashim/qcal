@@ -9,7 +9,6 @@ Relevant pyRPE code: https://gitlab.com/quapack/pyrpe
 import qcal.settings as settings
 
 from qcal.config import Config
-from qcal.managers.classification_manager import ClassificationManager
 from qcal.math.utils import round_to_order_error
 from qcal.qpu.qpu import QPU
 from qcal.plotting.utils import calculate_nrows_ncols
@@ -84,6 +83,82 @@ def interleaved_circuit_depths(circuit_depths: List[int]) -> List[int]:
     return circuit_depths[:idx+1]
 
 
+def make_idle_circuits(circuit_depths: List[int], qubits: Tuple[int]):
+    """Generate the idle RPE circuits.
+
+    Args:
+        circuit_depths (List[int]): circuit depths.
+        qubits (Tuple[int]): qubit labels.
+    """
+    try:
+        import pygsti
+    except ImportError:
+        logger.warning('Unable to import pyGSTi!')
+
+    circuits = (
+        [make_idle_cos_circ(d, qubits) for d in circuit_depths] +
+        [make_idle_sin_circ(d, qubits) for d in circuit_depths]
+    )
+
+    return pygsti.remove_duplicates(circuits)
+
+
+def make_idle_cos_circ(d: int, qubits: Tuple[int] | List[int]):
+    """Make the cosine circuit for idle RPE.
+
+    Args:
+        d (int): circuit depth.
+        qubits (Tuple[int] | List[int]): qubit labels.
+
+    Returns:
+       pygsti.circuits.Circuit: pyGSTi circuit.
+    """
+    try:
+        import pygsti
+    except ImportError:
+        logger.warning('Unable to import pyGSTi!')
+
+    Gi_prep = pygsti.circuits.Circuit(
+        [[('Gypi2', q) for q in qubits]], line_labels=qubits
+    )
+    Gi_germ = pygsti.circuits.Circuit(
+        [[('Gidle', q) for q in qubits]], line_labels=qubits
+    ) * d
+    Gi_meas = pygsti.circuits.Circuit(
+        [[('Gypi2', q) for q in qubits]], line_labels=qubits
+    ) * 3
+
+    return Gi_prep + Gi_germ + Gi_meas
+
+
+def make_idle_sin_circ(d: int, qubits: Tuple[int] | List[int]):
+    """Make the cosine circuit for idle RPE.
+
+    Args:
+        d (int): circuit depth.
+        qubits (Tuple[int] | List[int]): qubit labels.
+
+    Returns:
+       pygsti.circuits.Circuit: pyGSTi circuit.
+    """
+    try:
+        import pygsti
+    except ImportError:
+        logger.warning('Unable to import pyGSTi!')
+
+    Gi_prep = pygsti.circuits.Circuit(
+        [[('Gxpi2', q) for q in qubits]], line_labels=qubits
+    )
+    Gi_germ = pygsti.circuits.Circuit(
+        [[('Gidle', q) for q in qubits]], line_labels=qubits
+    ) * d
+    Gi_meas = pygsti.circuits.Circuit(
+        [[('Gypi2', q) for q in qubits]], line_labels=qubits
+    ) * 3
+
+    return Gi_prep + Gi_germ + Gi_meas
+
+
 def make_x90_circuits(circuit_depths: List[int], qubits: Tuple[int]):
     """Generate the axis X90 RPE circuits.
 
@@ -96,11 +171,6 @@ def make_x90_circuits(circuit_depths: List[int], qubits: Tuple[int]):
     except ImportError:
         logger.warning('Unable to import pyGSTi!')
 
-    # i_circuit_depths = interleaved_circuit_depths(circuit_depths)
-    # circuits = (
-    #     [make_x90_cos_circ(d, qubits) for d in circuit_depths] +
-    #     [make_x90_sin_circ(d, qubits) for d in circuit_depths]
-    # )
     circuits = (
         [make_x90_cos_circ(d, qubits) for d in circuit_depths] +
         [make_x90_sin_circ(d, qubits) for d in circuit_depths] +
@@ -147,7 +217,6 @@ def make_x90_sin_circ(d: int, qubits: Tuple[int] | List[int]):
     except ImportError:
         logger.warning('Unable to import pyGSTi!')
 
-    # return pygsti.circuits.Circuit([[('Gxpi2', q) for q in qubits]]) * (d + 1)
     return pygsti.circuits.Circuit(
         [[('Gxpi2', q) for q in qubits]], line_labels=qubits
     ) * (d + 1)
@@ -419,6 +488,56 @@ def make_cz_sin_circ(
             "state_pair must be in [(0,1), (1,0), (2,3), (3,2), (1,3), (3,1)]"
         )
     return circ
+
+
+def analyze_idle(
+        dataset, 
+        qubits: List[int], 
+        circuit_depths: List[int]
+    ) -> Tuple:
+    """Analyze idle RPE dataset.
+
+    Args:
+        dataset (pygsti.data.dataset): pyGSTi dataset.
+        qubits (List[int]): qubit labels.
+        circuit_depths (List[int]): circuit depths.
+
+    Returns:
+        Tuple: angle estimates, angle errors, and index of last good depth
+    """
+    try:
+        from quapack.pyRPE import RobustPhaseEstimation
+        from quapack.pyRPE.quantum import Q
+    except ImportError:
+        logger.warning(' Unable to import pyRPE!')
+
+    cos_circs = {
+        d: make_idle_cos_circ(d, qubits) for d in circuit_depths
+    }
+    sin_circs = {
+        d: make_idle_sin_circ(d, qubits) for d in circuit_depths
+    }
+
+    # Angle estimate
+    experiment = Q()
+    for d in circuit_depths:
+        cos_counts = dataset[cos_circs[d]].counts
+        sin_counts = dataset[sin_circs[d]].counts
+        experiment.process_cos(d,
+            (int(cos_counts['0']), int(cos_counts['1']))
+        )
+        experiment.process_sin(d,
+            (int(sin_counts['1']), int(sin_counts['0']))
+        )
+    analysis = RobustPhaseEstimation(experiment)
+    angle_estimates = analysis.angle_estimates
+    angle_estimates = {'Z': np.array([
+        rectify_angle(angle) for angle in angle_estimates
+    ])}
+    angle_errors = {'Z': angle_estimates['Z']}
+    last_good_idx = analysis.check_unif_local(historical=True)
+
+    return (angle_estimates, angle_errors, last_good_idx)
 
 
 def analyze_x90(
@@ -741,8 +860,8 @@ def RPE(qpu:             QPU,
 
             self._config = config
 
-            assert gate.upper() in ('X90', 'CZ'), (
-                'Only X90 and CZ gates are currently supported!'
+            assert gate.upper() in ('I', 'X90', 'CZ'), (
+                'Only I, X90, and CZ gates are currently supported!'
             )
             self._qubit_labels = qubit_labels
             self._gate = gate.upper()
@@ -757,18 +876,22 @@ def RPE(qpu:             QPU,
             self._qubits = sorted(qubits)
 
             self._gate_model = {
+                'I':   None,
                 'X90': X90,
                 'CZ':  CZ,
             }
             self._target_model = {
+                'I':   None,
                 'X90': smq2Q_XXYYII.target_model(),
                 'CZ':  smq2Q_XYICPHASE.target_model(),
             }
             self._make_circuits = {
+                'I':   make_idle_circuits,
                 'X90': make_x90_circuits,
                 'CZ':  make_cz_circuits
             }
             self._analyze_results = {
+                'I':   analyze_idle,
                 'X90': analyze_x90,
                 'CZ':  analyze_cz
             }
@@ -880,7 +1003,7 @@ def RPE(qpu:             QPU,
                 )
 
         def analyze(self):
-            """Analyze the SRB results."""
+            """Analyze the RPE results."""
             logger.info(' Analyzing the results...')
             import pygsti
             
@@ -953,6 +1076,8 @@ def RPE(qpu:             QPU,
                                     self._circuit_depths[:len(errors)]
                                 )),
                                 fmt='o-',
+                                elinewidth=0.75,
+                                capsize=7,
                                 label=angle
                             )
                         ax.axvline(

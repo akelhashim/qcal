@@ -5,6 +5,7 @@ from qcal.circuit import Layer, Circuit, CircuitSet
 from qcal.gate.single_qubit import single_qubit_gates
 from qcal.gate.two_qubit import two_qubit_gates
 from qcal.transpilation.transpiler import Transpiler
+from qcal.units import ns
 
 import logging
 
@@ -53,14 +54,18 @@ def to_qcal(
                         gqubits = tuple(
                             int(str(q).replace('Q','')) for q in gate.qubits
                         )
-                        if gate.name == 'Gzr':
+                        if gate.name == 'Gidle':
+                            tlayer.append(
+                                gate_mapper['Gidle'](
+                                    gqubits, duration=100*ns  # Hardcoded
+                                )
+                            )
+                        elif gate.name == 'Gzr':
                             tlayer.append(
                                 gate_mapper['Gzr'](
                                     gqubits, float(gate.args[0])
                                 )
                             )
-                        # elif gate.name == 'Gypi2':
-                        #     layer.extend()
                         else:
                             tlayer.append(
                                 gate_mapper[gate.name](gqubits)
@@ -72,7 +77,13 @@ def to_qcal(
                 gqubits = tuple(
                     int(str(q).replace('Q','')) for q in layer.qubits
                 )
-                if layer.name == 'Gzr':
+                if layer.name == 'Gidle':
+                    tcircuit.append(
+                        Layer(
+                            {gate_mapper['Gidle'](gqubits, duration=100*ns)}
+                        )
+                    )
+                elif layer.name == 'Gzr':
                     tcircuit.append(
                         Layer(
                             {gate_mapper['Gzr'](gqubits, float(layer.args[0]))}
@@ -104,7 +115,8 @@ class PyGSTiTranspiler(Transpiler):
             gate_mapper = {
                 'Gcnot':   two_qubit_gates['CX'], 
                 'Gcphase': two_qubit_gates['CZ'],
-                'Gidle':   single_qubit_gates['Id'],
+                'Gi':      single_qubit_gates['Id'],
+                'Gidle':   single_qubit_gates['Idle'],
                 'Gxpi2':   single_qubit_gates['X90'], 
                 'Gypi2':   single_qubit_gates['Y90'],
                 'Gzpi2':   single_qubit_gates['Z90'],
