@@ -21,7 +21,8 @@ import scipy
 
 from collections.abc import Iterable
 from IPython.display import clear_output
-from numpy.typing import NDArray
+from matplotlib.lines import Line2D
+from numpy.typing import NDArray, ArrayLike
 from typing import Any, Callable, Dict, List, Tuple
 
 logger = logging.getLogger(__name__)
@@ -518,6 +519,7 @@ def analyze_idle(
         d: make_idle_sin_circ(d, qubits) for d in circuit_depths
     }
 
+    signal = {'ramsey': []}
     # Angle estimate
     experiment = Q()
     for d in circuit_depths:
@@ -529,6 +531,14 @@ def analyze_idle(
         experiment.process_sin(d,
             (int(sin_counts['1']), int(sin_counts['0']))
         )
+        p_I = int(cos_counts['0']) / (
+            int(cos_counts['0']) + int(cos_counts['1'])
+        )
+        p_Q = int(sin_counts['1']) / (
+            int(sin_counts['0']) + int(sin_counts['1'])
+        )
+        signal['ramsey'].append(1 - 2 * p_I + 1j - 2j * p_Q)
+
     analysis = RobustPhaseEstimation(experiment)
     angle_estimates = analysis.angle_estimates
     angle_estimates = {'Z': np.array([
@@ -537,7 +547,7 @@ def analyze_idle(
     angle_errors = {'Z': angle_estimates['Z']}
     last_good_idx = analysis.check_unif_local(historical=True)
 
-    return (angle_estimates, angle_errors, last_good_idx)
+    return (angle_estimates, angle_errors, last_good_idx, signal)
 
 
 def analyze_x90(
@@ -579,6 +589,7 @@ def analyze_x90(
         d: make_interleaved_sin_circ(d, qubits) for d in circuit_depths
     }
 
+    signal = {'direct': [], 'interleaved': []}
     # Direct angle estimates
     experiment = Q()
     for d in circuit_depths:
@@ -590,6 +601,13 @@ def analyze_x90(
         experiment.process_sin(d,
             (int(direct_sin_counts['1']), int(direct_sin_counts['0']))
         )
+        p_I = int(direct_cos_counts['0']) / (
+            int(direct_cos_counts['0']) + int(direct_cos_counts['1'])
+        )
+        p_Q = int(direct_sin_counts['1']) / (
+            int(direct_sin_counts['0']) + int(direct_sin_counts['1'])
+        )
+        signal['direct'].append(1 - 2 * p_I + 1j - 2j * p_Q)
     analysis = RobustPhaseEstimation(experiment)
     direct_angle_estimates = analysis.angle_estimates
     direct_angle_estimates = np.array([
@@ -612,6 +630,14 @@ def analyze_x90(
              int(interleaved_sin_counts['0'])
             )
         )
+        p_I = int(interleaved_cos_counts['0']) / (
+            int(interleaved_cos_counts['0']) + int(interleaved_cos_counts['1'])
+        )
+        p_Q = int(interleaved_sin_counts['1']) / (
+            int(interleaved_sin_counts['0']) + int(interleaved_sin_counts['1'])
+        )
+        signal['interleaved'].append(1 - 2 * p_I + 1j - 2j * p_Q)
+
     analysis = RobustPhaseEstimation(experiment)
     interleaved_angle_estimates = analysis.angle_estimates
     interleaved_angle_estimates = np.array([
@@ -655,7 +681,7 @@ def analyze_x90(
         'Z': angle_estimates['Z']
     }
 
-    return (angle_estimates, angle_errors, last_good_idx)
+    return (angle_estimates, angle_errors, last_good_idx, signal)
         
 
 def analyze_cz(
@@ -710,6 +736,7 @@ def analyze_cz(
         } for state_pair in state_pairs
     }
 
+    signal = {state_pair: [] for state_pair in state_pairs}
     experiments = {}
     for state_pair in state_pairs:
         experiments[state_pair] = Q()
@@ -720,16 +747,25 @@ def analyze_cz(
         sin_plus = state_pair_lookup[state_pair]['sin','+']
         sin_minus = state_pair_lookup[state_pair]['sin','-']
         for d in circuit_depths:
-            experiments[state_pair].process_sin(d,
-                (int(dataset[sin_dict[state_pair][d]][sin_plus]),
-                 int(dataset[sin_dict[state_pair][d]][sin_minus])
-                )
-            )
             experiments[state_pair].process_cos(d,
                 (int(dataset[cos_dict[state_pair][d]][cos_plus]),
                  int(dataset[cos_dict[state_pair][d]][cos_minus])
                 )
             )
+            experiments[state_pair].process_sin(d,
+                (int(dataset[sin_dict[state_pair][d]][sin_plus]),
+                 int(dataset[sin_dict[state_pair][d]][sin_minus])
+                )
+            )
+            p_I = int(dataset[cos_dict[state_pair][d]][cos_plus]) / (
+                int(dataset[cos_dict[state_pair][d]][cos_plus]) + 
+                int(dataset[cos_dict[state_pair][d]][cos_minus])
+            )
+            p_Q = int(dataset[sin_dict[state_pair][d]][sin_plus]) / (
+                int(dataset[sin_dict[state_pair][d]][sin_plus]) + 
+                int(dataset[sin_dict[state_pair][d]][sin_minus])
+            )
+            signal[state_pair].append(1 - 2 * p_I + 1j - 2j * p_Q)
 
     analyses = {}
     for state_pair in state_pairs:
@@ -777,7 +813,7 @@ def analyze_cz(
         'ZI': zi_estimates - target_zi,
     }
 
-    return (angle_estimates, angle_errors, last_good_idx)
+    return (angle_estimates, angle_errors, last_good_idx, signal)
 
 
 def rectify_angle(theta: float) -> float:
@@ -793,6 +829,60 @@ def rectify_angle(theta: float) -> float:
     #     theta -= 2 * np.pi
     # return theta
     return (theta + np.pi) % (2 * np.pi) - np.pi
+
+
+def plot_signal(
+        signal: Dict, 
+        circuit_depths: ArrayLike,
+        ax: plt.axes = None, 
+        title: str = None
+    ) -> None:
+    """Plot RPE signal decay.
+
+    Args:
+        signal (Dict): signal for each RPE experiment.
+        circuit_depths (ArrayLike): circuit depths.
+        ax (plt.axes, optional): plot axes. Defaults to None.
+        title (str, optional): plot title. Defaults to None.
+    """
+    if not ax:
+        fig, ax = plt.subplots(1, figsize=(5, 4))
+
+    mt = list(Line2D.markers.keys())[2:]
+    # Plot the signals on the complex plane with a colormap for the depth
+    n = 0
+    for label, data in signal.items():
+        for i, d in enumerate(circuit_depths):
+            ax.scatter(
+                data[i].real, 
+                data[i].imag,
+                marker=mt[n], 
+                color=plt.cm.viridis(i / (len(circuit_depths) - 1)),
+                label=label if i == 0 else None
+            )
+        n += 1
+    ax.set_title(title)
+    ax.set_xlabel('Re')
+    ax.set_ylabel('Im')
+    ax.set_aspect('equal')
+    ax.grid()
+    ax.legend(loc=1)
+
+    # Add colorbar 
+    sm = plt.cm.ScalarMappable(
+        cmap=plt.cm.viridis, 
+        norm=plt.Normalize(vmin=0, vmax=len(circuit_depths))
+    )
+    sm.set_array([])
+    plt.colorbar(sm, ax=ax, label='Depth index')
+
+    # Draw the unit circle
+    circle = plt.Circle((0, 0), 1, fill=False, color='black')
+    ax.add_artist(circle)
+
+    # Set the axis limits
+    ax.set_xlim(-1.1, 1.1)
+    ax.set_ylim(-1.1, 1.1)
 
 
 def RPE(qpu:             QPU,
@@ -815,24 +905,6 @@ def RPE(qpu:             QPU,
         circuit_depths (List[int], optional): a list of positive integers 
             specifying the circuit depths. Defaults to ```[1, 2, 4, 8, 16, 32, 
             64, 128, 256]```.
-        compiler (Any | Compiler | None, optional): custom compiler to compile
-            the True-Q circuits. Defaults to None.
-        transpiler (Any | None, optional): custom transpiler to transpile
-            the True-Q circuits to experimental circuits. Defaults to None.
-        classifier (ClassificationManager, optional): manager used for 
-            classifying raw data. Defaults to None.
-        n_shots (int, optional): number of measurements per circuit. 
-                Defaults to 1024.
-        n_batches (int, optional): number of batches of measurements. Defaults
-            to 1.
-        n_circs_per_seq (int, optional): maximum number of circuits that can be
-            measured per sequence. Defaults to 1.
-        raster_circuits (bool, optional): whether to raster through all
-            circuits in a batch during measurement. Defaults to False. By
-            default, all circuits in a batch will be measured n_shots times
-            one by one. If True, all circuits in a batch will be measured
-            back-to-back one shot at a time. This can help average out the 
-            effects of drift on the timescale of a measurement.
 
     Returns:
         Callable: RPE class instance.
@@ -901,6 +973,7 @@ def RPE(qpu:             QPU,
             self._angle_estimates = {}
             self._angle_errors = {}
             self._last_good_idx = {}
+            self._signal = {}
 
             transpiler = kwargs.get('transpiler', PyGSTiTranspiler())
             kwargs.pop('transpiler', None)
@@ -941,6 +1014,17 @@ def RPE(qpu:             QPU,
                 Dict: last good index.
             """
             return self._last_good_idx
+        
+        @property
+        def signal(self) -> Dict:
+            """Signal decay.
+
+            signal = 1 - 2p(I) + i(1 - 2p(Q))
+
+            Returns:
+                Dict: signal as a function of cirucit depth for each experiment.
+            """
+            return self._signal
 
         def generate_circuits(self):
             """Generate all RPE circuits."""
@@ -1022,10 +1106,11 @@ def RPE(qpu:             QPU,
                 results = self._analyze_results[self._gate](
                     dataset, self._qubit_labels, self._circuit_depths
                 )
-                angle_estimates, angle_errors, last_good_idx = results
+                angle_estimates, angle_errors, last_good_idx, signal = results
                 self._angle_estimates[ql] = angle_estimates
                 self._angle_errors[ql] = angle_errors
                 self._last_good_idx[ql] = last_good_idx
+                self._signal[ql] = signal
 
             for ql in self._qubit_labels:
                 if isinstance(ql, Iterable):
@@ -1117,6 +1202,53 @@ def RPE(qpu:             QPU,
                 )
                 fig.savefig(
                     self._data_manager._save_path + 'RPE.svg'
+                )
+            plt.show()
+
+        def plot_signal(self) -> None:
+            """Plot signal decay."""
+            nrows, ncols = calculate_nrows_ncols(len(self._qubit_labels))
+            figsize = (5 * ncols, 4 * nrows)
+            fig, axes = plt.subplots(
+                nrows, ncols, figsize=figsize, layout='constrained'
+            )
+
+            k = -1
+            for i in range(nrows):
+                for j in range(ncols):
+                    k += 1
+
+                    if len(self._qubit_labels) == 1:
+                        ax = axes
+                    elif axes.ndim == 1:
+                        ax = axes[j]
+                    elif axes.ndim == 2:
+                        ax = axes[i,j]
+
+                    if k < len(self._qubit_labels):
+                        ql = self._qubit_labels[k]
+
+                        plot_signal(
+                            signal=self._signal[ql], 
+                            circuit_depths=self._circuit_depths,
+                            ax=ax,
+                            title=f'Q{ql}'
+                        )
+
+                    else:
+                        ax.axis('off')
+
+            # fig.set_tight_layout(True)
+            if settings.Settings.save_data:
+                fig.savefig(
+                    self._data_manager._save_path + 'RPE_signal.png', 
+                    dpi=300
+                )
+                fig.savefig(
+                    self._data_manager._save_path + 'RPE_signal.pdf'
+                )
+                fig.savefig(
+                    self._data_manager._save_path + 'RPE_signal.svg'
                 )
             plt.show()
 
