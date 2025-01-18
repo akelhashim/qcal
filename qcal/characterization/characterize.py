@@ -76,16 +76,16 @@ class Characterize:
     
     @property
     def results(self) -> Dict:
-        """Results from the calibration.
+        """Results from the characterization.
         
         Returns:
-            Dict: calibration results for each qubit.
+            Dict: characterization results for each qubit.
         """
         return self._results
     
     @property
     def subspace(self) -> str:
-        """Subspace of the gate being calibrated.
+        """Subspace of the gate being characterized.
 
         Returns:
             str: gate subspace.
