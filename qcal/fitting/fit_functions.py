@@ -14,6 +14,7 @@ __all__ = (
     'cosine',
     'decaying_cosine',
     'exponential',
+    'linear',
     'parabola'
 )
 
@@ -82,6 +83,20 @@ def exponential(x: ArrayLike, a: float, b: float, c: float) -> NDArray:
         NDArray: exponential curve.
     """
     return a * np.exp(-b * x) + c
+
+
+def linear(x: ArrayLike, m: float, b: float) -> ArrayLike:
+    """Linear function
+
+    Args:
+        x (ArrayLike): data.
+        m (float): slope of the line.
+        b (float): y-intercept.
+
+    Returns:
+        ArrayLike: linear curve.
+    """
+    return m * x + b
 
 
 def parabola(x: ArrayLike, a: float, b: float, c: float) -> ArrayLike:

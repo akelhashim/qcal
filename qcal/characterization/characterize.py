@@ -126,7 +126,9 @@ class Characterize:
     def final(self) -> None:
         """Save and load the config after changing parameters."""
         for q in self._qubits:
-            if self._fit[q].fit_success:
+            if self._fit and self._fit[q].fit_success:
+                self.set_param(self._params[q], self._char_values[q])
+            elif self._char_values[q]:
                 self.set_param(self._params[q], self._char_values[q])
 
         self._config.save()
