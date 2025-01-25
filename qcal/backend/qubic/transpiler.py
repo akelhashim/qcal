@@ -192,11 +192,11 @@ def add_heralding(
          
 
 def add_measurement(
-        config: Config, 
+        config:        Config, 
         qubit_or_meas: int | Gate,
-        circuit: List, 
-        pulses: defaultdict | None,
-        reset: bool = False
+        circuit:       List, 
+        pulses:        defaultdict | None,
+        reset:         bool = False
     ) -> None:
     """Add measurement to a circuit.
 
@@ -268,10 +268,10 @@ def add_measurement(
 
 
 def add_dynamical_decoupling(
-        config: Config, 
-        dd_method: str, 
-        qubit: int, 
-        length: float, 
+        config:      Config, 
+        dd_method:   str, 
+        qubit:       int, 
+        length:      float, 
         n_dd_pulses: int, 
         pulse: List
     ) -> None:
