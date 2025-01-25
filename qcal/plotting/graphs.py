@@ -414,10 +414,11 @@ def draw_qpu(config: Config):
             #'Greys' | 'YlGnBu' | 'Greens' | 'YlOrRd' | 'Bluered' | 'RdBu' |
             #'Reds' | 'Blues' | 'Picnic' | 'Rainbow' | 'Portland' | 'Jet' |
             #'Hot' | 'Blackbody' | 'Earth' | 'Electric' | 'Viridis' |
-            colorscale='YlGnBu',
-            reversescale=True,
+            colorscale='Tealgrn',
+            reversescale=False,
+            opacity=0.65,
             color=[],
-            size=25,
+            size=30,
             colorbar=dict(
                 thickness=15,
                 title='Qubit Connectivity',
@@ -427,9 +428,11 @@ def draw_qpu(config: Config):
     )
     node_text = []
     for q in config.qubits:
-        node_text.append(format_qubit_text(
+        node_text.append(
+            f'Q{q}:<br>' + format_qubit_text(
             config.parameters['single_qubit'][q]
-        ))
+            )
+        )
     node_adjacencies = []
     for node, adjacencies in enumerate(G.adjacency()):
         node_adjacencies.append(len(adjacencies[1]))
