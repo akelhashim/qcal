@@ -56,8 +56,8 @@ class QubicQPU(QPU):
                 save_raw_data:       bool = False,
                 gmm_manager:         GMMManager = None,
                 sd_param:            Dict | None = None,
-                rpc_ip_address:      str = '192.168.1.122',
-                port:                int = 9095
+                ip_address:          str = None,
+                port:                int = None
         ) -> None:
         """Initialize a instance of a QPU for QubiC.
 
@@ -126,9 +126,9 @@ class QubicQPU(QPU):
                 saved manager object: 'gmm_manager.pkl'.
             sd_param (Dict | None, optional): this kwarg is unused and only
                 included for compatiblity with qcal-pro. Defaults to None.
-            rpc_ip_address (str, optional): IP address for RPC server.
-                Defaults to '192.168.1.25'.
-            port (int, option): port for RPC server. Defaults to 9096.
+            ip_address (str, optional): IP address for RPC server. Defaults to 
+                None.
+            port (int, option): port for RPC server. Defaults to None.
         """
         QPU.__init__(self,
             config=config,
@@ -179,7 +179,7 @@ class QubicQPU(QPU):
             os.path.join(settings.Settings.config_path, 'qubic_cfg.json')
         )
         self._runner = rpc_client.CircuitRunnerClient(
-            ip=rpc_ip_address, port=port
+            ip=ip_address, port=port
         )
 
         # Overwrite qubit and readout frequencies:
