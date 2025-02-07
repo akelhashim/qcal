@@ -8,8 +8,8 @@ from qcal.circuit import Cycle, Circuit, CircuitSet
 from qcal.config import Config
 from qcal.fitting.fit import FitLinear
 from qcal.gate.single_qubit import Meas
-from qcal.plotting.utils import calculate_nrows_ncols
 from qcal.qpu.qpu import QPU
+from qcal.characterization.spectroscopy.utils import find_inflection_points
 from qcal.units import GHz
 
 import logging
@@ -23,30 +23,9 @@ from collections.abc import Iterable
 from IPython.display import clear_output
 from numpy.typing import NDArray
 from plotly.subplots import make_subplots
-from scipy.ndimage import gaussian_filter1d
 from typing import Callable, Dict
 
 logger = logging.getLogger(__name__)
-
-
-def find_inflection_points(x: NDArray, y: NDArray, sigma=10) -> NDArray:
-    """Find inflection points for resonator fitting.
-
-    Args:
-        x (NDArray): independent variable.
-        y (NDArray): dependent variable.
-        sigma (int, optional): standard deviation for Gaussian kernel. Defaults 
-            to 10.
-
-    Returns:
-        NDArray: indices of inflection points.
-    """
-    y_smoothed = gaussian_filter1d(y, sigma=sigma)
-    dy_dx = np.gradient(y_smoothed, x)
-    d2y_dx2 = np.gradient(dy_dx, x)
-    inflection_idxs = np.where(np.diff(np.sign(d2y_dx2)))[0]
-    
-    return inflection_idxs
 
 
 def Punchout(             
@@ -314,7 +293,11 @@ def Punchout(
                     cbar = p.collections[0].colorbar
                     cbar.ax.set_ylabel("Log(Mag) (dB)", fontsize=10)
                     cbar.ax.tick_params(labelsize=10)
-                    ax[0].set_title(f'R{q}', fontsize=12)
+                    # ax[0].set_title(f'R{q}', fontsize=12)
+                    ax[0].text(
+                            0.05, 0.9, f'R{q}', size=12, 
+                            transform=ax.transAxes
+                        )
                     ax[0].set_xlabel('Frequency (GHz)', fontsize=12)
                     ax[0].set_ylabel('Amplitude (a.u.)', fontsize=12)
                     ax[0].set_xticklabels(
@@ -346,13 +329,19 @@ def Punchout(
                     cbar = p.collections[0].colorbar
                     cbar.ax.set_ylabel("Unwrapped Phase (rad.)", fontsize=10)
                     cbar.ax.tick_params(labelsize=10)
-                    ax[1].set_title(f'R{q}', fontsize=12)
+                    # ax[1].set_title(f'R{q}', fontsize=12)
+                    ax[1].text(
+                            0.05, 0.9, f'R{q}', size=12, 
+                            transform=ax.transAxes
+                        )
                     ax[1].set_xlabel('Frequency (GHz)', fontsize=12)
                     ax[1].set_ylabel('Amplitude (a.u.)', fontsize=12)
                     ax[1].set_xticklabels(
                         np.around(self._freqs[q][xtick_values] / GHz, 3)
                     )
-                    ax[1].set_yticklabels([])
+                    ax[1].set_yticklabels(
+                        np.around(self._amps[q][ytick_values], 3)
+                    )
                     ax[1].tick_params(
                         axis='x', which='major', labelsize=10, labelrotation=45
                     )
@@ -546,7 +535,7 @@ def Resonator(
                 except Exception as e:
                     self._char_values[q] = None
                     logger.warning(
-                        f' Unable to find the resonator frequency for Q{q}: {e}'
+                        f' Unable to find the resonator frequency for R{q}: {e}'
                     )
 
         def save(self):
