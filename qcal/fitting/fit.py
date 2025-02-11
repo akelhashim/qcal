@@ -18,6 +18,7 @@ __all__ = (
     'FitCosine',
     'FitDecayingCosine',
     'FitExponential',
+    'FitLinear',
     'FitParabola',
 )
 
@@ -147,6 +148,14 @@ class FitExponential(Fit):
     """Exponential fit class."""
 
     def __init__(self, fit_function: Callable = exponential) -> None:
+        """Initialize an exponential fitter using the exponential function."""
+        super().__init__(fit_function)
+
+
+class FitLinear(Fit):
+    """Linear fit class."""
+
+    def __init__(self, fit_function: Callable = linear) -> None:
         """Initialize an exponential fitter using the exponential function."""
         super().__init__(fit_function)
 

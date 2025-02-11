@@ -76,16 +76,16 @@ class Characterize:
     
     @property
     def results(self) -> Dict:
-        """Results from the calibration.
+        """Results from the characterization.
         
         Returns:
-            Dict: calibration results for each qubit.
+            Dict: characterization results for each qubit.
         """
         return self._results
     
     @property
     def subspace(self) -> str:
-        """Subspace of the gate being calibrated.
+        """Subspace of the gate being characterized.
 
         Returns:
             str: gate subspace.
@@ -126,7 +126,9 @@ class Characterize:
     def final(self) -> None:
         """Save and load the config after changing parameters."""
         for q in self._qubits:
-            if self._fit[q].fit_success:
+            if self._fit and self._fit[q].fit_success:
+                self.set_param(self._params[q], self._char_values[q])
+            elif self._char_values[q]:
                 self.set_param(self._params[q], self._char_values[q])
 
         self._config.save()

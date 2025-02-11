@@ -208,7 +208,7 @@ class Calibration:
                         self._param_sweep[q], self._sweep_results[q],
                         'o', c='blue', label=f'Meas, Q{q}'
                     )
-                    if self._fit[q].fit_success:
+                    if self._fit and self._fit[q].fit_success:
                         x = np.linspace(
                             self._param_sweep[q][0],
                             self._param_sweep[q][-1], 
@@ -221,6 +221,12 @@ class Calibration:
                         ax.axvline(
                             self._cal_values[q],  
                             ls='--', c='k', label='Fit value'
+                        )
+
+                    elif self._cal_values:
+                        ax.axvline(
+                            self._cal_values[q],  
+                            ls='--', c='k', label='Optimal value'
                         )
 
                     ax.legend(loc=0, fontsize=12)

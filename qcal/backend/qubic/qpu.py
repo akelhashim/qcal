@@ -181,14 +181,6 @@ class QubicQPU(QPU):
         self._runner = rpc_client.CircuitRunnerClient(
             ip=rpc_ip_address, port=port
         )
-        self._jobman = job_manager.JobManager(
-            self._fpga_config,
-            self._channel_config,
-            self._runner,
-            self._qchip,
-            gmm_manager=self._gmm_manager
-        )
-        self._compiled_program = None
 
         # Overwrite qubit and readout frequencies:
         for q in self._config.qubits:
@@ -201,6 +193,24 @@ class QubicQPU(QPU):
             self._qchip.qubits[f'Q{q}'].readfreq = (
                 self._config[f'readout/{q}/freq']
             )
+            self._channel_config[f'Q{q}.qdrv'].elem_params['interp_ratio'] = (
+                self._config[f'hardware/interpolation_ratio/qdrv']
+            )
+            self._channel_config[f'Q{q}.rdrv'].elem_params['interp_ratio'] = (
+                self._config[f'hardware/interpolation_ratio/rdrv']
+            )
+            self._channel_config[f'Q{q}.rdlo'].elem_params['interp_ratio'] = (
+                self._config[f'hardware/interpolation_ratio/rdlo']
+            )
+
+        self._jobman = job_manager.JobManager(
+            self._fpga_config,
+            self._channel_config,
+            self._runner,
+            self._qchip,
+            gmm_manager=self._gmm_manager
+        )
+        self._compiled_program = None 
 
     @property
     def fpga_config(self):

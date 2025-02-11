@@ -91,6 +91,7 @@ def draw_circuit(circuit: Circuit, show: bool = True):
     gate_names = []
     marker_colors = []
     barrier_locs = []
+    qnode_text = defaultdict(lambda: False, {})
     n_barriers = 0
     for c, cycle in enumerate(circuit.cycles):
         if cycle.is_barrier:
@@ -103,18 +104,31 @@ def draw_circuit(circuit: Circuit, show: bool = True):
                     for q in gate.qubits:
                         node_x.append(c)
                         node_y.append(circuit.qubits.index(q))
+                    text = qnode_text[
+                        f'{gate.name}{gate.subspace}:{gate.qubits}'
+                    ]
+                    if not text:
+                        text = format_gate_text(gate)
+                        qnode_text[
+                            f'{gate.name}{gate.subspace}:{gate.qubits}'
+                        ] = text
                     node_text.extend(
-                        [format_gate_text(gate)] * len(gate.qubits)
+                        [text] * len(gate.qubits)
                     )
                     node_symbols.extend(
                         [symbol_map[gate.name][0]] * len(gate.qubits)
                     )
-                    gate_names.extend(
-                        ['M'] * len(gate.qubits) 
-                        if gate.name in ('Meas', 'MCM') else (
-                            [gate.name] * len(gate.qubits) 
-                            if len(gate.name) < 3 
-                            else [gate.name[:3]] * len(gate.qubits) 
+                    gate_names.append(
+                        dict(
+                            x=c, 
+                            y=circuit.qubits.index(q), 
+                            text='M' if gate.name in 
+                                ('Meas', 'MCM') else (
+                                    gate.name if len(gate.name) < 3 
+                                    else gate.name[:3]
+                                ),
+                            font=dict(color='black', size=13),
+                            showarrow=False
                         )
                     )
                     marker_colors.extend(
@@ -124,11 +138,24 @@ def draw_circuit(circuit: Circuit, show: bool = True):
                     for q in gate.qubits:
                         node_x.append(c)
                         node_y.append(circuit.qubits.index(q))
-                    node_text.extend([format_gate_text(gate)]*2)
+                    text = qnode_text[
+                        f'{gate.name}{gate.subspace}:{gate.qubits}'
+                    ]
+                    if not text:
+                        text = format_gate_text(gate)
+                        qnode_text[
+                            f'{gate.name}{gate.subspace}:{gate.qubits}'
+                        ] = text
+                    node_text.extend([text] * 2)
                     node_symbols.extend(symbol_map[gate.name])
-                    gate_names.extend(
-                        # [gate.name if len(gate.name) < 3 else gate.name[0]]*2
-                        ['', '']
+                    gate_names.append(
+                        dict(
+                            x=c, 
+                            y=circuit.qubits.index(q), 
+                            text='',
+                            font=dict(color='black', size=13),
+                            showarrow=False
+                        ),
                     )
                     marker_colors.extend(['white', 'white'])
 
@@ -149,8 +176,6 @@ def draw_circuit(circuit: Circuit, show: bool = True):
     node_trace.text = node_text
 
     edge_traces = []
-    # q0 = circuit.qubits[0]
-    # for i in range(q0, circuit.circuit_width + q0):
     for i, q in enumerate(circuit.qubits):
         edge_x = []
         for j in range(1, circuit.circuit_depth):
@@ -185,6 +210,15 @@ def draw_circuit(circuit: Circuit, show: bool = True):
                         mode='lines'
                         )
                     )
+    
+    gate_names.append(
+        dict(
+            text="Quantum Circuit",
+            showarrow=False,
+            xref="paper", yref="paper",
+            x=-0.001, y=1.05
+        )
+    )
 
     fig = go.Figure(
         data= edge_traces + [node_trace],
@@ -194,31 +228,21 @@ def draw_circuit(circuit: Circuit, show: bool = True):
         showlegend=False,
         hovermode='closest',
         margin=dict(b=20,l=10,r=5,t=50),
-        annotations=[ dict(
-            text="Quantum Circuit",
-            showarrow=False,
-            xref="paper", yref="paper",
-            x=-0.001, y=1.05) ],
+        annotations=gate_names,
         xaxis=dict(tick0=0, dtick=1, showgrid=False, zeroline=False, 
                    showticklabels=True),
         yaxis=dict(tickmode='array', 
                    tickvals=[q for q in range(len(circuit.qubits))],
-                   ticktext=circuit.qubits,#[str(q) for q in ] 
+                   ticktext=circuit.qubits,
                    showgrid=False, zeroline=False, showticklabels=True))
     )
-    for x, y, name in zip(node_x, node_y, gate_names):
-        fig.add_annotation(
-            font=dict(color='black', size=13),
-            x=x, y=y,
-            text=name,
-            showarrow=False
-        )
+
     fig['layout']['yaxis']['autorange'] = "reversed"
     for loc in barrier_locs:
         fig.add_vline(x=loc, line_width=3,
                       line_dash="dash", line_color="black")
 
-    fig.update_xaxes(range=[-0.75, circuit.circuit_depth + 0.75])
+    fig.update_xaxes(range=[-0.75, circuit.circuit_depth - 0.5])
     # fig.update_yaxes(range=[-2, circuit.circuit_width + 2])
     fig.update_layout(
         autosize=False,

@@ -11,8 +11,9 @@ used to store other useful information about the circuits, enabling fast and
 easy sorting of circuits by arbitrary variables.
 
 Basic example useage:
-
-    cs = CircuitSet([list of circuits])
+```    
+cs = CircuitSet([list of circuits])
+```
 """
 from __future__ import annotations
 
