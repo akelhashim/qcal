@@ -574,6 +574,7 @@ def analyze_x90(
         logger.warning(' Unable to import pyRPE!')
 
     target_x = np.pi / 2
+    eps = 1e-8  # Small additive factor to ensure we do not divide by zero
 
     direct_cos_circs = {
         d: make_x90_cos_circ(d, qubits) for d in circuit_depths
@@ -602,10 +603,10 @@ def analyze_x90(
             (int(direct_sin_counts['1']), int(direct_sin_counts['0']))
         )
         p_I = int(direct_cos_counts['0']) / (
-            int(direct_cos_counts['0']) + int(direct_cos_counts['1'])
+            int(direct_cos_counts['0']) + int(direct_cos_counts['1']) + eps
         )
         p_Q = int(direct_sin_counts['1']) / (
-            int(direct_sin_counts['0']) + int(direct_sin_counts['1'])
+            int(direct_sin_counts['0']) + int(direct_sin_counts['1']) + eps
         )
         signal['direct'].append(1 - 2 * p_I + 1j - 2j * p_Q)
     analysis = RobustPhaseEstimation(experiment)
@@ -705,6 +706,7 @@ def analyze_cz(
 
     target_zz = -np.pi/2
     target_iz = target_zi = np.pi/2
+    eps = 1e-8  # Small additive factor to ensure we do not divide by zero
 
     state_pairs = [(0, 1), (2, 3), (3, 1)]
     state_pair_lookup = {
@@ -759,11 +761,11 @@ def analyze_cz(
             )
             p_I = int(dataset[cos_dict[state_pair][d]][cos_plus]) / (
                 int(dataset[cos_dict[state_pair][d]][cos_plus]) + 
-                int(dataset[cos_dict[state_pair][d]][cos_minus])
+                int(dataset[cos_dict[state_pair][d]][cos_minus]) + eps
             )
             p_Q = int(dataset[sin_dict[state_pair][d]][sin_plus]) / (
                 int(dataset[sin_dict[state_pair][d]][sin_plus]) + 
-                int(dataset[sin_dict[state_pair][d]][sin_minus])
+                int(dataset[sin_dict[state_pair][d]][sin_minus]) + eps
             )
             signal[state_pair].append(1 - 2 * p_I + 1j - 2j * p_Q)
 
@@ -890,6 +892,7 @@ def RPE(qpu:             QPU,
         qubit_labels:    Iterable[int],
         gate:            str,
         circuit_depths:  List[int] = [1, 2, 4, 8, 16, 32, 64, 128, 256],
+        loss_angle:      str | List[str] | None = None,
         **kwargs
     ) -> Callable:
     """Robust Phase Estimation.
@@ -905,6 +908,10 @@ def RPE(qpu:             QPU,
         circuit_depths (List[int], optional): a list of positive integers 
             specifying the circuit depths. Defaults to ```[1, 2, 4, 8, 16, 32, 
             64, 128, 256]```.
+        loss_angle (str | list[str] | None, optional): a string or list of 
+            strings specifying which angle to use for calculating the loss from 
+            RPE. Defaults to None. If None, all angles are used. For example, 
+            for the X90 gate, the possible options are `'X'` or `'Z'`.
 
     Returns:
         Callable: RPE class instance.
@@ -918,6 +925,7 @@ def RPE(qpu:             QPU,
                 qubit_labels:    Iterable[int],
                 gate:            str,
                 circuit_depths:  List[int] = [1, 2, 4, 8, 16, 32, 64, 128, 256],
+                loss_angle:      str | None = None,
                 **kwargs
             ) -> None:
             from qcal.interface.pygsti.transpiler import PyGSTiTranspiler
@@ -938,6 +946,7 @@ def RPE(qpu:             QPU,
             self._qubit_labels = qubit_labels
             self._gate = gate.upper()
             self._circuit_depths = circuit_depths
+            self._loss_angle = loss_angle
 
             qubits = []
             for q in qubit_labels:
@@ -1015,6 +1024,34 @@ def RPE(qpu:             QPU,
                 Dict: last good index.
             """
             return self._last_good_idx
+        
+        @property
+        def loss(self) -> Dict:
+            """Loss for each qubit using the most trusted RPE estimates.
+
+            This property can be used for parameter optimization.
+
+            Returns:
+                Dict: loss for each qubit.
+            """
+            if self._loss_angle is None:
+                loss_angle = list(
+                    self._angle_errors[self._qubit_labels[0]].keys()
+                )
+            else:
+                loss_angle = (
+                    self._loss_angle if isinstance(self._loss_angle, list) else
+                    [self._loss_angle]
+                )
+            loss = {}
+            for ql, errors in self._trusted_err_est.items():
+                vals = []
+                for err, val in errors.items():
+                    if err in loss_angle:
+                        vals.append(abs(val['val']))
+                loss[ql] = vals
+
+            return loss
         
         @property
         def signal(self) -> Dict:
@@ -1186,9 +1223,9 @@ def RPE(qpu:             QPU,
                             label='Last good depth',
                         )
 
-                        maxval = np.abs(np.concatenate(
+                        maxval = np.nanmax(np.abs(np.concatenate(
                             [err for err in self._angle_errors[ql].values()]
-                        )).max()
+                        )))
                         ax.set_ylim((-1.1 * maxval, 1.1 * maxval))
 
                         ax.set_title(f'Q{ql}', fontsize=20)
@@ -1292,9 +1329,10 @@ def RPE(qpu:             QPU,
             self.final()
 
     return RPE(
-        config,
-        qubit_labels,
-        gate,   
-        circuit_depths,
+        config=config,
+        qubit_labels=qubit_labels,
+        gate=gate,   
+        circuit_depths=circuit_depths,
+        loss_angle=loss_angle,
         **kwargs
     )
