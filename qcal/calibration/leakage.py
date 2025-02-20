@@ -85,6 +85,7 @@ def Leakage(
             self._param_sweep = param_sweep
 
             self._qubits = list(self._params.keys())
+            self._loss = {}
 
         @property
         def circuit(self) -> Circuit:
@@ -112,6 +113,17 @@ def Leakage(
                 Dict: dictionary mapping leakage qubits to parameter sweeps.
             """
             return self._param_sweep
+    
+        @property
+        def loss(self) -> Dict:
+            """Loss for each qubit in terms of the |2> state population.
+
+            This property can be used for parameter optimization.
+
+            Returns:
+                Dict: loss for each qubit.
+            """
+            return self._loss
         
         def generate_circuits(self):
             """Generate a CircuitSet that sweeps over all param values."""
@@ -155,6 +167,7 @@ def Leakage(
                 self._cal_values[ql] = self._param_sweep[ql][
                     np.array(pop2).argmin()
                 ]
+                self._loss[ql] = np.array([np.array(pop2).min()])
 
         def save(self) -> None:
             """Save all circuits and data."""
