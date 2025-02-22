@@ -197,20 +197,20 @@ def CB(qpu:                  QPU,
             )
 
             if self._include_ref_cycle:
-                self._circuits.append(
-                    tq.make_cb(
+               self._circuits += tq.make_cb(
                         cycles=tq.Cycle({}),
                         n_random_cycles=self._circuit_depths,
                         n_circuits=self._n_circuits,
                         n_decays=self._n_decays, 
                         targeted_errors=self._targeted_errors, 
-                        twirl=tq.Twirl('P', self._circuits.labels),  
+                        twirl=self._twirl,  
                         compiled_pauli=self._compiled_pauli
                     )
-                )
 
             if self._include_rcal:
-                self._circuits.append(tq.make_rcal(self._circuits.labels))
+                self._circuits += tq.make_rcal(self._circuits.labels)
+
+            self._circuits.shuffle()
 
         def analyze(self):
             """Analyze the CB results."""
