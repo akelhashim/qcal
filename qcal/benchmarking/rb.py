@@ -465,9 +465,7 @@ def SRB(qpu:             QPU,
             )
 
             if self._include_rcal:
-                self._circuits += tq.make_rcal(self._circuits.labels)
-
-            self._circuits.shuffle()
+                self._circuits.append(tq.make_rcal(self._circuits.labels))
 
         def analyze(self):
             """Analyze the SRB results."""
@@ -559,13 +557,7 @@ def SRB(qpu:             QPU,
             if settings.Settings.save_data:
                 fig.savefig(
                     self._data_manager._save_path + 'SRB_infidelities.png', 
-                    dpi=600
-                )
-                fig.savefig(
-                    self._data_manager._save_path + 'SRB_infidelities.pdf'
-                )
-                fig.savefig(
-                    self._data_manager._save_path + 'SRB_infidelities.svg'
+                    dpi=300
                 )
             plt.show()
 
