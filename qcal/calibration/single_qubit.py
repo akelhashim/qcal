@@ -12,7 +12,6 @@ from qcal.config import Config
 from qcal.fitting.fit import (
     FitAbsoluteValue, FitCosine, FitDecayingCosine, FitParabola
 )
-from qcal.managers.classification_manager import ClassificationManager
 from qcal.math.utils import round_to_order_error
 from qcal.gate.single_qubit import Idle, VirtualZ, X, X90
 from qcal.plotting.utils import calculate_nrows_ncols

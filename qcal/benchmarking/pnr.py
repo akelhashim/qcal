@@ -133,7 +133,9 @@ def KNR(qpu:                  QPU,
             )
 
             if self._include_rcal:
-                self._circuits.append(tq.make_rcal(self._circuits.labels))
+                self._circuits += tq.make_rcal(self._circuits.labels)
+
+            self._circuits.shuffle()
 
         def analyze(self):
             """Analyze the KNR results."""

@@ -329,7 +329,7 @@ def ReadoutCalibration(
                             axis='both', style='sci', scilimits=(0,0)
                         )
                         ax.text(
-                            0.05, 0.9, f'Q{q}', size=15, 
+                            0.05, 0.9, f'R{q}', size=15, 
                             transform=ax.transAxes
                         )
 
@@ -580,7 +580,10 @@ def Fidelity(
                             self._cal_values[q],  
                             ls='--', c='k', label='Max fid.'
                         )
-
+                        ax.text(
+                            0.05, 0.9, f'R{q}', size=15, 
+                            transform=ax.transAxes
+                        )
                         ax.legend(loc=0, fontsize=12)
 
                     else:
