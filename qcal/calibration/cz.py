@@ -1949,18 +1949,32 @@ def LocalPhases(
                     )
                 )
 
-                if (self._fit[pair]['X_C0'].fit_success and
-                    self._fit[pair]['X_C1'].fit_success):
+                if self._fit[pair]['X_C0'].fit_success:
                     _, freq, phase, _ = self._fit[pair]['X_C0'].fit_params
                     self._phase_C0[pair] = wrap_phase(
                         -phase / (2 * np.pi * freq)
                     )
 
+                if self._fit[pair]['X_C1'].fit_success:
                     _, freq, phase, _ = self._fit[pair]['X_C1'].fit_params
                     self._phase_C1[pair] = wrap_phase(
                         -phase / (2 * np.pi * freq)
                     )
 
+                if self._fit[pair]['X_T0'].fit_success:
+                    _, freq, phase, _ = self._fit[pair]['X_T0'].fit_params
+                    self._phase_T0[pair] = wrap_phase(
+                        -phase / (2 * np.pi * freq)
+                    )
+
+                if self._fit[pair]['X_T1'].fit_success:
+                    _, freq, phase, _ = self._fit[pair]['X_T1'].fit_params
+                    self._phase_T1[pair] = wrap_phase(
+                        -phase / (2 * np.pi * freq)
+                    )
+
+                if (self._fit[pair]['X_C0'].fit_success and
+                    self._fit[pair]['X_C1'].fit_success):
                     newvalue = np.mean([
                         self._phase_C0[pair], self._phase_C1[pair]
                     ])
@@ -1968,15 +1982,6 @@ def LocalPhases(
 
                 if (self._fit[pair]['X_T0'].fit_success and
                     self._fit[pair]['X_T1'].fit_success):
-                    _, freq, phase, _ = self._fit[pair]['X_T0'].fit_params
-                    self._phase_T0[pair] = wrap_phase(
-                        -phase / (2 * np.pi * freq)
-                    )
-
-                    _, freq, phase, _ = self._fit[pair]['X_T1'].fit_params
-                    self._phase_T1[pair] = wrap_phase(
-                        -phase / (2 * np.pi * freq)
-                    )
 
                     newvalue = np.mean([
                         self._phase_T0[pair], self._phase_T1[pair]
