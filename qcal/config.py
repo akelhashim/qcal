@@ -18,6 +18,7 @@ import logging
 import pandas as pd
 import yaml
 
+from collections import defaultdict
 from typing import Any, Dict, List, Tuple
 
 logger = logging.getLogger(__name__)
@@ -112,10 +113,10 @@ class Config:
                 )
             except Exception:
                 logger.warning(' No configuration file was provided.')
-                self._parameters = {}
+                self._parameters = defaultdict(lambda: None, {})
 
     def __call__(self) -> Dict:
-        return self._parameters
+        return dict(self._parameters)
 
     def __copy__(self, deep_copy=False) -> Dict:
         """Copy the config dictionary.
@@ -162,16 +163,16 @@ class Config:
     #     return self._parameters.__iter__()
 
     def __len__(self) -> int:
-        return len(self._parameters)
+        return len(dict(self._parameters))
 
     # def __next__(self):
     #     return self._parameters.__next__()
 
     def __repr__(self) -> str:
-        return repr(self._parameters)
+        return repr(dict(self._parameters))
     
     def __str__(self) -> str:
-        return str(self._parameters)
+        return str(dict(self._parameters))
     
     @property
     def native_gates(self) -> Dict:
@@ -246,7 +247,7 @@ class Config:
         Returns:
             Dict: config parameters.
         """
-        return self._parameters
+        return dict(self._parameters)
     
     @property
     def readout(self) -> pd.DataFrame:
@@ -410,7 +411,12 @@ class Config:
 
         with open(filename, "r") as config:
             try:
-                self._parameters = yaml.load(config, Loader=yaml.FullLoader)
+                self._parameters = defaultdict(
+                    lambda: None,
+                    yaml.load(
+                        config, Loader=yaml.FullLoader
+                    )
+                )
             except yaml.YAMLError as exc:
                 logger.error(exc)
 
@@ -497,7 +503,7 @@ class Config:
                 encoding='utf8'
             ) as yaml_file:
                 yaml.dump(
-                    self._parameters, 
+                    dict(self._parameters), 
                     yaml_file, 
                     default_flow_style=False, 
                     allow_unicode=True,
