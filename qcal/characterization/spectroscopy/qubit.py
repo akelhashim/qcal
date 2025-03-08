@@ -24,16 +24,19 @@ from IPython.display import clear_output
 from numpy.typing import NDArray
 from plotly.subplots import make_subplots
 from typing import Callable, Dict
+from scipy.ndimage import gaussian_filter1d
+from scipy.signal import find_peaks
 
 logger = logging.getLogger(__name__)
 
 
 def TwoTone(             
-        qpu:    QPU,
-        config: Config,
-        qubits: Iterable[int],
-        freqs:  NDArray | Dict[int, NDArray],
-        params: Dict | None = None,
+        qpu:     QPU,
+        config:  Config,
+        qubits:  Iterable[int],
+        freqs:   NDArray | Dict[int, NDArray],
+        n_gates: int = 10,
+        params:  Dict | None = None,
         **kwargs
     ) -> Callable:
     """Two-Tone Spectroscopy.
@@ -44,6 +47,8 @@ def TwoTone(
         qubits (List[int] | Tuple[int]): qubits to measure.
         freqs (NDArray | Dict[int, NDArray]): frequencies to sweep over for each
             qubit.
+        n_gates(int): number of X90 gates to use to drive the qubit. Defaults to
+            10.
         params (Dict | None, optional): dictionary mapping qubit label to sweep
             parameter in the config. Defaults to None.
 
@@ -54,10 +59,11 @@ def TwoTone(
     class TwoTone(qpu, Characterize):
 
         def __init__(self, 
-                config: Config,
-                qubits: Iterable[int],
-                freqs:  NDArray | Dict[int, NDArray],
-                params: Dict | None = None,
+                config:  Config,
+                qubits:  Iterable[int],
+                freqs:   NDArray | Dict[int, NDArray],
+                n_gates: int = 10,
+                params:  Dict | None = None,
                 **kwargs
             ) -> None:
             """
@@ -67,6 +73,7 @@ def TwoTone(
             Characterize.__init__(self, config)
 
             self._qubits = qubits
+            self._n_gates = n_gates
 
             if not isinstance(freqs, dict):
                 self._freqs = {q: freqs for q in qubits}
@@ -125,7 +132,7 @@ def TwoTone(
             logger.info(' Generating circuits...')
 
             circuit = Circuit(
-                [Cycle({X90(q) for q in self._qubits})] * 2
+                [Cycle({X90(q) for q in self._qubits})] * self._n_gates
             )
             circuit.append(Cycle({Meas(q) for q in self._qubits}))
 
@@ -161,18 +168,31 @@ def TwoTone(
 
                 # Fit the phase by finding the inflection point
                 try:
-                    sigma = 10 
-                    inflection_idxs = find_inflection_points(
-                        self._freqs[q], self._phase[q], sigma=sigma
-                    )
-                    while len(inflection_idxs) > 1:
-                        sigma += 2
-                        inflection_idxs = find_inflection_points(
-                            self._freqs[q], self._phase[q], sigma=sigma
-                        )
-                        if sigma == 50:
-                            raise Exception("Fitting error!")
-                    self._char_values[q] = self._freqs[q][inflection_idxs][0]
+                    x = 20 * np.log10(self._mag[q])
+                    x_s = gaussian_filter1d(x, sigma=5)
+                    threshold = x.mean() + (x[x.argmin()] - x.mean()) / 2
+                    peaks, _ = find_peaks(-x_s, height=-threshold)
+                    if len(peaks) == 0:
+                        self._char_values[q] = self._freqs[q][
+                            np.argmin(self._mag[q])
+                        ]
+                    elif len(peaks) == 1:
+                        self._char_values[q] = self._freqs[q][peaks][0]
+                    else:
+                        raise Exception("Fitting error! Too many peaks.")
+
+                    # sigma = 10 
+                    # inflection_idxs = find_inflection_points(
+                    #     self._freqs[q], self._phase[q], sigma=sigma
+                    # )
+                    # while len(inflection_idxs) > 1:
+                    #     sigma += 2
+                    #     inflection_idxs = find_inflection_points(
+                    #         self._freqs[q], self._phase[q], sigma=sigma
+                    #     )
+                    #     if sigma == 50:
+                    #         raise Exception("Fitting error!")
+                    # self._char_values[q] = self._freqs[q][inflection_idxs][0]
                 
                 except Exception as e:
                     self._char_values[q] = None
@@ -214,7 +234,7 @@ def TwoTone(
                     fig.add_trace(
                         go.Scatter(
                             x=self._freqs[q], 
-                            y=20 * np.log(self._mag[q]), 
+                            y=20 * np.log10(self._mag[q]), 
                             name=f'Q{q}',
                             line=dict(width=4, color=colors[i + 1]),
                         ),
@@ -272,7 +292,7 @@ def TwoTone(
                     )
                     ax[1].plot(
                         self._freqs[q], 
-                        20 * np.log(self._mag[q]), 
+                        20 * np.log10(self._mag[q]), 
                         'b-',
                         label=f'Meas, Q{q}'
                     )
@@ -344,6 +364,7 @@ def TwoTone(
         config=config,
         qubits=qubits,
         freqs=freqs,
+        n_gates=n_gates,
         params=params,
         **kwargs
     )

@@ -9,7 +9,7 @@ from qcal.config import Config
 from qcal.fitting.fit import FitLinear
 from qcal.gate.single_qubit import Meas
 from qcal.qpu.qpu import QPU
-from qcal.characterization.spectroscopy.utils import find_inflection_points
+# from qcal.characterization.spectroscopy.utils import find_inflection_points
 from qcal.units import GHz
 
 import logging
@@ -18,11 +18,14 @@ import numpy as np
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
+import seaborn as sns
 
 from collections.abc import Iterable
 from IPython.display import clear_output
 from numpy.typing import NDArray
 from plotly.subplots import make_subplots
+from scipy.ndimage import gaussian_filter1d
+from scipy.signal import find_peaks
 from typing import Callable, Dict
 
 logger = logging.getLogger(__name__)
@@ -207,161 +210,163 @@ def Punchout(
             if settings.Settings.save_data:
                 qpu.save(self)
 
-        def plot(self, interactive=False) -> None:
-            """Plot the sweep results.
+        # def plot(self, interactive=False) -> None:
+            # """Plot the sweep results.
 
-            Args:
-                interactive (bool, optional): whether to plot the 2D sweep 
-                    using interactive plotting with Plotly. Defaults to False.
-            """
+            # Args:
+            #     interactive (bool, optional): whether to plot the 2D sweep 
+            #         using interactive plotting with Plotly. Defaults to False.
+            # """
+        def plot(self) -> None:
+            """Plot the sweep results."""
             nrows, ncols = len(self._qubits), 2
-            if interactive:  # TODO: colorbar bug when ploting multiple rows
-                fig = make_subplots(
-                    rows=nrows, cols=ncols, start_cell="top-left"
-                )
-                for i, q in enumerate(self._qubits):
-                    fig.add_trace(
-                        go.Heatmap(
-                            z=20 * np.log10(self._mag[q]),
-                            x=np.around(self._freqs[q] / GHz, 3),
-                            y=np.around(self._amps[q] , 3),
-                            colorscale='Viridis',
-                            colorbar=dict(title="Log(mag) (dB)"),
-                            colorbar_x=0.45
-                        ),
-                        row=i+1, 
-                        col=1
-                    )
+            # if interactive:  # TODO: colorbar bug when ploting multiple rows
+            #     fig = make_subplots(
+            #         rows=nrows, cols=ncols, start_cell="top-left"
+            #     )
+            #     for i, q in enumerate(self._qubits):
+            #         fig.add_trace(
+            #             go.Heatmap(
+            #                 z=20 * np.log10(self._mag[q]),
+            #                 x=np.around(self._freqs[q] / GHz, 3),
+            #                 y=np.around(self._amps[q] , 3),
+            #                 colorscale='Viridis',
+            #                 colorbar=dict(title="Log(mag) (dB)"),
+            #                 colorbar_x=0.45
+            #             ),
+            #             row=i+1, 
+            #             col=1
+            #         )
 
-                    fig.add_trace(
-                        go.Heatmap(
-                            z=self._phase[q],
-                            x=np.around(self._freqs[q] / GHz, 3),
-                            y=np.around(self._amps[q] , 3),
-                            colorscale='Viridis',
-                            colorbar=dict(title="Unwrapped Phase (rad.)")
-                        ),
-                        row=i+1, 
-                        col=2
-                    )
+            #         fig.add_trace(
+            #             go.Heatmap(
+            #                 z=self._phase[q],
+            #                 x=np.around(self._freqs[q] / GHz, 3),
+            #                 y=np.around(self._amps[q] , 3),
+            #                 colorscale='Viridis',
+            #                 colorbar=dict(title="Unwrapped Phase (rad.)")
+            #             ),
+            #             row=i+1, 
+            #             col=2
+            #         )
 
-                    fig.update_layout(
-                        height=400 * len(self._qubits),
-                        title_text="Resonator Punchout"
-                    )
-                    fig['layout']['xaxis']['title'] = 'Frequency (GHz)'
-                    fig['layout']['xaxis2']['title'] = 'Frequency (GHz)'
-                    fig['layout']['yaxis']['title'] = 'Amplitude (a.u.)'
-                    fig['layout']['yaxis2']['title'] = 'Amplitude (a.u.)'
+            #         fig.update_layout(
+            #             height=400 * len(self._qubits),
+            #             title_text="Resonator Punchout"
+            #         )
+            #         fig['layout']['xaxis']['title'] = 'Frequency (GHz)'
+            #         fig['layout']['xaxis2']['title'] = 'Frequency (GHz)'
+            #         fig['layout']['yaxis']['title'] = 'Amplitude (a.u.)'
+            #         fig['layout']['yaxis2']['title'] = 'Amplitude (a.u.)'
 
-                    save_properties = {
-                        'toImageButtonOptions': {
-                            'format': 'png', # one of png, svg, jpeg, webp
-                            'filename': 'resonator_punchout',
-                            'height': 400 * len(self._qubits),
-                            'width': 1000,
-                            'scale': 10 # Multiply all sizes by this factor
-                        }
-                    }
-                    fig.show(config=save_properties)
+            #         save_properties = {
+            #             'toImageButtonOptions': {
+            #                 'format': 'png', # one of png, svg, jpeg, webp
+            #                 'filename': 'resonator_punchout',
+            #                 'height': 400 * len(self._qubits),
+            #                 'width': 1000,
+            #                 'scale': 10 # Multiply all sizes by this factor
+            #             }
+            #         }
+            #         fig.show(config=save_properties)
             
-            else:
-                import seaborn as sns
-                figsize = (5 * ncols, 4 * nrows)
-                fig, axes = plt.subplots(
-                    nrows, ncols, figsize=figsize, layout='constrained'
+            # else:
+            
+            figsize = (5 * ncols, 4 * nrows)
+            fig, axes = plt.subplots(
+                nrows, ncols, figsize=figsize, layout='constrained'
+            )
+
+            for i, q in enumerate(self._qubits):
+                if len(self._qubits) == 1:
+                    ax = axes
+                else:
+                    ax = axes[i]
+            
+                p = sns.heatmap(
+                    20 * np.log10(self._mag[q]), 
+                    cmap='viridis', 
+                    cbar=True,
+                    ax=ax[0],
                 )
+                xtick_values = [
+                    int(tick.get_text()) for tick in ax[0].get_xticklabels()
+                ]
+                ytick_values = [
+                    int(tick.get_text()) for tick in ax[0].get_yticklabels()
+                ]
+                cbar = p.collections[0].colorbar
+                cbar.ax.set_ylabel("Log(Mag) (dB)", fontsize=10)
+                cbar.ax.tick_params(labelsize=10)
+                # ax[0].set_title(f'R{q}', fontsize=12)
+                ax[0].text(
+                        0.05, 0.9, f'R{q}', size=12, 
+                        transform=ax[0].transAxes
+                    )
+                ax[0].set_xlabel('Frequency (GHz)', fontsize=12)
+                ax[0].set_ylabel('Amplitude (a.u.)', fontsize=12)
+                ax[0].set_xticklabels(
+                    np.around(self._freqs[q][xtick_values] / GHz, 3)
+                )
+                ax[0].set_yticklabels(
+                    np.around(self._amps[q][ytick_values], 3)
+                )
+                ax[0].tick_params(
+                    axis='x', which='major', labelsize=10, labelrotation=45
+                )
+                ax[0].tick_params(
+                    axis='y', which='major', labelsize=10, labelrotation=0
+                )
+                ax[0].invert_yaxis()
 
-                for i, q in enumerate(self._qubits):
-                    if len(self._qubits) == 1:
-                        ax = axes
-                    else:
-                        ax = axes[i]
-                
-                    p = sns.heatmap(
-                        20 * np.log10(self._mag[q]), 
-                        cmap='viridis', 
-                        cbar=True,
-                        ax=ax[0],
+                p = sns.heatmap(
+                    self._phase[q], 
+                    cmap='viridis', 
+                    cbar=True,
+                    ax=ax[1],
+                )
+                xtick_values = [
+                    int(tick.get_text()) for tick in ax[1].get_xticklabels()
+                ]
+                ytick_values = [
+                    int(tick.get_text()) for tick in ax[1].get_yticklabels()
+                ]
+                cbar = p.collections[0].colorbar
+                cbar.ax.set_ylabel("Unwrapped Phase (rad.)", fontsize=10)
+                cbar.ax.tick_params(labelsize=10)
+                # ax[1].set_title(f'R{q}', fontsize=12)
+                ax[1].text(
+                        0.05, 0.9, f'R{q}', size=12, 
+                        transform=ax[1].transAxes
                     )
-                    xtick_values = [
-                        int(tick.get_text()) for tick in ax[0].get_xticklabels()
-                    ]
-                    ytick_values = [
-                        int(tick.get_text()) for tick in ax[0].get_yticklabels()
-                    ]
-                    cbar = p.collections[0].colorbar
-                    cbar.ax.set_ylabel("Log(Mag) (dB)", fontsize=10)
-                    cbar.ax.tick_params(labelsize=10)
-                    # ax[0].set_title(f'R{q}', fontsize=12)
-                    ax[0].text(
-                            0.05, 0.9, f'R{q}', size=12, 
-                            transform=ax.transAxes
-                        )
-                    ax[0].set_xlabel('Frequency (GHz)', fontsize=12)
-                    ax[0].set_ylabel('Amplitude (a.u.)', fontsize=12)
-                    ax[0].set_xticklabels(
-                        np.around(self._freqs[q][xtick_values] / GHz, 3)
-                    )
-                    ax[0].set_yticklabels(
-                        np.around(self._amps[q][ytick_values], 3)
-                    )
-                    ax[0].tick_params(
-                        axis='x', which='major', labelsize=10, labelrotation=45
-                    )
-                    ax[0].tick_params(
-                        axis='y', which='major', labelsize=10, labelrotation=0
-                    )
-                    ax[0].invert_yaxis()
+                ax[1].set_xlabel('Frequency (GHz)', fontsize=12)
+                ax[1].set_ylabel('Amplitude (a.u.)', fontsize=12)
+                ax[1].set_xticklabels(
+                    np.around(self._freqs[q][xtick_values] / GHz, 3)
+                )
+                ax[1].set_yticklabels(
+                    np.around(self._amps[q][ytick_values], 3)
+                )
+                ax[1].tick_params(
+                    axis='x', which='major', labelsize=10, labelrotation=45
+                )
+                ax[1].tick_params(
+                    axis='y', which='major', labelsize=10, labelrotation=0
+                )
+                ax[1].invert_yaxis()
 
-                    p = sns.heatmap(
-                        self._phase[q], 
-                        cmap='viridis', 
-                        cbar=True,
-                        ax=ax[1],
-                    )
-                    xtick_values = [
-                        int(tick.get_text()) for tick in ax[1].get_xticklabels()
-                    ]
-                    ytick_values = [
-                        int(tick.get_text()) for tick in ax[1].get_yticklabels()
-                    ]
-                    cbar = p.collections[0].colorbar
-                    cbar.ax.set_ylabel("Unwrapped Phase (rad.)", fontsize=10)
-                    cbar.ax.tick_params(labelsize=10)
-                    # ax[1].set_title(f'R{q}', fontsize=12)
-                    ax[1].text(
-                            0.05, 0.9, f'R{q}', size=12, 
-                            transform=ax.transAxes
-                        )
-                    ax[1].set_xlabel('Frequency (GHz)', fontsize=12)
-                    ax[1].set_ylabel('Amplitude (a.u.)', fontsize=12)
-                    ax[1].set_xticklabels(
-                        np.around(self._freqs[q][xtick_values] / GHz, 3)
-                    )
-                    ax[1].set_yticklabels(
-                        np.around(self._amps[q][ytick_values], 3)
-                    )
-                    ax[1].tick_params(
-                        axis='x', which='major', labelsize=10, labelrotation=45
-                    )
-                    ax[1].tick_params(
-                        axis='y', which='major', labelsize=10, labelrotation=0
-                    )
-                    ax[1].invert_yaxis()
-
-                if settings.Settings.save_data:
-                    fig.savefig(
-                       self._data_manager._save_path + 'resonator_punchout.png', 
-                       dpi=600
-                    )
-                    fig.savefig(
-                        self._data_manager._save_path + 'resonator_punchout.pdf'
-                    )
-                    fig.savefig(
-                        self._data_manager._save_path + 'resonator_punchout.svg'
-                    )
-                plt.show()
+            if settings.Settings.save_data:
+                fig.savefig(
+                    self._data_manager._save_path + 'resonator_punchout.png', 
+                    dpi=600
+                )
+                fig.savefig(
+                    self._data_manager._save_path + 'resonator_punchout.pdf'
+                )
+                fig.savefig(
+                    self._data_manager._save_path + 'resonator_punchout.svg'
+                )
+            plt.show()
             
         def final(self) -> None:
             """Final calibration method."""
@@ -517,20 +522,33 @@ def Resonator(
                     self._iq[q] *= np.exp(-1j * self._freqs[q] * m)
                     self._phase[q] = np.unwrap(np.angle(self._iq[q]))
 
-                # Fit the phase by finding the inflection point
+                # Fit the phase by finding the minimum magnitude
                 try:
-                    sigma = 10 
-                    inflection_idxs = find_inflection_points(
-                        self._freqs[q], self._phase[q], sigma=sigma
-                    )
-                    while len(inflection_idxs) > 1:
-                        sigma += 2
-                        inflection_idxs = find_inflection_points(
-                            self._freqs[q], self._phase[q], sigma=sigma
-                        )
-                        if sigma == 50:
-                            raise Exception("Fitting error!")
-                    self._char_values[q] = self._freqs[q][inflection_idxs][0]
+                    x = 20 * np.log10(self._mag[q])
+                    x_s = gaussian_filter1d(x, sigma=3)
+                    threshold = x.mean() + (x[x.argmin()] - x.mean()) / 2
+                    peaks, _ = find_peaks(-x_s, height=-threshold)
+                    if len(peaks) == 0:
+                        self._char_values[q] = self._freqs[q][
+                            np.argmin(self._mag[q])
+                        ]
+                    elif len(peaks) == 1:
+                        self._char_values[q] = self._freqs[q][peaks][0]
+                    else:
+                        raise Exception("Fitting error! Too many peaks.")
+                    
+                    # sigma = 10 
+                    # inflection_idxs = find_inflection_points(
+                    #     self._freqs[q], self._phase[q], sigma=sigma
+                    # )
+                    # while len(inflection_idxs) > 1:
+                    #     sigma += 2
+                    #     inflection_idxs = find_inflection_points(
+                    #         self._freqs[q], self._phase[q], sigma=sigma
+                    #     )
+                    #     if sigma == 50:
+                    #         raise Exception("Fitting error!")
+                    # self._char_values[q] = self._freqs[q][inflection_idxs][0]
                 
                 except Exception as e:
                     self._char_values[q] = None
@@ -572,7 +590,7 @@ def Resonator(
                     fig.add_trace(
                         go.Scatter(
                             x=self._freqs[q], 
-                            y=20 * np.log(self._mag[q]), 
+                            y=20 * np.log10(self._mag[q]), 
                             name=f'R{q}',
                             line=dict(width=4, color=colors[i + 1]),
                         ),
@@ -630,7 +648,7 @@ def Resonator(
                     )
                     ax[1].plot(
                         self._freqs[q], 
-                        20 * np.log(self._mag[q]), 
+                        20 * np.log10(self._mag[q]), 
                         'b-',
                         label=f'Meas, R{q}'
                     )
