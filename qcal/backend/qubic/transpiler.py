@@ -72,6 +72,44 @@ def readout_time(config: Config, qubit: int) -> float:
     return time
 
 
+def initialize(config: Config, circuit: List, ) -> None:
+    """Initialize DC pulses at the beginning of a sequence.
+
+    Args:
+        config (Config): qcal Config object.
+        circuit (List):  qubic circuit.
+    """
+    for pulse in config['initialize']:
+        circuit.append(
+            {'name': 'pulse', 
+             'env': None, 
+             'freq': None, 
+             'amp': pulse['amp'],
+             'twidth': pulse['length'], 
+             'dest': pulse['channel']
+            }
+        )
+
+
+def deactivate(config: Config, circuit: List, ) -> None:
+    """Deactivate DC pulses at the end of a sequence.
+
+    Args:
+        config (Config): qcal Config object.
+        circuit (List):  qubic circuit.
+    """
+    for pulse in config['initialize']:
+        circuit.append(
+            {'name': 'pulse', 
+             'env': None, 
+             'freq': None, 
+             'amp': 0.,
+             'twidth': 0., 
+             'dest': pulse['channel']
+            }
+        )
+
+
 def add_reset(
        config:          Config, 
        qubits_or_reset: List | Tuple | Reset, 
@@ -146,8 +184,8 @@ def add_reset(
                      'cond_lhs': 1,
                      'func_id':  f'Q{q}.meas',
                      'scope':    [f'Q{q}'],
-                        'true':  reset_q_pulse,
-                        'false': []
+                     'true':     reset_q_pulse,
+                     'false':    []
                     },
                 )
 
@@ -794,6 +832,10 @@ def to_qubic(
             }
         ])
 
+    if config._parameters['initialize']:
+        initialize(config, qubic_circuit)
+        qubic_circuit.append({'name': 'barrier'})
+
     # Add reset to the beginning of the circuit
     add_reset(config, circuit.qubits, qubic_circuit, pulses)
 
@@ -825,6 +867,10 @@ def to_qubic(
             qubic_circuit.append(
                {'name': 'barrier', 'qubit': [f'Q{q}' for q in circuit.qubits]},
             )
+
+        if config._parameters['initialize']:
+            qubic_circuit.append({'name': 'barrier'})
+            deactivate(config, qubic_circuit)
 
     return qubic_circuit
 
