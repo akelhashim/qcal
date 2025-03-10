@@ -383,7 +383,7 @@ def draw_qpu(config: Config):
 
     node_x = []
     node_y = []
-    for i, node in enumerate(G.nodes()):
+    for node in sorted(G.nodes()):
         x, y = pos[node]
         node_x.append(x)
         node_y.append(y)
