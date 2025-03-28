@@ -150,7 +150,7 @@ class Calibration:
                                 self._params[q][i], self._cal_values[q][i]
                             )
                 else:
-                    if self._fit[q].fit_success:
+                    if self._fit[q].fit_success or self._cal_values[q]:
                         if (isinstance(self._params[q], (list, tuple)) and
                             isinstance(self._cal_values[q], (list, tuple))):
                             for param, val in zip(
@@ -223,7 +223,7 @@ class Calibration:
                             ls='--', c='k', label='Fit value'
                         )
 
-                    elif self._cal_values:
+                    elif self._cal_values[q]:
                         ax.axvline(
                             self._cal_values[q],  
                             ls='--', c='k', label='Optimal value'
