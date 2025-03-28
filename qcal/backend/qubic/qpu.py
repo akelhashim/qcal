@@ -48,6 +48,7 @@ class QubicQPU(QPU):
                 outputs:             List[str] = ['s11'],
                 hardware_vz_qubits:  List[str] = [],
                 measure_qubits:      List[str] | None = None,
+                circuit_for_loop:    bool = False,
                 reload_pulse:        bool = True,
                 reload_cmd:          bool = True,
                 reload_freq:         bool = True,
@@ -103,6 +104,8 @@ class QubicQPU(QPU):
                 for post-processing measurements. Defaults to None. This will
                 overwrite the measurement qubits listed in the measurement
                 objects. Example: ```measure_qubits = ['Q0', 'Q1', 'Q3']```.
+            circuit_for_loop (bool): loops over circuit partitions for circuits
+                with repeated structures. Defaults to False.
             reload_pulse (bool): reloads the stored pulses when compiling each
                 circuit. Defaults to True.
             reload_cmd (bool, optional): reload pulse command buffer for each
@@ -158,6 +161,7 @@ class QubicQPU(QPU):
         self._n_reads_per_shot = None
         self._outputs = outputs
         self._measure_qubits = measure_qubits
+        self._circuit_for_loop = circuit_for_loop
         self._reload_cmd = reload_cmd
         self._reload_freq = reload_freq
         self._reload_env = reload_env
@@ -168,10 +172,11 @@ class QubicQPU(QPU):
         
         self._qubic_transpiler = Transpiler(
             config, 
+            circuit_for_loop=circuit_for_loop,
             reload_pulse=reload_pulse,
             hardware_vz_qubits=hardware_vz_qubits
         )
-        self._fpga_config = FPGAConfig()
+        self._fpga_config = FPGAConfig(jump_cond_clks=6)
         self._channel_config = load_channel_configs(
             os.path.join(settings.Settings.config_path, 'channel_config.json')
         )
