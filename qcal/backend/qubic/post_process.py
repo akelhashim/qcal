@@ -77,6 +77,8 @@ def post_process(
         save_raw_data (bool, optional): whether to save raw IQ data for each
                 qubit in the CircuitSet. Defaults to False.
     """
+    from qubic.results.tools import pack_s11_results
+
     outputs = list(measurements[0].keys())
 
     meas_qubits = set()
@@ -92,9 +94,10 @@ def post_process(
     if 's11' in outputs:  # Might not work with rastering
         # {'Q0': np.array([[...],...,[...]])} of shape 
         # (n circuits, n shots, n reads)}
-        raw_iq = { 
+        measurements = [pack_s11_results(meas['s11']) for meas in measurements]
+        raw_iq = {
             q: np.vstack([
-                meas['s11'][f'{q}.rdlo'] for meas in measurements
+                meas[f'{q}.rdlo'] for meas in measurements
             ]) for q in meas_qubits
         }
         if raster_circuits:
