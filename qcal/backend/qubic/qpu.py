@@ -251,6 +251,7 @@ class QubicQPU(QPU):
         2) Generate the raw ASM code. This is what we are calling the
             "sequence."
         """
+        from distproc.compiler import proc_grouping_from_channelconfig
         from qubic.toolchain import run_compile_stage, run_assemble_stage
 
         self._exp_circuits = self._qubic_transpiler.transpile(
@@ -264,7 +265,9 @@ class QubicQPU(QPU):
             self._exp_circuits = [rastered_circuit]
 
         self._compiled_program = run_compile_stage(
-            self._exp_circuits, self._fpga_config, self._qchip
+            self._exp_circuits, self._fpga_config, self._qchip,
+            compiler_flags={'scope_control_flow': True},
+            proc_grouping=proc_grouping_from_channelconfig(self._channel_config)
         )
         self._sequence = run_assemble_stage(
             self._compiled_program, self._channel_config
