@@ -987,6 +987,10 @@ def to_qubic(
             qubic_circuit.append({'name': 'barrier'})
             deactivate(config, qubic_circuit)
 
+        if config._parameters['initialize']:
+            qubic_circuit.append({'name': 'barrier'})
+            deactivate(config, qubic_circuit)
+
     return qubic_circuit
 
 
