@@ -87,7 +87,7 @@ def post_process(
             meas_qubits.add(q)
     else:
         for meas in measurements:
-            for q in meas['s11'].keys():  # 'Q0.rdlo
+            for q in meas['s11'][0].keys():  # 'Q0.rdlo
                 meas_qubits.add(q.replace('.rdlo', ''))
     meas_qubits = sorted(meas_qubits)
 
