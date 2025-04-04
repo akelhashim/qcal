@@ -1143,6 +1143,7 @@ def RPE(qpu:            QPU,
             self._angle_errors = {}
             self._last_good_idx = {}
             self._signal = {}
+            self._trusted_angle_est = {ql: {} for ql in qubit_labels}
             self._trusted_err_est = {ql: {} for ql in qubit_labels}
 
             transpiler = kwargs.get('transpiler', PyGSTiTranspiler())
@@ -1223,6 +1224,16 @@ def RPE(qpu:            QPU,
                 Dict: signal as a function of cirucit depth for each experiment.
             """
             return self._signal
+        
+        @property
+        def trusted_angle_est(self) -> Dict:
+            """Most trusted angle estimates.
+
+            Returns:
+                Dict: trusted angle estimates and uncertainties for each qubit 
+                    label and error type.
+            """
+            return self._trusted_angle_est
         
         @property
         def trusted_error_est(self) -> Dict:
@@ -1324,6 +1335,14 @@ def RPE(qpu:            QPU,
                 self._angle_errors[ql] = angle_errors
                 self._last_good_idx[ql] = last_good_idx
                 self._signal[ql] = signal
+
+                for angle, estimates in self._angle_estimates[ql].items():
+                    error = estimates[self._last_good_idx[ql]]
+                    unc = np.pi / (2 * 2**self._last_good_idx[ql])
+                    est, unc = round_to_order_error(error, unc)
+                    self._trusted_angle_est[ql][angle] = {
+                        'val': est, 'err': unc
+                    }
 
             for ql in self._qubit_labels:
                 if isinstance(ql, Iterable):
