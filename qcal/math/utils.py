@@ -70,6 +70,36 @@ def round_to_order_error(
     return val_rounded, err_rounded
 
 
+def uncertainty_of_exp(val: float, err: float, p: float | int) -> float:
+    """Computes the error propagation for power functions.
+
+    Args:
+        val (float): value.
+        err (float): error in value.
+        p (float | int): power of the exponential.
+
+    Returns:
+        float: error of the exponential.
+    """
+    return abs(p) * err * val**(p - 1)
+
+
+def uncertainty_of_product(values: NDArray, errors: NDArray) -> float:
+    """Computes the uncertainty of a product of values.
+
+    c = a * b
+    err(c) = c * sqrt( (err(a)/a)^2 +  (err(b)/b)^2 )
+
+    Args:
+        values (NDArray): values.
+        errors (NDArray): uncertainty of each value.
+
+    Returns:
+        float: uncertainty of product of values.
+    """
+    return np.prod(values) * np.sqrt(np.sum((errors / values) ** 2))
+
+
 def uncertainty_of_sum(errors: List | NDArray) -> float:
     """Computes the quadrature sum of errors from a list/array of errors.
 

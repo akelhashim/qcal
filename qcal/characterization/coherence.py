@@ -8,7 +8,6 @@ from qcal.circuit import Barrier, Cycle, Circuit, CircuitSet
 from qcal.config import Config
 from qcal.fitting.fit import FitCosine, FitDecayingCosine, FitExponential
 from qcal.gate.single_qubit import Idle, Rz, VirtualZ, X90, X
-from qcal.managers.classification_manager import ClassificationManager
 from qcal.math.utils import (
     uncertainty_of_sum, reciprocal_uncertainty, round_to_order_error
 )
@@ -27,13 +26,13 @@ from typing import Any, Callable, Dict, List, Tuple
 logger = logging.getLogger(__name__)
 
 
-def T1(qpu:             QPU,
-       config:          Config,
-       qubits:          List | Tuple,
-       t_max:           float = 500*us,
-       gate:            str = 'X90',
-       subspace:        str = 'GE',
-       n_elements:      int = 50,
+def T1(qpu:        QPU,
+       config:     Config,
+       qubits:     List[int] | Tuple[int],
+       t_max:      float = 500*us,
+       gate:       str = 'X90',
+       subspace:   str = 'GE',
+       n_elements: int = 50,
        **kwargs
     ) -> Callable:
     """T1 coherence characterization.
@@ -51,7 +50,7 @@ def T1(qpu:             QPU,
     Args:
         qpu (QPU): custom QPU object.
         config (Config): qcal Config object.
-        qubits (List | Tuple): qubits to measure.
+        qubits (List[int] | Tuple[int]): qubits to measure.
         t_max (float, option): maximum wait time. Defaults to 500 us.
         gate (str, optional): native gate used for state preparation. Defaults 
             to 'X90'.
@@ -72,12 +71,12 @@ def T1(qpu:             QPU,
         """
 
         def __init__(self, 
-                config:          Config,
-                qubits:          List | Tuple,
-                t_max:           float = 500*us,
-                gate:            str = 'X90',
-                subspace:        str = 'GE',
-                n_elements:      int = 50,
+                config:     Config,
+                qubits:     List | Tuple,
+                t_max:      float = 500*us,
+                gate:       str = 'X90',
+                subspace:   str = 'GE',
+                n_elements: int = 50,
                 **kwargs
             ) -> None:
             """Initialize the T1 experiment class within the function."""
@@ -253,14 +252,14 @@ def T1(qpu:             QPU,
     )
 
 
-def T2(qpu:             QPU,
-       config:          Config,
-       qubits:          List | Tuple,
-       t_max:           float = 250*us,
-       detuning:        float = 0.05 * MHz,
-       echo:            bool = False,
-       subspace:        str = 'GE',
-       n_elements:      int = 50,
+def T2(qpu:        QPU,
+       config:     Config,
+       qubits:     List | Tuple,
+       t_max:      float = 250*us,
+       detuning:   float = 0.05 * MHz,
+       echo:       bool = False,
+       subspace:   str = 'GE',
+       n_elements: int = 50,
        **kwargs
     ) -> Callable:
     """T2 coherence characterization.
@@ -304,13 +303,13 @@ def T2(qpu:             QPU,
         """
 
         def __init__(self, 
-                config:          Config,
-                qubits:          List | Tuple,
-                t_max:           float = 250*us,
-                detuning:        float = 0.05 * MHz,
-                echo:            bool = False,
-                subspace:        str = 'GE',
-                n_elements:      int = 50,
+                config:     Config,
+                qubits:     List | Tuple,
+                t_max:      float = 250*us,
+                detuning:   float = 0.05 * MHz,
+                echo:       bool = False,
+                subspace:   str = 'GE',
+                n_elements: int = 50,
                 **kwargs
             ) -> None:
             """Initialize the T2 experiment class within the function."""
@@ -516,11 +515,11 @@ def T2(qpu:             QPU,
 
 
 def ParityOscillations(
-        qpu:             QPU,
-        config:          Config,
-        circuit:         Circuit,
-        qubits:          List | Tuple = None,
-        n_elements:      int = 31,
+        qpu:        QPU,
+        config:     Config,
+        circuit:    Circuit,
+        qubits:     List[int] | Tuple[int] = None,
+        n_elements: int = 31,
         **kwargs
     ) -> Callable:
     """Parity oscillations coherence characterization.
@@ -531,7 +530,7 @@ def ParityOscillations(
         qpu (QPU): custom QPU object.
         config (Config): qcal Config object.
         cicuit (Circuit): qcal Circuit.
-        qubits (List | Tuple): qubits to measure. Defaults to None.
+        qubits (List[int] | Tuple[int]): qubits to measure. Defaults to None.
         n_elements (int, optional): number of phases between 0 and pi.
             Defaults to 31.
 
@@ -547,10 +546,10 @@ def ParityOscillations(
         """
 
         def __init__(self, 
-                config:          Config,
-                circuit:         Circuit,
-                qubits:          List | Tuple = None,
-                n_elements:      int = 31,
+                config:     Config,
+                circuit:    Circuit,
+                qubits:     List[int] | Tuple[int] = None,
+                n_elements: int = 31,
                 **kwargs
             ) -> None:
             """Initialize the ParityOscillations class within the function."""

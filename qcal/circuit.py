@@ -25,6 +25,8 @@ import copy
 import pandas as pd
 
 from collections import deque
+from itertools import groupby
+import numpy as np
 from typing import Any, Dict, List, Set, Tuple
 
 import plotly.io as pio
@@ -32,6 +34,38 @@ pio.renderers.default = 'colab'  # TODO: replace with settings
 
 
 __all__ = ('Barrier', 'Cycle', 'Layer', 'Circuit', 'CircuitSet')
+
+
+def partition_circuit(circuit: Circuit, block_size: int = 1) -> List:
+    """Partition a circuit in terms of a maximum of `block_size`.
+
+    Args:
+        circuit (Circuit): qcal Circuit.
+        block_size (int, optional): maximum number of consecutive cycles to 
+            group together. Defaults to 1.
+
+    Returns:
+        List: (circuit_partitions, counts)
+    """
+    added_cycles = set()
+    cycle_map = {
+        str(cycle): cycle for cycle in circuit.cycles
+        if cycle not in added_cycles and not added_cycles.add(cycle)
+    }
+    cycles = [str(cycle) for cycle in circuit.cycles]
+
+    # Create a list of tuples representing blocks of size `block_size`
+    blocks = [
+        list(cycles[i:i+block_size]) for i in range(0, len(cycles), block_size)
+    ]
+    
+    # Use groupby to count consecutive occurrences of the same block
+    partitions = [
+        ([cycle_map[key] for key in keys], len(list(group))) 
+        for keys, group in groupby(blocks)
+    ]
+
+    return partitions
 
 
 class Barrier:
@@ -355,7 +389,11 @@ class Circuit:
         Returns:
             list: list of cycles.
         """
-        return [cycle for cycle in self._cycles]
+        return [
+            cycle if cycle.is_barrier else
+            Cycle(sorted(cycle, key=lambda gate: gate.qubits))
+            for cycle in self._cycles
+        ]
     
     @property
     def layers(self) -> list:
@@ -364,7 +402,11 @@ class Circuit:
         Returns:
             list: list of layers.
         """
-        return [cycle for cycle in self._cycles]
+        return [
+            layer if layer.is_barrier else
+            Layer(sorted(layer, key=lambda gate: gate.qubits))
+            for layer in self._cycles
+        ]
     
     @property
     def circuit_depth(self) -> int:  # TODO: exclude measurement cycle?
@@ -410,6 +452,25 @@ class Circuit:
             int: number of qubits.
         """
         return len(self.qubits)
+    
+    @property
+    def partitions(self) -> List:
+        """Repeated circuit partitions.
+
+        Returns:
+            List: list of tuples of circuit partitions and their counts.
+        """
+        circuit_partitions = pd.DataFrame(columns=['Partitions', 'Size'])
+        n = max([1, int(np.log2(self.n_cycles / 4))])
+        for block_size in [2**i for i in range(n + 1)]:
+            partitions = partition_circuit(self, block_size=block_size)
+            circuit_partitions.loc[block_size] = {
+                'Partitions': partitions, 'Size': len(partitions)
+            }
+
+        return circuit_partitions[
+            circuit_partitions.Size == circuit_partitions.Size.min()
+        ].Partitions.iloc[0]
     
     @property
     def results(self) -> Results:

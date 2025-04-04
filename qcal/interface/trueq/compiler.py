@@ -8,9 +8,10 @@ import logging
 import numpy as np
 
 from scipy.linalg import block_diag
-from typing import List, Tuple
+from typing import Dict, List, Tuple
 
 logger = logging.getLogger(__name__)
+
 
 class TrueqCompiler:
     """True-Q compiler.
@@ -18,7 +19,10 @@ class TrueqCompiler:
     The compiler can be created from a True-Q config file, or automatically
     from a qcal Config object.
     """
-    import trueq as tq
+    try:
+        import trueq as tq
+    except ImportError:
+        logger.warning(' Unable to import trueq!')
 
     __slots__ = ('_config', '_tq_config', '_compiler')
 
@@ -125,6 +129,73 @@ class TrueqCompiler:
 
         return tq.Config.from_yaml(_config)
     
+    @staticmethod
+    def from_generators(generators: Dict[int, Dict]):
+        """Generates a compiler which decomposes single-qubit gates based on the 
+        true native gate.
+
+        See: trueq.Gate.from_generators
+
+        Args:
+            generators (dict): Dictionary of gate generators for each qubit.
+
+        Returns:
+            tq.Compiler: True-Q compiler object
+        """
+        try:
+            import trueq as tq
+        except ImportError:
+            logger.warning(' Unable to import trueq!')
+
+        class SqCycleDecomp(tq.compilation.base.NCyclePass):
+
+            n_input_cycles = 1
+            def __init__(self, native_cycle):
+                self._natives = [native_cycle]
+
+            def _apply_cycles(self, cycles):
+                cycle = cycles[0]
+                if len(cycle) == 0:
+                    return cycles
+
+                return tq.backend.local.decompose_sq_gates(
+                    cycle, self._natives, True
+                )
+        
+
+        native_gate_cycle = tq.Cycle({
+            q: tq.Gate.from_generators(
+                "X", generators[q]['X'],
+                "Z", generators[q]['Z']
+            ) for q in generators.keys()
+        })
+
+        factories = [
+            tq.config.GateFactory(
+                f"X90", 
+                layers=[tq.math.FixedRotation(g),],
+                involving = {label: tuple()}
+            ) for label, g in native_gate_cycle.gates.items()
+        ]
+        factories.append(
+            tq.config.GateFactory.from_hamiltonian("Rz", [["Z", "phi"]])
+        )
+        # TODO
+        # factories.append(tq.config.GateFactory.from_matrix("cz", tq.Gate.cz))
+
+        # Put everything together into a compiler
+        compiler = tq.Compiler([
+            tq.compilation.Native2Q(factories),
+            tq.compilation.Merge(),
+            SqCycleDecomp(native_gate_cycle),
+            tq.compilation.Parallel(
+                replacements=tq.compilation.NativeExact(factories)
+            ),
+            tq.compilation.RemoveEmptyCycle()
+        ])
+
+        return compiler
+    
     def compile(
             self, circuits: tq.Circuit | tq.CircuitCollection
         ) -> tq.Circuit | tq.CircuitCollection:
@@ -143,8 +214,10 @@ class TrueqCompiler:
         
 class QuditCompiler:
     """True-Q qudit compiler."""
-    import trueq as tq
-
+    try:
+        import trueq as tq
+    except ImportError:
+        logger.warning(' Unable to import trueq!')
     # __slots__ = ('_config', '_tq_config', '_compiler')
 
     def __init__(self) -> None:

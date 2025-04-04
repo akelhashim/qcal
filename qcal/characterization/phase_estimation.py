@@ -65,9 +65,72 @@ def CZ(theta_iz: float, theta_zi: float, theta_zz: float) -> NDArray:
     except ImportError:
         logger.warning('Unable to import pyGSTi!')
 
-    return scipy.linalg.expm(-1j /2 * (theta_iz * pygsti.sigmaiz + 
-                                       theta_zi * pygsti.sigmazi + 
-                                       theta_zz * pygsti.sigmazz))
+    return scipy.linalg.expm(
+        -1j / 2 * (
+            theta_iz * pygsti.sigmaiz + 
+            theta_zi * pygsti.sigmazi + 
+            theta_zz * pygsti.sigmazz
+        )
+    )
+
+
+def decompose_X90(phases: Dict[int, List]):
+    """Decompose and X90 gate into ZXZ or ZXZXZ.
+
+    Args:
+        phases (Dict[int, List]): local phases for the X90 on each qubit.
+    """
+    try:
+        from pygsti.baseobjs import Label as L
+    except ImportError:
+        logger.warning('Unable to import pyGSTi!')
+
+    qubits = list(phases.keys())
+    n_layers = max(len(phases[q]) for q in qubits)
+
+    layers = []
+    for i in range(2 * n_layers - 1):
+        if i % 2 == 0:
+            layers.append([
+                L('Gzr', q, args=(phases[q][i // 2],)) 
+                for q in qubits if i // 2 < len(phases[q])
+            ])
+        else:
+            layers.append([
+                ('Gxpi2', q) for q in qubits if (i // 2) < (len(phases[q]) - 1)
+            ])
+
+    # Remove any empty layers (in case some qubits have fewer phase corrections)
+    layers = [layer for layer in layers if layer]
+    
+    return layers
+
+
+def decompose_CZ(phases: Dict[Tuple, List]):
+    """Decompose and CZ gate into CZ + IZ + ZI.
+
+    Args:
+        phases (Dict[int, List]): local phases for the CZ on each qubit.
+    """
+    try:
+        from pygsti.baseobjs import Label as L
+    except ImportError:
+        logger.warning('Unable to import pyGSTi!')
+
+    qubit_pairs = list(phases.keys())
+    layers = [
+        [('Gcphase', qp[0], qp[1]) for qp in qubit_pairs]
+    ]
+
+    layer = []
+    for qp, phase in phases.items():
+        layer.extend([
+            L('Gzr', qp[0], args=(phase[0],)), 
+            L('Gzr', qp[1], args=(phase[1],))
+        ])
+    layers.append(layer)
+    
+    return layers
 
 
 def interleaved_circuit_depths(circuit_depths: List[int]) -> List[int]:
@@ -84,12 +147,21 @@ def interleaved_circuit_depths(circuit_depths: List[int]) -> List[int]:
     return circuit_depths[:idx+1]
 
 
-def make_idle_circuits(circuit_depths: List[int], qubits: Tuple[int]):
+def make_idle_circuits(
+        circuit_depths: List[int],
+        qubits:         Tuple[int],
+        gate_layer:     List = None,
+    ) -> List:
     """Generate the idle RPE circuits.
 
     Args:
         circuit_depths (List[int]): circuit depths.
         qubits (Tuple[int]): qubit labels.
+        gate_layer (List, optional): custom gate layer for the gate of interest.
+            Defaults to None.
+
+    Returns:
+        List: pyGSTi circuits.
     """
     try:
         import pygsti
@@ -97,19 +169,23 @@ def make_idle_circuits(circuit_depths: List[int], qubits: Tuple[int]):
         logger.warning('Unable to import pyGSTi!')
 
     circuits = (
-        [make_idle_cos_circ(d, qubits) for d in circuit_depths] +
-        [make_idle_sin_circ(d, qubits) for d in circuit_depths]
+        [make_idle_cos_circ(d, qubits, gate_layer) for d in circuit_depths] +
+        [make_idle_sin_circ(d, qubits, gate_layer) for d in circuit_depths]
     )
 
     return pygsti.remove_duplicates(circuits)
 
 
-def make_idle_cos_circ(d: int, qubits: Tuple[int] | List[int]):
+def make_idle_cos_circ(
+        d: int, qubits: Tuple[int] | List[int], gate_layer: List = None,
+    ):
     """Make the cosine circuit for idle RPE.
 
     Args:
         d (int): circuit depth.
         qubits (Tuple[int] | List[int]): qubit labels.
+        gate_layer (List, optional): custom gate layer for the gate of interest.
+            Defaults to None.
 
     Returns:
        pygsti.circuits.Circuit: pyGSTi circuit.
@@ -123,7 +199,8 @@ def make_idle_cos_circ(d: int, qubits: Tuple[int] | List[int]):
         [[('Gypi2', q) for q in qubits]], line_labels=qubits
     )
     Gi_germ = pygsti.circuits.Circuit(
-        [[('Gidle', q) for q in qubits]], line_labels=qubits
+        gate_layer if gate_layer else [[('Gidle', q) for q in qubits]], 
+        line_labels=qubits
     ) * d
     Gi_meas = pygsti.circuits.Circuit(
         [[('Gypi2', q) for q in qubits]], line_labels=qubits
@@ -132,12 +209,16 @@ def make_idle_cos_circ(d: int, qubits: Tuple[int] | List[int]):
     return Gi_prep + Gi_germ + Gi_meas
 
 
-def make_idle_sin_circ(d: int, qubits: Tuple[int] | List[int]):
+def make_idle_sin_circ(
+        d: int, qubits: Tuple[int] | List[int], gate_layer: List = None,
+    ):
     """Make the cosine circuit for idle RPE.
 
     Args:
         d (int): circuit depth.
         qubits (Tuple[int] | List[int]): qubit labels.
+        gate_layer (List, optional): custom gate layer for the gate of interest.
+            Defaults to None.
 
     Returns:
        pygsti.circuits.Circuit: pyGSTi circuit.
@@ -151,7 +232,8 @@ def make_idle_sin_circ(d: int, qubits: Tuple[int] | List[int]):
         [[('Gxpi2', q) for q in qubits]], line_labels=qubits
     )
     Gi_germ = pygsti.circuits.Circuit(
-        [[('Gidle', q) for q in qubits]], line_labels=qubits
+        gate_layer if gate_layer else [[('Gidle', q) for q in qubits]], 
+        line_labels=qubits
     ) * d
     Gi_meas = pygsti.circuits.Circuit(
         [[('Gypi2', q) for q in qubits]], line_labels=qubits
@@ -160,12 +242,21 @@ def make_idle_sin_circ(d: int, qubits: Tuple[int] | List[int]):
     return Gi_prep + Gi_germ + Gi_meas
 
 
-def make_x90_circuits(circuit_depths: List[int], qubits: Tuple[int]):
+def make_x90_circuits(
+        circuit_depths: List[int],
+        qubits:         Tuple[int],
+        gate_layer:     List = None,
+    ) -> List:
     """Generate the axis X90 RPE circuits.
 
     Args:
         circuit_depths (List[int]): circuit depths.
         qubits (Tuple[int]): qubit labels.
+        gate_layer (List, optional): custom gate layer for the gate of interest.
+            Defaults to None.
+
+    Returns:
+        List: list of pyGSTi circuits.
     """
     try:
         import pygsti
@@ -173,21 +264,25 @@ def make_x90_circuits(circuit_depths: List[int], qubits: Tuple[int]):
         logger.warning('Unable to import pyGSTi!')
 
     circuits = (
-        [make_x90_cos_circ(d, qubits) for d in circuit_depths] +
-        [make_x90_sin_circ(d, qubits) for d in circuit_depths] +
-        [make_interleaved_cos_circ(d, qubits) for d in circuit_depths] +
-        [make_interleaved_sin_circ(d, qubits) for d in circuit_depths]
+        [make_x90_cos_circ(d, qubits, gate_layer) for d in circuit_depths] +
+        [make_x90_sin_circ(d, qubits, gate_layer) for d in circuit_depths] +
+        [make_X90_icos_circ(d, qubits, gate_layer) for d in circuit_depths] +
+        [make_X90_isin_circ(d, qubits, gate_layer) for d in circuit_depths]
     )
 
     return pygsti.remove_duplicates(circuits)
 
 
-def make_x90_cos_circ(d: int, qubits: Tuple[int] | List[int]):
+def make_x90_cos_circ(
+        d: int, qubits: Tuple[int] | List[int], gate_layer: List = None,
+    ):
     """Make the cosine circuit for X90 RPE.
 
     Args:
         d (int): circuit depth.
         qubits (Tuple[int] | List[int]): qubit labels.
+        gate_layer (List, optional): custom gate layer for the gate of interest.
+            Defaults to None.
 
     Returns:
        pygsti.circuits.Circuit: pyGSTi circuit.
@@ -196,19 +291,23 @@ def make_x90_cos_circ(d: int, qubits: Tuple[int] | List[int]):
         import pygsti
     except ImportError:
         logger.warning('Unable to import pyGSTi!')
-
-    # return pygsti.circuits.Circuit([[('Gxpi2', q) for q in qubits]]) * d
+    
     return pygsti.circuits.Circuit(
-        [[('Gxpi2', q) for q in qubits]], line_labels=qubits
-    ) * d
+            gate_layer if gate_layer else [[('Gxpi2', q) for q in qubits]], 
+            line_labels=qubits
+        ) * d
 
 
-def make_x90_sin_circ(d: int, qubits: Tuple[int] | List[int]):
+def make_x90_sin_circ(
+        d: int, qubits: Tuple[int] | List[int], gate_layer: List = None,
+    ):
     """Make the sine circuit for X90 RPE.
 
     Args:
         d (int): circuit depth.
         qubits (Tuple[int] | List[int]): qubit labels.
+        gate_layer (List, optional): custom gate layer for the gate of interest.
+            Defaults to None.
 
     Returns:
        pygsti.circuits.Circuit: pyGSTi circuit.
@@ -217,18 +316,23 @@ def make_x90_sin_circ(d: int, qubits: Tuple[int] | List[int]):
         import pygsti
     except ImportError:
         logger.warning('Unable to import pyGSTi!')
-
+    
     return pygsti.circuits.Circuit(
-        [[('Gxpi2', q) for q in qubits]], line_labels=qubits
-    ) * (d + 1)
+            gate_layer if gate_layer else [[('Gxpi2', q) for q in qubits]], 
+            line_labels=qubits
+        ) * (d + 1)
 
 
-def make_interleaved_cos_circ(d: int, qubits: Tuple[int] | List[int]):
+def make_X90_icos_circ(
+        d: int, qubits: Tuple[int] | List[int], gate_layer: List = None,
+    ):
     """Make the interleaved cosine circuit for X90 axis error RPE.
 
     Args:
         d (int): circuit depth.
         qubits (Tuple[int] | List[int]): qubit labels.
+        gate_layer (List, optional): custom gate layer for the gate of interest.
+            Defaults to None.
 
     Returns:
        pygsti.circuits.Circuit: pyGSTi circuit.
@@ -242,20 +346,26 @@ def make_interleaved_cos_circ(d: int, qubits: Tuple[int] | List[int]):
         [[('Gzpi2', q) for q in qubits]], line_labels=qubits
     )
     Gx_layer = pygsti.circuits.Circuit(
-        [[('Gxpi2', q) for q in qubits]], line_labels=qubits
+        gate_layer if gate_layer else [[('Gxpi2', q) for q in qubits]], 
+        line_labels=qubits
     )
+
     return (
         Gz_layer + Gx_layer + Gx_layer + Gz_layer + Gz_layer + Gx_layer + 
         Gx_layer + Gz_layer
     ) * d
 
 
-def make_interleaved_sin_circ(d: int, qubits: Tuple[int] | List[int]):
+def make_X90_isin_circ(
+        d: int, qubits: Tuple[int] | List[int], gate_layer: List = None,
+    ):
     """Make the interleaved sine circuit for X90 axis error RPE.
 
     Args:
         d (int): circuit depth.
         qubits (Tuple[int] | List[int]): qubit labels.
+        gate_layer (List, optional): custom gate layer for the gate of interest.
+            Defaults to None.
 
     Returns:
        pygsti.circuits.Circuit: pyGSTi circuit.
@@ -269,8 +379,10 @@ def make_interleaved_sin_circ(d: int, qubits: Tuple[int] | List[int]):
         [[('Gzpi2', q) for q in qubits]], line_labels=qubits
     )
     Gx_layer = pygsti.circuits.Circuit(
-        [[('Gxpi2', q) for q in qubits]], line_labels=qubits
+        gate_layer if gate_layer else [[('Gxpi2', q) for q in qubits]], 
+        line_labels=qubits
     )
+
     return (
         Gz_layer + Gx_layer + Gx_layer + Gz_layer + Gz_layer + Gx_layer + 
         Gx_layer + Gz_layer
@@ -278,13 +390,17 @@ def make_interleaved_sin_circ(d: int, qubits: Tuple[int] | List[int]):
 
 
 def make_cz_circuits(
-        circuit_depths: List[int], qubit_pairs: List[Tuple[int]]
+        circuit_depths: List[int], 
+        qubit_pairs:    List[Tuple[int]], 
+        gate_layer:     List = None,
     ) -> List:
     """Generate CZ RPE circuits.
 
     Args:
         circuit_depths (List[int]): circuit depths.
         qubit_pairs (List[Tuple[int]]): pairs of qubits for two-qubit gates.
+        gate_layer (List, optional): custom gate layer for the gate of interest.
+            Defaults to None.
 
     Returns:
         List: list of pyGSTi circuits.
@@ -298,14 +414,14 @@ def make_cz_circuits(
     sin_dict = {
         state_pair: {
             i: make_cz_sin_circ(
-                i, state_pair, qubit_pairs
+                i, state_pair, qubit_pairs, gate_layer
             ) for i in circuit_depths
         } for state_pair in state_pairs
     }
     cos_dict = {
         state_pair: {
             i: make_cz_cos_circ(
-                i, state_pair, qubit_pairs
+                i, state_pair, qubit_pairs, gate_layer
             ) for i in circuit_depths
         } for state_pair in state_pairs
     }
@@ -319,7 +435,10 @@ def make_cz_circuits(
 
 
 def make_cz_cos_circ(
-        d: int, state_pair: Tuple[int], qubit_pairs: List[Tuple[int]]
+        d:           int, 
+        state_pair:  Tuple[int], 
+        qubit_pairs: List[Tuple[int]], 
+        gate_layer:  List = None,
     ):
     """Make the cosine circuit for CZ RPE.
 
@@ -327,6 +446,8 @@ def make_cz_cos_circ(
         d (int): circuit depth.
         state_pair (Tuple[int]): state pair.
         qubit_pairs (List[Tuple[int]]): pairs of qubits for two-qubit gates.
+        gate_layer (List, optional): custom gate layer for the gate of interest.
+            Defaults to None.
 
     Returns:
        pygsti.circuits.Circuit: pyGSTi circuit.
@@ -349,7 +470,9 @@ def make_cz_cos_circ(
                line_labels=line_labels
            ) +
            pygsti.circuits.Circuit(
-               [[('Gcphase', qp[0], qp[1]) for qp in qubit_pairs]]
+               gate_layer if gate_layer else [
+                   [('Gcphase', qp[0], qp[1]) for qp in qubit_pairs]
+               ]
            ) * d +
            pygsti.circuits.Circuit(
                [[('Gypi2', qp[1]) for qp in qubit_pairs]]
@@ -370,7 +493,9 @@ def make_cz_cos_circ(
                 [[('Gypi2', qp[1]) for qp in qubit_pairs]]
             ) +
             pygsti.circuits.Circuit(
-                [[('Gcphase', qp[0], qp[1]) for qp in qubit_pairs]]
+                gate_layer if gate_layer else [
+                   [('Gcphase', qp[0], qp[1]) for qp in qubit_pairs]
+               ]
             ) * d +
             pygsti.circuits.Circuit(
                 [[('Gypi2', qp[1]) for qp in qubit_pairs]]
@@ -391,7 +516,9 @@ def make_cz_cos_circ(
                 [[('Gypi2', qp[0]) for qp in qubit_pairs]]
             ) +
             pygsti.circuits.Circuit(
-                [[('Gcphase', qp[0], qp[1]) for qp in qubit_pairs]]
+                gate_layer if gate_layer else [
+                   [('Gcphase', qp[0], qp[1]) for qp in qubit_pairs]
+               ]
             ) * d +
             pygsti.circuits.Circuit(
                 [[('Gypi2', qp[0]) for qp in qubit_pairs]]
@@ -407,7 +534,10 @@ def make_cz_cos_circ(
 
     
 def make_cz_sin_circ(
-        d: int, state_pair: Tuple[int], qubit_pairs: List[Tuple[int]]
+        d:           int, 
+        state_pair:  Tuple[int], 
+        qubit_pairs: List[Tuple[int]], 
+        gate_layer:  List = None,
     ):
     """Make the sine circuit for CZ RPE.
 
@@ -415,6 +545,8 @@ def make_cz_sin_circ(
         d (int): circuit depth.
         state_pair (Tuple[int]): state pair.
         qubit_pairs (List[Tuple[int]]): pairs of qubits for two-qubit gates.
+        gate_layer (List, optional): custom gate layer for the gate of interest.
+            Defaults to None.
 
     Returns:
        pygsti.circuits.Circuit: pyGSTi circuit.
@@ -436,7 +568,9 @@ def make_cz_sin_circ(
                 line_labels=line_labels
             ) +
             pygsti.circuits.Circuit(
-                [[('Gcphase', qp[0], qp[1]) for qp in qubit_pairs]]
+                gate_layer if gate_layer else [
+                   [('Gcphase', qp[0], qp[1]) for qp in qubit_pairs]
+               ]
             ) * d +
             pygsti.circuits.Circuit(
                 [[('Gxpi2', qp[1]) for qp in qubit_pairs]]
@@ -457,7 +591,9 @@ def make_cz_sin_circ(
                 [[('Gypi2', qp[1]) for qp in qubit_pairs]]
             ) +
             pygsti.circuits.Circuit(
-                [[('Gcphase', qp[0], qp[1]) for qp in qubit_pairs]]
+                gate_layer if gate_layer else [
+                   [('Gcphase', qp[0], qp[1]) for qp in qubit_pairs]
+               ]
             ) * d +
             pygsti.circuits.Circuit(
                 [[('Gxpi2', qp[1]) for qp in qubit_pairs]]
@@ -478,7 +614,9 @@ def make_cz_sin_circ(
                 [[('Gypi2', qp[0]) for qp in qubit_pairs]]
             ) +
             pygsti.circuits.Circuit(
-                [[('Gcphase', qp[0], qp[1]) for qp in qubit_pairs]]
+                gate_layer if gate_layer else [
+                   [('Gcphase', qp[0], qp[1]) for qp in qubit_pairs]
+               ]
             ) * d +
             pygsti.circuits.Circuit(
                 [[('Gxpi2', qp[0]) for qp in qubit_pairs]]
@@ -493,8 +631,9 @@ def make_cz_sin_circ(
 
 def analyze_idle(
         dataset, 
-        qubits: List[int], 
-        circuit_depths: List[int]
+        qubits:         List[int], 
+        circuit_depths: List[int],
+        gate_layer:     List = None,
     ) -> Tuple:
     """Analyze idle RPE dataset.
 
@@ -502,6 +641,8 @@ def analyze_idle(
         dataset (pygsti.data.dataset): pyGSTi dataset.
         qubits (List[int]): qubit labels.
         circuit_depths (List[int]): circuit depths.
+        gate_layer (List, optional): custom gate layer for the gate of interest.
+            Defaults to None.
 
     Returns:
         Tuple: angle estimates, angle errors, and index of last good depth
@@ -513,10 +654,12 @@ def analyze_idle(
         logger.warning(' Unable to import pyRPE!')
 
     cos_circs = {
-        d: make_idle_cos_circ(d, qubits) for d in circuit_depths
+        d: make_idle_cos_circ(d, qubits, gate_layer) 
+        for d in circuit_depths
     }
     sin_circs = {
-        d: make_idle_sin_circ(d, qubits) for d in circuit_depths
+        d: make_idle_sin_circ(d, qubits, gate_layer) 
+        for d in circuit_depths
     }
 
     signal = {'ramsey': []}
@@ -552,9 +695,10 @@ def analyze_idle(
 
 def analyze_x90(
         dataset, 
-        qubits: List[int], 
+        qubits:         List[int], 
         circuit_depths: List[int], 
-        estimator_type: str = 'linearized'
+        gate_layer:     List = None,
+        estimator_type: str = 'linearized',
     ) -> Tuple:
     """Analyze RPE dataset for the X90 gate.
 
@@ -562,6 +706,8 @@ def analyze_x90(
         dataset (pygsti.data.dataset): pyGSTi dataset.
         qubits (List[int]): qubit labels.
         circuit_depths (List[int]): circuit depths.
+        gate_layer (List, optional): custom gate layer for the gate of interest.
+            Defaults to None.
         estimator_type (str): type of estimator. Defaults to 'linearized'.
 
     Returns:
@@ -574,19 +720,24 @@ def analyze_x90(
         logger.warning(' Unable to import pyRPE!')
 
     target_x = np.pi / 2
+    eps = 1e-8  # Small additive factor to ensure we do not divide by zero
 
     direct_cos_circs = {
-        d: make_x90_cos_circ(d, qubits) for d in circuit_depths
+        d: make_x90_cos_circ(d, qubits, gate_layer) 
+        for d in circuit_depths
     }
     direct_sin_circs = {
-        d: make_x90_sin_circ(d, qubits) for d in circuit_depths
+        d: make_x90_sin_circ(d, qubits, gate_layer) 
+        for d in circuit_depths
     }
 
     interleaved_cos_circs = {
-        d: make_interleaved_cos_circ(d, qubits) for d in circuit_depths
+        d: make_X90_icos_circ(d, qubits, gate_layer) 
+        for d in circuit_depths
     }
     interleaved_sin_circs = {
-        d: make_interleaved_sin_circ(d, qubits) for d in circuit_depths
+        d: make_X90_isin_circ(d, qubits, gate_layer) 
+        for d in circuit_depths
     }
 
     signal = {'direct': [], 'interleaved': []}
@@ -602,10 +753,10 @@ def analyze_x90(
             (int(direct_sin_counts['1']), int(direct_sin_counts['0']))
         )
         p_I = int(direct_cos_counts['0']) / (
-            int(direct_cos_counts['0']) + int(direct_cos_counts['1'])
+            int(direct_cos_counts['0']) + int(direct_cos_counts['1']) + eps
         )
         p_Q = int(direct_sin_counts['1']) / (
-            int(direct_sin_counts['0']) + int(direct_sin_counts['1'])
+            int(direct_sin_counts['0']) + int(direct_sin_counts['1']) + eps
         )
         signal['direct'].append(1 - 2 * p_I + 1j - 2j * p_Q)
     analysis = RobustPhaseEstimation(experiment)
@@ -685,7 +836,10 @@ def analyze_x90(
         
 
 def analyze_cz(
-        dataset, qubit_pairs: List[Tuple[int]], circuit_depths: List[int]
+        dataset, 
+        qubit_pairs:    List[Tuple[int]], 
+        circuit_depths: List[int], 
+        gate_layer:     List = None,
     ) -> Tuple:
     """Analyze RPE dataset for the CZ gate.
 
@@ -693,6 +847,8 @@ def analyze_cz(
         dataset (pygsti.data.dataset): pyGSTi dataset.
         qubit_pairs (List[Tuple[int]]): qubit labels.
         circuit_depths (List[int]): circuit depths.
+        gate_layer (List, optional): custom gate layer for the gate of interest.
+            Defaults to None.
 
     Returns:
         Tuple: angle estimates, angle errors, and index of last good depth
@@ -705,6 +861,7 @@ def analyze_cz(
 
     target_zz = -np.pi/2
     target_iz = target_zi = np.pi/2
+    eps = 1e-8  # Small additive factor to ensure we do not divide by zero
 
     state_pairs = [(0, 1), (2, 3), (3, 1)]
     state_pair_lookup = {
@@ -724,14 +881,14 @@ def analyze_cz(
     sin_dict = {
         state_pair: {
             d: make_cz_sin_circ(
-                d, state_pair, qubit_pairs
+                d, state_pair, qubit_pairs, gate_layer
             ) for d in circuit_depths
         } for state_pair in state_pairs
     }
     cos_dict = {
         state_pair: {
             d: make_cz_cos_circ(
-                d, state_pair, qubit_pairs
+                d, state_pair, qubit_pairs, gate_layer
             ) for d in circuit_depths
         } for state_pair in state_pairs
     }
@@ -759,11 +916,11 @@ def analyze_cz(
             )
             p_I = int(dataset[cos_dict[state_pair][d]][cos_plus]) / (
                 int(dataset[cos_dict[state_pair][d]][cos_plus]) + 
-                int(dataset[cos_dict[state_pair][d]][cos_minus])
+                int(dataset[cos_dict[state_pair][d]][cos_minus]) + eps
             )
             p_Q = int(dataset[sin_dict[state_pair][d]][sin_plus]) / (
                 int(dataset[sin_dict[state_pair][d]][sin_plus]) + 
-                int(dataset[sin_dict[state_pair][d]][sin_minus])
+                int(dataset[sin_dict[state_pair][d]][sin_minus]) + eps
             )
             signal[state_pair].append(1 - 2 * p_I + 1j - 2j * p_Q)
 
@@ -832,10 +989,10 @@ def rectify_angle(theta: float) -> float:
 
 
 def plot_signal(
-        signal: Dict, 
+        signal:         Dict, 
         circuit_depths: ArrayLike,
-        ax: plt.axes = None, 
-        title: str = None
+        ax:             plt.axes = None, 
+        title:          str = None
     ) -> None:
     """Plot RPE signal decay.
 
@@ -885,11 +1042,13 @@ def plot_signal(
     ax.set_ylim(-1.1, 1.1)
 
 
-def RPE(qpu:             QPU,
-        config:          Config,
-        qubit_labels:    Iterable[int],
-        gate:            str,
-        circuit_depths:  List[int] = [1, 2, 4, 8, 16, 32, 64, 128, 256],
+def RPE(qpu:            QPU,
+        config:         Config,
+        qubit_labels:   Iterable[int],
+        gate:           str,
+        circuit_depths: List[int] = [1, 2, 4, 8, 16, 32, 64, 128, 256],
+        gate_layer:     List = None,
+        loss_angle:     str | List[str] | None = None,
         **kwargs
     ) -> Callable:
     """Robust Phase Estimation.
@@ -905,6 +1064,12 @@ def RPE(qpu:             QPU,
         circuit_depths (List[int], optional): a list of positive integers 
             specifying the circuit depths. Defaults to ```[1, 2, 4, 8, 16, 32, 
             64, 128, 256]```.
+        gate_layer (List, optional): custom gate layer for the gate of interest.
+            Defaults to None.
+        loss_angle (str | list[str] | None, optional): a string or list of 
+            strings specifying which angle to use for calculating the loss from 
+            RPE. Defaults to None. If None, all angles are used. For example, 
+            for the X90 gate, the possible options are `'X'` or `'Z'`.
 
     Returns:
         Callable: RPE class instance.
@@ -914,10 +1079,12 @@ def RPE(qpu:             QPU,
         """pyRPE protocol."""
 
         def __init__(self,
-                config:          Config,
-                qubit_labels:    Iterable[int],
-                gate:            str,
-                circuit_depths:  List[int] = [1, 2, 4, 8, 16, 32, 64, 128, 256],
+                config:         Config,
+                qubit_labels:   Iterable[int],
+                gate:           str,
+                circuit_depths: List[int] = [1, 2, 4, 8, 16, 32, 64, 128, 256],
+                gate_layer:     List = None,
+                loss_angle:     str | None = None,
                 **kwargs
             ) -> None:
             from qcal.interface.pygsti.transpiler import PyGSTiTranspiler
@@ -938,6 +1105,8 @@ def RPE(qpu:             QPU,
             self._qubit_labels = qubit_labels
             self._gate = gate.upper()
             self._circuit_depths = circuit_depths
+            self._loss_angle = loss_angle
+            self._gate_layer = gate_layer
 
             qubits = []
             for q in qubit_labels:
@@ -974,6 +1143,7 @@ def RPE(qpu:             QPU,
             self._angle_errors = {}
             self._last_good_idx = {}
             self._signal = {}
+            self._trusted_angle_est = {ql: {} for ql in qubit_labels}
             self._trusted_err_est = {ql: {} for ql in qubit_labels}
 
             transpiler = kwargs.get('transpiler', PyGSTiTranspiler())
@@ -1017,6 +1187,34 @@ def RPE(qpu:             QPU,
             return self._last_good_idx
         
         @property
+        def loss(self) -> Dict:
+            """Loss for each qubit using the most trusted RPE estimates.
+
+            This property can be used for parameter optimization.
+
+            Returns:
+                Dict: loss for each qubit.
+            """
+            if self._loss_angle is None:
+                loss_angle = list(
+                    self._angle_errors[self._qubit_labels[0]].keys()
+                )
+            else:
+                loss_angle = (
+                    self._loss_angle if isinstance(self._loss_angle, list) else
+                    [self._loss_angle]
+                )
+            loss = {}
+            for ql, errors in self._trusted_err_est.items():
+                vals = []
+                for err, val in errors.items():
+                    if err in loss_angle:
+                        vals.append(abs(val['val']))
+                loss[ql] = vals
+
+            return loss
+        
+        @property
         def signal(self) -> Dict:
             """Signal decay.
 
@@ -1026,6 +1224,16 @@ def RPE(qpu:             QPU,
                 Dict: signal as a function of cirucit depth for each experiment.
             """
             return self._signal
+        
+        @property
+        def trusted_angle_est(self) -> Dict:
+            """Most trusted angle estimates.
+
+            Returns:
+                Dict: trusted angle estimates and uncertainties for each qubit 
+                    label and error type.
+            """
+            return self._trusted_angle_est
         
         @property
         def trusted_error_est(self) -> Dict:
@@ -1043,7 +1251,9 @@ def RPE(qpu:             QPU,
 
             logger.info(' Generating circuits from pyGSTi...')
             circuits = self._make_circuits[self._gate](
-                self._circuit_depths, self._qubit_labels
+                self._circuit_depths, 
+                self._qubit_labels, 
+                self._gate_layer
             )
             self._circuits = load_circuits(circuits)
 
@@ -1115,13 +1325,24 @@ def RPE(qpu:             QPU,
                 self._datasets[ql] = dataset
 
                 results = self._analyze_results[self._gate](
-                    dataset, self._qubit_labels, self._circuit_depths
+                    dataset, 
+                    self._qubit_labels, 
+                    self._circuit_depths, 
+                    self._gate_layer
                 )
                 angle_estimates, angle_errors, last_good_idx, signal = results
                 self._angle_estimates[ql] = angle_estimates
                 self._angle_errors[ql] = angle_errors
                 self._last_good_idx[ql] = last_good_idx
                 self._signal[ql] = signal
+
+                for angle, estimates in self._angle_estimates[ql].items():
+                    error = estimates[self._last_good_idx[ql]]
+                    unc = np.pi / (2 * 2**self._last_good_idx[ql])
+                    est, unc = round_to_order_error(error, unc)
+                    self._trusted_angle_est[ql][angle] = {
+                        'val': est, 'err': unc
+                    }
 
             for ql in self._qubit_labels:
                 if isinstance(ql, Iterable):
@@ -1186,9 +1407,9 @@ def RPE(qpu:             QPU,
                             label='Last good depth',
                         )
 
-                        maxval = np.abs(np.concatenate(
+                        maxval = np.nanmax(np.abs(np.concatenate(
                             [err for err in self._angle_errors[ql].values()]
-                        )).max()
+                        )))
                         ax.set_ylim((-1.1 * maxval, 1.1 * maxval))
 
                         ax.set_title(f'Q{ql}', fontsize=20)
@@ -1292,9 +1513,11 @@ def RPE(qpu:             QPU,
             self.final()
 
     return RPE(
-        config,
-        qubit_labels,
-        gate,   
-        circuit_depths,
+        config=config,
+        qubit_labels=qubit_labels,
+        gate=gate,   
+        circuit_depths=circuit_depths,
+        gate_layer=gate_layer,
+        loss_angle=loss_angle,
         **kwargs
     )

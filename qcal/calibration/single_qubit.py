@@ -12,7 +12,6 @@ from qcal.config import Config
 from qcal.fitting.fit import (
     FitAbsoluteValue, FitCosine, FitDecayingCosine, FitParabola
 )
-from qcal.managers.classification_manager import ClassificationManager
 from qcal.math.utils import round_to_order_error
 from qcal.gate.single_qubit import Idle, VirtualZ, X, X90
 from qcal.plotting.utils import calculate_nrows_ncols
@@ -665,11 +664,12 @@ def Frequency(
 
 
 def Phase(
-        qpu:             QPU,
-        config:          Config,
-        qubits:          List | Tuple,
-        phases:          ArrayLike | NDArray | Dict[ArrayLike | NDArray],
-        subspace:        str = 'GE',
+        qpu:            QPU,
+        config:         Config,
+        qubits:         List | Tuple,
+        phases:         ArrayLike | NDArray | Dict[ArrayLike | NDArray],
+        subspace:       str = 'GE',
+        relative_phase: bool = False,
         **kwargs
     ) -> Callable:
     """Phase calibration for single-qubit gates.
@@ -699,6 +699,9 @@ def Phase(
             should be a dictionary mapping an array to a qubit label.
         subspace (str, optional): qubit subspace for the defined gate.
             Defaults to 'GE'.
+        relative_phase (bool, optional): whether phase sweep is relative to the
+            current phase value. Defaults to False. If true, the phase sweep
+            is added to the current value.
 
     Returns:
         Callable: Phases calibration class.
@@ -712,10 +715,11 @@ def Phase(
         """
 
         def __init__(self, 
-                config:          Config,
-                qubits:          List | Tuple,
-                phases:          ArrayLike | NDArray | Dict,
-                subspace:        str = 'GE',
+                config:         Config,
+                qubits:         List | Tuple,
+                phases:         ArrayLike | NDArray | Dict,
+                subspace:       str = 'GE',
+                relative_phase: bool = False,
                 **kwargs
             ) -> None:
             """Initialize the Phase calibration class within the function."""
@@ -734,7 +738,6 @@ def Phase(
                 self._phases = {q: phases for q in qubits}
             else:
                 self._phases = phases
-            self._param_sweep = self._phases
 
             self._params = {}
             for q in qubits:
@@ -742,6 +745,13 @@ def Phase(
                     f'single_qubit/{q}/{subspace}/X90/pulse/0/kwargs/phase',
                     f'single_qubit/{q}/{subspace}/X90/pulse/2/kwargs/phase'
                 ]
+
+            if relative_phase:
+                for q in qubits:
+                    self._phases[q] = (
+                        self._phases[q] + config[self._params[q][0]]
+                    )
+            self._param_sweep = self._phases
 
             self._fit = {q: FitParabola() for q in qubits}
 
@@ -889,26 +899,42 @@ def Phase(
                             f'Fit failed for qubit {q} (negative curvature)!'
                         )
                         self._fit[q]._fit_success = False
+                        self._cal_values[q] = self._phases[q][
+                            np.argmin(self._sweep_results[q])
+                        ]
                     elif not in_range(newvalue, self._phases[q]):
                         logger.warning(
                             f'Fit failed for qubit {q} (out of range)!'
                         )
                         self._fit[q]._fit_success = False
+                        self._cal_values[q] = self._phases[q][
+                            np.argmin(self._sweep_results[q])
+                        ]
                     else:
                         self._cal_values[q] = newvalue
+                
+                else:
+                    self._cal_values[q] = self._phases[q][
+                        np.argmin(self._sweep_results[q])
+                    ]
 
         def save(self):
             """Save all circuits and data."""
-            qpu.save(self)
-            # self._data_manager.save_to_csv(
-            #      pd.DataFrame([self._param_sweep]), 'param_sweep'
-            # )
-            self._data_manager.save_to_csv(
-                 pd.DataFrame([self._sweep_results]), 'sweep_results'
+            clear_output(wait=True)
+            self._data_manager._exp_id += (
+                f'_phase_cal_Q{"".join(str(q) for q in self._qubits)}'
             )
-            self._data_manager.save_to_csv(
-                 pd.DataFrame([self._cal_values]), 'calibrated_values'
-            )
+            if settings.Settings.save_data:
+                qpu.save(self)
+                # self._data_manager.save_to_csv(
+                #      pd.DataFrame([self._param_sweep]), 'param_sweep'
+                # )
+                self._data_manager.save_to_csv(
+                    pd.DataFrame([self._sweep_results]), 'sweep_results'
+                )
+                self._data_manager.save_to_csv(
+                    pd.DataFrame([self._cal_values]), 'calibrated_values'
+                )
 
         def plot(self) -> None:
             """Plot the phase sweep and fit results."""
@@ -974,6 +1000,7 @@ def Phase(
                                 x, self._fit[q].predict(x),
                                 '-', c='orange', label='Fit'
                             )
+                        if self._cal_values[q]:
                             ax.axvline(
                                 self._cal_values[q],  
                                 ls='--', c='k', label='Fit value'
@@ -998,25 +1025,25 @@ def Phase(
                 )
             plt.show()
 
+        def final(self) -> None:
+            """Final experimental method."""
+            Calibration.final(self)
+            print(f"\nRuntime: {repr(self._runtime)[8:]}\n")
+        
         def run(self):
             """Run all experimental methods and analyze results."""
             self.generate_circuits()
             qpu.run(self, self._circuits, save=False)
             self.analyze()
-            clear_output(wait=True)
-            self._data_manager._exp_id += (
-                f'_phase_cal_Q{"".join(str(q) for q in self._qubits)}'
-            )
-            if settings.Settings.save_data:
-                self.save()
+            self.save()
             self.plot()
             self.final()
-            print(f"\nRuntime: {repr(self._runtime)[8:]}\n")
 
     return Phase(
-        config,
-        qubits,
-        phases,
-        subspace,
+        config=config,
+        qubits=qubits,
+        phases=phases,
+        subspace=subspace,
+        relative_phase=relative_phase,
         **kwargs
     )

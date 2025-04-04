@@ -29,7 +29,7 @@ def calculate_n_reads(config: Config, compiled_program) -> dict:
         dict: number of reads per channel.
     """
     seq = qubic_sequence(compiled_program)
-    qubits = seq.columns
+    qubits = [col for col in seq.columns if 'Q' in col]
     
     n_reads = {}
     for q in qubits:
