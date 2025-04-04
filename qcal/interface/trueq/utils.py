@@ -2,11 +2,14 @@
 
 """
 import logging
+import numpy as np
+
+from typing import Dict, List
 
 logger = logging.getLogger(__name__)
 
 
-def set_cycles(circuit, list_of_cycles):
+def set_cycles(circuit, list_of_cycles: List):
     """Function that changes the cycles of a circuit.
 
     Args:
@@ -16,7 +19,10 @@ def set_cycles(circuit, list_of_cycles):
     Returns:
         tq.Circuit: same True-Q circuit but with different cycles.
     """
-    import trueq as tq
+    try:
+        import trueq as tq
+    except ImportError:
+        logger.warning(' Unable to import trueq!')
 
     circuit_dict = circuit.to_dict()
     circuit_dict['cycles'] = tq.Circuit(list_of_cycles).to_dict()['cycles']
@@ -24,7 +30,7 @@ def set_cycles(circuit, list_of_cycles):
     return tq.Circuit.from_dict(circuit_dict)
 
 
-def set_marker(cycle, marker):
+def set_marker(cycle, marker: int):
     """Function that sets the marker of a cycle.
 
     Args:
@@ -34,7 +40,10 @@ def set_marker(cycle, marker):
     Returns:
         tq.Cycle: True-Q cycle with a modified marker.
     """
-    import trueq as tq
+    try:
+        import trueq as tq
+    except ImportError:
+        logger.warning(' Unable to import trueq!')
 
     dict_cycle = cycle.to_dict()
     dict_cycle['marker']= marker
@@ -55,7 +64,10 @@ def serialize_cycles(circuit):
     Returns:
         tq.Circuit: same True-Q circuit but with serialized cycles.
     """
-    import trueq as tq
+    try:
+        import trueq as tq
+    except ImportError:
+        logger.warning(' Unable to import trueq!')
 
     # To keep track of original cycle markers
     markers = []
@@ -82,7 +94,7 @@ def serialize_cycles(circuit):
             list_of_cycles.append(cycle)
     circuit = set_cycles(circuit, list_of_cycles)
 
-    # Remark the cycles using the original pattern
+    # Re-mark the cycles using the original pattern
     list_of_cycles = []
     for i, cycle in enumerate(circuit): 
         # Mark all cycles using the original markers
@@ -90,3 +102,35 @@ def serialize_cycles(circuit):
     circuit = set_cycles(circuit, list_of_cycles)
             
     return circuit
+
+
+def X90_phases(
+        qubits: list, compiler, in_radians: bool = True
+    ) -> Dict[int, List]:
+    """Extracts the phases of a decomposed X90.
+
+    Args:
+        qubits (list): qubit labels
+        compiler (tq.Compiler): True-Q compiler
+        in_radians (bool, optional): phases in radians. Defaults to True.
+
+    Returns:
+        Dict[int, List]: list of pahses for each qubit.
+    """
+    try:
+        import trueq as tq
+    except ImportError:
+        logger.warning(' Unable to import trueq!')
+        
+    phases = {q: [] for q in qubits}
+    compiled_X90 = compiler.compile(
+        tq.Circuit([tq.Cycle({(q,): tq.Gate.sx for q in qubits})])
+    )
+    for i in range(0, compiled_X90.n_cycles, 2):
+        for q in qubits:
+            phases[q].append(
+                np.deg2rad(compiled_X90[i][q].parameters['phi']) if in_radians
+                else compiled_X90[i][q].parameters['phi']
+            )
+            
+    return phases

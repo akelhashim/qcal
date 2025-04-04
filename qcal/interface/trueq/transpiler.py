@@ -25,7 +25,10 @@ def transpile_cycle(cycle, gate_mapper: defaultdict) -> deque:
     Returns:
         deque: transpiled cycle.
     """
-    import trueq as tq
+    try:
+        import trueq as tq
+    except ImportError:
+        logger.warning(' Unable to import trueq!')
 
     tcycle = deque()
     for q, gate in cycle:
@@ -139,7 +142,10 @@ def to_qcal(
 
 class TrueqTranspiler(Transpiler):
     """True-Q to qcal Transpiler."""
-    import trueq as tq
+    try:
+        import trueq as tq
+    except ImportError:
+        logger.warning(' Unable to import trueq!')
 
     __slots__ = ('_gate_mapper', '_barrier_between_all', '_cycle_replacement')
 

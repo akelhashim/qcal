@@ -96,6 +96,9 @@ class Adam:
         x (float | NDArray): parameter values corresponding to the loss.
         loss (float | NDArray): loss for each paramter value.
         """
+        if isinstance(loss, list):  # Compatibility with Optimize class
+            loss = loss[0]
+            
         delta = x - self._x_t
         self._grad = (loss - self._loss) / (delta + self._eps)
         self._prev_loss = self._loss
