@@ -33,9 +33,7 @@ def calculate_n_reads(config: Config, compiled_program) -> dict:
     
     n_reads = {}
     for q in qubits:
-        n_reads[str(int(config[f"readout/{q.strip('Q')}/channel"]))] = (
-            sum(seq[q] == 'Readout')
-        )
+        n_reads[f'{q}.rdlo'] = sum(seq[q] == 'Readout')
 
     return n_reads
 

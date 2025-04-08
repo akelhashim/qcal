@@ -43,12 +43,12 @@ class QubicQPU(QPU):
                 n_batches:           int = 1, 
                 n_circs_per_seq:     int = 1,
                 n_levels:            int = 2,
-                raster_circuits:     bool = False,
-                rcorr_cmat:          pd.DataFrame | None = None,
                 outputs:             List[str] = ['s11'],
                 hardware_vz_qubits:  List[str] = [],
                 measure_qubits:      List[str] | None = None,
+                rcorr_cmat:          pd.DataFrame | None = None,
                 circuit_for_loop:    bool = False,
+                raster_circuits:     bool = False,
                 reload_pulse:        bool = True,
                 reload_cmd:          bool = True,
                 reload_freq:         bool = True,
@@ -79,16 +79,6 @@ class QubicQPU(QPU):
             n_levels (int, optional): number of energy levels to be measured. 
                 Defaults to 2. If n_levels = 3, this assumes that the
                 measurement supports qutrit classification.
-            raster_circuits (bool, optional): whether to raster through all
-                circuits in a batch during measurement. Defaults to False. By
-                default, all circuits in a batch will be measured n_shots times
-                one by one. If True, all circuits in a batch will be measured
-                back-to-back one shot at a time. This can help average out the 
-                effects of drift on the timescale of a measurement.
-            rcorr_cmat (pd.DataFrame | None, optional): confusion matrix for
-                readout correction. Defaults to None. If passed, the readout
-                correction will be applied to the raw bit strings in 
-                post-processing.
             outputs (List[str]): what output data is desired for each
                 measurement. Defaults to ['s11', 'shots', 'counts']. 's11'
                 is to the integrated IQ data; 'shots' is the classified data
@@ -104,8 +94,18 @@ class QubicQPU(QPU):
                 for post-processing measurements. Defaults to None. This will
                 overwrite the measurement qubits listed in the measurement
                 objects. Example: ```measure_qubits = ['Q0', 'Q1', 'Q3']```.
+            rcorr_cmat (pd.DataFrame | None, optional): confusion matrix for
+                readout correction. Defaults to None. If passed, the readout
+                correction will be applied to the raw bit strings in 
+                post-processing.
             circuit_for_loop (bool): loops over circuit partitions for circuits
                 with repeated structures. Defaults to False.
+            raster_circuits (bool, optional): whether to raster through all
+                circuits in a batch during measurement. Defaults to False. By
+                default, all circuits in a batch will be measured n_shots times
+                one by one. If True, all circuits in a batch will be measured
+                back-to-back one shot at a time. This can help average out the 
+                effects of drift on the timescale of a measurement.
             reload_pulse (bool): reloads the stored pulses when compiling each
                 circuit. Defaults to True.
             reload_cmd (bool, optional): reload pulse command buffer for each
@@ -161,7 +161,6 @@ class QubicQPU(QPU):
         self._n_reads_per_shot = None
         self._outputs = outputs
         self._measure_qubits = measure_qubits
-        self._circuit_for_loop = circuit_for_loop
         self._reload_cmd = reload_cmd
         self._reload_freq = reload_freq
         self._reload_env = reload_env
@@ -171,10 +170,10 @@ class QubicQPU(QPU):
         self._sd_param = sd_param
         
         self._qubic_transpiler = Transpiler(
-            config, 
+            config,
+            hardware_vz_qubits=hardware_vz_qubits,
             circuit_for_loop=circuit_for_loop,
-            reload_pulse=reload_pulse,
-            hardware_vz_qubits=hardware_vz_qubits
+            reload_pulse=reload_pulse
         )
         self._fpga_config = FPGAConfig(jump_cond_clks=6)
         self._channel_config = load_channel_configs(

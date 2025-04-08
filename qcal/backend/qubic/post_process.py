@@ -105,7 +105,7 @@ def post_process(
             for q in meas_qubits:
                 if isinstance(n_reads_per_shot, dict):
                     n_reads = int(
-                        n_reads_per_shot[q] / len(circuits)
+                        n_reads_per_shot[f'{q}.rdlo'] / len(circuits)
                     )
                 elif isinstance(n_reads_per_shot, int):
                     n_reads = int(n_reads_per_shot / len(circuits))
