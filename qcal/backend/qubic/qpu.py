@@ -269,8 +269,11 @@ class QubicQPU(QPU):
             self._exp_circuits = [rastered_circuit]
 
         self._compiled_program = run_compile_stage(
-            self._exp_circuits, self._fpga_config, self._qchip,
+            self._exp_circuits, 
+            self._fpga_config, 
+            self._qchip,
             compiler_flags={'scope_control_flow': True},
+            suppress_duplicate_warnings=True,
             proc_grouping=proc_grouping_from_channelconfig(self._channel_config)
         )
         self._sequence = run_assemble_stage(
