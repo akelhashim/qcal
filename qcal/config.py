@@ -354,6 +354,24 @@ class Config:
         return tuple(self.parameters['single_qubit'].keys())
     
     @property
+    def qubits_even(self) -> list:
+        """Even labeled qubits on the process
+
+        Returns:
+            list: qubit labels.
+        """
+        return tuple([q for q in self.qubits if q % 2 == 0])
+    
+    @property
+    def qubits_odd(self) -> list:
+        """Odd labeled qubits on the process
+
+        Returns:
+            list: qubit labels.
+        """
+        return tuple([q for q in self.qubits if q % 2 == 1])
+    
+    @property
     def qubit_pairs(self) -> List[tuple]:
         """Available qubit pairs on the processor.
 
@@ -396,7 +414,7 @@ class Config:
             if abs(newvalue) > 1 or newvalue == 0:
                 newvalue = round(float(newvalue), 5)
             elif abs(newvalue) < 1:
-                newvalue = round_sig_figures(float(newvalue), 5)
+                newvalue = round_sig_figures(float(newvalue), 8)
         cfg_param = self.get(param[:-1])
         cfg_param[param[-1]] = newvalue
         logger.info(f' Param {param} set to {newvalue}.')
