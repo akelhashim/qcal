@@ -10,6 +10,7 @@ import logging
 import matplotlib.pyplot as plt
 import numpy as np
 
+from collections import defaultdict
 from typing import Any, Dict, List, Tuple
 
 logger = logging.getLogger(__name__)
@@ -39,7 +40,7 @@ class Calibration:
         self._param_sweep = {}
         self._sweep_results = {}
         self._fit = {}
-        self._cal_values = {}
+        self._cal_values = defaultdict(lambda: False, {})
         self._errors = {}
 
         if self._config['readout/esp/enable']:
