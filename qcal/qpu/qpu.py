@@ -11,6 +11,7 @@ from qcal.config import Config
 from qcal.circuit import CircuitSet
 from qcal.managers.classification_manager import ClassificationManager
 from qcal.managers.data_manager import DataMananger
+from qcal.utils import load_from_pickle
 
 import qcal.settings as settings
 
@@ -115,12 +116,21 @@ class QPU:
 
         if self._classifier is None:
             logger.warning(' No classifier has been instantiated!')
+            try:
+                self._classifier = load_from_pickle(
+                    settings.Settings.config_path +
+                    'ClassificationManager.pkl'
+                )
+            except Exception:
+                logger.warning(' Unable to automatically load a classifier!')
 
         assert n_levels <= 3, 'n_levels > is not currently supported!'
         self._n_levels = n_levels
 
-        if classifier is not None:
-            assert n_levels <= classifier[classifier._qubits[0]].n_components,(
+        if self._classifier is not None:
+            assert n_levels <= self._classifier[
+                self._classifier._qubits[0]
+            ].n_components, (
                 "'n_levels' is greater than the number of classified states!"
             )
 
