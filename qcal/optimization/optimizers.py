@@ -14,7 +14,8 @@ logger = logging.getLogger(__name__)
 
 __all__ = (
     'Adam',
-    'CMA'
+    'CMA', 
+    'LQR'
 )
 
 
@@ -44,8 +45,9 @@ class Adam:
             eps (float, optional): small additive factor to ensure we do not 
                 divide by zero. In general, this value should not be changed. 
                 Defaults to 1e-8.
-            tol (float, optional): convergence criteria. If the change in the 
-                cost is less than this value, the optimization will terminate.
+            tol (float, optional): convergence criteria. Defaults to 1e-4. If 
+                the change in the cost is less than this value, the optimization 
+                will terminate.
             loss (float | NDArray | None, optional): initial loss corresponding
                 to the initial parameters (x). Defaults to 0. This is used to
                 compute gradients for the parameters via finite difference
@@ -61,6 +63,8 @@ class Adam:
 
         self._grad = 0.
         self._prev_loss = 0.
+        self._opt_loss = loss
+        self._opt_x = x0
         self._m_t = 0.     # Aggregate of gradients at time t
         self._m_t_bc = 0.  # Bias-corrected first moment estimate
         self._v_t = 0.     # Sum of the square of past gradients
@@ -74,7 +78,7 @@ class Adam:
         Returns:
             NDArray: optimal parameters.
         """
-        return self._x_t
+        return self._opt_x
     
     @property
     def opt_loss(self) -> NDArray:
@@ -83,7 +87,7 @@ class Adam:
         Returns:
             NDArray: loss.
         """
-        return self._loss
+        return self._opt_loss
 
     def tell(self, x: float | NDArray, loss: float | NDArray) -> None:
         """Pass the parameter values and loss values for computing a gradient.
@@ -98,11 +102,15 @@ class Adam:
         """
         if isinstance(loss, list):  # Compatibility with Optimize class
             loss = loss[0]
+
+        if np.abs(loss) < np.abs(self._opt_loss):
+            self._opt_loss = loss.copy()
+            self._opt_x = x.copy()
             
-        delta = x - self._x_t
+        delta = x.copy() - self._x_t
         self._grad = (loss - self._loss) / (delta + self._eps)
-        self._prev_loss = self._loss
-        self._loss = loss
+        self._prev_loss = self._loss.copy()
+        self._loss = loss.copy()
     
     def step(self, grad: float | NDArray  = None) -> float | NDArray:
         """Compute the new parameters values based on the gradient for each.
@@ -215,3 +223,98 @@ class CMA:
         """
         return self._es.stop()
         
+
+class LQR:
+
+    def __init__(self,
+            x0:  float | NDArray,
+            A:   NDArray,
+            B:   NDArray,
+            Q:   NDArray,
+            R:   NDArray,
+            tol: float = 1e-6,
+        ) -> None:
+        """Linear Quadratic Regulator.
+
+        See:
+        https://python-control.readthedocs.io/en/latest/generated/control.dlqr.html
+
+        Args:
+            x0 (float | NDArray): initial parameter values.
+            A (NDArray): dynamics matrix.
+            B (NDArray): input matrix.
+            Q (NDArray): state matrix.
+            R (NDArray): input weight matrix.
+            tol (float, optional): convergence criteria. Defaults to 1e-4. If 
+                the change in the cost is less than this value, the optimization 
+                will terminate.
+        """
+        try:
+            import control
+            from control import dlqr
+            logger.info(f" control version: {control.__version__}")
+        except ImportError:
+            logger.warning(' Unable to import control!')
+ 
+        self._x_t = x0.copy()  # Parameters at time t = 0
+        self._B = B
+        self._tol = tol
+
+        self._loss = np.zeros(B.shape) # np.array([0.])
+        self._prev_loss = 0.
+        self._opt_loss = 1e10  # Large value for initial comparison
+        self._opt_x = x0.copy()
+        self._lqr_gain, _, _ = dlqr(A, B, Q, R)
+        self._u = np.zeros(B.shape) # np.array([0.])  # Control TODO
+
+    @property
+    def opt_x(self) -> NDArray:
+        """Optimal parameter values.
+
+        Returns:
+            NDArray: optimal parameters.
+        """
+        return self._opt_x
+    
+    @property
+    def opt_loss(self) -> NDArray:
+        """Loss correstponding to the optimal parameter values.
+
+        Returns:
+            NDArray: loss.
+        """
+        return self._opt_loss
+
+    def tell(self, x: float | NDArray, loss: float | NDArray) -> None:
+        """Pass the parameter values and loss values for computing the control.
+
+        The control is computed according the LQR gain and the loss.
+
+        x (float | NDArray): parameter values corresponding to the loss.
+        loss (float | NDArray): loss for each paramter value.
+        """
+        if np.abs(loss) < np.abs(self._opt_loss):
+            self._opt_loss = loss.copy()
+            self._opt_x = x.copy()
+
+        self._prev_loss = self._loss.copy()
+        self._loss = loss.copy()
+        self._u = -self._lqr_gain @ loss.copy()  # Control
+
+    def step(self) -> float | NDArray:
+        """Compute the new parameters values based on the control.
+
+        Returns:
+            float | NDArray: new parameter values.
+        """
+        self._x_t += self._u
+
+        return self._x_t
+    
+    def stop(self) -> bool:
+        """Whether to stop the optimization if convergence has been reached.
+
+        Returns:
+            bool: stop the optimization loop or not.
+        """
+        return abs(self._loss - self._prev_loss) < self._tol

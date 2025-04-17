@@ -13,9 +13,42 @@ import numpy as np
 
 from numpy.typing import NDArray
 from sklearn.preprocessing import MinMaxScaler
-from typing import Any, Callable, Dict
+from typing import Any, Callable, Dict, List
 
 logger = logging.getLogger(__name__)
+
+
+class NoScaler:
+    """This is a dummy class that returns the same values that are input.
+    
+    It has the same methods as MinMaxScalar for compatibility with the Optimize
+    class, but no rescaling is performed.
+    """
+
+    def __init__(self):
+        pass
+
+    def fit_transform(self, x: Any) -> Any:
+        """Return the values that are passed.
+
+        Args:
+            x (Any): input values.
+
+        Returns:
+            Any: input values.
+        """
+        return x
+    
+    def inverse_transform(self, x: Any) -> Any:
+        """Return the values that are passed.
+
+        Args:
+            x (Any): input values.
+
+        Returns:
+            Any: input values.
+        """
+        return x
 
 
 class Optimize:
@@ -82,14 +115,19 @@ class Optimize:
                 )[1] for ql in self._qubit_labels
             }
         else:
-            self._scaler = {ql: MinMaxScaler() for ql in self._qubit_labels}
+            self._scaler = {ql: NoScaler() for ql in self._qubit_labels}
             self._x0 = {ql: 
                 self._scaler[ql].fit_transform(
-                    np.array(
-                        [self._config[p] for p in self._params[ql]]
-                    ).reshape(-1, 1)
+                    np.array([[self._config[p] for p in self._params[ql]]])
                 ) for ql in self._qubit_labels
             }
+            # self._x0 = {ql: 
+            #     self._scaler[ql].fit_transform(
+            #         np.array(
+            #             [self._config[p] for p in self._params[ql]]
+            #         ).reshape(-1, 1)
+            #     ) for ql in self._qubit_labels
+            # }
         
         opt_kwargs = opt_kwargs if opt_kwargs is not None else {
             ql: {} for ql in self._qubit_labels
@@ -224,10 +262,10 @@ class Optimize:
     
     @property
     def scaler(self) -> Dict:
-        """MinMaxScaler for each qubit label.
+        """MinMaxScaler or NoScaler for each qubit label.
 
-        The scaler rescales all parameter values to between 0 and 1 for improved
-        convergence.
+        The MinMaxScaler rescales all parameter values to between 0 and 1 for 
+        improved convergence. NoScaler does not rescale the parameter values.
 
         Returns:
             Dict: scaler for each qubit label.
@@ -275,8 +313,10 @@ class Optimize:
     def compute_loss(self) -> None:
         """Compute the cost using the cost function."""
         self._loss= {
-            ql: uncertainty_of_sum(
-                self._cost_func.loss[ql]
+            ql: np.array(
+                uncertainty_of_sum(self._cost_func.loss[ql]) 
+                if len(self._cost_func.loss[ql]) > 1 
+                else self._cost_func.loss[ql][0]
             ) for ql in self._qubit_labels
         }
         
@@ -289,19 +329,26 @@ class Optimize:
         """
         for ql in self._qubit_labels:
             self._params_history[ql].append(
-                self._scaler[ql].inverse_transform(values[ql].reshape(1, -1))[0]
+                self._scaler[ql].inverse_transform(
+                    values[ql].reshape(1, -1)
+                )[0].copy()
             )
             for i, param in enumerate(self._params[ql]):
                 self._config[param] = self._params_history[ql][-1][i]
                 
+        # Re-instantiate cost function class with updated config
+        self._cost_func._init_kwargs['config'] = self._config
+        self._cost_func.__init__(
+            *self._cost_func._init_args,
+            **self._cost_func._init_kwargs
+        )
+
         if '_param_sweep' in self._cost_func.__dict__.keys():
             self._cost_func._param_sweep = {
                 ql: self._scaler[ql].inverse_transform(
                     values[ql].reshape(1, -1)
                 )[0] for ql in self._qubit_labels
             }
-
-        self._cost_func._config = self._config
 
     def run(self) -> None:
         """Run the optimization loop."""
@@ -335,8 +382,10 @@ class Optimize:
                     losses[ql].append(self._loss[ql])
             
             for ql in self._qubit_labels:
-                self._loss_history[ql].append(losses[ql])
-                self._optimizer[ql].tell(self._x[ql], losses[ql])
+                self._loss_history[ql].append(losses[ql].copy())
+                self._optimizer[ql].tell(
+                    self._x[ql].copy(), losses[ql].copy()
+                )
             
             self.plot()
 
@@ -376,11 +425,11 @@ class Optimize:
                 if k < len(self._qubit_labels):
                     ql = self._qubit_labels[k]
 
-                    ax.plot(self._loss_history[ql], 'o', alpha=0.2)
+                    ax.plot(np.abs(self._loss_history[ql]), 'o', alpha=0.2)
                     ax.errorbar(
                         np.arange(len(self._loss_history[ql])),
-                        np.mean(self._loss_history[ql], 1), 
-                        yerr=np.std(self._loss_history[ql], 1),
+                        np.mean(np.abs(self._loss_history[ql]), 1), 
+                        yerr=np.std(np.abs(self._loss_history[ql]), 1),
                         color='black', ecolor='blueviolet', 
                         elinewidth=3, capsize=0, label='Mean'
                     )
