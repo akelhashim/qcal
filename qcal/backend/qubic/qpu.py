@@ -186,26 +186,28 @@ class QubicQPU(QPU):
             ip=ip_address, port=port
         )
 
-        # Overwrite qubit and readout frequencies:
+        # Overwrite frequencies and interpolation ratios
         for q in self._config.qubits:
-            self._qchip.qubits[f'Q{q}'].freq = (
-                self._config[f'single_qubit/{q}/GE/freq']
-            )
-            self._qchip.qubits[f'Q{q}'].freq_ef = (
-                self._config[f'single_qubit/{q}/EF/freq']
-            )
-            self._qchip.qubits[f'Q{q}'].readfreq = (
-                self._config[f'readout/{q}/freq']
-            )
-            self._channel_config[f'Q{q}.qdrv'].elem_params['interp_ratio'] = (
-                self._config[f'hardware/interpolation_ratio/qdrv']
-            )
-            self._channel_config[f'Q{q}.rdrv'].elem_params['interp_ratio'] = (
-                self._config[f'hardware/interpolation_ratio/rdrv']
-            )
-            self._channel_config[f'Q{q}.rdlo'].elem_params['interp_ratio'] = (
-                self._config[f'hardware/interpolation_ratio/rdlo']
-            )
+            if f'Q{q}' in self._qchip.qubits.keys():
+                self._qchip.qubits[f'Q{q}'].freq = (
+                    self._config[f'single_qubit/{q}/GE/freq']
+                )
+                self._qchip.qubits[f'Q{q}'].freq_ef = (
+                    self._config[f'single_qubit/{q}/EF/freq']
+                )
+                self._qchip.qubits[f'Q{q}'].readfreq = (
+                    self._config[f'readout/{q}/freq']
+                )
+            if any(f'Q{q}.' in key for key in self._channel_config.keys()):
+                self._channel_config[f'Q{q}.qdrv'].elem_params['interp_ratio']=(
+                    self._config[f'hardware/interpolation_ratio/qdrv']
+                )
+                self._channel_config[f'Q{q}.rdrv'].elem_params['interp_ratio']=(
+                    self._config[f'hardware/interpolation_ratio/rdrv']
+                )
+                self._channel_config[f'Q{q}.rdlo'].elem_params['interp_ratio']=(
+                    self._config[f'hardware/interpolation_ratio/rdlo']
+                )
 
         self._jobman = job_manager.JobManager(
             self._fpga_config,
