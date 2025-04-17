@@ -12,6 +12,7 @@ from qcal.config import Config
 from qcal.math.utils import round_to_order_error
 from qcal.qpu.qpu import QPU
 from qcal.plotting.utils import calculate_nrows_ncols
+from qcal.utils import save_init
 
 import logging
 import matplotlib.pyplot as plt
@@ -1077,7 +1078,8 @@ def RPE(qpu:            QPU,
 
     class RPE(qpu):
         """pyRPE protocol."""
-
+        
+        @save_init
         def __init__(self,
                 config:         Config,
                 qubit_labels:   Iterable[int],
@@ -1096,8 +1098,6 @@ def RPE(qpu:            QPU,
                 logger.info(f" pyGSTi version: {pygsti.__version__}\n")
             except ImportError:
                 logger.warning(' Unable to import pyGSTi!')
-
-            self._config = config
 
             assert gate.upper() in ('I', 'X90', 'CZ'), (
                 'Only I, X90, and CZ gates are currently supported!'
@@ -1143,6 +1143,7 @@ def RPE(qpu:            QPU,
             self._angle_errors = {}
             self._last_good_idx = {}
             self._signal = {}
+            self._loss = {ql: {} for ql in qubit_labels}
             self._trusted_angle_est = {ql: {} for ql in qubit_labels}
             self._trusted_err_est = {ql: {} for ql in qubit_labels}
 
@@ -1205,11 +1206,11 @@ def RPE(qpu:            QPU,
                     [self._loss_angle]
                 )
             loss = {}
-            for ql, errors in self._trusted_err_est.items():
+            for ql, errors in self._loss.items():
                 vals = []
                 for err, val in errors.items():
                     if err in loss_angle:
-                        vals.append(abs(val['val']))
+                        vals.append(val)
                 loss[ql] = vals
 
             return loss
@@ -1337,9 +1338,9 @@ def RPE(qpu:            QPU,
                 self._signal[ql] = signal
 
                 for angle, estimates in self._angle_estimates[ql].items():
-                    error = estimates[self._last_good_idx[ql]]
+                    est = estimates[self._last_good_idx[ql]]
                     unc = np.pi / (2 * 2**self._last_good_idx[ql])
-                    est, unc = round_to_order_error(error, unc)
+                    est, unc = round_to_order_error(est, unc)
                     self._trusted_angle_est[ql][angle] = {
                         'val': est, 'err': unc
                     }
@@ -1353,6 +1354,7 @@ def RPE(qpu:            QPU,
                 print(f'Last good depth: L = {2**self._last_good_idx[ql]}')
                 for angle, errors in self._angle_errors[ql].items():
                     error = errors[self._last_good_idx[ql]]
+                    self._loss[ql][angle] = error
                     unc = np.pi / (2 * 2**self._last_good_idx[ql])
                     error, unc = round_to_order_error(error, unc)
                     error_deg, unc_deg = round_to_order_error(
