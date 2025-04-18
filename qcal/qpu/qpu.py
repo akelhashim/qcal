@@ -115,14 +115,13 @@ class QPU:
         self._rcorr_cmat = rcorr_cmat
 
         if self._classifier is None:
-            logger.warning(' No classifier has been instantiated!')
             try:
                 self._classifier = load_from_pickle(
                     settings.Settings.config_path +
                     'ClassificationManager.pkl'
                 )
             except Exception:
-                logger.warning(' Unable to automatically load a classifier!')
+                logger.warning(' No classifier has been instantiated!')
 
         assert n_levels <= 3, 'n_levels > is not currently supported!'
         self._n_levels = n_levels

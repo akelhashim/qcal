@@ -462,11 +462,16 @@ class Circuit:
         """
         circuit_partitions = pd.DataFrame(columns=['Partitions', 'Size'])
         n = max([1, int(np.log2(self.n_cycles / 4))])
-        for block_size in [2**i for i in range(n + 1)]:
+        blocks = [2**i for i in range(n + 1)]
+        add = [3, 5, 6, 7, 9, 10, 11, 12, 15, 20, 21, 24]
+        blocks += list(np.array(add)[np.array(add) < 2**(n + 1)])
+        for block_size in sorted(blocks):
             partitions = partition_circuit(self, block_size=block_size)
             circuit_partitions.loc[block_size] = {
                 'Partitions': partitions, 'Size': len(partitions)
             }
+            if len(partitions) < 5:
+                break
 
         return circuit_partitions[
             circuit_partitions.Size == circuit_partitions.Size.min()
