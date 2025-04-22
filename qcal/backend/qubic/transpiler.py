@@ -12,9 +12,9 @@ from qcal.gate.gate import Gate
 from qcal.gate.single_qubit import (
     Id, Idle, Meas, MCM, Reset, Rz, VirtualZ, X, X90, Z
 )
-from qcal.sequencer.dynamical_decoupling import dd_sequences
-from qcal.sequencer.pulse_envelopes import pulse_envelopes
-from qcal.sequencer.utils import clip_amplitude
+from qcal.sequence.dynamical_decoupling import dd_sequences
+from qcal.sequence.pulse_envelopes import pulse_envelopes
+from qcal.sequence.utils import clip_amplitude
 
 import copy
 import logging
