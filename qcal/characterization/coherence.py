@@ -7,10 +7,11 @@ from qcal.characterization.characterize import Characterize
 from qcal.circuit import Barrier, Cycle, Circuit, CircuitSet
 from qcal.config import Config
 from qcal.fitting.fit import FitCosine, FitDecayingCosine, FitExponential
-from qcal.gate.single_qubit import Idle, Rz, VirtualZ, X90, X
+from qcal.gate.single_qubit import Idle, Rz, VirtualZ, X90, X, Z
 from qcal.math.utils import (
     uncertainty_of_sum, reciprocal_uncertainty, round_to_order_error
 )
+from qcal.sequence.dynamical_decoupling import XY
 from qcal.qpu.qpu import QPU
 from qcal.units import MHz, us
 
@@ -321,7 +322,6 @@ def T2(qpu:        QPU,
             self._qubits = qubits
             self._echo = echo
             self._detuning = detuning
-            self._gate = 'X90'
 
             assert subspace in ('GE', 'EF'), (
                 "'subspace' must be one of 'GE' or 'EF'!"
@@ -408,7 +408,7 @@ def T2(qpu:        QPU,
                 circuit.append(
                     Cycle({X90(q, subspace=self._subspace) 
                            for q in self._qubits})
-               )
+                )
                 
                 circuit.measure()
                 circuits.append(circuit)

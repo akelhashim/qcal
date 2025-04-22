@@ -1,6 +1,5 @@
-"""Submodule for handling transpilation to/from Bqskit.
+"""Submodule for transpiler from cirq and qiskit circuits..
 
-See: https://github.com/BQSKit/bqskit
 """
 from qcal.circuit import Barrier, Cycle, Layer, Circuit, CircuitSet
 from qcal.gate.single_qubit import Meas, Rz, X90, X
@@ -95,7 +94,7 @@ class CirqTranspiler(Transpiler):
 
     __slots__ = ('_gate_mapper',)
 
-    def __init__(self, gate_mapper:  defaultdict | Dict | None = None) -> None:
+    def __init__(self, gate_mapper: defaultdict | Dict | None = None) -> None:
         """Initialize with gate_mapper.
 
         Args:

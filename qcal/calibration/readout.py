@@ -343,7 +343,8 @@ def ReadoutCalibration(
                         else:
                             handles = []
                             for l in range(self._n_levels):
-                                handles.append(cs.legend_elements()[0][l*3])
+                                if l*3 < len(cs.legend_elements()[0]):
+                                    handles.append(cs.legend_elements()[0][l*3])
                             leg = ax.legend(
                                 handles=handles,
                                 labels=range(0, self._n_levels), 

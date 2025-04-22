@@ -8,10 +8,8 @@ https://trueq.quantumbenchmark.com/api/protocols.html#trueq.make_cb
 import qcal.settings as settings
 
 from qcal.config import Config
-from qcal.managers.classification_manager import ClassificationManager
 from qcal.math.utils import round_to_order_error
 from qcal.qpu.qpu import QPU
-from qcal.plotting.utils import calculate_nrows_ncols
 
 import logging
 import matplotlib.pyplot as plt

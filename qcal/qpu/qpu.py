@@ -248,7 +248,7 @@ class QPU:
         """
         self._data_manager.generate_exp_id()  # Create a new experimental id
         
-        if 'n_circuits' not in dir(circuits):
+        if not isinstance(circuits, List) and 'n_circuits' not in dir(circuits):
             circuits = [circuits]
         if isinstance(circuits, List):
             self._circuits = CircuitSet(circuits=circuits)
