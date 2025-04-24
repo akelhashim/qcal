@@ -79,16 +79,17 @@ def initialize(config: Config, circuit: List, ) -> None:
         config (Config): qcal Config object.
         circuit (List):  qubic circuit.
     """
-    for pulse in config['initialize']:
+    for ch in config['initialize']:
         circuit.append(
-            {'name': 'pulse', 
-             'env': None, 
-             'freq': None, 
-             'amp': pulse['amp'],
-             'twidth': pulse['length'], 
-             'dest': pulse['channel']
+            {'name':   'pulse', 
+             'env':    None, 
+             'freq':   None, 
+             'amp':    config[f'initialize/{ch}/amp'],
+             'twidth': config[f'initialize/{ch}/length'], 
+             'dest':   ch
             }
         )
+    circuit.append({'name': 'barrier'})
 
 
 def deactivate(config: Config, circuit: List, ) -> None:
@@ -98,14 +99,15 @@ def deactivate(config: Config, circuit: List, ) -> None:
         config (Config): qcal Config object.
         circuit (List):  qubic circuit.
     """
-    for pulse in config['initialize']:
+    circuit.append({'name': 'barrier'})
+    for ch in config['initialize']:
         circuit.append(
-            {'name': 'pulse', 
-             'env': None, 
-             'freq': None, 
-             'amp': 0.,
+            {'name':   'pulse', 
+             'env':    None, 
+             'freq':   None, 
+             'amp':    0.,
              'twidth': 0., 
-             'dest': pulse['channel']
+             'dest':   ch
             }
         )
 
@@ -849,7 +851,6 @@ def to_qubic(
 
     if config._parameters['initialize']:
         initialize(config, qubic_circuit)
-        qubic_circuit.append({'name': 'barrier'})
 
     # Add reset to the beginning of the circuit
     add_reset(config, circuit.qubits, qubic_circuit, pulses)
@@ -985,9 +986,8 @@ def to_qubic(
                     }
                 )
 
-    if config._parameters['initialize']:
-        qubic_circuit.append({'name': 'barrier'})
-        deactivate(config, qubic_circuit)
+    # if config._parameters['initialize']:
+    #     deactivate(config, qubic_circuit)
 
     return qubic_circuit
 
