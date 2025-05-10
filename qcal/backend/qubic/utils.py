@@ -63,11 +63,17 @@ def qubic_sequence(compiled_program) -> pd.DataFrame:
                 times.append(pulse['start_time'])
         times = np.array(times) #- times[0]
         times = np.around(times* 2 * ns / us, 3)
-        df = df.join(
-            pd.DataFrame({qubit: tags}, index=times),
-            how='outer'
-        )
+        if qubit in df.columns:
+            if len(pd.DataFrame({qubit: tags}, index=times)) > 0:
+                df = df.combine_first(
+                    pd.DataFrame({qubit: tags}, index=times)
+                )
+        else:
+            df = df.join(
+                pd.DataFrame({qubit: tags}, index=times),
+                how='outer'
+            )
 
-    df = df.reindex(sorted(df.columns), axis=1)
+    df = df.reindex(sorted(df.columns), axis=1).fillna('')
     df.index.name = '[us]'
     return df.fillna('')

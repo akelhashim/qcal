@@ -274,7 +274,7 @@ class QubicQPU(QPU):
             self._exp_circuits, 
             self._fpga_config, 
             self._qchip,
-            compiler_flags={'scope_control_flow': True},
+            compiler_flags={'scope_control_flow': True, 'multi_board': True},
             suppress_duplicate_warnings=True,
             proc_grouping=proc_grouping_from_channelconfig(self._channel_config)
         )
