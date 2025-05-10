@@ -312,7 +312,7 @@ class Optimize:
 
     def compute_loss(self) -> None:
         """Compute the cost using the cost function."""
-        self._loss= {
+        self._loss = {
             ql: np.array(
                 uncertainty_of_sum(self._cost_func.loss[ql]) 
                 if len(self._cost_func.loss[ql]) > 1 

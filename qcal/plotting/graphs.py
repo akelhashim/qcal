@@ -434,7 +434,7 @@ def draw_qpu(config: Config):
             )
         )
     node_adjacencies = []
-    for node, adjacencies in enumerate(G.adjacency()):
+    for node, adjacencies in enumerate(sorted(G.adjacency())):
         node_adjacencies.append(len(adjacencies[1]))
         node_text[node] += 'Connectivity: '+str(len(adjacencies[1]))
     node_trace.marker.color = node_adjacencies

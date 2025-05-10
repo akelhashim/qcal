@@ -932,9 +932,9 @@ def Frequency(
                 self._param_sweep[pair] = self._frequencies[pair]
                 
             self._R = {}
-            self._fit = {
-                pair: FitParabola() for pair in qubit_pairs
-            }
+            # self._fit = {
+            #     pair: FitParabola() for pair in qubit_pairs
+            # }
 
         @property
         def frequencies(self) -> Dict:
@@ -1022,27 +1022,30 @@ def Frequency(
                     (np.array(prob_C1_Y) - np.array(prob_C0_Y)) ** 2
                 )
                 self._sweep_results[pair] = self._R[pair]
+                self._cal_values[pair] = self._param_sweep[pair][
+                    np.array(self._R[pair]).argmax()
+                ]
 
-                self._fit[pair].fit(
-                    self._frequencies[pair][0], self._R[pair]
-                )
+                # self._fit[pair].fit(
+                #     self._frequencies[pair][0], self._R[pair]
+                # )
 
-                # If the fit was successful, find the new frequency
-                if self._fit[pair].fit_success:
-                    a, b, _ = self._fit[pair].fit_params
-                    newvalue = -b / (2 * a)  # Assume c = 0
-                    if a > 0:
-                        logger.warning(
-                            f'Fit failed for {pair} (positive curvature)!'
-                        )
-                        self._fit[pair]._fit_success = False
-                    elif not in_range(newvalue, self._frequencies[pair]):
-                        logger.warning(
-                            f'Fit failed for {pair} (out of range)!'
-                        )
-                        self._fit[pair]._fit_success = False
-                    else:
-                        self._cal_values[pair].append(newvalue)
+                # # If the fit was successful, find the new frequency
+                # if self._fit[pair].fit_success:
+                #     a, b, _ = self._fit[pair].fit_params
+                #     newvalue = -b / (2 * a)  # Assume c = 0
+                #     if a > 0:
+                #         logger.warning(
+                #             f'Fit failed for {pair} (positive curvature)!'
+                #         )
+                #         self._fit[pair]._fit_success = False
+                #     elif not in_range(newvalue, self._frequencies[pair]):
+                #         logger.warning(
+                #             f'Fit failed for {pair} (out of range)!'
+                #         )
+                #         self._fit[pair]._fit_success = False
+                #     else:
+                #         self._cal_values[pair].append(newvalue)
 
         def save(self):
             """Save all circuits and data."""
@@ -1094,16 +1097,16 @@ def Frequency(
                             'o', c='blue', label=f'Meas, {q}'
                         )
 
-                        if self._fit[q].fit_success:
-                            x = np.linspace(
-                                self._param_sweep[q][0],
-                                self._param_sweep[q][-1], 
-                                100
-                            )
-                            ax.plot(
-                                x, self._fit[q].predict(x),
-                                '-', c='orange', label='Fit'
-                            )
+                        if self._cal_values[q]:
+                            # x = np.linspace(
+                            #     self._param_sweep[q][0],
+                            #     self._param_sweep[q][-1], 
+                            #     100
+                            # )
+                            # ax.plot(
+                            #     x, self._fit[q].predict(x),
+                            #     '-', c='orange', label='Fit'
+                            # )
                             ax.axvline(
                                 self._cal_values[q],
                                 ls='--', c='k', label='Fit value'
@@ -1130,7 +1133,12 @@ def Frequency(
 
         def final(self) -> None:
             """Final calibration method."""
-            Calibration.final(self)
+            if self._cal_values:
+                for q, val in self._cal_values.items():
+                    self.set_param(self._params[q], val)
+            self._config.save()
+            self._config.load()
+            
             print(f"\nRuntime: {repr(self._runtime)[8:]}\n")
 
         def run(self):
