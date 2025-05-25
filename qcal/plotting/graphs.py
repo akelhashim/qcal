@@ -7,12 +7,12 @@ from qcal.gate.gate import Gate
 import logging
 import networkx as nx
 import numpy as np
+import plotly.graph_objects as go
+import plotly.io as pio
 
 from collections import defaultdict
-from typing import Dict
-
-import plotly.graph_objects as go
 from plotly.graph_objs.scatter import Marker
+from typing import Dict
 
 logger = logging.getLogger(__name__)
 
@@ -60,6 +60,8 @@ def draw_circuit(circuit: Circuit, show: bool = True):
             False, the figure object is returned.
 
     """
+    pio.templates.default = 'plotly'
+
     # https://plotly.com/python/marker-style/
     symbol_map = defaultdict(lambda: ['square', 'square'],
         {'Meas':   ['triangle-right'],
@@ -274,6 +276,8 @@ def draw_DAG(G: nx.Graph):
     Args:
         G (nx.Graph): networkx graph object.
     """
+    pio.templates.default = 'plotly'
+    
     pos = nx.spring_layout(G)
 
     node_x = []
