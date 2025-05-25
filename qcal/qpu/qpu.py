@@ -114,6 +114,9 @@ class QPU:
         self._raster_circuits = raster_circuits
         self._rcorr_cmat = rcorr_cmat
 
+        assert n_levels <= 3, 'n_levels > 3 is not currently supported!'
+        self._n_levels = n_levels
+
         if self._classifier is None:
             try:
                 self._classifier = load_from_pickle(
@@ -122,9 +125,6 @@ class QPU:
                 )
             except Exception:
                 logger.warning(' No classifier has been instantiated!')
-
-        assert n_levels <= 3, 'n_levels > is not currently supported!'
-        self._n_levels = n_levels
 
         if self._classifier is not None:
             assert n_levels <= self._classifier[

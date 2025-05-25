@@ -644,7 +644,7 @@ class Circuit:
         """Prepends a cycle/layer to the front of the circuit.
 
         Args:
-            cycle_or_layer (Barrier, Cycle, Laye, List): cycle/layer to 
+            cycle_or_layer (Barrier, Cycle, Layer, List): cycle/layer to 
                 prepend.
         """
         if isinstance(cycle_or_layer, List):
