@@ -1,30 +1,39 @@
 """Submodule for storing various definitions of pulse envelopes.
 
 """
+from qcal.sequence.utils import cosine_basis_function, solve_coefficients
+
+import logging
 import numpy as np
 
 from collections import defaultdict
 from numpy.typing import NDArray
-from typing import Union
+from typing import List, Union
+
+logger = logging.getLogger(__name__)
 
 
 __all__ = [
     'cosine_square',
     'custom',
     'DRAG',
+    'FAST',
+    'FAST_DRAG',
     'linear',
     'gaussian',
     'sine',
     'square',
     'virtualz',
-    # 'zz_DRAG'
 ]
 
 
 def cosine_square(
-        length: float, sample_rate: float, amp: float = 1.0,
-        phase: float = 0.0, ramp_fraction: float = 0.25
-    ) -> NDArray:
+        length:        float, 
+        sample_rate:   float, 
+        amp:           float = 1.0,
+        phase:         float = 0.0, 
+        ramp_fraction: float = 0.25
+    ) -> NDArray[np.complex64]:
     """Pulse envelope with cosine ramps and a flat top.
 
     Args:
@@ -36,7 +45,7 @@ def cosine_square(
             falling edge. Defaults to 0.25.
 
     Returns:
-        NDArray: envelope with cosine ramps and a flat top.
+        NDArray[np.complex64]: envelope with cosine ramps and a flat top.
     """
     assert ramp_fraction <= 0.5, 'ramp_fraction cannot be more than 0.5!'
     n_points = int(round(length * sample_rate))
@@ -69,10 +78,15 @@ def custom(length: float, sample_rate: float, filename: str) -> NDArray:
 
 
 def DRAG(
-        length: float, sample_rate: float, alpha: float = 0.0, 
-        amp: float = 1.0, anh: float = -270e6, df: float = 0.0,
-        n_sigma: int = 3, phase: float = 0.0
-    ) -> NDArray:
+        length:      float, 
+        sample_rate: float, 
+        alpha:       float = 0.0, 
+        amp:         float = 1.0, 
+        anh:         float = -200e6, 
+        df:          float = 0.0,
+        n_sigma:     int = 3, 
+        phase:       float = 0.0
+    ) -> NDArray[np.complex64]:
     """Derivative Removal by Adiabatic Gate (DRAG) pulse envelope.
 
     References:
@@ -86,13 +100,13 @@ def DRAG(
         alpha (float, optional): DRAG parameter. Defaults to 0.0. For phase
             errors, alpha should be 0.5. For leakage errors, alpha should be 1.
         amp (float, optional): pulse amplitude. Defaults to 1.0.
-        anh (float, optional): qubit anharmonicity. Defaults to -270e6.
+        anh (float, optional): qubit anharmonicity. Defaults to -200e6.
         df (float, optional): frequency detuning. Defaults to 0.0.
         n_sigma (int, optional): number of standard deviations. Defaults to 3.
         phase (float, optional): pulse phase. Defaults to 0.0.
 
     Returns:
-        NDArray: DRAG envelope.
+        NDArray[np.complex64]: DRAG envelope.
     """
     df /= sample_rate
     delta = 2 * np.pi * (anh / sample_rate + df)
@@ -108,9 +122,126 @@ def DRAG(
         ).astype(np.complex64)
 
 
+def FAST(
+        length:         float, 
+        sample_rate:    float, 
+        freq_intervals: List, 
+        weights:        List, 
+        amp:            float = 1.0, 
+        N:              int = 4, 
+        phase:          float = 0.0, 
+        theta:          float = np.pi/2 
+    ) -> NDArray[np.complex64]:
+    """Fourier Ansatz Spectrum Tuning (FAST) pulse envelope.
+
+    Reference:
+    https://journals.aps.org/prxquantum/abstract/10.1103/PRXQuantum.5.030353
+
+    Args:
+        length (float): pulse length in seconds.
+        sample_rate (float): sample rate in Hz.
+        freq_intervals (List): list of [f_low, f_high] pairs.
+        weights (List): weights for each frequency interval.
+        amp (float, optional): pulse amplitude. Defaults to 1.0.
+        N (int, optional): number of Fourier terms.
+        phase (float, optional): pulse phase. Defaults to 0.0.
+        theta (float, optional): rotation angle. Defaults to pi/2.
+
+    Returns:
+        NDArray[np.complex64]: FAST envelope.
+    """
+    # Setup time array
+    n_points = int(round(length * sample_rate))
+    t = np.linspace(0, length, n_points)
+
+    # Solve for coefficients
+    coefficients = solve_coefficients(
+        N=N, 
+        t_p=length, 
+        theta=theta, 
+        freq_intervals=freq_intervals, 
+        weights=weights,
+    )
+    
+    # Generate envelope
+    fast = np.zeros_like(t)
+    for n in range(N):
+        fast += coefficients[n] * cosine_basis_function(n+1, t, length)
+    fast /= np.max(np.abs(fast))
+    
+    return np.array(amp * fast * np.exp(1j*phase)).astype(np.complex64)
+
+
+def FAST_DRAG(
+        length:         float, 
+        sample_rate:    float, 
+        freq_intervals: List = None, 
+        weights:        List = None, 
+        alpha:          float = 0.0, 
+        amp:            float = 1.0, 
+        anh:            float = -200e6, 
+        N:              int = 4, 
+        phase:          float = 0.0, 
+        theta:          float = np.pi/2 
+    ) -> NDArray[np.complex64]:
+    """Fourier Ansatz Spectrum Tuning (FAST) DRAG pulse envelope.
+
+    Reference:
+    https://journals.aps.org/prxquantum/abstract/10.1103/PRXQuantum.5.030353
+
+    Args:
+        length (float): pulse length in seconds.
+        sample_rate (float): sample rate in Hz.
+        freq_intervals (List): list of [f_low, f_high] pairs.
+        weights (List): weights for each frequency interval.
+        alpha (float, optional): DRAG parameter. Defaults to 0.0. For phase
+            errors, alpha should be 0.5. For leakage errors, alpha should be 1.
+        amp (float, optional): pulse amplitude. Defaults to 1.0.
+        anh (float, optional): qubit anharmonicity. Defaults to -200e6.
+        N (int, optional): number of Fourier terms.
+        phase (float, optional): pulse phase. Defaults to 0.0.
+        theta (float): rotation angle. Defaults to pi/2.
+
+    Returns:
+        NDArray[np.complex64]: FAST DRAG envelope.
+    """
+    # Setup time array
+    dt = 1.0 / sample_rate
+    delta = 2 * np.pi * anh
+    
+    # Default frequency intervals based on anharmonicity if not provided
+    if freq_intervals is None:
+        freq_intervals = [
+            [abs(anh) * 0.8, abs(anh) * 1.2],  # Around ef-transition
+            [3 * abs(anh), 5 * abs(anh)]       # High frequency cutoff
+        ]
+    
+    if weights is None:
+        weights = [1.0, 0.1]  # Higher weight for ef-transition suppression
+    
+    # Generate I component using FAST
+    I = FAST(
+        length=length, 
+        sample_rate=sample_rate, 
+        freq_intervals=freq_intervals, 
+        weights=weights, 
+        amp=amp, 
+        N=N, 
+        phase=phase, 
+        theta=theta
+    )
+
+    # Generate Q component using DRAG
+    Q = alpha / delta * np.gradient(I, dt)
+
+    fast_drag = I + 1j * Q
+    
+    return np.array(fast_drag).astype(np.complex64)
+
+
 def linear(
         length: float, sample_rate: float, amp: float = 1.0, phase: float = 0.0
-    ) -> NDArray:
+    ) -> NDArray[np.complex64]:
     """Linear ramp pulse envelope.
 
     The linear ramp starts at 0, and ends at amp.
@@ -122,7 +253,7 @@ def linear(
         phase (float, optional): pulse phase. Defaults to 0.0.
 
     Returns:
-        NDArray: linear ramp envelop.
+        NDArray[np.complex64]: linear ramp envelop.
     """
     n_points = int(round(length * sample_rate))
     return np.array(
@@ -131,9 +262,12 @@ def linear(
 
 
 def gaussian(
-        length: float, sample_rate: float, amp: float = 1.0,
-        n_sigma: Union[float, int] = 3, phase: float = 0.0
-    ) -> NDArray:
+        length:      float, 
+        sample_rate: float, 
+        amp:         float = 1.0,
+        n_sigma:     int = 3, 
+        phase:       float = 0.0
+    ) -> NDArray[np.complex64]:
     """Gaussian pulse envelope.
 
     Args:
@@ -144,7 +278,7 @@ def gaussian(
         phase (float, optional): pulse phase. Defaults to 0.0.
         
     Returns:
-        NDArray: Gaussian envelope.
+        NDArray[np.complex64]: Gaussian envelope.
     """
     n_points = int(round(length * sample_rate))
     sigma = n_points / (2. * n_sigma)
@@ -154,9 +288,13 @@ def gaussian(
 
 
 def gaussian_square(
-        length: float, sample_rate: float, amp: float = 1.0,
-        n_sigma: int = 3, phase: float = 0.0, ramp_fraction: float = 0.25
-    ) -> NDArray:
+        length:        float, 
+        sample_rate:   float, 
+        amp:           float = 1.0,
+        n_sigma:       int = 3, 
+        phase:         float = 0.0, 
+        ramp_fraction: float = 0.25
+    ) -> NDArray[np.complex64]:
     """Pulse envelope with Gaussian ramps and a flat top.
 
     Args:
@@ -169,7 +307,7 @@ def gaussian_square(
             falling edge. Defaults to 0.25.
 
     Returns:
-        NDArray: _description_
+        NDArray[np.complex64]: Gaussian square envelope.
     """
     assert ramp_fraction <= 0.5, 'ramp_fraction cannot be more than 0.5!'
     n_points = int(round(length * sample_rate))
@@ -189,9 +327,12 @@ def gaussian_square(
 
 
 def sine(
-        length: float, sample_rate: float, amp: float = 1.0, 
-        freq: float = 0.0, phase: float= 0.0
-    ) -> NDArray:
+        length:      float, 
+        sample_rate: float, 
+        amp:         float = 1.0, 
+        freq:        float = 0.0, 
+        phase:       float= 0.0
+    ) -> NDArray[np.complex64]:
     """Sine pulse envelope.
 
     Args:
@@ -202,7 +343,7 @@ def sine(
         phase (float, optional): pulse phase. Defaults to 0.0.
 
     Returns:
-        NDArray: sine envelope.
+        NDArray[np.complex64]: sine envelope.
     """
     n_points = int(round(length * sample_rate))
     t = np.linspace(0, length, n_points)
@@ -213,7 +354,7 @@ def sine(
 
 def square(
         length: float, sample_rate: float, amp: float = 1.0, phase: float = 0.0
-    ) -> NDArray:
+    ) -> NDArray[np.complex64]:
     """Square pulse envelope.
 
     Args:
@@ -223,7 +364,7 @@ def square(
         phase (float, optional): pulse phase. Defaults to 0.0.
 
     Returns:
-        NDArray: square envelope.
+        NDArray[np.complex64]: square envelope.
     """
     n_points = int(round(length * sample_rate))
     return np.array(
@@ -232,15 +373,20 @@ def square(
 
 
 def virtualz(
-        length: float = 0, sample_rate: float = 0, 
-        amp: float = 1.0, phase: float= 0.0
+        length:      float = 0, 
+        sample_rate: float = 0, 
+        amp:         float = 1.0, 
+        phase:       float= 0.0
     ) -> np.complex64:
     """Virtual-z phase.
 
     Args:
-        length (float): pulse length in seconds. Defaults to 0.
-        sample_rate (float): sample rate in Hz. Defaults to 0.
-        amp (float, optional): pulse amplitude. Defaults to 1.0.
+        length (float): pulse length in seconds. Defaults to 0. Unused, but
+            included for consistency.
+        sample_rate (float): sample rate in Hz. Defaults to 0. Unused, but
+            included for consistency.
+        amp (float, optional): pulse amplitude. Defaults to 1.0. Unused, but
+            included for consistency.
         phase (float, optional): pulse phase. Defaults to 0.0.
 
     Returns:
@@ -249,64 +395,15 @@ def virtualz(
     return np.exp(1j*phase).astype(np.complex64)
 
 
-# def zz_DRAG(
-#         length: float, sample_rate: float, alpha: float = 0.0, amp: float = 1.0, 
-#         df: float = 0.0, phase: float = 0.0
-#     ) -> NDArray:
-#     """ZZ-Interaction-Free pulse.
-
-#     The a0 and a2 parameters are optimized for a 40 ns pulse.
-    
-#     Reference: https://arxiv.org/pdf/2309.13927
-
-#     Args:
-#         length (float): pulse length in seconds.
-#         sample_rate (float): sample rate in Hz.
-#         alpha (float, optional): DRAG parameter. Defaults to 0.0. For phase
-#             errors, alpha should be 0.5. For leakage errors, alpha should be 1.
-#         amp (float, optional): pulse amplitude. Defaults to 1.0.
-#         df (float, optional): frequency detuning. Defaults to 0.0.
-#         phase (float, optional): pulse phase. Defaults to 0.0.
-
-#     Returns:
-#         NDArray: ZZ DRAG envelope.
-#     """
-#     a0 = 0.31831
-#     a2 = -0.00515
-#     amp /= a0  # Rescale to a maximum of 1.0
-
-#     n_points = int(round(length * sample_rate))
-#     # t = np.arange(0, n_points).astype(np.complex64)
-#     t = np.linspace(0, length, n_points).astype(np.complex64)
-#     cos = np.cos((np.pi/length) * (t - length/2))
-#     env = a0 * cos**2 + a2 * (t - length/2)**2 * cos**2
-
-#     # DRAG correction
-#     sin = np.sin((np.pi/length) * (t - length/2))
-#     c = -2 * np.pi / length
-#     env_DRAG = 1.j * alpha * (
-#         c * a0 * cos * sin + 
-#         2 * a2 * (t - length/2) * cos**2 + 
-#         c * a2 * (t - length/2)**2 * cos * sin
-#     )
-#     env += env_DRAG
-
-#     # Detuning df offset
-#     df /= sample_rate
-#     x = np.linspace(0, length, n_points).astype(np.complex64)
-#     env *= np.exp(2 * np.pi * 1j * df * x)
-
-#     return np.array(amp * env * np.exp(1j * phase))
-
-
 pulse_envelopes = defaultdict(lambda: 'Pulse envelope not available!', {
     'cosine_square': cosine_square,
     'custom':        custom,
     'DRAG':          DRAG, 
+    'FAST':          FAST,
+    'FAST_DRAG':     FAST_DRAG,
     'linear':        linear, 
     'gaussian':      gaussian, 
     'sine':          sine, 
     'square':        square,
     'virtualz':      virtualz,
-    # 'zz_DRAG':       zz_DRAG
 })
