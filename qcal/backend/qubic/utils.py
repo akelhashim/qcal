@@ -41,8 +41,11 @@ def calculate_n_reads(compiled_program) -> dict:
     return n_reads
 
 
-def generate_pulse(
-        config: Config, pulse: Dict, include_amp_phase: bool = True    
+def generate_pulse_env(
+        config: Config, 
+        pulse: Dict, 
+        channel: str | None = None, 
+        include_amp_phase: bool = True    
     ) -> NDArray[np.complex64]:
     """Generate a pulse in a form compatible with QubiC.
 
@@ -50,15 +53,25 @@ def generate_pulse(
         config (Config): qcal Config object.
         pulse (Dict): dictionary object of a pulse returned from indexing a
             config file.
-        include_amp_phase (bool): whether to include the pulse amp and phase in
-            the generation of the envelope. Defaults to True. By default, QubiC
-            uses False because the amp and phase are dynamically included in
-            compilation. This lowers the waveform memory requirements when
-            generating sequences.
+        channel: (str | None, optional): drive channel (e.g., 'qdrv'). Defaults
+            to None. If None, drive channel is determined from the pulse.
+        include_amp_phase (bool, optional): whether to include the pulse amp and 
+            phase in the generation of the envelope. Defaults to True. By 
+            default, QubiC uses False because the amp and phase are dynamically 
+            included in compilation. This lowers the waveform memory 
+            requirements when generating sequences.
 
     Returns:
         NDArray[np.complex64]: complex pulse array.
     """
+    channel_map = {'qdrv': 'DAC', 'cdrv': 'DAC', 'rdrv': 'DAC', 'rdlo': 'ADC'}
+    length_time = {
+        'qdrv': 'length', 'cdrv': 'length', 'rdrv': 'time', 'rdlo': 'time'
+    }
+    channel = (
+        channel if channel is not None else pulse['channel'].split('.')[-1]
+    )
+
     if not include_amp_phase:
         kwargs = {}
         for key, val in pulse['kwargs'].items():
@@ -68,11 +81,12 @@ def generate_pulse(
         kwargs = {key: val for key, val in pulse['kwargs'].items()}
 
     pulse = pulse_envelopes[pulse['env']](
-        pulse['length'],
-        config['hardware/sample_rate/DAC'] / 
-            config['hardware/interpolation_ratio/qdrv'],
+        pulse[length_time[channel]],
+        config[f'hardware/sample_rate/{channel_map[channel]}'] / 
+            config[f'hardware/interpolation_ratio/{channel}'],
         **kwargs
     )
+
     return pulse
 
 

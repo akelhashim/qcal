@@ -15,6 +15,7 @@ from qcal.gate.single_qubit import (
 from qcal.sequence.dynamical_decoupling import dd_sequences
 from qcal.sequence.pulse_envelopes import pulse_envelopes
 from qcal.sequence.utils import clip_amplitude
+from qcal.backend.qubic.utils import generate_pulse_env
 
 import copy
 import logging
@@ -482,7 +483,7 @@ def add_single_qubit_gate(
             )  
 
     for pulse in (
-        config[f'single_qubit/{qubit}/{subspace}/{name}/pulse']
+            config[f'single_qubit/{qubit}/{subspace}/{name}/pulse']
         ):
 
         if isinstance(pulse, str):  # Pre- or post-pulse
@@ -505,13 +506,11 @@ def add_single_qubit_gate(
                  'amp':    clip_amplitude(pulse['kwargs']['amp']),
                  'phase':  pulse['kwargs']['phase'],
                  'twidth': pulse['length'],
-                 'env':    pulse_envelopes[pulse['env']](
-                            pulse['length'],
-                            config['hardware/sample_rate/DAC'] / 
-                                config['hardware/interpolation_ratio/qdrv'],
-                            **{key: val for key, val in pulse['kwargs'].items() 
-                            if key not in ['amp', 'phase']}
-                        )
+                 'env':    generate_pulse_env(
+                               config=config,
+                               pulse=pulse,
+                               include_amp_phase=False
+                           )
                 }
             )
 
@@ -590,13 +589,11 @@ def add_multi_qubit_gate(
                  'amp':    clip_amplitude(pulse['kwargs']['amp']),
                  'phase':  pulse['kwargs']['phase'],
                  'twidth': pulse['length'], 
-                 'env':    pulse_envelopes[pulse['env']](
-                            pulse['length'],
-                            config['hardware/sample_rate/DAC'] / 
-                                config['hardware/interpolation_ratio/qdrv'],
-                            **{key: val for key, val in pulse['kwargs'].items() 
-                            if key not in ['amp', 'phase']}
-                        )
+                 'env':    generate_pulse_env(
+                               config=config,
+                               pulse=pulse,
+                               include_amp_phase=False
+                           )
                 }
             )
 
@@ -624,8 +621,8 @@ def add_pre_post_pulse(
         if p['env'] == 'virtualz':
             gate_pulse.append(
                 {'name':  'virtual_z',
-                    'freq':  freq,
-                    'phase': p['kwargs']['phase']
+                 'freq':  freq,
+                 'phase': p['kwargs']['phase']
                 }
             )
         else:
@@ -636,16 +633,12 @@ def add_pre_post_pulse(
                     'freq':   freq,
                     'amp':    clip_amplitude(p['kwargs']['amp']),
                     'phase':  p['kwargs']['phase'],
-                    'twidth': p['length'], 
-                    'env':    pulse_envelopes[p['env']](
-                            p['length'],
-                            config['hardware/sample_rate/DAC'] / 
-                                config['hardware/interpolation_ratio/qdrv'],
-                            **{key: val for key, val 
-                                in p['kwargs'].items() 
-                                if key not in ['amp', 'phase']
-                                }
-                        )
+                    'twidth': p['length'],
+                    'env':    generate_pulse_env(
+                                  config=config,
+                                  pulse=p,
+                                  include_amp_phase=False
+                              )
                 }
             )
     gate_pulse.append(
@@ -696,7 +689,8 @@ def cycle_pulse(config: Config, cycle: Cycle) -> List:
                     pulse.append(
                         {'name':  'virtual_z',
                          'freq':  config[
-                                    f'single_qubit/{qubit}/{subspace}/freq'],
+                                    f'single_qubit/{qubit}/{subspace}/freq'
+                                  ],
                          'phase': p['kwargs']['phase']
                         }
                     )
@@ -711,16 +705,10 @@ def cycle_pulse(config: Config, cycle: Cycle) -> List:
                          'amp':    clip_amplitude(p['kwargs']['amp']),
                          'phase':  p['kwargs']['phase'],
                          'twidth': p['length'],
-                         'env':    pulse_envelopes[p['env']](
-                                     p['length'],
-                                     config['hardware/sample_rate/DAC'] / 
-                                        config[
-                                            'hardware/interpolation_ratio/qdrv'
-                                        ],
-                                     **{key: val for key, val in 
-                                        p['kwargs'].items() if key not in 
-                                        ['amp', 'phase']
-                                       }
+                         'env':    generate_pulse_env(
+                                       config=config,
+                                       pulse=p,
+                                       include_amp_phase=False
                                    )
                         }
                     )
@@ -734,13 +722,12 @@ def cycle_pulse(config: Config, cycle: Cycle) -> List:
                  'amp':    clip_amplitude(p['kwargs']['amp']),
                  'phase':  p['kwargs']['phase'],
                  'twidth': p['length'],
-                 'env':    pulse_envelopes[p['env']](
-                                p['length'],
-                                config['hardware/sample_rate/DAC'] / 
-                                    config['hardware/interpolation_ratio/qdrv'],
-                                **{key: val for key, val in p['kwargs'].items() 
-                                if key not in ['amp', 'phase']}
-                )} for p in config[f'single_qubit/{qubit}/{subspace}/X/pulse']
+                 'env':    generate_pulse_env(
+                               config=config,
+                               pulse=p,
+                               include_amp_phase=False
+                           )
+                } for p in config[f'single_qubit/{qubit}/{subspace}/X/pulse']
             ])
 
         elif isinstance(gate, Meas):
@@ -752,11 +739,10 @@ def cycle_pulse(config: Config, cycle: Cycle) -> List:
                  'amp':    config[f'readout/{qubit}/amp'], 
                  'phase':  0.0,
                  'twidth': config[f'readout/{qubit}/time'],
-                 'env':    pulse_envelopes[config[f'readout/{qubit}/env']](
-                                config[f'readout/{qubit}/time'],
-                                config['hardware/sample_rate/DAC'] /
-                                    config['hardware/interpolation_ratio/rdrv'],
-                                **config[f'readout/{qubit}/kwargs']
+                 'env':    generate_pulse_env(
+                               config=config,
+                               pulse=config[f'readout/{qubit}'],
+                               channel='rdrv'
                            )
                 },
                 {'name': 'delay',
@@ -769,12 +755,10 @@ def cycle_pulse(config: Config, cycle: Cycle) -> List:
                  'freq':   config[f'readout/{qubit}/freq'],
                  'phase':  config[f'readout/{qubit}/demod/phase'],
                  'twidth': config[f'readout/{qubit}/demod/time'],
-                 'env':    pulse_envelopes[
-                           config[f'readout/{qubit}/demod/env']](
-                                config[f'readout/{qubit}/demod/time'],
-                                config['hardware/sample_rate/ADC'] /
-                                    config['hardware/interpolation_ratio/rdlo'],
-                                **config[f'readout/{qubit}/demod/kwargs']
+                 'env':    generate_pulse_env(
+                               config=config,
+                               pulse=config[f'readout/{qubit}/demod'],
+                               channel='rdlo'
                            )
                 }
             ])
@@ -867,7 +851,7 @@ def to_qubic(
                     if not cycle.is_barrier:
                         qubic_circuit.append(
                             {'name': 'barrier', 
-                             'qubit': [f'Q{q}' for q in circuit.qubits]
+                            #  'qubit': [f'Q{q}' for q in circuit.qubits]
                             }
                         )
                         for gate in cycle:
@@ -960,7 +944,9 @@ def to_qubic(
 
             if not cycle.is_barrier:
                 qubic_circuit.append(
-                {'name': 'barrier', 'qubit': [f'Q{q}' for q in circuit.qubits]},
+                    {'name': 'barrier', 
+                    #  'qubit': [f'Q{q}' for q in circuit.qubits]
+                    }
                 )
                 for gate in cycle:
 
@@ -1103,6 +1089,15 @@ class Transpiler:
                     circuit_for_loop=self._circuit_for_loop
                 )
             )
+
+            # if i==0 and self._config._parameters['initialize']:
+            #     pre_circuit = []
+            #     initialize(self._config, pre_circuit)
+            #     transpiled_circuits[0] = (
+            #         pre_circuit + transpiled_circuits[0]
+            #     )
+            # elif i==len(circuits)-1 and self._config._parameters['initialize']:
+            #     deactivate(self._config, transpiled_circuits[-1])
               
         if params:
             self._config.reload()  # Reload after making all the changes

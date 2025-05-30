@@ -288,9 +288,7 @@ class QubicQPU(QPU):
 
     def acquire(self) -> None:
         """Measure all circuits."""
-        self._n_reads_per_shot = calculate_n_reads(
-            self._config, self._compiled_program[0]
-        )
+        self._n_reads_per_shot = calculate_n_reads(self._compiled_program[0])
 
         measurement = self._jobman.build_and_run_circuits(
             self._sequence, 
