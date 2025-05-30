@@ -28,8 +28,9 @@ def cirq_to_qcal(circuit, gate_mapper: defaultdict) -> Circuit:
     for moment in circuit:
         tcycle = Cycle()
         for op in moment:
-            if 'Measurement' in str(op):
-                # tcircuit.measure(tuple([q.x for q in op.qubits]))
+            if 'Barrier' in str(op):
+                tcycle = Barrier(tuple([q.x for q in op.qubits]))
+            elif 'Measurement' in str(op):
                 tcycle = Cycle({Meas(q.x) for q in op.qubits})
             else:
                 if 'Rz' in str(op.gate):
