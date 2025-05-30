@@ -167,8 +167,9 @@ class Calibration:
                                 self._params[q], self._cal_values[q]
                             )
 
-        self._config.save()
-        self._config.load()
+        if settings.Settings.save_data:
+            self._config.save()
+            # self._config.load()
 
     def plot(
             self, xlabel='Value Sweep', ylabel='Results', save_path=''

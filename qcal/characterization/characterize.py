@@ -132,8 +132,9 @@ class Characterize:
             elif self._char_values[q]:
                 self.set_param(self._params[q], self._char_values[q])
 
-        self._config.save()
-        self._config.load()
+        if settings.Settings.save_data:
+            self._config.save()
+            # self._config.load()
 
     def plot(
             self, xlabel='Value Sweep', ylabel='Results', flabel='Fit', 

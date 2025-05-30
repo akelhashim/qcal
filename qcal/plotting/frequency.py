@@ -10,6 +10,7 @@ import plotly.express as px
 
 from typing import List, Tuple
 # from plotly.colors import n_colors
+import plotly.io as pio
 
 logger = logging.getLogger(__name__)
 
@@ -38,6 +39,7 @@ def plot_freq_spectrum(
         plot_two_qubit (bool, optional): plot two-qubit gate frequencies. 
             Defaults to False.
     """
+    pio.templates.default = 'plotly'
 
     # TODO: add support for qubit_LO and readout_LO
     fig = go.Figure(
