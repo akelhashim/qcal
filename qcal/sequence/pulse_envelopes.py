@@ -1,6 +1,7 @@
 """Submodule for storing various definitions of pulse envelopes.
 
 """
+from qcal.units import MHz
 from qcal.sequence.utils import cosine_basis_function, solve_coefficients
 
 import logging
@@ -8,7 +9,8 @@ import numpy as np
 
 from collections import defaultdict
 from numpy.typing import NDArray
-from typing import List, Union
+from scipy.ndimage import gaussian_filter1d
+from typing import List
 
 logger = logging.getLogger(__name__)
 
@@ -19,8 +21,11 @@ __all__ = [
     'DRAG',
     'FAST',
     'FAST_DRAG',
-    'linear',
     'gaussian',
+    'gaussian_square',
+    'linear',
+    'RAP',
+    'STARAP',
     'sine',
     'square',
     'virtualz',
@@ -118,7 +123,7 @@ def DRAG(
     gauss = gaussian(length, sample_rate, amp, n_sigma, phase)
     dgauss_dx = -(x - n_points / 2.) / (sigma ** 2) * gauss
     return np.array(
-            det * (gauss - 1j * alpha * dgauss_dx / delta)
+            det * (gauss + 1j * alpha * dgauss_dx / delta)
         ).astype(np.complex64)
 
 
@@ -212,7 +217,7 @@ def FAST_DRAG(
     # Default frequency intervals based on anharmonicity if not provided
     if freq_intervals is None:
         freq_intervals = [
-            [abs(anh) * 0.8, abs(anh) * 1.2],  # Around ef-transition
+            [0.9 * abs(anh), 1.1 * abs(anh)],  # Around ef-transition
             [3 * abs(anh), 5 * abs(anh)]       # High frequency cutoff
         ]
     
@@ -237,28 +242,6 @@ def FAST_DRAG(
     fast_drag = I + 1j * Q
     
     return np.array(fast_drag).astype(np.complex64)
-
-
-def linear(
-        length: float, sample_rate: float, amp: float = 1.0, phase: float = 0.0
-    ) -> NDArray[np.complex64]:
-    """Linear ramp pulse envelope.
-
-    The linear ramp starts at 0, and ends at amp.
-
-    Args:
-        length (float): pulse length in seconds.
-        sample_rate (float): sample rate in Hz.
-        amp (float, optional): pulse amplitude. Defaults to 1.0.
-        phase (float, optional): pulse phase. Defaults to 0.0.
-
-    Returns:
-        NDArray[np.complex64]: linear ramp envelop.
-    """
-    n_points = int(round(length * sample_rate))
-    return np.array(
-            amp * np.linspace(0, 1, n_points) * np.exp(1j*phase)
-        ).astype(np.complex64)
 
 
 def gaussian(
@@ -324,6 +307,142 @@ def gaussian_square(
     return np.array(
             amp * gauss_square * np.exp(1j * phase)
         ).astype(np.complex64)
+
+
+def linear(
+        length: float, sample_rate: float, amp: float = 1.0, phase: float = 0.0
+    ) -> NDArray[np.complex64]:
+    """Linear ramp pulse envelope.
+
+    The linear ramp starts at 0, and ends at amp.
+
+    Args:
+        length (float): pulse length in seconds.
+        sample_rate (float): sample rate in Hz.
+        amp (float, optional): pulse amplitude. Defaults to 1.0.
+        phase (float, optional): pulse phase. Defaults to 0.0.
+
+    Returns:
+        NDArray[np.complex64]: linear ramp envelop.
+    """
+    n_points = int(round(length * sample_rate))
+    return np.array(
+            amp * np.linspace(0, 1, n_points) * np.exp(1j*phase)
+        ).astype(np.complex64)
+
+
+def RAP(
+       length: float, sample_rate: float, env: str, f0: float, f1: float, 
+        **kwargs
+    ) -> NDArray[np.complex64]:
+    """Rapid Adiabatic Passage pulse.
+
+    This pulse implements a frequency sweep (about the carrier frequency) by
+    advancing the phase of the pulse in time.
+
+    Args:
+        env (str): envelopoe of the underlying pulse.
+        f0 (float): start frequency in Hz.
+        f1 (float): end frequency in Hz.
+        length (float): pulse length in seconds.
+        sample_rate (float): sample rate in Hz.
+
+    Returns:
+        NDArray[np.complex64]: RAP pulse.
+    """
+    n_points = int(round(length * sample_rate))
+    t = np.linspace(0, length, n_points)
+    dt = t[1] - t[0]
+
+    # Linear frequency sweep: f(t) = f0 + (f1-f0)*t/T
+    # Phase: phi(t) = 2*pi*f0*t + pi*(f1-f0)*t^2/T
+    # phi_t = 2 * np.pi * f0 * t + np.pi * (f1 - f0) * t**2 / length
+
+    # Method 2: Numerical integration (more general)
+    f_t = f0 + (f1 - f0) * t / length  # instantaneous frequency, linear chirp
+    phi_t = 2 * np.pi * np.cumsum(f_t) * dt
+    phi_t = phi_t - phi_t[0]  # start at zero phase
+
+    # Get amplitude envelope
+    pulse = pulse_envelopes[env](length, sample_rate, **kwargs)
+
+    return pulse * np.exp(1j * phi_t)
+
+
+def STARAP(
+        length: float, sample_rate: float, env: str, f0: float, f1: float, 
+        omega0: float = 10 * MHz, cd_weight: float = 0.5, **kwargs
+    ) -> NDArray[np.complex64]:
+    """Shortcut to Adiabaticity enhanced Rapid Adiabatic Passage pulse.
+
+    This pulse implements a frequency sweep with counter-diabatic driving
+    to enable faster adiabatic evolution.
+
+    Args:
+        length (float): pulse length in seconds.
+        sample_rate (float): sample rate in Hz.
+        env (str): envelope of the underlying pulse.
+        f0 (float): start frequency in Hz.
+        f1 (float): end frequency in Hz.
+        omega0: Rabi frequency in Hz. Defaults to 10 MHz.
+        cd_weight: weight of counter-diabatic term. Defaults to 1.0, which is
+            the theoretical optimum.
+
+    Returns:
+        NDArray[np.complex64]: STA-RAP pulse.
+    """
+    n_points = int(round(length * sample_rate))
+    t = np.linspace(0, length, n_points)
+    dt = t[1] - t[0]
+
+    # Get amplitude envelope
+    envelope = pulse_envelopes[env](length, sample_rate, **kwargs)
+
+    # Frequency sweep
+    # tanh frequency sweep to avoid singularity at the center
+    a = 6                     # Steepness parameter
+    s = 2 * (t / length) - 1  # Normalize t to [-1, 1]
+    f_t = f0 + (f1 - f0) * (np.tanh(a * s) + 1) / 2
+
+    # Phase calculation
+    phi_t = 2 * np.pi * np.cumsum(f_t) * dt
+    phi_t = phi_t - phi_t[0]
+
+    # STA calculations
+    # Convert to detuning from center frequency
+    # Add epsilon to avoid division issues  
+    eps = 1e-12
+    f_center = (f0 + f1) / 2
+    delta_t = 2 * np.pi * (f_t - f_center)
+    delta_t = delta_t + eps * (np.abs(delta_t) < eps)
+
+    # Rabi frequency
+    omega_t = omega0 * 2 * np.pi * np.abs(envelope)
+
+    # Calculate mixing angle
+    theta_t = -np.arctan2(omega_t, delta_t) # Minus to go from 0 to pi
+
+    # Calculate derivative with smoothing to reduce noise
+    theta_smooth = gaussian_filter1d(theta_t, sigma=2.0)
+    theta_dot = np.gradient(theta_smooth, dt)
+
+    # Construct the STA pulse
+    # X component (original drive)
+    # Y component (counter-diabatic drive) 
+    sta_pulse = (omega_t/2 + cd_weight * 1j * theta_dot/2) * np.exp(1j * phi_t)
+
+    # Apply envelope phase safely
+    # envelope_abs = np.abs(envelope)
+    # envelope_phase = np.where(
+    #     envelope_abs > eps, 
+    #     envelope / envelope_abs, 
+    #     1.0 + 0j
+    # )
+    # sta_pulse *= envelope_phase
+
+    sta_pulse /= np.max(np.abs(sta_pulse))  # Normalize
+
+    return sta_pulse.astype(np.complex64)
 
 
 def sine(
@@ -396,14 +515,17 @@ def virtualz(
 
 
 pulse_envelopes = defaultdict(lambda: 'Pulse envelope not available!', {
-    'cosine_square': cosine_square,
-    'custom':        custom,
-    'DRAG':          DRAG, 
-    'FAST':          FAST,
-    'FAST_DRAG':     FAST_DRAG,
-    'linear':        linear, 
-    'gaussian':      gaussian, 
-    'sine':          sine, 
-    'square':        square,
-    'virtualz':      virtualz,
+    'cosine_square':        cosine_square,
+    'custom':               custom,
+    'DRAG':                 DRAG, 
+    'FAST':                 FAST,
+    'FAST_DRAG':            FAST_DRAG,
+    'gaussian':             gaussian, 
+    'gaussian_square':      gaussian_square,
+    'linear':               linear, 
+    'RAP':                  RAP,
+    'STARAP':               STARAP,
+    'sine':                 sine, 
+    'square':               square,
+    'virtualz':             virtualz,
 })

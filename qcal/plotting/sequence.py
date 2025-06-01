@@ -21,7 +21,7 @@ def plot_pulse(
         pulse_duration:  float,
         pulse_envelope:  NDArray[np.complex64],
         pulse_qubit:     int | None = None,
-        neighbor_qubits: List[int] | None = None
+        neighbor_qubits: List[int] | None = []
     ) -> None:
     """Plot the time and frequency domain of a pulse.
 
@@ -42,8 +42,15 @@ def plot_pulse(
 
     t = np.linspace(0, pulse_duration, len(pulse_envelope))
     dt = t[1] - t[0]
-    freq_spectrum = np.fft.fftshift(np.fft.fft(pulse_envelope))
-    freqs = np.fft.fftshift(np.fft.fftfreq(len(pulse_envelope), dt))
+    # freq_spectrum = np.fft.fftshift(np.fft.fft(pulse_envelope))
+    # freqs = np.fft.fftshift(np.fft.fftfreq(len(pulse_envelope), dt))
+
+    padded_pulse_envelope = np.pad(
+        pulse_envelope, (1000, 1000), mode='constant', constant_values=0.0 + 0.0j
+    )
+
+    freq_spectrum = np.fft.fftshift(np.fft.fft(padded_pulse_envelope))
+    freqs = np.fft.fftshift(np.fft.fftfreq(len(padded_pulse_envelope), dt))
     spectrum_magnitude = np.abs(freq_spectrum)
     
     # Create the plot
