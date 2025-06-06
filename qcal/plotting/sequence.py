@@ -46,7 +46,10 @@ def plot_pulse(
     # freqs = np.fft.fftshift(np.fft.fftfreq(len(pulse_envelope), dt))
 
     padded_pulse_envelope = np.pad(
-        pulse_envelope, (1000, 1000), mode='constant', constant_values=0.0 + 0.0j
+        pulse_envelope, 
+        (1000, 1000), 
+        mode='constant', 
+        constant_values=0.0 + 0.0j
     )
 
     freq_spectrum = np.fft.fftshift(np.fft.fft(padded_pulse_envelope))
