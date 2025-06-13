@@ -296,10 +296,18 @@ class LQR:
         if np.abs(loss) < np.abs(self._opt_loss):
             self._opt_loss = loss.copy()
             self._opt_x = x.copy()
-
         self._prev_loss = self._loss.copy()
         self._loss = loss.copy()
-        self._u = -self._lqr_gain @ loss.copy()  # Control
+
+        # Check proximity to noise floor
+        min_distance = np.min(np.abs(loss)) - self._tol
+        if min_distance < 0.1:  # Dead zone
+            # Reduce control effort near noise floor
+            scaling = np.clip(min_distance / 0.1, 0, 1)
+        else:
+            scaling = 1.
+
+        self._u = -scaling * self._lqr_gain @ loss.copy()  # Control
 
     def step(self) -> float | NDArray:
         """Compute the new parameters values based on the control.
