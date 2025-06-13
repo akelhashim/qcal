@@ -34,6 +34,44 @@ from plotly.subplots import make_subplots
 logger = logging.getLogger(__name__)
 
 
+def calculate_cz_frequency(
+        config: Config, qubit_pairs: List[Tuple], intermediate_state: str = '02'
+    ):
+    """Calculate the drive frequency for the 11 -> {02, 20} CZ gate.
+
+    Args:
+        config (Config): qcal Config object.
+        qubit_pairs (List[Tuple]): list of qubit pairs.
+        intermediate_state (str, optional): intermediate state of the gate. 
+            Defaults to '02'. '20' is also accepted.
+    """
+    assert intermediate_state in ('02', '20'), (
+        "'intermediate_state' must be one of ('02', '20')!"
+    )
+    for qp in qubit_pairs:
+        freq_11 = (  # 11 transition frequency
+            config[f'single_qubit/{qp[0]}/GE/freq'] + 
+            config[f'single_qubit/{qp[1]}/GE/freq'] 
+        )
+
+        freq_02 = (  # 02 transition frequency
+            config[f'single_qubit/{qp[1]}/GE/freq'] + 
+            config[f'single_qubit/{qp[1]}/EF/freq'] 
+        )
+
+        freq_20 = (  # 02 transition frequency
+            config[f'single_qubit/{qp[0]}/GE/freq'] + 
+            config[f'single_qubit/{qp[0]}/EF/freq'] 
+        )
+
+        freq_mapper = {'02': freq_02, '20': freq_20}
+        config[f'two_qubit/{qp}/CZ/freq'] = (
+            freq_mapper[intermediate_state] + freq_11
+        ) / 2
+
+    config.save()
+
+
 def tomography_circuits(
         qubit_pairs: List[Tuple], n_elements: int, n_gates: int = 1
     ) -> CircuitSet:
