@@ -164,9 +164,9 @@ def Leakage(
                 
                 self._sweep_results[ql] = pop2
                 self._circuits[f'Q{ql}: Prob(2)'] = pop2
-                self._cal_values[ql] = self._param_sweep[ql][
-                    np.array(pop2).argmin()
-                ]
+                self._cal_values[ql] = float(
+                    self._param_sweep[ql][np.array(pop2).argmin()]
+                    )
                 self._loss[ql] = np.array([np.array(pop2).min()])
 
         def save(self) -> None:

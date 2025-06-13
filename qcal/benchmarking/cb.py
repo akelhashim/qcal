@@ -7,6 +7,7 @@ https://trueq.quantumbenchmark.com/api/protocols.html#trueq.make_cb
 """
 import qcal.settings as settings
 
+from qcal.analysis.leakage import analyze_leakage
 from qcal.config import Config
 from qcal.math.utils import round_to_order_error
 from qcal.qpu.qpu import QPU
@@ -311,6 +312,11 @@ def CB(qpu:                  QPU,
                     self._data_manager._save_path + 'CB_infidelities.svg'
                 )
             plt.show()
+
+            if any(res.dim == 3 for res in self._circuits.results):
+                analyze_leakage(
+                    self._circuits, filename=self._data_manager._save_path
+                )
 
         def final(self) -> None:
             """Final benchmarking method."""

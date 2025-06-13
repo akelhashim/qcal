@@ -5,10 +5,10 @@ https://trueq.quantumbenchmark.com/guides/error_diagnostics/xrb.html
 """
 import qcal.settings as settings
 
+from qcal.analysis.leakage import analyze_leakage
 from qcal.config import Config
 from qcal.qpu.qpu import QPU
 from qcal.plotting.utils import calculate_nrows_ncols
-from qcal.utils import flatten
 
 import logging
 import matplotlib.pyplot as plt
@@ -236,6 +236,11 @@ def XRB(qpu:             QPU,
                     self._data_manager._save_path + 'XRB_infidelities.svg'
                 )
             plt.show()
+
+            if any(res.dim == 3 for res in self._circuits.results):
+                analyze_leakage(
+                    self._circuits, filename=self._data_manager._save_path
+                )
 
         def final(self) -> None:
             """Final benchmarking method."""
