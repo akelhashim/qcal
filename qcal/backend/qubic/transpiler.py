@@ -567,7 +567,7 @@ def add_multi_qubit_gate(
                 mq_pulse
             )
 
-    for pulse in config[f'two_qubit/{qubits}/{name}/pulse']:
+    for i, pulse in enumerate(config[f'two_qubit/{qubits}/{name}/pulse']):
 
         if isinstance(pulse, str):  # Pre- or post-pulse
             add_pre_post_pulse(config, qubits, pulse, mq_pulse)
@@ -581,11 +581,16 @@ def add_multi_qubit_gate(
             )
 
         else:
+            if config[f'two_qubit/{qubits}/{name}/pulse/{i}/freq']:
+                freq = config[f'two_qubit/{qubits}/{name}/pulse/{i}/freq']
+            else:
+                freq = config[f'two_qubit/{qubits}/{name}/freq']
+        
             mq_pulse.append(
                 {'name':  'pulse',
                  'tag':    name,
                  'dest':   pulse['channel'], 
-                 'freq':   config[f'two_qubit/{qubits}/{name}/freq'],
+                 'freq':   freq,
                  'amp':    clip_amplitude(pulse['kwargs']['amp']),
                  'phase':  pulse['kwargs']['phase'],
                  'twidth': pulse['length'], 
