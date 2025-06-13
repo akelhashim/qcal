@@ -144,12 +144,21 @@ class Calibration:
                             self.set_param(
                                 self._params[q][i], self._cal_values[q][i]
                             )
+                        elif self._cal_values[q][i]:
+                            self.set_param(
+                                self._params[q][i], self._cal_values[q][i]
+                            )
                 elif isinstance(self._fit[q], dict):
                     if all([fit.fit_success for fit in self._fit[q].values()]):
                         for i, param in enumerate(self._params[q]):
                             self.set_param(
                                 self._params[q][i], self._cal_values[q][i]
                             )
+                    elif self._cal_values[q]:
+                            for i, param in enumerate(self._params[q]):
+                                self.set_param(
+                                    self._params[q][i], self._cal_values[q][i]
+                                )
                 else:
                     if self._fit[q].fit_success or self._cal_values[q]:
                         if (isinstance(self._params[q], (list, tuple)) and

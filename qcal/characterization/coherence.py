@@ -7,7 +7,7 @@ from qcal.characterization.characterize import Characterize
 from qcal.circuit import Barrier, Cycle, Circuit, CircuitSet
 from qcal.config import Config
 from qcal.fitting.fit import FitCosine, FitDecayingCosine, FitExponential
-from qcal.gate.single_qubit import Idle, Rz, VirtualZ, X90, X, Z
+from qcal.gate.single_qubit import Idle, Rz, VirtualZ, X90, X
 from qcal.math.utils import (
     uncertainty_of_sum, reciprocal_uncertainty, round_to_order_error
 )
@@ -21,8 +21,9 @@ import numpy as np
 import pandas as pd
 
 from IPython.display import clear_output
+from lmfit import Parameters
 from numpy.typing import NDArray
-from typing import Any, Callable, Dict, List, Tuple
+from typing import Callable, Dict, List, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -189,13 +190,18 @@ def T1(qpu:        QPU,
                 c = np.array(prob1).min()
                 a = np.array(prob1).max() - c
                 b = -np.mean( np.diff(prob1) / np.diff(self._times[q]) ) / a
-                self._fit[q].fit(self._times[q], prob1, p0=(a, b, c))
+                params = Parameters()
+                params.add('a', value=a)  
+                params.add('b', value=b)
+                params.add('c', value=c)
+                self._fit[q].fit(self._times[q], prob1, params=params)
 
                 # If the fit was successful, write to the config
                 if self._fit[q].fit_success:
                     val, err = round_to_order_error(
                         *reciprocal_uncertainty(
-                            self._fit[q].fit_params[1], self._fit[q].error[1]
+                            self._fit[q].fit_params['b'].value, 
+                            self._fit[q].fit_params['b'].stderr
                         )
                     )
                     self._char_values[q] = val
@@ -442,20 +448,29 @@ def T2(qpu:        QPU,
                     c = np.array(prob1).min()
                     a = np.array(prob1).max() - c
                     b = np.mean( np.diff(prob1) / np.diff(self._times[q]) ) / a
-                    self._fit[q].fit(self._times[q], prob1, p0=(-a, b, c))
+                    params = Parameters()
+                    params.add('a', value=-a)  
+                    params.add('b', value=b)
+                    params.add('c', value=c)
                 else:
                     e = np.array(prob1).min()
                     a = np.array(prob1).max() - e
                     b = -np.mean( np.diff(prob1) / np.diff(self._times[q]) )/a
-                    c = self._detuning
-                    d = 0.
-                    self._fit[q].fit(self._times[q], prob1, p0=(a, b, c, d, e))
+                    params = Parameters()
+                    params.add('a', value=a)  
+                    params.add('b', value=b)
+                    params.add('c', value=self._detuning)
+                    params.add('d', value=0.)
+                    params.add('e', value=e)
+                
+                self._fit[q].fit(self._times[q], prob1, params=params)
 
                 # If the fit was successful, write to the config
                 if self._fit[q].fit_success:
                     val, err = round_to_order_error(
                         *reciprocal_uncertainty(
-                            self._fit[q].fit_params[1], self._fit[q].error[1]
+                            self._fit[q].fit_params['b'].value, 
+                            self._fit[q].fit_params['b'].stderr
                         )
                     )
                     self._char_values[q] = val

@@ -12,6 +12,7 @@ from qcal.config import Config
 from qcal.fitting.fit import (
     FitAbsoluteValue, FitCosine, FitDecayingCosine, FitParabola
 )
+from qcal.fitting.utils import est_freq_fft
 from qcal.math.utils import round_to_order_error
 from qcal.gate.single_qubit import Idle, VirtualZ, X, X90
 from qcal.plotting.utils import calculate_nrows_ncols
@@ -24,6 +25,7 @@ import numpy as np
 import pandas as pd
 
 from IPython.display import clear_output
+from lmfit import Parameters
 from typing import Any, Callable, Dict, List, Tuple
 from numpy.typing import ArrayLike, NDArray
 
@@ -31,14 +33,15 @@ logger = logging.getLogger(__name__)
 
 
 def Amplitude(
-        qpu:             QPU,
-        config:          Config,
-        qubits:          List | Tuple,
-        amplitudes:      ArrayLike | NDArray | Dict[ArrayLike | NDArray],
-        gate:            str = 'X90',
-        subspace:        str = 'GE',
-        n_gates:         int = 1,
-        relative_amp:    bool = False,
+        qpu:          QPU,
+        config:       Config,
+        qubits:       List | Tuple,
+        amplitudes:   ArrayLike | NDArray | Dict[ArrayLike | NDArray],
+        gate:         str = 'X90',
+        method:       str = 'Rabi',
+        subspace:     str = 'GE',
+        n_gates:      int = 1,
+        relative_amp: bool = False,
         **kwargs
     ) -> Callable:
     """Amplitude calibration for single-qubit gates.
@@ -65,6 +68,8 @@ def Amplitude(
             should be a dictionary mapping an array to a qubit label.
         gate (str, optional): native gate to calibrate. Defaults 
             to 'X90'.
+        method (str, optional): method used to calibrate a gate. Defaults to 
+            'Rabi'. Other option is 'RAP'.
         subspace (str, optional): qubit subspace for the defined gate.
             Defaults to 'GE'.
         n_gates (int, optional): number of gates for pulse repetition.
@@ -86,13 +91,14 @@ def Amplitude(
         """
 
         def __init__(self, 
-                config:          Config,
-                qubits:          List | Tuple,
-                amplitudes:      ArrayLike | NDArray | Dict,
-                gate:            str = 'X90',
-                subspace:        str = 'GE',
-                n_gates:         int = 1,
-                relative_amp:    bool = False,
+                config:       Config,
+                qubits:       List | Tuple,
+                amplitudes:   ArrayLike | NDArray | Dict,
+                gate:         str = 'X90',
+                method:       str = 'Rabi',
+                subspace:     str = 'GE',
+                n_gates:      int = 1,
+                relative_amp: bool = False,
                 **kwargs
             ) -> None:
             """Initialize the Amplitude calibration class within the function.
@@ -107,6 +113,11 @@ def Amplitude(
                 "'gate' must be one of 'X90' or 'X'!"
             )
             self._gate = gate
+
+            assert method.upper() in ('RABI', 'RAP'), (
+                "'method' must be one of 'Rabi' or 'RAP'!"
+            )
+            self._method = method
 
             assert subspace in ('GE', 'EF'), (
                 "'subspace' must be one of 'GE' or 'EF'!"
@@ -133,9 +144,9 @@ def Amplitude(
                     )
             self._relative_amp = relative_amp
 
-            if n_gates > 1 and gate == 'X90':
+            if n_gates > 1 and gate == 'X90' and method.upper() == 'RABI':
                 assert n_gates % 4 == 0, 'n_gates must be a multiple of 4!'
-            elif n_gates > 1 and gate == 'X':
+            elif n_gates > 1 and gate == 'X' and method.upper() == 'RABI':
                 assert n_gates % 2 == 0, 'n_gates must be a multiple of 2!'
             self._n_gates = n_gates
 
@@ -225,14 +236,28 @@ def Amplitude(
                 self._sweep_results[q] = prob
                 self._circuits[f'Q{q}: Prob({level[self._subspace]})'] = prob
 
-                self._fit[q].fit(self._amplitudes[q], prob)
+                if self._n_gates == 1:  # Cosine fit
+                    est_freq = est_freq_fft(self._amplitudes[q], prob)
+                    params = Parameters()
+                    params.add('amp', value=0.5, min=0., max=1.)  
+                    params.add('freq', value=est_freq)
+                    params.add('phase', value=0., min=-np.pi, max=np.pi)
+                    params.add('offset', value=0.5, min=0., max=1.)
+                elif self._n_gates > 1:  # Quadratic fit
+                    params = Parameters()
+                    params.add('a', value=-1.)  
+                    params.add('b', value=1.)
+                    params.add('c', value=1.)
+
+                self._fit[q].fit(self._amplitudes[q], prob, params=params)
 
                 # If the fit was successful, write find the new amp
                 if self._fit[q].fit_success:
 
                     period_frac = {'X90': 0.25, 'X': 0.5}
                     if self._n_gates == 1:  # Cosine fit
-                        _, freq, _, _ = self._fit[q].fit_params
+                        freq = self._fit[q].fit_params['freq'].value
+                        # _, freq, _, _ = self._fit[q].fit_params
                         newvalue = 1 / freq * period_frac[self._gate] 
                         if not in_range(newvalue, self._amplitudes[q]):
                             logger.warning(
@@ -243,7 +268,9 @@ def Amplitude(
                             self._cal_values[q] = newvalue
 
                     elif self._n_gates > 1:  # Quadratic fit
-                        a, b, _ = self._fit[q].fit_params
+                        a = self._fit[q].fit_params['a'].value
+                        b = self._fit[q].fit_params['b'].value
+                        # a, b, _ = self._fit[q].fit_params
                         newvalue = -b / (2 * a)  # Assume c = 0
                         if a > 0:
                             logger.warning(
@@ -257,6 +284,18 @@ def Amplitude(
                             self._fit[q]._fit_success = False
                         else:
                             self._cal_values[q] = newvalue
+
+                else:
+
+                    if self._n_gates == 1:  
+                        self._cal_values[q] = self._param_sweep[q][
+                            np.array(prob).argmin()
+                        ]
+                         
+                    elif self._n_gates > 1:  
+                        self._cal_values[q] = self._param_sweep[q][
+                            np.array(prob).argmax()
+                        ]
 
         def save(self):
             """Save all circuits and data."""
@@ -288,25 +327,26 @@ def Amplitude(
             print(f"\nRuntime: {repr(self._runtime)[8:]}\n")
 
     return Amplitude(
-        config,
-        qubits,
-        amplitudes,
-        gate,
-        subspace,
-        n_gates,
-        relative_amp,
+        config=config,
+        qubits=qubits,
+        amplitudes=amplitudes,
+        gate=gate,
+        method=method,
+        subspace=subspace,
+        n_gates=n_gates,
+        relative_amp=relative_amp,
         **kwargs
     )
 
 
 def Frequency(
-        qpu:             QPU,
-        config:          Config,
-        qubits:          List | Tuple,
-        t_max:           float = 2*us,
-        detunings:       NDArray = np.array([-2, -1, 1, 2])*MHz,
-        subspace:        str = 'GE',
-        n_elements:      int = 30,
+        qpu:        QPU,
+        config:     Config,
+        qubits:     List | Tuple,
+        t_max:      float = 2*us,
+        detunings:  NDArray = np.array([-2, -1, 1, 2])*MHz,
+        subspace:   str = 'GE',
+        n_elements: int = 30,
         **kwargs
     ) -> Callable:
     """Frequency calibration for single qubits.
@@ -346,12 +386,12 @@ def Frequency(
         """
 
         def __init__(self, 
-                config:          Config,
-                qubits:          List | Tuple,
-                t_max:           float = 2*us,
-                detunings:       NDArray = np.array([-2, -1, 1, 2])*MHz,
-                subspace:        str = 'GE',
-                n_elements:      int = 30,
+                config:     Config,
+                qubits:     List | Tuple,
+                t_max:      float = 2*us,
+                detunings:  NDArray = np.array([-2, -1, 1, 2])*MHz,
+                subspace:   str = 'GE',
+                n_elements: int = 30,
                 **kwargs
             ) -> None:
             """Initialize the Frequency experiment class within the function.
@@ -481,16 +521,20 @@ def Frequency(
                     e = np.array(prob).min()
                     a = np.array(prob).max() - e
                     b = -np.mean( np.diff(prob) / np.diff(self._times[q]) ) / a
-                    c = detuning
-                    d = 0.
+                    params = Parameters()
+                    params.add('a', value=a)  
+                    params.add('b', value=b)
+                    params.add('c', value=detuning)
+                    params.add('d', value=0.)
+                    params.add('e', value=e)
                     self._freq_fit[q][i].fit(
-                        self._times[q], prob, p0=(a, b, c, d, e)
+                        self._times[q], prob, params=params
                     )
 
                     # If the fit was successful, grab the frequency
                     if self._freq_fit[q][i].fit_success:
                         self._freqs[q].append(
-                            abs(self._freq_fit[q][i].fit_params[2])
+                            abs(self._freq_fit[q][i].fit_params['c'].value)
                         )
                         self._fit_detunings[q].append(detuning)
                 
@@ -501,13 +545,17 @@ def Frequency(
             
             # Fit the characterized frequencies to an absolute value curve
             for i, q in enumerate(self._qubits):
-                self._fit[q].fit(self._detunings, self._freqs[q], p0=(1, 0, 0)) 
+                params = Parameters()
+                params.add('a', value=1)  
+                params.add('b', value=0)
+                params.add('c', value=0)
+                self._fit[q].fit(self._detunings, self._freqs[q], params=params) 
 
                 if self._fit[q].fit_success:
-                    a, _, _ = self._fit[q].fit_params
+                    a = self._fit[q].fit_params['a'].value
                     newval, err = round_to_order_error(
-                        self._fit[q].fit_params[1],
-                        self._fit[q].error[1],
+                        self._fit[q].fit_params['b'].value,
+                        self._fit[q].fit_params['a'].stderr,
                         2
                     )
 
@@ -605,9 +653,9 @@ def Frequency(
                         c='orange',
                         label='Fit'
                     )
-                    df = round(self._fit[q].fit_params[1] / MHz, 3)
+                    df = round(self._fit[q].fit_params['b'].value / MHz, 3)
                     ax[1].axvline(
-                        round(self._fit[q].fit_params[1], 2),  
+                        round(self._fit[q].fit_params['b'].value, 2),  
                         ls='--', c='k', label=rf'$\Delta f$ = {df} MHz'
                     )
 
@@ -653,12 +701,12 @@ def Frequency(
             print(f"\nRuntime: {repr(self._runtime)[8:]}\n")
 
     return Frequency(
-        config,
-        qubits,
-        t_max,
-        detunings,
-        subspace,
-        n_elements,
+        config=config,
+        qubits=qubits,
+        t_max=t_max,
+        detunings=detunings,
+        subspace=subspace,
+        n_elements=n_elements,
         **kwargs
     )
 
@@ -888,11 +936,19 @@ def Phase(
                 self._circuits[f'Q{q}: Prob({level[self._subspace]})'] = pops
                 self._sweep_results[q] = (np.array(pop0) - np.array(pop1))**2
                 
-                self._fit[q].fit(self._phases[q], self._sweep_results[q])
+                params = Parameters()
+                params.add('a', value=1.)  
+                params.add('b', value=0.)
+                params.add('c', value=0., min=0., max=0.5)
+                self._fit[q].fit(
+                    self._phases[q], self._sweep_results[q], params=params
+                )
 
                 # If the fit was successful, write find the new phase
                 if self._fit[q].fit_success:
-                    a, b, _ = self._fit[q].fit_params
+                    a = self._fit[q].fit_params['a'].value
+                    b = self._fit[q].fit_params['b'].value
+                    # a, b, _ = self._fit[q].fit_params
                     newvalue = -b / (2 * a)  # Assume c = 0
                     if a < 0:
                         logger.warning(
