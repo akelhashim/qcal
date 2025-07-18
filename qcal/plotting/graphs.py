@@ -225,8 +225,7 @@ def draw_circuit(circuit: Circuit, show: bool = True):
     fig = go.Figure(
         data= edge_traces + [node_trace],
         layout=go.Layout(
-        # title='',
-        titlefont_size=16,
+        title=dict(font=dict(size=16)),
         showlegend=False,
         hovermode='closest',
         margin=dict(b=20,l=10,r=5,t=50),
@@ -338,8 +337,7 @@ def draw_DAG(G: nx.Graph):
     fig = go.Figure(
         data=[edge_trace, node_trace],
         layout=go.Layout(
-        # title='',
-        titlefont_size=16,
+        title=dict(font=dict(size=16)),
         showlegend=False,
         hovermode='closest',
         margin=dict(b=20,l=5,r=5,t=40),
@@ -425,9 +423,9 @@ def draw_qpu(config: Config):
             size=30,
             colorbar=dict(
                 thickness=15,
-                title='Qubit Connectivity',
+                title=dict(text='Qubit Connectivity', side='right'),
                 xanchor='left',
-                titleside='right'),
+                ),
             line_width=2)
     )
     node_text = []
@@ -479,8 +477,7 @@ def draw_qpu(config: Config):
     fig = go.Figure(
         data=[edge_trace, node_trace, qubit_labels, middle_node_trace],
         layout=go.Layout(
-            # title='',
-            titlefont_size=16,
+            title=dict(font=dict(size=16)),
             showlegend=False,
             hovermode='closest',
             margin=dict(b=20,l=5,r=5,t=40),
