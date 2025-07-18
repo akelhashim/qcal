@@ -977,8 +977,8 @@ def to_qubic(
                     }
                 )
 
-    # if config._parameters['initialize']:
-    #     deactivate(config, qubic_circuit)
+    if config._parameters['initialize']:
+        deactivate(config, qubic_circuit)
 
     return qubic_circuit
 
@@ -1094,15 +1094,6 @@ class Transpiler:
                     circuit_for_loop=self._circuit_for_loop
                 )
             )
-
-            # if i==0 and self._config._parameters['initialize']:
-            #     pre_circuit = []
-            #     initialize(self._config, pre_circuit)
-            #     transpiled_circuits[0] = (
-            #         pre_circuit + transpiled_circuits[0]
-            #     )
-            # elif i==len(circuits)-1 and self._config._parameters['initialize']:
-            #     deactivate(self._config, transpiled_circuits[-1])
               
         if params:
             self._config.reload()  # Reload after making all the changes
