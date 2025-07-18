@@ -396,6 +396,15 @@ class Circuit:
         ]
     
     @property
+    def labels(self) -> Tuple[int]:
+        """The qubit labels in the circuit.
+
+        Returns:
+            Tuple: qubit labels.
+        """ 
+        return tuple(sorted(self._qubits))
+
+    @property
     def layers(self) -> list:
         """The layers in the circuit.
 
