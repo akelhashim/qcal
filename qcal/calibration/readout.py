@@ -23,8 +23,11 @@ import numpy as np
 
 from IPython.display import clear_output
 from numpy.typing import ArrayLike
-from typing import Any, Callable, List, Tuple
+from sklearn.inspection import DecisionBoundaryDisplay
+
+from typing import Callable, List, Tuple
 from matplotlib.colors import ListedColormap
+from matplotlib.patches import Patch
 
 
 logger = logging.getLogger(__name__)
@@ -233,7 +236,7 @@ def ReadoutCalibration(
             """Save all circuits and data."""
             clear_output(wait=True)
             self._data_manager._exp_id += (
-                f'_RCal_Q{"".join(str(q) for q in self._qubits)}'
+                f'_RCal_Q{"".join("Q"+str(q) for q in self._qubits)}'
             )
             if settings.Settings.save_data:
                 qpu.save(self)
@@ -296,6 +299,16 @@ def ReadoutCalibration(
                                 cmap='Greys', gridsize=75
                             )
 
+                        DecisionBoundaryDisplay.from_estimator(
+                            self._classifier[q], 
+                            self._X[q], 
+                            response_method="predict",
+                            alpha=0.15,
+                            ax=ax,
+                            grid_resolution=50,
+                            cmap=cmap
+                        )
+
                         # Create a mesh plot
                         x_min, x_max = (
                             self._X[q][:, 0].min() - 10, 
@@ -305,23 +318,23 @@ def ReadoutCalibration(
                             self._X[q][:, 1].min() - 10, 
                             self._X[q][:, 1].max() + 10
                         )
-                        h = int(min([abs(x_min), abs(y_min)]) * 0.025)
-                        xx, yy = np.meshgrid(
-                            np.arange(x_min, x_max, h), 
-                            np.arange(y_min, y_max, h)
-                        )
+                        # h = int(min([abs(x_min), abs(y_min)]) * 0.025)
+                        # xx, yy = np.meshgrid(
+                        #     np.arange(x_min, x_max, h), 
+                        #     np.arange(y_min, y_max, h)
+                        # )
 
-                        # Plot the decision boundary by assigning a color to 
-                        # each point in the mesh [x_min, x_max]x[y_min, y_max].
-                        Z = self._classifier[q].predict(
-                            np.c_[xx.ravel(), yy.ravel()]
-                        )
-                        Z = Z.reshape(xx.shape)
-                        if raw:
-                            ax.contourf(xx, yy, Z, cmap=cmap, alpha=0.15)
-                        else:
-                            cs = ax.contourf(xx, yy, Z, cmap=cmap, alpha=0.15)
-                            self._cs = cs
+                        # # Plot the decision boundary by assigning a color to 
+                        # # each point in the mesh [x_min, x_max]x[y_min, y_max].
+                        # Z = self._classifier[q].predict(
+                        #     np.c_[xx.ravel(), yy.ravel()]
+                        # )
+                        # Z = Z.reshape(xx.shape)
+                        # if raw:
+                        #     ax.contourf(xx, yy, Z, cmap=cmap, alpha=0.15)
+                        # else:
+                        #     cs = ax.contourf(xx, yy, Z, cmap=cmap, alpha=0.15)
+                        #     self._cs = cs
                             
                         ax.set_xlim([x_min, x_max])
                         ax.set_ylim([y_min, y_max])
@@ -341,10 +354,20 @@ def ReadoutCalibration(
                                 loc=0
                             )
                         else:
-                            handles = []
-                            for l in range(self._n_levels):
-                                if l*3 < len(cs.legend_elements()[0]):
-                                    handles.append(cs.legend_elements()[0][l*3])
+                        #     handles = []
+                        #     for l in range(self._n_levels):
+                        #         if l*3 < len(cs.legend_elements()[0]):
+                        #             handles.append(cs.legend_elements()[0][l*3])
+                        #     leg = ax.legend(
+                        #         handles=handles,
+                        #         labels=range(0, self._n_levels), 
+                        #         fontsize=12,
+                        #         loc=0
+                        #     )
+                            handles = [
+                                Patch(color=cmap(i/(self._n_levels-1)), alpha=1) 
+                                for i in range(self._n_levels)
+                            ]
                             leg = ax.legend(
                                 handles=handles,
                                 labels=range(0, self._n_levels), 
@@ -396,13 +419,20 @@ def ReadoutCalibration(
             
             print(f"\nRuntime: {repr(self._runtime)[8:]}\n")
 
-        def run(self):
-            """Run all experimental methods and analyze results."""
+        def run(self, plot: bool = True):
+            """Run all experimental methods and analyze results.
+
+            Args:
+                plot (bool, optional): whether to plot the readout results.
+                    Defaults to True. Plotting the results can take time due to
+                    meshgrid. It is best to set this to False if doing a sweep.
+            """
             self.generate_circuits()
             qpu.run(self, self._circuits, save=False)
             self.analyze()
             self.save()
-            self.plot()
+            if plot:
+                self.plot()
             self.final()
 
     return ReadoutCalibration(
@@ -854,7 +884,7 @@ def Separation(
                     self._rcal._config[param] = self._param_sweep[j][i]
 
                 self._rcal._measurements = []
-                self._rcal.run()
+                self._rcal.run(plot=False)
 
                 for q in self._qubits:
                     for g in self._groupings:
