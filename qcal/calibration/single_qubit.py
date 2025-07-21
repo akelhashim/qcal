@@ -236,20 +236,22 @@ def Amplitude(
                 self._sweep_results[q] = prob
                 self._circuits[f'Q{q}: Prob({level[self._subspace]})'] = prob
 
-                if self._n_gates == 1:  # Cosine fit
+                # Cosine fit
+                if self._n_gates == 1 and self._method.upper() != 'RAP': 
                     est_freq = est_freq_fft(self._amplitudes[q], prob)
                     params = Parameters()
                     params.add('amp', value=0.5, min=0., max=1.)  
                     params.add('freq', value=est_freq)
                     params.add('phase', value=0., min=-np.pi, max=np.pi)
                     params.add('offset', value=0.5, min=0., max=1.)
-                elif self._n_gates > 1:  # Quadratic fit
+                    self._fit[q].fit(self._amplitudes[q], prob, params=params)
+                # Quadratic fit
+                elif self._n_gates > 1 and self._method.upper() != 'RAP':
                     params = Parameters()
                     params.add('a', value=-1.)  
                     params.add('b', value=1.)
                     params.add('c', value=1.)
-
-                self._fit[q].fit(self._amplitudes[q], prob, params=params)
+                    self._fit[q].fit(self._amplitudes[q], prob, params=params)
 
                 # If the fit was successful, write find the new amp
                 if self._fit[q].fit_success:
