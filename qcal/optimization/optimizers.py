@@ -7,7 +7,7 @@ import logging
 import numpy as np
 
 from numpy.typing import ArrayLike, NDArray
-from typing import Dict
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -22,13 +22,14 @@ __all__ = (
 class Adam:
 
     def __init__(self,
-            x0:     float | NDArray,
-            lr:     float = 0.01, 
-            beta_1: float = 0.9, 
-            beta_2: float = 0.999, 
-            eps:    float = 1e-8,
-            tol:    float = 1e-4,
-            loss:   float | NDArray = 0.,
+            x0:        float | NDArray,
+            lr:        float = 0.01, 
+            beta_1:    float = 0.9, 
+            beta_2:    float = 0.999, 
+            eps:       float = 1e-8,
+            tol:       float = 1e-4,
+            loss:      float | NDArray = 0.,
+            grad_func: Any | None = None
         ) -> None:
         """Based on ADAM, a momentum-based stochastic optimizer.
         
@@ -52,6 +53,8 @@ class Adam:
                 to the initial parameters (x). Defaults to 0. This is used to
                 compute gradients for the parameters via finite difference
                 methods.
+            grad_funct (Any | None, optional): function (or class) for computing
+                the gradient. If None, finite-difference is used.
         """
         self._x_t = x0  # Parameters at time t = 0
         self._lr = lr
@@ -60,6 +63,7 @@ class Adam:
         self._eps = eps
         self._tol = tol
         self._loss = loss
+        self._grad_func = grad_func
 
         self._grad = 0.
         self._prev_loss = 0.
@@ -92,7 +96,8 @@ class Adam:
     def tell(self, x: float | NDArray, loss: float | NDArray) -> None:
         """Pass the parameter values and loss values for computing a gradient.
 
-        The gradient is computed using finite difference approximation:
+        If no gradient function is specified, the gradient is computed using 
+        finite difference approximation:
 
         delta = x - x_t
         df(x)/dx = [f(x + delta) - f(x)] / delta
@@ -107,8 +112,13 @@ class Adam:
             self._opt_loss = loss.copy()
             self._opt_x = x.copy()
             
-        delta = x.copy() - self._x_t
-        self._grad = (loss - self._loss) / (delta + self._eps)
+        if self._grad_func:
+            self._grad_func.tell(x, loss)
+            self._grad = self._grad_func.grad
+        else:
+            delta = x.copy() - self._x_t
+            self._grad = (loss - self._loss) / (delta + self._eps)
+        
         self._prev_loss = self._loss.copy()
         self._loss = loss.copy()
     
@@ -267,6 +277,15 @@ class LQR:
         self._lqr_gain, _, _ = dlqr(A, B, Q, R)
         self._u = np.zeros(B.shape) # np.array([0.])  # Control TODO
 
+    @property
+    def grad(self) -> float | NDArray:
+        """Compatibility for using LQR to estimate gradients.
+
+        Returns:
+            float | NDArray: control (u).
+        """
+        return self._u
+    
     @property
     def opt_x(self) -> NDArray:
         """Optimal parameter values.
