@@ -14,7 +14,7 @@ from qcal.fitting.fit import (
 )
 from qcal.fitting.utils import est_freq_fft
 from qcal.math.utils import round_to_order_error
-from qcal.gate.single_qubit import Idle, VirtualZ, X, X90
+from qcal.gate.single_qubit import Idle, Rz, X, X90
 from qcal.plotting.utils import calculate_nrows_ncols
 from qcal.qpu.qpu import QPU
 from qcal.units import MHz, us
@@ -66,8 +66,7 @@ def Amplitude(
             gate amplitudes to sweep over for calibrating the single-qubit gate 
             amplitude. If calibrating multiple qubits at the same time, this 
             should be a dictionary mapping an array to a qubit label.
-        gate (str, optional): native gate to calibrate. Defaults 
-            to 'X90'.
+        gate (str, optional): native gate to calibrate. Defaults to 'X90'.
         method (str, optional): method used to calibrate a gate. Defaults to 
             'Rabi'. Other option is 'RAP'.
         subspace (str, optional): qubit subspace for the defined gate.
@@ -482,7 +481,7 @@ def Frequency(
                     circuit.extend([
                         Cycle({Idle(q, duration=t) for q in self._qubits}),
                         Barrier(self._qubits),
-                        Cycle({VirtualZ(q, phase, subspace=self._subspace) 
+                        Cycle({Rz(q, phase, subspace=self._subspace) 
                               for q in self._qubits}),
                         Barrier(self._qubits),
                     ])
@@ -718,8 +717,10 @@ def Phase(
         config:         Config,
         qubits:         List | Tuple,
         phases:         ArrayLike | NDArray | Dict[ArrayLike | NDArray],
+        gate:           str = 'X90',
         subspace:       str = 'GE',
         relative_phase: bool = False,
+        params:         Dict | None = None,
         **kwargs
     ) -> Callable:
     """Phase calibration for single-qubit gates.
@@ -747,11 +748,14 @@ def Phase(
             phases to sweep over for calibrating the single-qubit gate 
             phases. If calibrating multiple qubits at the same time, this 
             should be a dictionary mapping an array to a qubit label.
+        gate (str, optional): native gate to calibrate. Defaults to 'X90'.
         subspace (str, optional): qubit subspace for the defined gate.
             Defaults to 'GE'.
         relative_phase (bool, optional): whether phase sweep is relative to the
             current phase value. Defaults to False. If true, the phase sweep
             is added to the current value.
+        params (Dict, None): dictionary mapping the qubit labels to the config 
+            parameter to sweep over.
 
     Returns:
         Callable: Phases calibration class.
@@ -768,8 +772,10 @@ def Phase(
                 config:         Config,
                 qubits:         List | Tuple,
                 phases:         ArrayLike | NDArray | Dict,
+                gate:           str = 'X90',
                 subspace:       str = 'GE',
                 relative_phase: bool = False,
+                params:         Dict | None = None,
                 **kwargs
             ) -> None:
             """Initialize the Phase calibration class within the function."""
@@ -778,6 +784,11 @@ def Phase(
             Calibration.__init__(self, config)
 
             self._qubits = qubits
+
+            assert gate in ('X90', 'X'), (
+                "'gate' must be one of 'X90' or 'X'!"
+            )
+            self._gate = gate
 
             assert subspace in ('GE', 'EF'), (
                 "'subspace' must be one of 'GE' or 'EF'!"
@@ -789,12 +800,15 @@ def Phase(
             else:
                 self._phases = phases
 
-            self._params = {}
-            for q in qubits:
-                self._params[q] = [
-                    f'single_qubit/{q}/{subspace}/X90/pulse/0/kwargs/phase',
-                    f'single_qubit/{q}/{subspace}/X90/pulse/2/kwargs/phase'
-                ]
+            if params:
+                self._params = params
+            else:
+                self._params = {}
+                for q in qubits:
+                    self._params[q] = [
+                     f'single_qubit/{q}/{subspace}/{gate}/pulse/0/kwargs/phase',
+                     f'single_qubit/{q}/{subspace}/{gate}/pulse/2/kwargs/phase'
+                    ]
 
             if relative_phase:
                 for q in qubits:
@@ -840,57 +854,99 @@ def Phase(
                 ])
 
             # Y180_X90
-            circuit_Y180_X90.extend([
-                Cycle({
-                    VirtualZ(q, np.pi/2, subspace=level[self._n_levels])
-                    for q in self._qubits
-                }),
-                Cycle({
-                    X90(q, subspace=level[self._n_levels]) 
-                    for q in self._qubits
-                }),
-                Barrier(self._qubits),
-                Cycle({
-                    X90(q, subspace=level[self._n_levels]) 
-                    for q in self._qubits
-                }),
-                Cycle({
-                    VirtualZ(q, -np.pi/2, subspace=level[self._n_levels])
-                    for q in self._qubits
-                }),
-                Barrier(self._qubits),
-                Cycle({
-                    X90(q, subspace=level[self._n_levels]) 
-                    for q in self._qubits
-                })
-            ])
+            if self._gate == 'X':
+                circuit_Y180_X90.extend([
+                    Cycle({
+                        Rz(q, np.pi/2, subspace=level[self._n_levels])
+                        for q in self._qubits
+                    }),
+                    Cycle({
+                        X(q, subspace=level[self._n_levels]) 
+                        for q in self._qubits
+                    }),
+                    Cycle({
+                        Rz(q, -np.pi/2, subspace=level[self._n_levels])
+                        for q in self._qubits
+                    }),
+                    Barrier(self._qubits),
+                    Cycle({
+                        X90(q, subspace=level[self._n_levels]) 
+                        for q in self._qubits
+                    })
+                ])
+            else:
+                circuit_Y180_X90.extend([
+                    Cycle({
+                        Rz(q, np.pi/2, subspace=level[self._n_levels])
+                        for q in self._qubits
+                    }),
+                    Cycle({
+                        X90(q, subspace=level[self._n_levels]) 
+                        for q in self._qubits
+                    }),
+                    # Barrier(self._qubits),
+                    Cycle({
+                        X90(q, subspace=level[self._n_levels]) 
+                        for q in self._qubits
+                    }),
+                    Cycle({
+                        Rz(q, -np.pi/2, subspace=level[self._n_levels])
+                        for q in self._qubits
+                    }),
+                    Barrier(self._qubits),
+                    Cycle({
+                        X90(q, subspace=level[self._n_levels]) 
+                        for q in self._qubits
+                    })
+                ])
             circuit_Y180_X90.measure()
 
             # X180_Y90
-            circuit_X180_Y90.extend([
-                Cycle({
-                    X90(q, subspace=level[self._n_levels]) 
-                    for q in self._qubits
-                }),
-                Barrier(self._qubits),
-                Cycle({
-                    X90(q, subspace=level[self._n_levels]) 
-                    for q in self._qubits
-                }),
-                Barrier(self._qubits),
-                Cycle({
-                    VirtualZ(q, np.pi/2, subspace=level[self._n_levels])
-                    for q in self._qubits
-                }),
-                Cycle({
-                    X90(q, subspace=level[self._n_levels]) 
-                    for q in self._qubits
-                }),
-                Cycle({
-                    VirtualZ(q, -np.pi/2, subspace=level[self._n_levels])
-                    for q in self._qubits
-                }),
-            ])
+            if self._gate == 'X':
+                circuit_X180_Y90.extend([
+                    Cycle({
+                        X(q, subspace=level[self._n_levels]) 
+                        for q in self._qubits
+                    }),
+                    Barrier(self._qubits),
+                    Cycle({
+                        Rz(q, np.pi/2, subspace=level[self._n_levels])
+                        for q in self._qubits
+                    }),
+                    Cycle({
+                        X90(q, subspace=level[self._n_levels]) 
+                        for q in self._qubits
+                    }),
+                    Cycle({
+                        Rz(q, -np.pi/2, subspace=level[self._n_levels])
+                        for q in self._qubits
+                    }),
+                ])
+            else:
+                circuit_X180_Y90.extend([
+                    Cycle({
+                        X90(q, subspace=level[self._n_levels]) 
+                        for q in self._qubits
+                    }),
+                    # Barrier(self._qubits),
+                    Cycle({
+                        X90(q, subspace=level[self._n_levels]) 
+                        for q in self._qubits
+                    }),
+                    Barrier(self._qubits),
+                    Cycle({
+                        Rz(q, np.pi/2, subspace=level[self._n_levels])
+                        for q in self._qubits
+                    }),
+                    Cycle({
+                        X90(q, subspace=level[self._n_levels]) 
+                        for q in self._qubits
+                    }),
+                    Cycle({
+                        Rz(q, -np.pi/2, subspace=level[self._n_levels])
+                        for q in self._qubits
+                    }),
+                ])
             circuit_X180_Y90.measure()
             
             circuits = []
@@ -1101,7 +1157,9 @@ def Phase(
         config=config,
         qubits=qubits,
         phases=phases,
+        gate=gate,
         subspace=subspace,
         relative_phase=relative_phase,
+        params=params,
         **kwargs
     )
