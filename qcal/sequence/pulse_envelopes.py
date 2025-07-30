@@ -2,7 +2,10 @@
 
 """
 from qcal.units import MHz
-from qcal.sequence.utils import cosine_basis_function, solve_coefficients
+from qcal.sequence.utils import (
+    # calculate_third_order_z_component, 
+    cosine_basis_function, solve_coefficients
+)
 
 import logging
 import numpy as np
@@ -25,6 +28,7 @@ __all__ = [
     'gaussian_square',
     'linear',
     'RAP',
+    # 'SATD',
     'STARAP',
     'sine',
     'square',
@@ -218,7 +222,7 @@ def FAST_DRAG(
     if freq_intervals is None:
         freq_intervals = [
             [0.9 * abs(anh), 1.1 * abs(anh)],  # Around ef-transition
-            [3 * abs(anh), 5 * abs(anh)]       # High frequency cutoff
+            [2 * abs(anh), 5 * abs(anh)]       # High frequency cutoff
         ]
     
     if weights is None:
@@ -371,7 +375,7 @@ def RAP(
 
 def STARAP(
         length: float, sample_rate: float, env: str, f0: float, f1: float, 
-        omega0: float = 10 * MHz, cd_weight: float = 0.5, **kwargs
+        omega0: float = 100 * MHz, cd_weight: float = 1.0, **kwargs
     ) -> NDArray[np.complex64]:
     """Shortcut to Adiabaticity enhanced Rapid Adiabatic Passage pulse.
 
@@ -391,6 +395,7 @@ def STARAP(
     Returns:
         NDArray[np.complex64]: STA-RAP pulse.
     """
+    eps = 1e-12  # Small value to avoid division issues  
     n_points = int(round(length * sample_rate))
     t = np.linspace(0, length, n_points)
     dt = t[1] - t[0]
@@ -411,7 +416,6 @@ def STARAP(
     # STA calculations
     # Convert to detuning from center frequency
     # Add epsilon to avoid division issues  
-    eps = 1e-12
     f_center = (f0 + f1) / 2
     delta_t = 2 * np.pi * (f_t - f_center)
     delta_t = delta_t + eps * (np.abs(delta_t) < eps)
@@ -423,8 +427,7 @@ def STARAP(
     theta_t = -np.arctan2(omega_t, delta_t) # Minus to go from 0 to pi
 
     # Calculate derivative with smoothing to reduce noise
-    theta_smooth = gaussian_filter1d(theta_t, sigma=2.0)
-    theta_dot = np.gradient(theta_smooth, dt)
+    theta_dot = np.gradient(gaussian_filter1d(theta_t, sigma=2.0), dt)
 
     # Construct the STA pulse
     # X component (original drive)
@@ -443,6 +446,175 @@ def STARAP(
     sta_pulse /= np.max(np.abs(sta_pulse))  # Normalize
 
     return sta_pulse.astype(np.complex64)
+
+
+# def SATD(
+#         length: float, sample_rate: float, env: str, f0: float, f1: float, 
+#         omega0: float = 10 * MHz, cd_weight: float = 0.5, order: int = 2, 
+#         **kwargs
+#     ) -> NDArray[np.complex64]:
+#     """SuperAdiabatic Transitionless Driving (SATD).
+    
+#     This is a superadiabatic shortcut to adiabaticity enhanced RAP pulse. This 
+#     pulse implements a frequency sweep with higher-order counter-diabatic 
+#     corrections for even faster adiabatic evolution.
+
+#     Args:
+#         length (float): pulse length in seconds.
+#         sample_rate (float): sample rate in Hz.
+#         env (str): envelope of the underlying pulse.
+#         f0 (float): start frequency in Hz.
+#         f1 (float): end frequency in Hz.
+#         omega0: Rabi frequency in Hz. Defaults to 10 MHz.
+#         cd_weight: weight of counter-diabatic term. Defaults to 0.5.
+#         order: order of superadiabatic corrections (1, 2, or 3). Defaults to 2.
+
+#     Returns:
+#         NDArray[np.complex64]: SATD pulse.
+#     """
+#     if order not in [1, 2, 3]:
+#         raise ValueError("Order must be 1, 2, or 3!")
+
+#     eps = 1e-12  # Small value to avoid division issues
+#     sigma = 2.0  # Smoothing parameter
+#     n_points = int(round(length * sample_rate))
+#     t = np.linspace(0, length, n_points)
+#     dt = t[1] - t[0]
+
+#     # Get amplitude envelope
+#     envelope = pulse_envelopes[env](length, sample_rate, **kwargs)
+
+#     # Frequency sweep (tanh profile)
+#     a = 6  # Steepness parameter
+#     s = 2 * (t / length) - 1  # Normalize t to [-1, 1]
+#     f_t = f0 + (f1 - f0) * (np.tanh(a * s) + 1) / 2
+
+#     # Phase calculation
+#     phi_t = 2 * np.pi * np.cumsum(f_t) * dt
+#     phi_t = phi_t - phi_t[0]
+
+#     # Convert to detuning from center frequency
+#     f_center = (f0 + f1) / 2
+#     delta_t = 2 * np.pi * (f_t - f_center)
+#     delta_t = delta_t + eps * (np.abs(delta_t) < eps)
+
+#     # Rabi frequency
+#     omega_t = omega0 * 2 * np.pi * np.abs(envelope)
+
+#     # Calculate effective frequency (energy gap in rotating frame)
+#     omega_eff = np.sqrt(omega_t**2 + delta_t**2) + eps
+
+#     # Calculate mixing angle
+#     theta_t = -np.arctan2(omega_t, delta_t) 
+
+#     # Calculate derivatives
+#     # Smooth theta before taking derivatives
+#     theta_dot = np.gradient(gaussian_filter1d(theta_t, sigma=sigma), dt)
+#     theta_ddot = np.gradient(gaussian_filter1d(theta_dot, sigma=sigma/2), dt)
+    
+#     # Initialize pulse with original drive (X component)
+#     satd_pulse = omega_t / 2 * np.exp(1j * phi_t)
+
+#     # Add first-order counter-diabatic correction (Y component)
+#     if order >= 1:
+#         # First-order CD term: i * theta_dot / 2 * sigma_y
+#         cd1_term = cd_weight * 1j * theta_dot / 2
+#         satd_pulse += cd1_term * np.exp(1j * phi_t)
+
+#     # # Add second-order superadiabatic correction
+#     # if order >= 2:
+#     #     # Second-order terms involve combinations of theta_ddot and theta_dot^2
+#     #     # In the eigenbasis of H0, the second-order correction includes:
+#     #     # - A term proportional to theta_ddot / omega_eff
+#     #     # - A term proportional to theta_dot^2 / omega_eff
+        
+#     #     # Calculate second-order amplitudes
+#     #     # Note: These formulas are simplified; full expressions are more complex
+#     #     cd2_amplitude = theta_ddot / (4 * omega_eff)
+#     #     cd2_phase_correction = -theta_dot**2 / (2 * omega_eff)
+        
+#     #     # Second-order contribution (back in lab frame)
+#     #     # This acts on both X and Z components
+#     #     cd2_x = cd2_amplitude * np.sin(theta_t) * cd_weight**2
+#     #     cd2_z = cd2_amplitude * np.cos(theta_t) * cd_weight**2
+        
+#     #     # Add to pulse
+#     #     satd_pulse += (cd2_x + 1j * cd2_phase_correction) * np.exp(1j * phi_t)
+
+#     # Add second-order superadiabatic correction
+#     if order >= 2:
+#          # The X-component of second-order correction
+#         cd2_x = theta_ddot * np.sin(theta_t) / (4 * omega_eff) * cd_weight**2
+
+#         # The Z-component can be absorbed into a time-dependent frame rotation
+#         cd2_z = theta_ddot * np.cos(theta_t) / (4 * omega_eff) * cd_weight**2
+        
+#         # This Z-term contributes an additional phase
+#         # Integrate to get accumulated phase
+#         phase_correction_2nd = -np.cumsum(cd2_z) * dt
+        
+#         # Additional velocity-dependent correction
+#         velocity_correction = -theta_dot**2 / (2 * omega_eff) * cd_weight**2
+        
+#         # Apply corrections
+#         # X-component can be directly added
+#         satd_pulse += cd2_x * np.exp(1j * phi_t)
+        
+#         # Z-component appears as phase modulation
+#         satd_pulse *= np.exp(1j * phase_correction_2nd)
+        
+#         # Velocity correction affects the amplitude
+#         satd_pulse *= (1 + velocity_correction)
+
+#     # # Add third-order superadiabatic correction
+#     # if order >= 3:
+#     #     # Third-order is even more complex
+#     #     theta_dddot = np.gradient(
+#     #         gaussian_filter1d(theta_ddot, sigma=sigma/3), dt
+#     #     )
+        
+#     #     # Simplified third-order terms
+#     #     cd3_amplitude = (
+#     #         theta_dddot / (8 * omega_eff**2) - 
+#     #         3 * theta_dot * theta_ddot / (4 * omega_eff**3)
+#     #     )
+        
+#     #     # Add third-order contribution
+#     #     cd3_term = cd3_amplitude * cd_weight**3
+#     #     satd_pulse += cd3_term * np.exp(1j * phi_t)
+
+#     # Add third-order superadiabatic correction
+#     if order >= 3:
+#         theta_dddot = np.gradient(
+#             gaussian_filter1d(theta_ddot, sigma=sigma/3), dt
+#         )
+        
+#         # Third-order has X, Y, and Z components
+#         # For microwave control, we handle them differently:
+        
+#         # Y-component (can be directly implemented)
+#         cd3_y = (
+#             theta_dddot / (8 * omega_eff**2) - 
+#             3 * theta_dot * theta_ddot / (4 * omega_eff**3)
+#         ) * cd_weight**3
+        
+#         # Z-component contributions to phase
+#         cd3_z = calculate_third_order_z_component(
+#             theta_t, theta_dot, theta_ddot, theta_dddot, omega_eff
+#         ) * cd_weight**3
+#         phase_correction_3rd = -np.cumsum(cd3_z) * dt
+        
+#         # Apply corrections
+#         satd_pulse += 1j * cd3_y * np.exp(1j * phi_t)
+#         satd_pulse *= np.exp(1j * phase_correction_3rd)
+
+#     # Apply envelope modulation if needed
+#     # (Your original envelope application code here)
+
+#     # Normalize
+#     satd_pulse /= np.max(np.abs(satd_pulse))
+
+#     return satd_pulse.astype(np.complex64)
 
 
 def sine(
@@ -524,6 +696,7 @@ pulse_envelopes = defaultdict(lambda: 'Pulse envelope not available!', {
     'gaussian_square':      gaussian_square,
     'linear':               linear, 
     'RAP':                  RAP,
+    # 'SATD':                 SATD,
     'STARAP':               STARAP,
     'sine':                 sine, 
     'square':               square,
