@@ -1075,6 +1075,7 @@ class Transpiler:
         """
         transpiled_circuits = []
         # Check for a param sweep
+        params_reset = {}
         params = [col for col in circuits._df.columns if 'param' in col]
         for i, circuit in enumerate(circuits):
             if self._reload_pulse:
@@ -1082,6 +1083,7 @@ class Transpiler:
 
             if params:
                 for param in params:  # [7:] removes the string 'param: '
+                    params_reset[param[7:]] = self._config[param[7:]]
                     self._config[param[7:]] = circuits[param].iloc[i]
             
             transpiled_circuits.append(
@@ -1096,7 +1098,9 @@ class Transpiler:
             )
               
         if params:
-            self._config.reload()  # Reload after making all the changes
-            # TODO: only reload the params that we changed
+            logger.info(' Resetting params...')
+            # self._config.reload()  # Reload after making all the changes
+            for param, val in params_reset.items():
+                self._config[param] = val
 
         return transpiled_circuits
