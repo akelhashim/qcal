@@ -10,7 +10,7 @@ from .utils import find_pulse_index, in_range
 from qcal.circuit import Barrier, Cycle, Circuit, CircuitSet
 from qcal.config import Config
 from qcal.fitting.fit import (
-    FitAbsoluteValue, FitCosine, FitDecayingCosine, FitParabola
+    FitAbsoluteValue, FitCosine, FitDecayingCosine, FitParabola, FitLinear
 )
 from qcal.fitting.utils import est_freq_fft
 from qcal.math.utils import round_to_order_error
@@ -803,7 +803,7 @@ def Phase(
                     )
             self._param_sweep = self._phases
 
-            self._fit = {q: FitParabola() for q in qubits}
+            self._fit = {q: FitLinear() for q in qubits}
 
         @property
         def phases(self) -> Dict:
@@ -936,31 +936,21 @@ def Phase(
                         pop1.append(pop)
         
                 self._circuits[f'Q{q}: Prob({level[self._subspace]})'] = pops
-                self._sweep_results[q] = (np.array(pop0) - np.array(pop1))**2
+                self._sweep_results[q] = (np.array(pop0) - np.array(pop1))
                 
                 params = Parameters()
-                params.add('a', value=1.)  
-                params.add('b', value=0.)
-                params.add('c', value=0., min=0., max=0.5)
+                params.add('m', value=-1.)
+                params.add('b', value=0.5)
                 self._fit[q].fit(
                     self._phases[q], self._sweep_results[q], params=params
                 )
 
                 # If the fit was successful, write find the new phase
                 if self._fit[q].fit_success:
-                    a = self._fit[q].fit_params['a'].value
+                    m = self._fit[q].fit_params['m'].value
                     b = self._fit[q].fit_params['b'].value
-                    # a, b, _ = self._fit[q].fit_params
-                    newvalue = -b / (2 * a)  # Assume c = 0
-                    if a < 0:
-                        logger.warning(
-                            f'Fit failed for qubit {q} (negative curvature)!'
-                        )
-                        self._fit[q]._fit_success = False
-                        self._cal_values[q] = self._phases[q][
-                            np.argmin(self._sweep_results[q])
-                        ]
-                    elif not in_range(newvalue, self._phases[q]):
+                    newvalue = - b / m # compute x-intercept 
+                    if not in_range(newvalue, self._phases[q]):
                         logger.warning(
                             f'Fit failed for qubit {q} (out of range)!'
                         )
@@ -968,6 +958,16 @@ def Phase(
                         self._cal_values[q] = self._phases[q][
                             np.argmin(self._sweep_results[q])
                         ]
+                    elif self._fit[q].error < 0.1:
+                        logger.warning(
+                            f'Fit failed for qubit {q} (overfitting based on low reduced chi2)!'
+                        )
+                        self._cal_values[q] = newvalue
+                    elif self._fit[q].error > 10:
+                        logger.warning(
+                            f'Fit failed for qubit {q} (underfitting based on high reduced chi2)!'
+                        )
+                        self._cal_values[q] = newvalue
                     else:
                         self._cal_values[q] = newvalue
                 
