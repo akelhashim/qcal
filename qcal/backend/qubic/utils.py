@@ -4,7 +4,6 @@
 from qcal.config import Config
 from qcal.sequence.pulse_envelopes import pulse_envelopes
 from qcal.units import ns, us
-from qcal.sequence.utils import clip_amplitude
 
 import logging
 import numpy as np
@@ -87,7 +86,6 @@ def generate_pulse_env(
             config[f'hardware/interpolation_ratio/{channel}'],
         **kwargs
     )
-    pulse = clip_amplitude(pulse)
 
     return pulse
 
