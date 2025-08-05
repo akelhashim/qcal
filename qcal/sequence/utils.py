@@ -67,7 +67,7 @@ def clip_amplitude(
     Returns:
         NDArray: pulse array with clipped amplitude.
     """
-    return np.clip(amp, min_amp, max_amp)
+    return np.clip(amp.real, min_amp, max_amp) + 1j*np.clip(amp.imag, min_amp, max_amp)
 
 
 def compute_matrix_A(
