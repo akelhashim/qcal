@@ -122,9 +122,13 @@ def DRAG(
 
     gauss = gaussian(length, sample_rate, amp, n_sigma, phase)
     dgauss_dx = -(x - n_points / 2.) / (sigma ** 2) * gauss
-    return np.array(
+    drag_pulse = np.array(
             det * (gauss + 1j * alpha * dgauss_dx / delta)
         ).astype(np.complex64)
+
+    drag_pulse /= max(abs(drag_pulse)) # Normalize
+
+    return amp*drag_pulse
 
 
 def FAST(
@@ -239,9 +243,11 @@ def FAST_DRAG(
     # Generate Q component using DRAG
     Q = alpha / delta * np.gradient(I, dt)
 
-    fast_drag = I + 1j * Q
-    
-    return np.array(fast_drag).astype(np.complex64)
+    fast_drag = np.array(I + 1j * Q).astype(np.complex64)
+
+    fast_drag /= max(abs(fast_drag)) # Normalize
+
+    return amp*fast_drag
 
 
 def gaussian(
