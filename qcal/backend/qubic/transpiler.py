@@ -1073,17 +1073,20 @@ class Transpiler:
         Returns:
             List[Dict]: transpiled circuits.
         """
-        transpiled_circuits = []
         # Check for a param sweep
-        params_reset = {}
         params = [col for col in circuits._df.columns if 'param' in col]
+        params_reset = {}
+        if params:
+            for param in params: # [7:] removes the string 'param: '
+                 params_reset[param[7:]] = self._config[param[7:]]
+
+        transpiled_circuits = []
         for i, circuit in enumerate(circuits):
             if self._reload_pulse:
                  self._pulses = defaultdict(lambda: False, {})
 
             if params:
-                for param in params:  # [7:] removes the string 'param: '
-                    params_reset[param[7:]] = self._config[param[7:]]
+                for param in params:
                     self._config[param[7:]] = circuits[param].iloc[i]
             
             transpiled_circuits.append(
