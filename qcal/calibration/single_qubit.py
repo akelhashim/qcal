@@ -13,7 +13,7 @@ from qcal.fitting.fit import (
     FitAbsoluteValue, FitCosine, FitDecayingCosine, FitParabola
 )
 from qcal.fitting.utils import est_freq_fft
-from qcal.math.utils import round_to_order_error
+from qcal.math.utils import round_to_order_error, wrap_phase
 from qcal.gate.single_qubit import Idle, Rz, X, X90
 from qcal.plotting.utils import calculate_nrows_ncols
 from qcal.qpu.qpu import QPU
@@ -805,10 +805,13 @@ def Phase(
             else:
                 self._params = {}
                 for q in qubits:
-                    self._params[q] = [
-                     f'single_qubit/{q}/{subspace}/{gate}/pulse/0/kwargs/phase',
-                     f'single_qubit/{q}/{subspace}/{gate}/pulse/2/kwargs/phase'
-                    ]
+                    pulse = f'single_qubit/{q}/{subspace}/{gate}/pulse/'
+                    if gate == 'X90':
+                        self._params[q] = [
+                            pulse + '0/kwargs/phase', pulse + '2/kwargs/phase'
+                        ]
+                    elif gate == 'X':
+                        self._params[q] = pulse + '1/kwargs/phase'
 
             if relative_phase:
                 for q in qubits:
@@ -817,7 +820,10 @@ def Phase(
                     )
             self._param_sweep = self._phases
 
-            self._fit = {q: FitParabola() for q in qubits}
+            if gate == 'X90':
+                self._fit = {q: FitParabola() for q in qubits}
+            elif gate == 'X':
+                self._fit = {q: FitCosine() for q in qubits}
 
         @property
         def phases(self) -> Dict:
@@ -835,139 +841,133 @@ def Phase(
             level = {2: 'GE', 3: 'EF'}
             circuit_Y180_X90 = Circuit()
             circuit_X180_Y90 = Circuit()
+            circuit_X90_X_X90 = Circuit()
 
             # Prepulse for EF calibration
             if self._subspace == 'EF':
                 
                 circuit_Y180_X90.extend([
                     Cycle({X90(q, subspace='GE') for q in self._qubits}),
-                    Barrier(self._qubits),
+                    # Barrier(self._qubits),
                     Cycle({X90(q, subspace='GE') for q in self._qubits}),
                     Barrier(self._qubits)
                 ])
 
                 circuit_X180_Y90.extend([
                     Cycle({X90(q, subspace='GE') for q in self._qubits}),
-                    Barrier(self._qubits),
+                    # Barrier(self._qubits),
                     Cycle({X90(q, subspace='GE') for q in self._qubits}),
                     Barrier(self._qubits)
+                ])
+
+                circuit_X90_X_X90.extend([
+                    Cycle({X(q, subspace='GE') for q in self._qubits}),
                 ])
 
             # Y180_X90
-            if self._gate == 'X':
-                circuit_Y180_X90.extend([
-                    Cycle({
-                        Rz(q, np.pi/2, subspace=level[self._n_levels])
-                        for q in self._qubits
-                    }),
-                    Cycle({
-                        X(q, subspace=level[self._n_levels]) 
-                        for q in self._qubits
-                    }),
-                    Cycle({
-                        Rz(q, -np.pi/2, subspace=level[self._n_levels])
-                        for q in self._qubits
-                    }),
-                    Barrier(self._qubits),
-                    Cycle({
-                        X90(q, subspace=level[self._n_levels]) 
-                        for q in self._qubits
-                    })
-                ])
-            else:
-                circuit_Y180_X90.extend([
-                    Cycle({
-                        Rz(q, np.pi/2, subspace=level[self._n_levels])
-                        for q in self._qubits
-                    }),
-                    Cycle({
-                        X90(q, subspace=level[self._n_levels]) 
-                        for q in self._qubits
-                    }),
-                    # Barrier(self._qubits),
-                    Cycle({
-                        X90(q, subspace=level[self._n_levels]) 
-                        for q in self._qubits
-                    }),
-                    Cycle({
-                        Rz(q, -np.pi/2, subspace=level[self._n_levels])
-                        for q in self._qubits
-                    }),
-                    Barrier(self._qubits),
-                    Cycle({
-                        X90(q, subspace=level[self._n_levels]) 
-                        for q in self._qubits
-                    })
-                ])
+            circuit_Y180_X90.extend([
+                Cycle({
+                    Rz(q, np.pi/2, subspace=level[self._n_levels])
+                    for q in self._qubits
+                }),
+                Cycle({
+                    X90(q, subspace=level[self._n_levels]) 
+                    for q in self._qubits
+                }),
+                # Barrier(self._qubits),
+                Cycle({
+                    X90(q, subspace=level[self._n_levels]) 
+                    for q in self._qubits
+                }),
+                Cycle({
+                    Rz(q, -np.pi/2, subspace=level[self._n_levels])
+                    for q in self._qubits
+                }),
+                Barrier(self._qubits),
+                Cycle({
+                    X90(q, subspace=level[self._n_levels]) 
+                    for q in self._qubits
+                })
+            ])
             circuit_Y180_X90.measure()
 
             # X180_Y90
-            if self._gate == 'X':
-                circuit_X180_Y90.extend([
-                    Cycle({
-                        X(q, subspace=level[self._n_levels]) 
-                        for q in self._qubits
-                    }),
-                    Barrier(self._qubits),
-                    Cycle({
-                        Rz(q, np.pi/2, subspace=level[self._n_levels])
-                        for q in self._qubits
-                    }),
-                    Cycle({
-                        X90(q, subspace=level[self._n_levels]) 
-                        for q in self._qubits
-                    }),
-                    Cycle({
-                        Rz(q, -np.pi/2, subspace=level[self._n_levels])
-                        for q in self._qubits
-                    }),
-                ])
-            else:
-                circuit_X180_Y90.extend([
-                    Cycle({
-                        X90(q, subspace=level[self._n_levels]) 
-                        for q in self._qubits
-                    }),
-                    # Barrier(self._qubits),
-                    Cycle({
-                        X90(q, subspace=level[self._n_levels]) 
-                        for q in self._qubits
-                    }),
-                    Barrier(self._qubits),
-                    Cycle({
-                        Rz(q, np.pi/2, subspace=level[self._n_levels])
-                        for q in self._qubits
-                    }),
-                    Cycle({
-                        X90(q, subspace=level[self._n_levels]) 
-                        for q in self._qubits
-                    }),
-                    Cycle({
-                        Rz(q, -np.pi/2, subspace=level[self._n_levels])
-                        for q in self._qubits
-                    }),
-                ])
+            circuit_X180_Y90.extend([
+                Cycle({
+                    X90(q, subspace=level[self._n_levels]) 
+                    for q in self._qubits
+                }),
+                # Barrier(self._qubits),
+                Cycle({
+                    X90(q, subspace=level[self._n_levels]) 
+                    for q in self._qubits
+                }),
+                Barrier(self._qubits),
+                Cycle({
+                    Rz(q, np.pi/2, subspace=level[self._n_levels])
+                    for q in self._qubits
+                }),
+                Cycle({
+                    X90(q, subspace=level[self._n_levels]) 
+                    for q in self._qubits
+                }),
+                Cycle({
+                    Rz(q, -np.pi/2, subspace=level[self._n_levels])
+                    for q in self._qubits
+                }),
+            ])
             circuit_X180_Y90.measure()
+
+            # X90_X_X90
+            circuit_X90_X_X90.extend([
+                Cycle({
+                    X90(q, subspace=level[self._n_levels]) 
+                    for q in self._qubits
+                }),
+                Cycle({
+                    X(q, subspace=level[self._n_levels]) 
+                    for q in self._qubits
+                }),
+                Cycle({
+                    X90(q, subspace=level[self._n_levels]) 
+                    for q in self._qubits
+                }),
+            ])
+            circuit_X90_X_X90.measure()
             
             circuits = []
-            for _ in range(self._phases[self._qubits[0]].size):
-                circuits.append(circuit_Y180_X90.copy())
-                circuits.append(circuit_X180_Y90.copy())
+            if self._gate == 'X90':
+                for _ in range(self._phases[self._qubits[0]].size):
+                    circuits.append(circuit_Y180_X90.copy())
+                    circuits.append(circuit_X180_Y90.copy())
 
-            self._circuits = CircuitSet(circuits=circuits)
-            self._circuits['sequence'] = [
-                    'Y180_X90', 'X180_Y90'
-                ] * int(self._circuits.n_circuits / 2)
-            for q in self._qubits:
-                _phases = []
-                for p in self._phases[q]:
-                    _phases.extend([p, p])
-                self._circuits[
-                        f'param: {self._params[q][0]}'
-                    ] = _phases
-                self._circuits[
-                        f'param: {self._params[q][1]}'
-                    ] = _phases
+                self._circuits = CircuitSet(circuits=circuits)
+                self._circuits['sequence'] = [
+                        'Y180_X90', 'X180_Y90'
+                    ] * int(self._circuits.n_circuits / 2)
+                for q in self._qubits:
+                    _phases = []
+                    for p in self._phases[q]:
+                        _phases.extend([p, p])
+                    self._circuits[
+                            f'param: {self._params[q][0]}'
+                        ] = _phases
+                    self._circuits[
+                            f'param: {self._params[q][1]}'
+                        ] = _phases
+                    
+            elif self._gate == 'X':
+                for _ in range(self._phases[self._qubits[0]].size):
+                    circuits.append(circuit_X90_X_X90.copy())
+
+                self._circuits = CircuitSet(circuits=circuits)
+                self._circuits['sequence'] = (
+                    ['X90_X_X90'] * int(self._circuits.n_circuits)
+                )
+                for q in self._qubits:
+                    self._circuits[
+                        f'param: {self._params[q]}'
+                    ] = self._phases[q]
                 
         def analyze(self) -> None:
             """Analyze the data."""
@@ -975,74 +975,119 @@ def Phase(
 
             level = {'GE': '1', 'EF': '2'}
             for i, q in enumerate(self._qubits):
-                pop0 = []  # circuit_Y180_X90
-                pop1 = []  # circuit_X180_Y90
-                pops = []
-                for j, circuit in enumerate(self._circuits):
-                    pop = circuit.results.marginalize(i).populations[
-                        level[self._subspace]
-                    ]
-                    pops.append(pop)
+                if self._gate == 'X90':
+                    pop0 = []  # circuit_Y180_X90
+                    pop1 = []  # circuit_X180_Y90
+                    pops = []
+                    for j, circuit in enumerate(self._circuits):
+                        pop = circuit.results.marginalize(i).populations[
+                            level[self._subspace]
+                        ]
+                        pops.append(pop)
+                        
+                        # Y180_X90
+                        if j % 2 == 0:
+                            pop0.append(pop)
+                        # X180_Y90
+                        elif j % 2 == 1:
+                            pop1.append(pop)
+            
+                    self._circuits[
+                        f'Q{q}: Prob({level[self._subspace]})'
+                    ] = pops
+                    self._sweep_results[q] = (
+                        np.array(pop0) - np.array(pop1)
+                    )**2
                     
-                    # 'Y180_X90'
-                    if j % 2 == 0:
-                        pop0.append(pop)
-                    # 'X180_Y90'
-                    elif j % 2 == 1:
-                        pop1.append(pop)
-        
-                self._circuits[f'Q{q}: Prob({level[self._subspace]})'] = pops
-                self._sweep_results[q] = (np.array(pop0) - np.array(pop1))**2
-                
-                params = Parameters()
-                params.add('a', value=1.)  
-                params.add('b', value=0.)
-                params.add('c', value=0., min=0., max=0.5)
-                self._fit[q].fit(
-                    self._phases[q], self._sweep_results[q], params=params
-                )
+                    params = Parameters()
+                    params.add('a', value=1.)  
+                    params.add('b', value=0.)
+                    params.add('c', value=0., min=0., max=0.5)
+                    self._fit[q].fit(
+                        self._phases[q], self._sweep_results[q], params=params
+                    )
 
-                # If the fit was successful, write find the new phase
-                if self._fit[q].fit_success:
-                    a = self._fit[q].fit_params['a'].value
-                    b = self._fit[q].fit_params['b'].value
-                    # a, b, _ = self._fit[q].fit_params
-                    newvalue = -b / (2 * a)  # Assume c = 0
-                    if a < 0:
-                        logger.warning(
-                            f'Fit failed for qubit {q} (negative curvature)!'
-                        )
-                        self._fit[q]._fit_success = False
-                        self._cal_values[q] = self._phases[q][
-                            np.argmin(self._sweep_results[q])
-                        ]
-                    elif not in_range(newvalue, self._phases[q]):
-                        logger.warning(
-                            f'Fit failed for qubit {q} (out of range)!'
-                        )
-                        self._fit[q]._fit_success = False
-                        self._cal_values[q] = self._phases[q][
-                            np.argmin(self._sweep_results[q])
-                        ]
+                    # If the fit was successful, write find the new phase
+                    if self._fit[q].fit_success:
+                        a = self._fit[q].fit_params['a'].value
+                        b = self._fit[q].fit_params['b'].value
+                        newvalue = -b / (2 * a)  # Assume c = 0
+                        if a < 0:
+                            logger.warning(
+                               f'Fit failed for qubit {q} (negative curvature)!'
+                            )
+                            self._fit[q]._fit_success = False
+                            self._cal_values[q] = self._phases[q][
+                                np.argmin(self._sweep_results[q])
+                            ]
+                        elif not in_range(newvalue, self._phases[q]):
+                            logger.warning(
+                                f'Fit failed for qubit {q} (out of range)!'
+                            )
+                            self._fit[q]._fit_success = False
+                            self._cal_values[q] = self._phases[q][
+                                np.argmin(self._sweep_results[q])
+                            ]
+                        else:
+                            self._cal_values[q] = newvalue
+                    
                     else:
-                        self._cal_values[q] = newvalue
-                
-                else:
-                    self._cal_values[q] = self._phases[q][
-                        np.argmin(self._sweep_results[q])
-                    ]
+                        self._cal_values[q] = self._phases[q][
+                            np.argmin(self._sweep_results[q])
+                        ]
+
+                elif self._gate == 'X':
+                    pop0 = []
+                    pop1 = []
+                    for j, circuit in enumerate(self._circuits):
+                        pop0.append(
+                            circuit.results.marginalize(i).populations[
+                                str(int(level[self._subspace]) - 1)
+                            ]
+                        )
+                        pop1.append(
+                            circuit.results.marginalize(i).populations[
+                                level[self._subspace]
+                            ]
+                        )
+
+                    self._circuits[
+                        f'Q{q}: Prob({int(level[self._subspace]) - 1})'
+                    ] = pop0
+                    self._sweep_results[q] = np.array(pop0) - np.array(pop1)
+
+                    est_freq = est_freq_fft(
+                        self._phases[q], self._sweep_results[q]
+                    )
+                    params = Parameters()
+                    params.add('amp', value=1.0, min=0.75, max=1.)  
+                    params.add('freq', value=est_freq, min=0.)
+                    params.add('phase', value=0., min=-np.pi, max=np.pi)
+                    params.add('offset', value=0., min=-0.1, max=0.1)
+                    self._fit[q].fit(
+                        self._phases[q], self._sweep_results[q], params=params
+                    )
+
+                    if self._fit[q].fit_success:
+                        freq = self._fit[q].fit_params['freq'].value
+                        phase = self._fit[q].fit_params['phase'].value
+                        self._cal_values[q] = wrap_phase(
+                            -phase / (2 * np.pi * freq)
+                        )
+                    else:
+                        self._cal_values[q] = self._phases[q][
+                            np.argmax(self._sweep_results[q])
+                        ]
+
 
         def save(self):
             """Save all circuits and data."""
             clear_output(wait=True)
             self._data_manager._exp_id += (
-                f'_phase_cal_Q{"".join(str(q) for q in self._qubits)}'
+                f'_phase_cal{"".join("Q"+str(q) for q in self._qubits)}'
             )
             if settings.Settings.save_data:
                 qpu.save(self)
-                # self._data_manager.save_to_csv(
-                #      pd.DataFrame([self._param_sweep]), 'param_sweep'
-                # )
                 self._data_manager.save_to_csv(
                     pd.DataFrame([self._sweep_results]), 'sweep_results'
                 )
@@ -1076,30 +1121,34 @@ def Phase(
                         q = self._qubits[k]
 
                         ax.set_xlabel('Phase (rad.)', fontsize=15)
-                        ax.set_ylabel(
-                            r'$|2\rangle$ Population' if self._subspace == 'EF' 
-                            else r'$|1\rangle$ Population',
-                            fontsize=15
-                        )
+                        if self._gate == 'X90':
+                            ax.set_ylabel(
+                                r'$|2\rangle$ Population' if self._subspace == 'EF' 
+                                else r'$|1\rangle$ Population',
+                                fontsize=15
+                            )
+                        elif self._gate == 'X':
+                            ax.set_ylabel(r'$\langle Z \rangle$', fontsize=15)
                         ax.tick_params(
                             axis='both', which='major', labelsize=12
                         )
                         ax.grid(True)
 
-                        ax.plot(
-                            self._param_sweep[q], 
-                            self._circuits[
-                                self._circuits['sequence'] == 'Y180_X90'
-                            ][f'Q{q}: Prob({level[self._subspace]})'],
-                            '-o', c='blue', label='Y180_X90'
-                        )
-                        ax.plot(
-                            self._param_sweep[q], 
-                            self._circuits[
-                                self._circuits['sequence'] == 'X180_Y90'
-                            ][f'Q{q}: Prob({level[self._subspace]})'],
-                            '-o', c='blueviolet', label='X180_Y90'
-                        )
+                        if self._gate == 'X90':
+                            ax.plot(
+                                self._param_sweep[q], 
+                                self._circuits[
+                                    self._circuits['sequence'] == 'Y180_X90'
+                                ][f'Q{q}: Prob({level[self._subspace]})'],
+                                '-o', c='blue', label='Y180_X90'
+                            )
+                            ax.plot(
+                                self._param_sweep[q], 
+                                self._circuits[
+                                    self._circuits['sequence'] == 'X180_Y90'
+                                ][f'Q{q}: Prob({level[self._subspace]})'],
+                                '-o', c='blueviolet', label='X180_Y90'
+                            )
                         ax.plot(
                             self._param_sweep[q], self._sweep_results[q],
                             'o', c='k', label=f'Meas, Q{q}'

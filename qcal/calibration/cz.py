@@ -11,7 +11,6 @@ from qcal.circuit import Barrier, Cycle, Circuit, CircuitSet
 from qcal.config import Config
 from qcal.fitting.fit import FitCosine, FitParabola
 from qcal.fitting.utils import est_freq_fft
-from qcal.managers.classification_manager import ClassificationManager
 from qcal.math.utils import wrap_phase
 from qcal.gate.single_qubit import Meas, Rz, X90
 from qcal.gate.two_qubit import CZ
@@ -1405,8 +1404,7 @@ def RelativeAmp(
                 # If the fit was successful, find the new phase
                 if self._fit[pair].fit_success:
                     a = self._fit[pair].fit_params['a'].value
-                    a = self._fit[pair].fit_params['b'].value
-                    # a, b, _ = self._fit[pair].fit_params
+                    b = self._fit[pair].fit_params['b'].value
                     newvalue = -b / (2 * a)  # Assume c = 0
                     if a > 0:
                         logger.warning(
@@ -2003,13 +2001,6 @@ def LocalPhases(
                 self._fit[pair]['X_C0'].fit(
                     self._phases[pair], X_C0, params=params
                 )
-                # self._fit[pair]['X_C0'].fit(
-                #     self._phases[pair], X_C0, p0=(1, 1/(2*np.pi), 0, 0),
-                #     bounds=(
-                #         [0., 0., -np.pi, -0.1], 
-                #         [1., np.inf, np.pi, 0.1]
-                #     )
-                # )
 
                 est_freq = est_freq_fft(self._phases[pair], X_C1)
                 params = Parameters()
@@ -2020,13 +2011,6 @@ def LocalPhases(
                 self._fit[pair]['X_C1'].fit(
                     self._phases[pair], X_C1, params=params
                 )
-                # self._fit[pair]['X_C1'].fit(
-                #     self._phases[pair], X_C1, p0=(-1, 1/(2*np.pi), 0, 0),
-                #     bounds=(
-                #         [-1., 0., -np.pi, -0.1], 
-                #         [0., np.inf, np.pi, 0.1]
-                #     )
-                # )
 
                 est_freq = est_freq_fft(self._phases[pair], X_T0)
                 params = Parameters()
@@ -2037,13 +2021,6 @@ def LocalPhases(
                 self._fit[pair]['X_T0'].fit(
                     self._phases[pair], X_T0, params=params
                 )
-                # self._fit[pair]['X_T0'].fit(
-                #     self._phases[pair], X_T0, p0=(1, 1/(2*np.pi), 0, 0),
-                #     bounds=(
-                #         [0., 0., -np.pi, -0.1], 
-                #         [1., np.inf, np.pi, 0.1]
-                #     )
-                # )
 
                 est_freq = est_freq_fft(self._phases[pair], X_T1)
                 params = Parameters()
@@ -2054,18 +2031,10 @@ def LocalPhases(
                 self._fit[pair]['X_T1'].fit(
                     self._phases[pair], X_T1, params=params
                 )
-                # self._fit[pair]['X_T1'].fit(
-                #     self._phases[pair], X_T1, p0=(-1, 1/(2*np.pi), 0, 0),
-                #     bounds=(
-                #         [-1., 0., -np.pi, -0.1], 
-                #         [0., np.inf, np.pi, 0.1]
-                #     )
-                # )
-
+                
                 if self._fit[pair]['X_C0'].fit_success:
                     freq = self._fit[pair]['X_C0'].fit_params['freq'].value
                     phase = self._fit[pair]['X_C0'].fit_params['phase'].value
-                    # _, freq, phase, _ = self._fit[pair]['X_C0'].fit_params
                     self._phase_C0[pair] = wrap_phase(
                         -phase / (2 * np.pi * freq)
                     )
@@ -2073,7 +2042,6 @@ def LocalPhases(
                 if self._fit[pair]['X_C1'].fit_success:
                     freq = self._fit[pair]['X_C1'].fit_params['freq'].value
                     phase = self._fit[pair]['X_C1'].fit_params['phase'].value
-                    # _, freq, phase, _ = self._fit[pair]['X_C1'].fit_params
                     self._phase_C1[pair] = wrap_phase(
                         -phase / (2 * np.pi * freq)
                     )
@@ -2081,7 +2049,6 @@ def LocalPhases(
                 if self._fit[pair]['X_T0'].fit_success:
                     freq = self._fit[pair]['X_T0'].fit_params['freq'].value
                     phase = self._fit[pair]['X_T0'].fit_params['phase'].value
-                    # _, freq, phase, _ = self._fit[pair]['X_T0'].fit_params
                     self._phase_T0[pair] = wrap_phase(
                         -phase / (2 * np.pi * freq)
                     )
@@ -2089,7 +2056,6 @@ def LocalPhases(
                 if self._fit[pair]['X_T1'].fit_success:
                     freq = self._fit[pair]['X_T1'].fit_params['freq'].value
                     phase = self._fit[pair]['X_T1'].fit_params['phase'].value
-                    # _, freq, phase, _ = self._fit[pair]['X_T1'].fit_params
                     self._phase_T1[pair] = wrap_phase(
                         -phase / (2 * np.pi * freq)
                     )
