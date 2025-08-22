@@ -415,24 +415,36 @@ def STARAP(
 
     # STA calculations
     # Convert to detuning from center frequency
-    # Add epsilon to avoid division issues  
+    # Add epsilon to avoid division issues 
     f_center = (f0 + f1) / 2
-    delta_t = 2 * np.pi * (f_t - f_center)
-    delta_t = delta_t + eps * (np.abs(delta_t) < eps)
+    Delta_t = 2 * np.pi * (f_t - f_center)
+    Delta_t = Delta_t + eps * (np.abs(Delta_t) < eps)
 
     # Rabi frequency
-    omega_t = omega0 * 2 * np.pi * np.abs(envelope)
+    Omega_t = omega0 * 2 * np.pi * np.abs(envelope)
 
     # Calculate mixing angle
-    theta_t = -np.arctan2(omega_t, delta_t) # Minus to go from 0 to pi
+    theta_t = np.arctan2(Omega_t, Delta_t)
 
     # Calculate derivative with smoothing to reduce noise
     theta_dot = np.gradient(gaussian_filter1d(theta_t, sigma=2.0), dt)
+    
+    # Dynamical phase accumulated over the evolution
+    # phi_c = np.pi / 2 - 0.5 * np.sum( np.sqrt(Delta_t**2 + Omega_t**2) ) * dt
+    # phi_c = -0.5 * np.sum( np.sqrt(delta_t**2 + omega_t**2) ) * dt
+
+    # Beta phase factor
+    # Beta_t = np.arctan(theta_dot / Omega_t) + phi_c
 
     # Construct the STA pulse
     # X component (original drive)
     # Y component (counter-diabatic drive) 
-    sta_pulse = (omega_t/2 + cd_weight * 1j * theta_dot/2) * np.exp(1j * phi_t)
+
+    sta_pulse = (Omega_t/2 - cd_weight * 1j * theta_dot/2) * np.exp(1j * phi_t)
+    # sta_pulse = (Omega_t/2 - cd_weight * 1j * theta_dot/2) * np.exp(1j * (phi_t + phi_c))
+    # sta_pulse = (Omega_t/2 - cd_weight * 1j * theta_dot/2)
+    # sta_pulse *= np.abs(sta_pulse) * np.exp(1j * Beta_t)
+    # sta_pulse *= np.exp(1j * phi_t)
 
     # Apply envelope phase safely
     # envelope_abs = np.abs(envelope)
