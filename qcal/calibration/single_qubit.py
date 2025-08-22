@@ -278,11 +278,17 @@ def Amplitude(
                               f'Fit failed for qubit {q} (positive curvature)!'
                             )
                             self._fit[q]._fit_success = False
+                            self._cal_values[q] = self._param_sweep[q][
+                                np.array(prob).argmax()
+                            ]
                         elif not in_range(newvalue, self._amplitudes[q]):
                             logger.warning(
                               f'Fit failed for qubit {q} (out of range)!'
                             )
                             self._fit[q]._fit_success = False
+                            self._cal_values[q] = self._param_sweep[q][
+                                np.array(prob).argmax()
+                            ]
                         else:
                             self._cal_values[q] = newvalue
 
