@@ -689,7 +689,6 @@ def cycle_pulse(config: Config, cycle: Cycle) -> List:
 
         elif isinstance(gate, X90):
             for p in config[f'single_qubit/{qubit}/{subspace}/X90/pulse']:
-
                 if p['env'] == 'virtualz':
                     pulse.append(
                         {'name':  'virtual_z',
@@ -699,14 +698,14 @@ def cycle_pulse(config: Config, cycle: Cycle) -> List:
                          'phase': p['kwargs']['phase']
                         }
                     )
-                    
                 else:
                     pulse.append(
                         {'name':   'pulse',
                          'tag':    f'X90 {subspace}',
                          'dest':   p['channel'],
-                         'freq':   config[
-                             f'single_qubit/{qubit}/{subspace}/freq'],
+                         'freq':  (
+                              config[f'single_qubit/{qubit}/{subspace}/freq']
+                         ),
                          'amp':    clip_amplitude(p['kwargs']['amp']),
                          'phase':  p['kwargs']['phase'],
                          'twidth': p['length'],
@@ -719,21 +718,34 @@ def cycle_pulse(config: Config, cycle: Cycle) -> List:
                     )
 
         elif isinstance(gate, X):
-            pulse.extend([
-                {'name':   'pulse',
-                 'tag':    f'X {subspace}',
-                 'dest':   p['channel'], 
-                 'freq':   config[f'single_qubit/{qubit}/{subspace}/freq'],
-                 'amp':    clip_amplitude(p['kwargs']['amp']),
-                 'phase':  p['kwargs']['phase'],
-                 'twidth': p['length'],
-                 'env':    generate_pulse_env(
-                               config=config,
-                               pulse=p,
-                               include_amp_phase=False
-                           )
-                } for p in config[f'single_qubit/{qubit}/{subspace}/X/pulse']
-            ])
+             for p in config[f'single_qubit/{qubit}/{subspace}/X/pulse']:
+                if p['env'] == 'virtualz':
+                    pulse.append(
+                        {'name':  'virtual_z',
+                         'freq':  config[
+                                    f'single_qubit/{qubit}/{subspace}/freq'
+                                  ],
+                         'phase': p['kwargs']['phase']
+                        }
+                    )
+                else:
+                    pulse.append(
+                        {'name':   'pulse',
+                        'tag':    f'X {subspace}',
+                        'dest':   p['channel'], 
+                        'freq':   (
+                            config[f'single_qubit/{qubit}/{subspace}/freq']
+                        ),
+                        'amp':    clip_amplitude(p['kwargs']['amp']),
+                        'phase':  p['kwargs']['phase'],
+                        'twidth': p['length'],
+                        'env':    generate_pulse_env(
+                                    config=config,
+                                    pulse=p,
+                                    include_amp_phase=False
+                                )
+                        }
+                    )
 
         elif isinstance(gate, Meas):
             pulse.extend([
