@@ -1063,6 +1063,10 @@ def Phase(
                                 self._cal_values[q],  
                                 ls='--', c='k', label='Fit value'
                             )
+                            ax.axhline(
+                                0, ls='--', c='k'
+                            )
+
 
                         ax.legend(loc=0, fontsize=12)
 
