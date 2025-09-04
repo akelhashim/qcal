@@ -11,6 +11,49 @@ from typing import List
 logger = logging.getLogger(__name__)
 
 
+# def calculate_third_order_z_component(
+#         theta_t: NDArray, 
+#         theta_dot: NDArray, 
+#         theta_ddot: NDArray, 
+#         theta_dddot: NDArray, 
+#         omega_eff: float
+#     ) -> NDArray:
+#     """Calculate the Z-component of third-order superadiabatic corrections.
+
+#     Based on the theory of superadiabatic transformations, the third-order
+#     Z-component involves multiple terms from nested commutators.
+
+#     Args:
+#         theta_t (NDArray): phase as a function of time.
+#         theta_dot (NDArray): first time derivative of the phase.
+#         theta_ddot (NDArray): second time derivative of the phase.
+#         theta_dddot (NDArray): third time derivative of the phase.
+#         omega_eff (float): effective Rabi frequency.
+
+#     Returns:
+#         NDArray: third order Z-component.
+#     """
+#     # Third-order Z-component in the original frame
+#     # These formulas come from the recursive superadiabatic transformation
+    
+#     # Term 1: Direct third-order contribution
+#     term1 = theta_dddot * np.cos(theta_t) / (8 * omega_eff**2)
+    
+#     # Term 2: Mixed derivative term
+#     term2 = -3 * theta_dot * theta_ddot * np.cos(theta_t) / (4 * omega_eff**3)
+    
+#     # Term 3: Velocity-cubed term
+#     term3 = theta_dot**3 * np.sin(theta_t) * np.cos(theta_t) / (2 * omega_eff**3)
+    
+#     # Term 4: Correction from second-order back-transformation
+#     term4 = -theta_ddot * theta_dot * np.sin(theta_t) / (4 * omega_eff**2)
+    
+#     # Total Z-component
+#     cd3_z = term1 + term2 + term3 + term4
+    
+#     return cd3_z
+
+
 def clip_amplitude(
         amp: float | NDArray, min_amp: float = -1.0, max_amp: float = 1.0
     ) -> float | NDArray:
@@ -24,7 +67,8 @@ def clip_amplitude(
     Returns:
         NDArray: pulse array with clipped amplitude.
     """
-    return np.clip(amp.real, min_amp, max_amp) + 1j*np.clip(amp.imag, min_amp, max_amp)
+    return np.clip(amp, min_amp, max_amp)
+    # return np.clip(amp.real, min_amp, max_amp) + 1j*np.clip(amp.imag, min_amp, max_amp)
 
 
 def compute_matrix_A(
@@ -170,7 +214,7 @@ def solve_coefficients(
     bottom_right = np.array([[0]])
     
     aug_matrix = np.block([[top_left, top_right],
-                          [bottom_left, bottom_right]])
+                           [bottom_left, bottom_right]])
     
     # Right-hand side
     rhs = np.vstack([zero_vec, [[theta / t_p]]])
