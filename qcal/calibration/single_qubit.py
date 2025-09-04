@@ -1182,15 +1182,13 @@ def Phase(
                             if self._gate == 'X90' and self._fit[q][fit_index].fit_success:
                                ax.plot(
                                     x, self._fit[q][fit_index].predict(x),
-                                    '-', c=["navy", "indigo"][fit_index], label=f"Fit {['Y180_X90', 'X180_Y90'][fit_index] }"
+                                    '-', c=["navy", "indigo"][fit_index]
                                 )
                         if self._gate == 'X90' and self._fit[q][0].fit_success and self._fit[q][1].fit_success:
                             ax.plot(
                                  x, np.subtract(self._fit[q][0].predict(x), self._fit[q][1].predict(x))**2,
-                                 '-', c='orange', label=f"Fit Squared Difference"
-                             )
-
-
+                                 '-', c='orange'
+                            )
 
                         if self._cal_values[q]:
                             ax.axvline(
