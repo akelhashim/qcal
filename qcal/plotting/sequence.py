@@ -95,7 +95,7 @@ def plot_pulse(
     )
     
     # Add spectrum trace
-    if pulse_qubit:  # TODO: make compatible with EF
+    if pulse_qubit is not None:  # TODO: make compatible with EF
         freqs += config[f'single_qubit/{pulse_qubit}/GE/freq']
 
     fig.add_trace(
@@ -112,12 +112,12 @@ def plot_pulse(
         row=2, col=1
     )
 
-    if pulse_qubit:  # TODO: make compatible with EF
+    if pulse_qubit is not None:  # TODO: make compatible with EF
         fig.add_vline(
             x=config[f'single_qubit/{pulse_qubit}/GE/freq'], 
             line_dash="solid", 
             line_color="blue",
-            annotation_text=f"Q{pulse_qubit} EF",
+            annotation_text=f"Q{pulse_qubit} GE",
             annotation_position="top",
             row=2, col=1
         )
