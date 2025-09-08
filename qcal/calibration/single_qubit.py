@@ -10,7 +10,7 @@ from .utils import find_pulse_index, in_range
 from qcal.circuit import Barrier, Cycle, Circuit, CircuitSet
 from qcal.config import Config
 from qcal.fitting.fit import (
-    FitAbsoluteValue, FitCosine, FitDecayingCosine, FitParabola
+    FitAbsoluteValue, FitCosine, FitDecayingCosine, FitParabola, FitLinear
 )
 from qcal.fitting.utils import est_freq_fft
 from qcal.math.utils import round_to_order_error, wrap_phase
@@ -827,7 +827,7 @@ def Phase(
             self._param_sweep = self._phases
 
             if gate == 'X90':
-                self._fit = {q: FitParabola() for q in qubits}
+                self._fit = {q: [FitLinear(), FitLinear()] for q in qubits} # list for each of the two linear fits()
             elif gate == 'X':
                 self._fit = {q: FitCosine() for q in qubits}
 
@@ -1001,42 +1001,48 @@ def Phase(
                     self._circuits[
                         f'Q{q}: Prob({level[self._subspace]})'
                     ] = pops
-                    self._sweep_results[q] = (
-                        np.array(pop0) - np.array(pop1)
-                    )**2
+                                        
+                    self._sweep_results[q] = (np.array(pop0) - np.array(pop1))**2
                     
-                    params = Parameters()
-                    params.add('a', value=1.)  
-                    params.add('b', value=0.)
-                    params.add('c', value=0., min=0., max=0.5)
-                    self._fit[q].fit(
-                        self._phases[q], self._sweep_results[q], params=params
-                    )
+                    fit_df = {
+                        "data": [pop0, pop1],
+                        "params": [Parameters(), Parameters()],
+                    }
+                    for fit_index in range(2): # for each of the two linear fits
+                        params = fit_df["params"][fit_index]
+                        params.add('m', value=-1.)
+                        params.add('b', value=0.5)
+                        self._fit[q][fit_index].fit(
+                            self._phases[q], fit_df["data"][fit_index], params=params
+                        )
 
                     # If the fit was successful, write find the new phase
-                    if self._fit[q].fit_success:
-                        a = self._fit[q].fit_params['a'].value
-                        b = self._fit[q].fit_params['b'].value
-                        newvalue = -b / (2 * a)  # Assume c = 0
-                        if a < 0:
-                            logger.warning(
-                               f'Fit failed for qubit {q} (negative curvature)!'
-                            )
-                            self._fit[q]._fit_success = False
-                            self._cal_values[q] = self._phases[q][
-                                np.argmin(self._sweep_results[q])
-                            ]
-                        elif not in_range(newvalue, self._phases[q]):
+                    if self._fit[q][0].fit_success and self._fit[q][1].fit_success:
+                        m0 = self._fit[q][0].fit_params['m'].value
+                        b0 = self._fit[q][0].fit_params['b'].value
+                        m1 = self._fit[q][1].fit_params['m'].value
+                        b1 = self._fit[q][1].fit_params['b'].value
+
+                        newvalue = - (b0 - b1) / (m0 - m1) # compute x-intercept 
+                        if not in_range(newvalue, self._phases[q]):
                             logger.warning(
                                 f'Fit failed for qubit {q} (out of range)!'
                             )
-                            self._fit[q]._fit_success = False
+                            self._fit[q][0]._fit_success = False
+                            self._fit[q][1]._fit_success = False
                             self._cal_values[q] = self._phases[q][
                                 np.argmin(self._sweep_results[q])
                             ]
-                        else:
+                        elif self._fit[q][0].error < 0.1 or self._fit[q][1].error < 0.1:
+                            logger.warning(
+                                f'Fit is not ideal for qubit {q} (overfitting based on reduced chi2<<1)!'
+                            )
                             self._cal_values[q] = newvalue
-                    
+                        elif self._fit[q][0].error > 10 or self._fit[q][1].error > 10:
+                            logger.warning(
+                                f'Fit failed for qubit {q} (underfitting based on reduced chi2>>1)!'
+                            )
+                            self._cal_values[q] = newvalue
                     else:
                         self._cal_values[q] = self._phases[q][
                             np.argmin(self._sweep_results[q])
@@ -1139,7 +1145,8 @@ def Phase(
                             axis='both', which='major', labelsize=12
                         )
                         ax.grid(True)
-
+                        
+                        # Plot data
                         if self._gate == 'X90':
                             ax.plot(
                                 self._param_sweep[q], 
@@ -1159,16 +1166,30 @@ def Phase(
                             self._param_sweep[q], self._sweep_results[q],
                             'o', c='k', label=f'Meas, Q{q}'
                         )
-                        if self._fit[q].fit_success:
-                            x = np.linspace(
-                                self._param_sweep[q][0],
-                                self._param_sweep[q][-1], 
-                                100
-                            )
-                            ax.plot(
+
+                        # Plot fitted curves
+                        x = np.linspace(
+                            self._param_sweep[q][0],
+                            self._param_sweep[q][-1], 
+                            100
+                        )
+                        if self._gate == 'X' and self._fit[q].fit_success:
+                           ax.plot(
                                 x, self._fit[q].predict(x),
                                 '-', c='orange', label='Fit'
                             )
+                        for fit_index in range(2):
+                            if self._gate == 'X90' and self._fit[q][fit_index].fit_success:
+                               ax.plot(
+                                    x, self._fit[q][fit_index].predict(x),
+                                    '-', c=["navy", "indigo"][fit_index]
+                                )
+                        if self._gate == 'X90' and self._fit[q][0].fit_success and self._fit[q][1].fit_success:
+                            ax.plot(
+                                 x, np.subtract(self._fit[q][0].predict(x), self._fit[q][1].predict(x))**2,
+                                 '-', c='orange'
+                            )
+
                         if self._cal_values[q]:
                             ax.axvline(
                                 self._cal_values[q],  
