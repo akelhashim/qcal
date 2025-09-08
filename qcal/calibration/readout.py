@@ -25,7 +25,7 @@ from IPython.display import clear_output
 from numpy.typing import ArrayLike
 from sklearn.inspection import DecisionBoundaryDisplay
 
-from typing import Callable, List, Tuple
+from typing import Callable, Dict, List, Tuple
 from matplotlib.colors import ListedColormap
 from matplotlib.patches import Patch
 
@@ -39,14 +39,14 @@ _classifiers = {
 
 
 def ReadoutCalibration(
-        qpu:             QPU,
-        config:          Config,
-        qubits:          List | Tuple,
-        method:          str = 'pi_pulse',
-        gate:            str = 'X90',
-        model:           str = 'gmm',
-        classifier:      ClassificationManager = None,
-        n_levels:        int = 2,
+        qpu:        QPU,
+        config:     Config,
+        qubits:     List | Tuple,
+        method:     str = 'pi_pulse',
+        gate:       str = 'X90',
+        model:      str = 'gmm',
+        classifier: ClassificationManager = None,
+        n_levels:   int = 2,
         **kwargs
     ) -> Callable:
     """Readout calibration
@@ -86,13 +86,13 @@ def ReadoutCalibration(
         """
 
         def __init__(self, 
-                config:          Config,
-                qubits:          List | Tuple,
-                method:          str = 'pi_pulse',
-                gate:            str = 'X90',
-                model:           str = 'gmm',
-                classifier:      ClassificationManager = None,
-                n_levels:        int = 2,
+                config:     Config,
+                qubits:     List | Tuple,
+                method:     str = 'pi_pulse',
+                gate:       str = 'X90',
+                model:      str = 'gmm',
+                classifier: ClassificationManager = None,
+                n_levels:   int = 2,
                 **kwargs
             ) -> None:
             """Initialize the readout calibration class within the function.
@@ -448,13 +448,13 @@ def ReadoutCalibration(
 
 
 def Fidelity(
-        qpu:             QPU,
-        config:          Config,
-        qubits:          List | Tuple,
-        params:          List[str],
-        param_sweep:     ArrayLike | List[ArrayLike],
-        gate:            str = 'X90',
-        n_levels:        int = 2,
+        qpu:         QPU,
+        config:      Config,
+        qubits:      List | Tuple,
+        params:      Dict[int, str],
+        param_sweep: ArrayLike | Dict[int, ArrayLike],
+        gate:        str = 'X90',
+        n_levels:    int = 2,
         **kwargs
     ) -> Callable:
     """Fidelity calibration.
@@ -462,12 +462,12 @@ def Fidelity(
     Basic example useage:
         
     ```
-    qubits=[0, 1, 2, 3, 4, 5, 6, 7]
-    params = [f'readout/{q}/amp' for q in qubits]
-    param_sweep = [
-        np.linspace(-0.005, 0.005, 21)
+    qubits = [0, 1, 2, 3, 4, 5, 6, 7]
+    params = {q: f'readout/{q}/amp' for q in qubits}
+    param_sweep = {
+        q: np.linspace(-0.005, 0.005, 21)
         + cfg[f'readout/{q}/amp'] for q in qubits
-    ]
+    }
 
     cal = Fidelity(
         CustomQPU,
@@ -483,8 +483,10 @@ def Fidelity(
         qpu (QPU): custom QPU object.
         config (Config): qcal Config object.
         qubits (List | Tuple): qubits to calibrate.
-        params (List[str]): list specifying which config params to sweep over.
-        param_sweep (ArrayLike | List[ArrayLike]): value sweep for each param.
+        params (Dict[int, str]): dictionary mapping qubit label to param to 
+            sweep over.
+        param_sweep (ArrayLike | Dict[int, ArrayLike]): value sweep for each 
+            qubit.
         gate (str, optional): native gate to used to prepare states. Defaults 
             to 'X90'.
         n_levels (int, optional): number of energy levels to classify. 
@@ -501,12 +503,12 @@ def Fidelity(
         """
 
         def __init__(self, 
-                config:          Config,
-                qubits:          List | Tuple,
-                params:          List[str],
-                param_sweep:     ArrayLike | List[ArrayLike],
-                gate:            str = 'X90',
-                n_levels:        int = 2,
+                config:      Config,
+                qubits:      List | Tuple,
+                params:      Dict[int, str],
+                param_sweep: ArrayLike | Dict[int, ArrayLike],
+                gate:        str = 'X90',
+                n_levels:    int = 2,
                 **kwargs
             ) -> None:
             """Initialize the Fidelity calibration class within the function.
@@ -529,9 +531,9 @@ def Fidelity(
 
             self._params = params
             self._param_sweep = (
-                param_sweep if isinstance(param_sweep, list) else [
-                    param_sweep for _ in range(len(params))
-                ]
+                param_sweep if isinstance(param_sweep, Dict) else {
+                    q: param_sweep for q in qubits
+                }
             )
 
             self._n_levels = n_levels
@@ -559,9 +561,7 @@ def Fidelity(
                 for n in range(self._n_levels)[1:]:
                     fid += np.array(self._fid[q][n])
                 max_fid_idx = np.argmax(fid)
-                self._cal_values[q] = self._param_sweep[
-                        self._qubits.index(q)
-                    ][max_fid_idx]
+                self._cal_values[q] = self._param_sweep[q][max_fid_idx]
 
         def plot(self) -> None:
             """Plot the fidelity calibration results."""
@@ -600,7 +600,7 @@ def Fidelity(
 
                         for n in range(self._n_levels):
                             ax.plot(
-                                self._param_sweep[self._qubits.index(q)], 
+                                self._param_sweep[q], 
                                 self._fid[q][n],
                                 'o-',
                                 c=colors[n],
@@ -631,18 +631,16 @@ def Fidelity(
         def final(self) -> None:
             """Save and load the config after changing parameters."""
             for q in self._qubits:
-                self._config[
-                        self._params[self._qubits.index(q)]
-                    ] = self._cal_values[q]
+                self._config[self._params[q]] = self._cal_values[q]
 
             self._config.save()
             self._config.load()
 
         def run(self) -> None:
             """Run the experiment."""
-            for i in range(len(self._param_sweep[0])):
-                for j, param in enumerate(self._params):
-                    self._rcal._config[param] = self._param_sweep[j][i]
+            for i in range(len(self._param_sweep[self._qubits[0]])):
+                for q, param in self._params.items():
+                    self._rcal._config[param] = self._param_sweep[q][i]
 
                 self._rcal._measurements = []
                 self._rcal.run()
@@ -662,26 +660,26 @@ def Fidelity(
             self.final()
 
     return Fidelity(
-        config,
-        qubits,
-        params,
-        param_sweep,
-        gate,
-        n_levels,
+        config=config,
+        qubits=qubits,
+        params=params,
+        param_sweep=param_sweep,
+        gate=gate,
+        n_levels=n_levels,
         **kwargs
     )
 
 
 def Separation(
-        qpu:             QPU,
-        config:          Config,
-        qubits:          List | Tuple,
-        params:          List[str],
-        param_sweep:     ArrayLike | List[ArrayLike],
-        method:          str = 'pi_pulse',
-        gate:            str = 'X90',
-        model:           str = 'gmm',
-        n_levels:        int = 2,
+        qpu:         QPU,
+        config:      Config,
+        qubits:      List | Tuple,
+        params:      Dict[int, str],
+        param_sweep: ArrayLike | Dict[int, ArrayLike],
+        method:      str = 'pi_pulse',
+        gate:        str = 'X90',
+        model:       str = 'gmm',
+        n_levels:    int = 2,
         **kwargs
     ) -> Callable:
     """Separation calibration.
@@ -689,12 +687,13 @@ def Separation(
     Basic example useage:
         
     ```
-    qubits=[0, 1, 2, 3, 4, 5, 6, 7]
-    params = [f'readout/{q}/freq' for q in qubits]
-    param_sweep = [ # +/- 500 kHz sweep around the current frequency
-        np.linspace(-0.25, 0.25, 21) * MHz
-        + config[f'readout/{q}/freq'] for q in qubits
-    ]
+    qubits = [0, 1, 2, 3, 4, 5, 6, 7]
+    params = {q: f'readout/{q}/freq' for q in qubits}
+    # +/- 500 kHz sweep around the current frequency
+    param_sweep = { # +/- 500 kHz sweep around the current frequency
+        q: np.linspace(-0.5, 0.5, 31) * MHz
+        + cfg[f'readout/{q}/freq'] for q in qubits
+    }
 
     cal = Separation(
         CustomQPU,
@@ -710,8 +709,10 @@ def Separation(
         qpu (QPU): custom QPU object.
         config (Config): qcal Config object.
         qubits (List | Tuple): qubits to calibrate.
-        params (List[str]): list specifying which config params to sweep over.
-        param_sweep (ArrayLike | List[ArrayLike]): value sweep for each param.
+        params (Dict[int, str]): dictionary mapping qubit label to param to 
+            sweep over.
+        param_sweep (ArrayLike | Dict[int, ArrayLike]): value sweep for each 
+            qubit.
         method (str, optional): calibration method. Must be one of ('pi_pulse',
             'rabi').
         gate (str, optional): native gate used for state preparation. Defaults 
@@ -731,14 +732,14 @@ def Separation(
         """
 
         def __init__(self, 
-                config:          Config,
-                qubits:          List | Tuple,
-                params:          List[str],
-                param_sweep:     ArrayLike | List[ArrayLike],
-                method:          str = 'pi_pulse',
-                gate:            str = 'X90',
-                model:           str = 'gmm',
-                n_levels:        int = 2,
+                config:      Config,
+                qubits:      List | Tuple,
+                params:      Dict[int, str],
+                param_sweep: ArrayLike | Dict[int, ArrayLike],
+                method:      str = 'pi_pulse',
+                gate:        str = 'X90',
+                model:       str = 'gmm',
+                n_levels:    int = 2,
                 **kwargs
             ) -> None:
             """Initialize the Amplitude calibration class within the function.
@@ -763,9 +764,9 @@ def Separation(
 
             self._params = params
             self._param_sweep = (
-                param_sweep if isinstance(param_sweep, list) else [
-                    param_sweep for _ in range(len(params))
-                ]
+                param_sweep if isinstance(param_sweep, Dict) else {
+                    q: param_sweep for q in qubits
+                }
             )
 
             self._groupings = []
@@ -795,9 +796,7 @@ def Separation(
                 for g in self._groupings[1:]:
                     sep += np.array(self._sep[q][g])
                 max_sep_idx = np.argmax(sep)
-                self._cal_values[q] = self._param_sweep[
-                        self._qubits.index(q)
-                    ][max_sep_idx]
+                self._cal_values[q] = self._param_sweep[q][max_sep_idx]
 
         def plot(self) -> None:
             """Plot the calibration results for the maximum separation."""
@@ -833,10 +832,14 @@ def Separation(
                         ax.tick_params(
                             axis='both', which='major', labelsize=12
                         )
+                        ax.text(
+                            0.05, 0.9, f'R{q}', size=15, 
+                            transform=ax.transAxes
+                        )
 
                         for m, g in enumerate(self._groupings):
                             ax.plot(
-                                self._param_sweep[self._qubits.index(q)], 
+                                self._param_sweep[q], 
                                 self._sep[q][g],
                                 'o-',
                                 c=colors[m],
@@ -870,18 +873,16 @@ def Separation(
         def final(self) -> None:
             """Save and load the config after changing parameters."""
             for q in self._qubits:
-                self._config[
-                        self._params[self._qubits.index(q)]
-                    ] = self._cal_values[q]
+                self._config[self._params[q]] = self._cal_values[q]
 
             self._config.save()
             self._config.load()
 
         def run(self) -> None:
             """Run the experiment."""
-            for i in range(len(self._param_sweep[0])):
-                for j, param in enumerate(self._params):
-                    self._rcal._config[param] = self._param_sweep[j][i]
+            for i in range(len(self._param_sweep[self._qubits[0]])):
+                for q, param in self._params.items():
+                    self._rcal._config[param] = self._param_sweep[q][i]
 
                 self._rcal._measurements = []
                 self._rcal.run(plot=False)
@@ -897,13 +898,13 @@ def Separation(
             self.final()
 
     return Separation(
-        config,
-        qubits,
-        params,
-        param_sweep,
-        method,
-        gate,
-        model,
-        n_levels,
+        config=config,
+        qubits=qubits,
+        params=params,
+        param_sweep=param_sweep,
+        method=method,
+        gate=gate,
+        model=model,
+        n_levels=n_levels,
         **kwargs
     )
