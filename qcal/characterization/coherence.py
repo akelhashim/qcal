@@ -214,7 +214,7 @@ def T1(qpu:        QPU,
             """Save all circuits and data."""
             clear_output(wait=True)
             self._data_manager._exp_id += (
-                f'_T1_Q{"".join(str(q) for q in self._qubits)}'
+                f'_T1_{"".join("Q"+str(q) for q in self._qubits)}'
             )
             if settings.Settings.save_data:
                 qpu.save(self)
@@ -483,7 +483,7 @@ def T2(qpu:        QPU,
             """Save all circuits and data."""
             clear_output(wait=True)
             self._data_manager._exp_id += (
-                f'_T2_Q{"".join(str(q) for q in self._qubits)}'
+                f'_T2_{"".join("Q"+str(q) for q in self._qubits)}'
             )
             if settings.Settings.save_data:
                 qpu.save(self)
@@ -617,7 +617,7 @@ def T2XY(
             self._param_sweep = self._times
 
             self._params = {
-                q: f'single_qubit/{q}/{subspace}/T2e' for q in qubits
+                q: f'single_qubit/{q}/{subspace}/T2DD' for q in qubits
             }
             self._fit = {q: FitExponential() for q in qubits}
             
@@ -721,17 +721,21 @@ def T2XY(
                 self._results[q] = prob1
                 self._circuits[f'Q{q}: Prob(1)'] = prob1
 
-                # Add initial guesses to fit
                 c = np.array(prob1).min()
                 a = np.array(prob1).max() - c
                 b = np.mean( np.diff(prob1) / np.diff(self._times[q]) ) / a
-                self._fit[q].fit(self._times[q], prob1, p0=(-a, b, c))
+                params = Parameters()
+                params.add('a', value=-a)  
+                params.add('b', value=b)
+                params.add('c', value=c)
+                self._fit[q].fit(self._times[q], prob1, params=params)
 
                 # If the fit was successful, write to the config
                 if self._fit[q].fit_success:
                     val, err = round_to_order_error(
                         *reciprocal_uncertainty(
-                            self._fit[q].fit_params[1], self._fit[q].error[1]
+                            self._fit[q].fit_params['b'].value, 
+                            self._fit[q].fit_params['b'].stderr
                         )
                     )
                     self._char_values[q] = val
@@ -741,7 +745,7 @@ def T2XY(
             """Save all circuits and data."""
             clear_output(wait=True)
             self._data_manager._exp_id += (
-                f'_T2XY_Q{"".join(str(q) for q in self._qubits)}'
+                f'_T2XY_{"".join("Q"+str(q) for q in self._qubits)}'
             )
             if settings.Settings.save_data:
                 qpu.save(self)
@@ -942,7 +946,7 @@ def ParityOscillations(
             """Save all circuits and data."""
             clear_output(wait=True)
             self._data_manager._exp_id += (
-                f'_ParityOscillations_Q{"".join(str(q) for q in self._qubits)}'
+              f'_ParityOscillations_{"".join("Q"+str(q) for q in self._qubits)}'
             )
             if settings.Settings.save_data:
                 qpu.save(self)

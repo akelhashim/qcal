@@ -263,6 +263,12 @@ def add_measurement(
                 meas_pulse.extend(
                     cycle_pulse(config, Cycle({X(qubit, subspace='EF')}))
                 )
+                # meas_pulse.extend(
+                #     cycle_pulse(config, Cycle({X90(qubit, subspace='EF')}))
+                # )
+                # meas_pulse.extend(
+                #     cycle_pulse(config, Cycle({X90(qubit, subspace='EF')}))
+                # )
             else:
                 length = 0.
                 for pulse in config[f'single_qubit/{qubit}/EF/X/pulse']:
@@ -849,6 +855,20 @@ def to_qubic(
              'var':  f'{q}_phase'
             }
         ])
+
+        # if config[f'single_qubit/{q[1:]}/EF/freq']:
+        #     qubic_circuit.extend([
+        #     {'name':  'declare', 
+        #      'var':   f'{q}_phase_EF', 
+        #      'dtype': 'phase', 
+        #      'scope': [q]
+        #     },
+        #     {'name': 'set_var', 'value': 0, 'var': f'{q}_phase_EF'},
+        #     {'name': 'bind_phase',
+        #      'freq': config[f'single_qubit/{q[1:]}/EF/freq'],
+        #      'var':  f'{q}_phase_EF'
+        #     }
+        # ])
 
     if config._parameters['initialize']:
         initialize(config, qubic_circuit)

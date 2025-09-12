@@ -175,6 +175,77 @@ class Config:
         return str(dict(self._parameters))
     
     @property
+    def coherence_times(self) -> pd.DataFrame:
+        """Coherences times of all of the qubits.
+        
+        Args:
+            include_EF (bool, optional): include EF coherences. 
+                Defaults to True.
+
+        Returns:
+            pd.DataFrame: DataFrame of coherences times.
+        """
+        df = pd.DataFrame(columns=['Qubit', 'Coherence Time', 'Coherence Type'])
+        for c in ['T1', 'T2*', 'T2e', 'T2DD']:
+            coh = []
+            qs = []
+            label = []
+            for q in self.qubits:
+                # GE
+                val = self[f"single_qubit/{q}/GE/{c}"]
+                if val is not None and val > 0:
+                    coh.append(val)
+                    qs.append(q)
+                    label.append(c + ' GE')
+                # EF
+                val = self[f"single_qubit/{q}/EF/{c}"]
+                if val is not None and val > 0:
+                    coh.append(val)
+                    qs.append(q)
+                    label.append(c + ' EF')
+            
+            df = pd.concat([
+                df, 
+                pd.DataFrame(
+                    {'Qubit': qs, 
+                     'Coherence Time': coh, 
+                     'Coherence Type': label
+                    }
+                )
+            ])
+
+        return df
+
+    @property
+    def filename(self) -> str:
+        """The filename of the config.yaml file.
+
+        Returns:
+            str: filename of the config.yaml file.
+        """
+        return self._filename
+    
+    @property
+    def hardware(self) -> pd.DataFrame:
+        """Hardware parameters in a table format.
+
+        Returns:
+            pd.DataFrame: hardware properties.
+        """
+        return pd.DataFrame.from_dict(
+            self.parameters['hardware'], orient='index', columns=['hardware']
+        )
+    
+    @property
+    def n_qubits(self) -> int:
+        """Number of qubits on the processor.
+
+        Returns:
+            int: number of qubits.
+        """
+        return len(self.qubits)
+    
+    @property
     def native_gates(self) -> Dict:
         """Native gates for each qubit (subspace) and qubit pair.
 
@@ -210,35 +281,6 @@ class Config:
         native_gates['set'] = native_set
 
         return native_gates
-
-    @property
-    def filename(self) -> str:
-        """The filename of the config.yaml file.
-
-        Returns:
-            str: filename of the config.yaml file.
-        """
-        return self._filename
-    
-    @property
-    def hardware(self) -> pd.DataFrame:
-        """Hardware parameters in a table format.
-
-        Returns:
-            pd.DataFrame: hardware properties.
-        """
-        return pd.DataFrame.from_dict(
-            self.parameters['hardware'], orient='index', columns=['hardware']
-        )
-    
-    @property
-    def n_qubits(self) -> int:
-        """Number of qubits on the processor.
-
-        Returns:
-            int: number of qubits.
-        """
-        return len(self.qubits)
 
     @property
     def parameters(self) -> Dict:
@@ -447,6 +489,26 @@ class Config:
         """
         from qcal.plotting.graphs import draw_qpu
         draw_qpu(self)
+
+    def plot_coherences(self, 
+            qubits:  List | Tuple | None = None, 
+            plot_EF: bool = False
+        ) -> None:
+        """Plot the coherence times in a CDF.
+
+        Args:
+            qubits (List | Tuple | None, optional): qubits to plot. Defaults to 
+                None.
+            plot_EF (bool, optional): plot EF coherences. Defaults to False.
+        """
+        from qcal.plotting.cdf import CDF
+
+        df = self.coherence_times
+        df = df[df['Qubit'].isin(qubits if qubits is not None else self.qubits)]
+        if not plot_EF:
+            df = df[~df['Coherence Type'].str.contains('EF', na=False)]
+
+        CDF(df=df, x='Coherence Time', color='Coherence Type')
 
     def plot_freqs(self,
             qubits:      List | Tuple | None = None,

@@ -236,7 +236,7 @@ def ReadoutCalibration(
             """Save all circuits and data."""
             clear_output(wait=True)
             self._data_manager._exp_id += (
-                f'_RCal_Q{"".join("Q"+str(q) for q in self._qubits)}'
+                f'_RCal_{"".join("Q"+str(q) for q in self._qubits)}'
             )
             if settings.Settings.save_data:
                 qpu.save(self)
