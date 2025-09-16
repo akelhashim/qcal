@@ -19,10 +19,10 @@ logger = logging.getLogger(__name__)
 
 
 def ReadoutFidelity(
-        qpu:             QPU,
-        config:          Config,
-        qubits:          List | Tuple,
-        gate:            str = 'X90',
+        qpu:    QPU,
+        config: Config,
+        qubits: List | Tuple,
+        gate:   str = 'X90',
         **kwargs
     ) -> Callable:
     """Function which passes a custom QPU to the ReadoutFidelity class.
@@ -53,9 +53,9 @@ def ReadoutFidelity(
         """
 
         def __init__(self, 
-                config:          Config,
-                qubits:          List | Tuple,
-                gate:            str = 'X90',
+                config: Config,
+                qubits: List | Tuple,
+                gate:   str = 'X90',
                 **kwargs
             ) -> None:
             """Initialize the ReadoutFidelity class within the function.
@@ -138,8 +138,9 @@ def ReadoutFidelity(
 
             for i, circuit in enumerate(self._circuits):  # i = prep state
                 for j, q in enumerate(self._qubits):  # j, q = idx, qubit
-                    self._confusion_mat.iloc[i].loc[f'Q{q}'][
-                        'Meas State'] = ([
+                    self._confusion_mat.loc[
+                        ('Prep State', i), (f'Q{q}', 'Meas State')
+                    ] = ([
                         circuit.results.marginalize(j).populations[f'{n}']
                         for n in range(self._n_levels)
                     ])
@@ -169,8 +170,8 @@ def ReadoutFidelity(
             self.final()
 
     return ReadoutFidelity(
-        config,
-        qubits,
-        gate,
+        config=config,
+        qubits=qubits,
+        gate=gate,
         **kwargs
     )
