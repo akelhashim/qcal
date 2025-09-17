@@ -14,6 +14,7 @@ __all__ = (
     'cosine',
     'decaying_cosine',
     'exponential',
+    'constrained_exponential',
     'linear',
     'parabola'
 )
@@ -83,6 +84,20 @@ def exponential(x: ArrayLike, a: float, b: float, c: float) -> NDArray:
         NDArray: exponential curve.
     """
     return a * np.exp(-b * x) + c
+
+def constrained_exponential(x: ArrayLike, a: float, b: float) -> NDArray:
+    """Exponential function.
+
+    Args:
+        x (ArrayLike): data.
+        a (float): y-amplitude/offset
+        b (float): exponential constant.
+
+    Returns:
+        NDArray: exponential curve.
+    """
+    return a*(1 - np.exp(-b * x))
+
 
 
 def linear(x: ArrayLike, m: float, b: float) -> ArrayLike:

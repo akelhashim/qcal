@@ -571,7 +571,7 @@ def SRB(qpu:             QPU,
             plt.show()
 
             if any(res.dim == 3 for res in self._circuits.results):
-                analyze_leakage(
+                _, self.leakage_fitting_results = analyze_leakage(
                     self._circuits, filename=self._data_manager._save_path
                 )
 

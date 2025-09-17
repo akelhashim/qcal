@@ -20,6 +20,7 @@ __all__ = (
     'FitCosine',
     'FitDecayingCosine',
     'FitExponential',
+    'FitConstrainedExponential',
     'FitLinear',
     'FitParabola',
 )
@@ -159,6 +160,13 @@ class FitExponential(Fit):
     """Exponential fit class."""
 
     def __init__(self, fit_function: Callable = exponential) -> None:
+        """Initialize an exponential fitter using the exponential function."""
+        super().__init__(fit_function)
+
+class FitConstrainedExponential(Fit):
+    """Exponential fit class."""
+
+    def __init__(self, fit_function: Callable = constrained_exponential) -> None:
         """Initialize an exponential fitter using the exponential function."""
         super().__init__(fit_function)
 
