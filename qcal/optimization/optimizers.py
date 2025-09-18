@@ -14,7 +14,8 @@ logger = logging.getLogger(__name__)
 
 __all__ = (
     'Adam',
-    'CMA', 
+    'CMA',
+    'LQG', 
     'LQR'
 )
 
@@ -119,8 +120,8 @@ class Adam:
             delta = x.copy() - self._x_t
             self._grad = (loss - self._loss) / (delta + self._eps)
         
-        self._prev_loss = self._loss.copy()
-        self._loss = loss.copy()
+        self._prev_loss = self._loss
+        self._loss = loss
     
     def step(self, grad: float | NDArray  = None) -> float | NDArray:
         """Compute the new parameters values based on the gradient for each.

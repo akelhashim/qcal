@@ -144,7 +144,7 @@ def JAZZ(
             loss = {}
             for qp in self._qubits:
                 if self._char_values[qp]:
-                    loss[qp] = self._char_values[qp]['val']
+                    loss[qp] = [self._char_values[qp]['val']]
 
             return loss
 
@@ -153,7 +153,7 @@ def JAZZ(
             logger.info(' Generating circuits...')
             phases = []
             sequence = []
-            qubits = list(flatten(self._qubits))
+            qubits = sorted(flatten(self._qubits))
             self._circuits = CircuitSet()
             for t in self._times[self._qubits[0]]:
                 phase = 2. * np.pi * self._detuning * t  # theta = 2pi*freq*t
@@ -236,7 +236,7 @@ def JAZZ(
             logger.info(' Analyzing the data...')
 
             # Fit the frequency of oscillations
-            qubits = list(flatten(self._qubits))
+            qubits = sorted(flatten(self._qubits))
             for qp in self._qubits:
                 t = qubits.index(qp[1])
 
@@ -340,11 +340,11 @@ def JAZZ(
                         ax.grid(True)
 
                         ax.plot(
-                            self._param_sweep[qp], self._results[qp]['C0'],
+                            self._times[qp], self._results[qp]['C0'],
                             'o', c='blue', label=rf'Q{qp[0]} $|0\rangle$'
                         )
                         ax.plot(
-                            self._param_sweep[qp], self._results[qp]['C1'],
+                            self._times[qp], self._results[qp]['C1'],
                             'o', c='red', label=rf'Q{qp[0]} $|1\rangle$'
                         )
                         
@@ -372,12 +372,14 @@ def JAZZ(
                                 label=f'{freq / kHz:.3f} kHz'
                             )
 
+                        title = f'{qp}'
                         if self._char_values[qp]:
                             val = self._char_values[qp]['val']
                             err = self._char_values[qp]['err']
-                            ax.set_title(
-                                f'{qp}: ZZ = {val / kHz:.3f} ({err / kHz:.3f}) kHz'
+                            title += (
+                                f': ZZ = {val / kHz:.3f} ({err / kHz:.3f}) kHz'
                             )
+                        ax.set_title(title)
                         
                         ax.legend(loc=0, fontsize=12)
 
@@ -402,13 +404,17 @@ def JAZZ(
             """Final calibration method."""
             for qp in self._qubits:
                 if self._char_values[qp]:
+                    self.set_param(
+                        self._params[qp], self._char_values[qp]['val']
+                    )
                     print(
                         f"{qp}: ZZ = {self._char_values[qp]['val'] / kHz:.3f} "
                         f"({self._char_values[qp]['err'] / kHz:.3f})"
                     )
-                    # self.set_param(
-                    #     self._params[qp], self._char_values[qp]['val']
-            #         )
+
+            if settings.Settings.save_data:
+                self._config.save()
+
             print(f"\nRuntime: {repr(self._runtime)[8:]}\n")
 
         def run(self):

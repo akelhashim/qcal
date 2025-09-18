@@ -59,15 +59,18 @@ def calculate_cz_frequency(
             config[f'single_qubit/{qp[1]}/EF/freq'] 
         )
 
-        freq_20 = (  # 02 transition frequency
+        freq_20 = (  # 20 transition frequency
             config[f'single_qubit/{qp[0]}/GE/freq'] + 
             config[f'single_qubit/{qp[0]}/EF/freq'] 
         )
 
         freq_mapper = {'02': freq_02, '20': freq_20}
-        config[f'two_qubit/{qp}/CZ/freq'] = (
-            freq_mapper[intermediate_state] + freq_11
-        ) / 2
+        # config[f'two_qubit/{qp}/CZ/freq'] = (
+        #     freq_mapper[intermediate_state] + freq_11
+        # ) / 2
+        config[f'two_qubit/{qp}/CZ/freq'] = abs(
+            freq_mapper[intermediate_state] - freq_11
+        )
 
     config.save()
 
@@ -86,7 +89,7 @@ def tomography_circuits(
     Returns:
         CircuitSet: partial tomography CZ circuits.
     """
-    qubits = list(flatten(qubit_pairs))
+    qubits = sorted(flatten(qubit_pairs))
 
     circuit_C0_X = Circuit([
         # Y90 on target qubit
@@ -358,7 +361,7 @@ def AmpFreqSweep(
             logger.info(' Analyzing the data...')
 
             # Compute the conditionality for each amp/freq
-            qubits = list(flatten(self._qubits))
+            qubits = sorted(flatten(self._qubits))
             for pair in self._qubits:
                 self._R[pair] = np.zeros((
                     self._frequencies[pair].size,
@@ -689,7 +692,7 @@ def Amplitude(
             logger.info(' Analyzing the data...')
 
             # Compute the conditionality and fit to a parabola
-            qubits = list(flatten(self._qubits))
+            qubits = sorted(flatten(self._qubits))
             for pair in self._qubits:
                 i = qubits.index(pair[1])
 
@@ -1031,7 +1034,7 @@ def Frequency(
             logger.info(' Analyzing the data...')
 
             # Compute the conditionality and fit to a parabola
-            qubits = list(flatten(self._qubits))
+            qubits = sorted(flatten(self._qubits))
             for pair in self._qubits:
                 i = qubits.index(pair[1])
 
@@ -1353,7 +1356,7 @@ def RelativeAmp(
             logger.info(' Analyzing the data...')
 
             # Compute the conditionality and fit to a parabola
-            qubits = list(flatten(self._qubits))
+            qubits = sorted(flatten(self._qubits))
             for pair in self._qubits:
                 i = qubits.index(pair[1])
 
@@ -1591,7 +1594,7 @@ def RelativePhase(
             logger.info(' Analyzing the data...')
 
             # Compute the conditionality and fit to a parabola
-            qubits = list(flatten(self._qubits))
+            qubits = sorted(flatten(self._qubits))
             for pair in self._qubits:
                 i = qubits.index(pair[1])
 
@@ -1829,7 +1832,7 @@ def LocalPhases(
         def generate_circuits(self) -> None:
             """Generate all amplitude calibration circuits."""
             logger.info(' Generating circuits...')
-            qubits = list(flatten(self._qubits))
+            qubits = sorted(flatten(self._qubits))
 
             circuit_C0_X = Circuit([
                 # Y90 on target qubit
@@ -1880,8 +1883,6 @@ def LocalPhases(
                 Cycle({Rz(p[0], -np.pi/2) for p in qubit_pairs}),
                 Cycle({X90(p[0]) for p in qubit_pairs}),
                 Cycle({Rz(p[0], np.pi/2) for p in qubit_pairs}),
-                # Measure
-                Cycle(Meas(q) for q in qubits)
             ])
             circuit_T0_X.measure()
 
@@ -1933,7 +1934,7 @@ def LocalPhases(
             logger.info(' Analyzing the data...')
 
             # Compute the conditionality and fit to a parabola
-            qubits = list(flatten(self._qubits))
+            qubits = sorted(flatten(self._qubits))
             for pair in self._qubits:
                 c = qubits.index(pair[0])
                 t = qubits.index(pair[1])
@@ -2374,7 +2375,7 @@ def SpectatorPhase(
         def generate_circuits(self) -> None:
             """Generate all amplitude calibration circuits."""
             logger.info(' Generating circuits...')
-            qubits = list(flatten(self._qubits + self._squbits))
+            qubits = sorted(flatten(self._qubits + self._squbits))
 
             circuit_C0_X = Circuit([
                 # Y90 on spectator qubits

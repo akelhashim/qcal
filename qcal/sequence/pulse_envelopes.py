@@ -162,6 +162,7 @@ def FAST(
     # Setup time array
     n_points = int(round(length * sample_rate))
     t = np.linspace(0, length, n_points)
+    N = int(N)  # N needs to be an int
 
     # Solve for coefficients
     coefficients = solve_coefficients(
