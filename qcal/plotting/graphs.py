@@ -364,7 +364,7 @@ def format_qubit_text(qubit: Dict) -> str:
     text = ''
     for key, value in qubit.items():
         if not isinstance(value, dict):
-            text = f'{key.capitalize()}: {qubit[key]}<br>'
+            text += f'{key.capitalize()}: {qubit[key]}<br>'
         else:
             text += f'{key}:<br>'
             for k, v in qubit[key].items():

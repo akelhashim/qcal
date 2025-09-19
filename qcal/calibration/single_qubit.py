@@ -318,7 +318,7 @@ def Amplitude(
             self.analyze()
             clear_output(wait=True)
             self._data_manager._exp_id += (
-                f'_amp_cal_Q{"".join(str(q) for q in self._qubits)}'
+                f'_amp_cal_{"".join("Q" + str(q) for q in self._qubits)}'
             )
             if settings.Settings.save_data:
                 self.save()
@@ -509,7 +509,7 @@ def Frequency(
             """Analyze the data."""
             logger.info(' Analyzing the data...')
 
-            level = {'GE': '1', 'EF': '2'}
+            level = {'GE': '0', 'EF': '1'}
             # Fit the measured frequency for each detuning
             probs = {q: list() for q in self._qubits}
             for i, detuning in enumerate(self._detunings):
@@ -600,7 +600,7 @@ def Frequency(
                 nrows, 2, figsize=figsize, layout='constrained'
             )
             colors = plt.get_cmap('viridis', self._detunings.size)
-            level = {'GE': '1', 'EF': '2'}
+            level = {'GE': '0', 'EF': '1'}
 
             for i, q in enumerate(self._qubits):
                 if len(self._qubits) == 1:
@@ -699,7 +699,7 @@ def Frequency(
             self.analyze()
             clear_output(wait=True)
             self._data_manager._exp_id += (
-                f'_freq_cal_Q{"".join(str(q) for q in self._qubits)}'
+                f'_freq_cal_{"".join("Q" + str(q) for q in self._qubits)}'
             )
             if settings.Settings.save_data:
                 self.save()
@@ -1113,7 +1113,7 @@ def Phase(
             """Save all circuits and data."""
             clear_output(wait=True)
             self._data_manager._exp_id += (
-                f'_phase_cal{"".join("Q"+str(q) for q in self._qubits)}'
+                f'_phase_cal{"".join("Q" + str(q) for q in self._qubits)}'
             )
             if settings.Settings.save_data:
                 qpu.save(self)
