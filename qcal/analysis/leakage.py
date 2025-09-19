@@ -1,10 +1,9 @@
 """Submodule for analyzing leakage.
 
 """
-from qcal.fitting.fit_functions import constrained_exponential
 import qcal.settings as settings
 
-from qcal.fitting.fit import FitExponential, FitConstrainedExponential
+from qcal.fitting.fit import FitExponential
 from qcal.math.utils import round_to_order_error
 from qcal.results import Results
 from qcal.utils import save_to_pickle
@@ -13,11 +12,16 @@ import logging
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-
+import scipy
+from lmfit import Parameters
 from uncertainties import ufloat, umath, umath_core
 
-from lmfit import Parameters
-from typing import Any, Dict
+import qcal.settings as settings
+from qcal.fitting.fit import FitConstrainedExponential, FitExponential
+from qcal.fitting.fit_functions import constrained_exponential
+from qcal.math.utils import round_to_order_error
+from qcal.results import Results
+from qcal.utils import save_to_pickle
 
 logger = logging.getLogger(__name__)
 
@@ -52,12 +56,10 @@ def analyze_leakage(circuits: Any, filename: str | None = None) -> Dict:
         for q, i in zip(qubits, q_index):
             if circuit_depth in leakage[q].keys():
                 leakage[q][circuit_depth].append(
-                    results.marginalize(i).populations['2']
+                    results.marginalize(i).populations["2"]
                 )
             else:
-                leakage[q][circuit_depth] = [
-                    results.marginalize(i).populations['2']
-                ]
+                leakage[q][circuit_depth] = [results.marginalize(i).populations["2"]]
 
     circuit_depths = np.array(sorted(circuit_depths))
 
@@ -66,12 +68,32 @@ def analyze_leakage(circuits: Any, filename: str | None = None) -> Dict:
         y = np.array([np.mean(leakage[q][d]) for d in circuit_depths])
         a = y.min() - y.max()
         params = Parameters()
-        #params.add('a', value=a, min=-10, max=0)
-        #params.add('b', value=1/np.mean(circuit_depths), min=0.0, max=1.0)
-        #params.add('c', value=y.min() - a, min=0, max=1.0)
-        params.add('a', value=y.min() - a, min=0, max=1.0)
-        params.add('b', value=1/np.mean(circuit_depths), min=0.0, max=1.0)
-        fit[q].fit(circuit_depths, y, params=params)
+        # params.add('a', value=a, min=-10, max=0)
+        # params.add('b', value=1/np.mean(circuit_depths), min=0.0, max=1.0)
+        # params.add('c', value=y.min() - a, min=0, max=1.0)
+        params.add("a", value=y.min() - a, min=0, max=1.0)
+        params.add("b", value=1 / np.mean(circuit_depths), min=0.0, max=1.0)
+        # fit[q].fit(circuit_depths, y, params=params)
+
+        # params.add("a", value=a, min=-10, max=0)
+        # params.add("b", value=1 / np.mean(circuit_depths), min=0.0, max=1.0)
+        # params.add("c", value=y.min() - a, min=0, max=1.0)
+
+        estimate_error = {key: [] for key in ["x", "y", "weights"]}
+        for key, val in leakage[q].items():
+            estimate_error["x"].append(key)
+            estimate_error["y"].append(np.mean(val))
+            estimate_error["weights"].append(1 / scipy.stats.sem(val))
+        print(estimate_error)
+
+        fit[q].fit(
+            x=estimate_error["x"],
+            y=estimate_error["y"],
+            params=params,
+            weights=estimate_error["weights"],
+            scale_covar=False,
+        )
+        print(fit[q].result)
 
         if fit[q].fit_success:
             r = abs(fit[q].fit_params['b'].value)
@@ -79,6 +101,8 @@ def analyze_leakage(circuits: Any, filename: str | None = None) -> Dict:
             r, err = round_to_order_error(r, err, 2)
             label[q] += f": r = {r:.3f} ({err:.3f})"
             print(label[q])
+            print(r, err)
+            print(umath.exp(-ufloat(r, err)))
 
             # Free Exponential Fitting
             # a = ufloat(fit[q].fit_params['a'].value, fit[q].fit_params['a'].stderr)
@@ -87,14 +111,14 @@ def analyze_leakage(circuits: Any, filename: str | None = None) -> Dict:
             # leakage_512 = a*umath.exp(-512*b) + c
 
             # Constrained Exponential Fitting
-            a = ufloat(fit[q].fit_params['a'].value, fit[q].fit_params['a'].stderr)
-            b = ufloat(fit[q].fit_params['b'].value, fit[q].fit_params['b'].stderr)
-            leakage_512 = a*(1 - umath.exp(-512*b))
+            a = ufloat(fit[q].fit_params["a"].value, fit[q].fit_params["a"].stderr)
+            b = ufloat(fit[q].fit_params["b"].value, fit[q].fit_params["b"].stderr)
+            leakage_512 = a * (1 - umath.exp(-512 * b))
 
             fitting_parameters[q] = {
                 "a": a,
                 "b": b,
-                "Leakage at 512 Depth": leakage_512
+                "Leakage at 512 Depth": leakage_512,
             }
             print(f"a: {a}, b: {b}")
             # print(f"a: {a}, b: {b}, c: {c}")
@@ -103,8 +127,6 @@ def analyze_leakage(circuits: Any, filename: str | None = None) -> Dict:
             print(f"Q{q}: 512 Depth Leakage: {leakage_512}")
             # print(f"Leakage per gate(paper): {c*(1 - umath.exp(-b))}")
             # print(f"Leakage per gate(slope): {-a*b}")
-
-
 
     # Plot the data
     fig = plt.figure(figsize=(6, 4))
