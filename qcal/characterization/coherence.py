@@ -432,33 +432,33 @@ def T2(qpu:        QPU,
             """Analyze the data."""
             logger.info(' Analyzing the data...')
 
-            pop = {'GE': '1', 'EF': '2'}
+            pop = {'GE': '0', 'EF': '1'}
             # Fit the probability of being in 1 from the time sweep to an 
             # exponential
             for i, q in enumerate(self._qubits):
-                prob1 = []
+                prob0 = []
                 for circuit in self._circuits:
-                    prob1.append(
+                    prob0.append(
                         circuit.results.marginalize(i).populations[
                             pop[self._subspace]
                         ]
                     )
-                self._results[q] = prob1
-                self._circuits[f'Q{q}: Prob(1)'] = prob1
+                self._results[q] = prob0
+                self._circuits[f'Q{q}: Prob(0)'] = prob0
 
                 # Add initial guesses to fit
-                if self._echo:
-                    c = np.array(prob1).min()
-                    a = np.array(prob1).max() - c
-                    b = np.mean( np.diff(prob1) / np.diff(self._times[q]) ) / a
+                if self._echo:  # a * np.exp(-b * x) + c
+                    c = np.array(prob0).min()
+                    a = np.array(prob0).max() - c
+                    b = -np.mean( np.diff(prob0) / np.diff(self._times[q]) ) / a
                     params = Parameters()
-                    params.add('a', value=-a)  
+                    params.add('a', value=a)  
                     params.add('b', value=b)
                     params.add('c', value=c)
-                else:
-                    e = np.array(prob1).min()
-                    a = np.array(prob1).max() - e
-                    b = -np.mean( np.diff(prob1) / np.diff(self._times[q]) )/a
+                else:  # a * np.exp(-b * x) * np.cos(2 * np.pi * c * x + d) + e
+                    e = np.array(prob0).min()
+                    a = np.array(prob0).max() - e
+                    b = np.mean( np.diff(prob0) / np.diff(self._times[q]) ) / a
                     params = Parameters()
                     params.add('a', value=a)  
                     params.add('b', value=b)
@@ -466,7 +466,7 @@ def T2(qpu:        QPU,
                     params.add('d', value=0.)
                     params.add('e', value=e)
                 
-                self._fit[q].fit(self._times[q], prob1, params=params)
+                self._fit[q].fit(self._times[q], prob0, params=params)
 
                 # If the fit was successful, write to the config
                 if self._fit[q].fit_success:
@@ -499,8 +499,8 @@ def T2(qpu:        QPU,
             Characterize.plot(self,
                 xlabel=r'Time ($\mu$s)',
                 ylabel=(
-                r'$|2\rangle$ Population' if self._subspace == 'EF' else
-                r'$|1\rangle$ Population'
+                    r'$|1\rangle$ Population' if self._subspace == 'EF' else
+                    r'$|0\rangle$ Population'
                 ),
                 flabel=r'$T_{2E}$' if self._echo else r'$T_2$',
                 save_path=self._data_manager._save_path
@@ -707,28 +707,28 @@ def T2XY(
             """Analyze the data."""
             logger.info(' Analyzing the data...')
 
-            pop = {'GE': '1', 'EF': '2'}
-            # Fit the probability of being in 1 from the time sweep to an 
+            pop = {'GE': '0', 'EF': '1'}
+            # Fit the probability of being in 0 from the time sweep to an 
             # exponential
             for i, q in enumerate(self._qubits):
-                prob1 = []
+                prob0 = []
                 for circuit in self._circuits:
-                    prob1.append(
+                    prob0.append(
                         circuit.results.marginalize(i).populations[
                             pop[self._subspace]
                         ]
                     )
-                self._results[q] = prob1
-                self._circuits[f'Q{q}: Prob(1)'] = prob1
+                self._results[q] = prob0
+                self._circuits[f'Q{q}: Prob(0)'] = prob0
 
-                c = np.array(prob1).min()
-                a = np.array(prob1).max() - c
-                b = np.mean( np.diff(prob1) / np.diff(self._times[q]) ) / a
+                c = np.array(prob0).min()
+                a = np.array(prob0).max() - c
+                b = -np.mean( np.diff(prob0) / np.diff(self._times[q]) ) / a
                 params = Parameters()
                 params.add('a', value=-a)  
                 params.add('b', value=b)
                 params.add('c', value=c)
-                self._fit[q].fit(self._times[q], prob1, params=params)
+                self._fit[q].fit(self._times[q], prob0, params=params)
 
                 # If the fit was successful, write to the config
                 if self._fit[q].fit_success:
