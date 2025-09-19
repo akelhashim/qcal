@@ -19,10 +19,10 @@ logger = logging.getLogger(__name__)
 
 
 def ReadoutFidelity(
-        qpu:             QPU,
-        config:          Config,
-        qubits:          List | Tuple,
-        gate:            str = 'X90',
+        qpu:    QPU,
+        config: Config,
+        qubits: List | Tuple,
+        gate:   str = 'X90',
         **kwargs
     ) -> Callable:
     """Function which passes a custom QPU to the ReadoutFidelity class.
@@ -53,9 +53,9 @@ def ReadoutFidelity(
         """
 
         def __init__(self, 
-                config:          Config,
-                qubits:          List | Tuple,
-                gate:            str = 'X90',
+                config: Config,
+                qubits: List | Tuple,
+                gate:   str = 'X90',
                 **kwargs
             ) -> None:
             """Initialize the ReadoutFidelity class within the function.
@@ -68,12 +68,23 @@ def ReadoutFidelity(
             self._qubits = sorted(qubits)
             assert gate in ('X90', 'X'), 'gate must be an X90 or X!'
             self._gate = gate
-            self._confusion_mat = None
+            self._cmat = None
+
+        @property
+        def cmat(self):
+            """Confusion matrix for each qubit."""
+            return self._cmat
 
         @property
         def confusion_matrix(self):
-            """Confusion matrix for each qubit."""
-            return self._confusion_mat
+            """Styled confusion matrix for each qubit."""
+            return self._cmat.astype(float).style.background_gradient(
+                cmap='Blues', vmin=0, vmax=1
+            ).format("{:.3f}").set_properties(**{
+                'font-size': '12pt',
+                'padding': '8px',
+                'text-align': 'center'
+            })
 
         def generate_circuits(self):
             """Generate the readout calibration circuits."""
@@ -132,14 +143,15 @@ def ReadoutFidelity(
                 columns[1].extend(['Meas State'] * self._n_levels)
                 columns[2].extend([n for n in range(self._n_levels)])
 
-            self._confusion_mat = pd.DataFrame(
+            self._cmat = pd.DataFrame(
                 columns=columns, index=index
             )
 
             for i, circuit in enumerate(self._circuits):  # i = prep state
                 for j, q in enumerate(self._qubits):  # j, q = idx, qubit
-                    self._confusion_mat.iloc[i].loc[f'Q{q}'][
-                        'Meas State'] = ([
+                    self._cmat.loc[
+                        ('Prep State', i), (f'Q{q}', 'Meas State')
+                    ] = ([
                         circuit.results.marginalize(j).populations[f'{n}']
                         for n in range(self._n_levels)
                     ])
@@ -153,7 +165,7 @@ def ReadoutFidelity(
             if settings.Settings.save_data:
                 qpu.save(self)
                 self._data_manager.save_to_csv(
-                    self._confusion_mat, 'confusion_matrix'
+                    self._cmat, 'confusion_matrix'
                 )
 
         def final(self):
@@ -169,8 +181,8 @@ def ReadoutFidelity(
             self.final()
 
     return ReadoutFidelity(
-        config,
-        qubits,
-        gate,
+        config=config,
+        qubits=qubits,
+        gate=gate,
         **kwargs
     )

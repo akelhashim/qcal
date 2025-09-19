@@ -14,7 +14,8 @@ logger = logging.getLogger(__name__)
 
 __all__ = (
     'Adam',
-    'CMA', 
+    'CMA',
+    'LQG', 
     'LQR'
 )
 
@@ -119,8 +120,8 @@ class Adam:
             delta = x.copy() - self._x_t
             self._grad = (loss - self._loss) / (delta + self._eps)
         
-        self._prev_loss = self._loss.copy()
-        self._loss = loss.copy()
+        self._prev_loss = self._loss
+        self._loss = loss
     
     def step(self, grad: float | NDArray  = None) -> float | NDArray:
         """Compute the new parameters values based on the gradient for each.
@@ -238,6 +239,7 @@ class LQG:
 
     def __init__(self,
             x0:   float | NDArray,
+            loss: float | NDArray,
             P0:   float | NDArray,
             A:    NDArray,
             B:    NDArray,
@@ -253,7 +255,9 @@ class LQG:
 
         Args:
             x0 (float | NDArray): initial parameter values.
-            P0 (float | NDArray): covariance matrix on the initial estimate.
+            loss (float | NDArray): initial loss.
+            P0 (float | NDArray): covariance matrix on the initial loss 
+                estimate.
             A (NDArray): dynamics matrix.
             B (NDArray): input matrix.
             Q (NDArray): state weight matrix for LQR.
@@ -274,7 +278,7 @@ class LQG:
             logger.warning(' Unable to import control!')
  
         self._x_t = x0.copy()    # True parameters at time t
-        self._x_est = x0.copy()  # Estimated parameters (Kalman filter state)
+        # self._x_est = x0.copy()  # Estimated parameters (Kalman filter state)
         self._B = B
         self._A = A
         self._Q_kf = Q_kf  # Process noise covariance
@@ -297,7 +301,7 @@ class LQG:
         else:
             self._C = C
 
-        self._loss = np.zeros_like(x0)
+        self._loss = np.zeros_like(loss)
         self._prev_loss = 0.
         self._opt_loss = 1e10
         self._opt_x = x0.copy()
@@ -311,6 +315,7 @@ class LQG:
         self._kalman_gain, _, _ = dlqe(A, self._G, self._C, Q_kf, R_kf)
         
         # Initialize covariance matrix for Kalman filter
+        self._loss_est = loss
         self._P_est = P0
         
         self._u = np.zeros_like(B @ x0 if B.ndim > 1 else np.array([0.]))
@@ -383,12 +388,12 @@ class LQG:
         y = np.atleast_1d(loss)
         
         # Prediction step (predict state and covariance)
-        x_pred = self._A @ self._x_est + self._B @ self._u.flatten()
+        loss_pred = self._A @ self._loss_est + self._B @ self._u.flatten()
         P_pred = self._A @ self._P_est @ self._A.T + self._Q_kf
         
         # Update step (correct prediction with measurement)
         # Innovation (measurement residual)
-        innovation = y - self._C @ x_pred
+        innovation = y - self._C @ loss_pred
         
         # Innovation covariance
         S = self._C @ P_pred @ self._C.T + self._R_kf
@@ -397,11 +402,11 @@ class LQG:
         K = P_pred @ self._C.T @ np.linalg.inv(S)
         
         # Update state estimate and covariance
-        self._x_est = x_pred + K @ innovation
-        self._P_est = (np.eye(len(self._x_est)) - K @ self._C) @ P_pred
+        self._loss_est = loss_pred + K @ innovation
+        self._P_est = (np.eye(len(self._loss_est)) - K @ self._C) @ P_pred
         
         # Use estimated state for control (this is the key LQG principle)
-        self._u = -self._lqr_gain @ self._x_est
+        self._u = -self._lqr_gain @ self._loss_est
 
     def reset_filter(self) -> None:
         """Reset the Kalman filter to initial conditions."""

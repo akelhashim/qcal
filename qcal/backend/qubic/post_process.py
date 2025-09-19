@@ -89,7 +89,8 @@ def post_process(
         for meas in measurements:
             for q in meas['s11'][0].keys():  # 'Q0.rdlo
                 meas_qubits.add(q.replace('.rdlo', ''))
-    meas_qubits = sorted(meas_qubits)
+    # meas_qubits = sorted(meas_qubits)
+    meas_qubits = sorted(meas_qubits, key=lambda x: int(x[1:]))
 
     if 's11' in outputs:  # Might not work with rastering
         # {'Q0': np.array([[...],...,[...]])} of shape 
