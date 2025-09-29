@@ -208,6 +208,12 @@ class QubicQPU(QPU):
                 self._channel_config[f'Q{q}.rdlo'].elem_params['interp_ratio']=(
                     self._config[f'hardware/interpolation_ratio/rdlo']
                 )
+                if self._config[f'hardware/interpolation_ratio/cdrv']:
+                    self._channel_config[f'C{q}.cdrv'].elem_params[
+                            'interp_ratio'
+                        ] = (
+                        self._config[f'hardware/interpolation_ratio/cdrv']
+                    )
 
         self._jobman = job_manager.JobManager(
             self._fpga_config,
