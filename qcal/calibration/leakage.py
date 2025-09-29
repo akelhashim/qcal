@@ -25,6 +25,7 @@ def Leakage(
         circuit:     Circuit,
         params:      Dict,
         param_sweep: Dict,
+        maximize:    bool = False,
         **kwargs
     ) -> Callable:
     """Leakage calibration.
@@ -57,6 +58,10 @@ def Leakage(
             the config parameter which is causing the leakage.
         param_sweep (ArrayLike): dictionary mapping the qubits on which leakage 
             occurs to sweep values for the parameter to be optimized.
+        maximize (bool, optional): whether to select the parameter that 
+            maximizes leakage, instead of minimze. Defaults to False. This can
+            be used to find gate parameters that amplify leakage, such that one
+            can better tune other parameters to cancel leakage.
 
     Returns:
         Callable: Leakage calibration class.
@@ -74,6 +79,7 @@ def Leakage(
                 circuit:     Circuit,
                 params:      Dict,
                 param_sweep: Dict,
+                maximize:    bool = False,
                 **kwargs
             ) -> None:
             """Initialize the Leakage class within the function."""
@@ -83,6 +89,7 @@ def Leakage(
             self._circuit = circuit
             self._params = params
             self._param_sweep = param_sweep
+            self._maximize = maximize
 
             self._qubits = list(self._params.keys())
             self._loss = {}
@@ -137,43 +144,74 @@ def Leakage(
             )
 
             for q, param in self._params.items():
-                self._circuits[
-                        f'param: {param}'
-                    ] = self._param_sweep[q]
-        
+                if isinstance(param, list):
+                    for p in param:
+                        self._circuits[
+                            f'param: {p}'
+                        ] = self._param_sweep[q]
+                else:
+                    self._circuits[
+                            f'param: {param}'
+                        ] = self._param_sweep[q]
+            
         def analyze(self) -> None:
             """Analyze the data."""
             logger.info(' Analyzing the data...')
 
             for ql in self._qubits:
+                # pop0 = []
+                # pop1 = []
                 pop2 = []
                 if isinstance(ql, Iterable):
                     for circ in self._circuits:
-                        val = 0
+                        # val0 = 0
+                        # val1 = 0
+                        val2 = 0
                         for q in ql:
                             i = self._circuit.qubits.index(q)
-                            val += circ.results.marginalize(i).populations['2']
-                        pop2.append(val)
+                            # val0 += circ.results.marginalize(i).populations['0']
+                            # val1 += circ.results.marginalize(i).populations['1']
+                            val2 += circ.results.marginalize(i).populations['2']
+                        # pop0.append(val0)
+                        # pop1.append(val1)
+                        pop2.append(val2)
                         
                 else:
                     i = self._circuit.qubits.index(ql)
                     for circ in self._circuits:
+                        # pop0.append(
+                        #     circ.results.marginalize(i).populations['0']
+                        # )
+                        # pop1.append(
+                        #     circ.results.marginalize(i).populations['1']
+                        # )
                         pop2.append(
                             circ.results.marginalize(i).populations['2']
                         )
                 
                 self._sweep_results[ql] = pop2
+                # self._sweep_results[ql] = {
+                #     'Prob(0)': pop0,
+                #     'Prob(1)': pop1,
+                #     'Prob(2)': pop2
+                # }
                 self._circuits[f'Q{ql}: Prob(2)'] = pop2
-                self._cal_values[ql] = float(
-                    self._param_sweep[ql][np.array(pop2).argmin()]
-                    )
+                if self._maximize:
+                    self._cal_values[ql] = float(
+                        self._param_sweep[ql][np.array(pop2).argmax()]
+                        )
+                else:
+                    self._cal_values[ql] = float(
+                        self._param_sweep[ql][np.array(pop2).argmin()]
+                        )
+                
                 self._loss[ql] = np.array([np.array(pop2).min()])
 
         def save(self) -> None:
             """Save all circuits and data."""
             clear_output(wait=True)
             self._data_manager._exp_id += (
-                f'_Leakage_Q{"".join(str(q) for q in self._qubits)}'
+                f'_Leakage_{"".join("Q" + str(q) for q in self._qubits)}'
             )
             if settings.Settings.save_data:
                 qpu.save(self)
@@ -187,7 +225,8 @@ def Leakage(
         def plot(self) -> None:
             """Plot the sweep results"""
             Calibration.plot(self,
-                ylabel=r'$|2\rangle$ Population',
+                # ylabel=r'$|2\rangle$ Population',
+                ylabel='Probability',
                 save_path=self._data_manager._save_path
             )
 
@@ -195,9 +234,12 @@ def Leakage(
             """Final calibration method."""
             if self._cal_values:
                 for q, val in self._cal_values.items():
-                    self.set_param(self._params[q], val)
+                    if isinstance(self._params[q], list):
+                        for p in self._params[q]:
+                            self.set_param(p, val)
+                    else:
+                        self.set_param(self._params[q], val)
             self._config.save()
-            self._config.load()
 
             print(f"\nRuntime: {repr(self._runtime)[8:]}\n")
 
@@ -215,5 +257,6 @@ def Leakage(
         circuit=circuit,
         params=params,
         param_sweep=param_sweep,
+        maximize=maximize,
         **kwargs
     )
