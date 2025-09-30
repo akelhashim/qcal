@@ -245,7 +245,7 @@ def FAST_DRAG(
     Q = alpha / delta * np.gradient(I, dt)
 
     fast_drag = I + 1j * Q
-    # fast_drag /= np.max(np.abs(fast_drag))  # Normalize
+    fast_drag /= np.max(np.abs(fast_drag))  # Normalize
     
     return np.array(fast_drag).astype(np.complex64)
 
