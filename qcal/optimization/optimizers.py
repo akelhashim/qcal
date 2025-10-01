@@ -279,25 +279,27 @@ class LQG:
  
         self._x_t = x0.copy()    # True parameters at time t
         # self._x_est = x0.copy()  # Estimated parameters (Kalman filter state)
+        self._A = A        
         self._B = B
-        self._A = A
         self._Q_kf = Q_kf  # Process noise covariance
         self._R_kf = R_kf  # Measurement noise covariance
         self._tol = tol
 
         # Set default process noise input matrix if not provided
         if G is None:
-            self._G = (
-                np.eye(len(x0)) if hasattr(x0, '__len__') else np.array([[1.]])
-            )
+            # self._G = (
+            #     np.eye(len(x0)) if hasattr(x0, '__len__') else np.array([[1.]])
+            # )
+            self._G = np.eye(B.shape[0])
         else:
             self._G = G
 
         # Set default observation matrix if not provided
         if C is None:
-            self._C = (
-                np.eye(len(x0)) if hasattr(x0, '__len__') else np.array([[1.]])
-            )
+            # self._C = (
+            #     np.eye(len(x0)) if hasattr(x0, '__len__') else np.array([[1.]])
+            # )
+            self._C = np.eye(B.shape[0])
         else:
             self._C = C
 
@@ -318,7 +320,8 @@ class LQG:
         self._loss_est = loss
         self._P_est = P0
         
-        self._u = np.zeros_like(B @ x0 if B.ndim > 1 else np.array([0.]))
+        # self._u = np.zeros_like(B @ x0 if B.ndim > 1 else np.array([0.]))
+        self._u = np.zeros_like(B.shape[0])
         
 
     @property

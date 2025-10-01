@@ -341,6 +341,12 @@ def CRB(qpu:             QPU,
                             )
                         else:
                             self._results[qtup].for_protocol['RB'].plot()
+
+            if any(circ.results.dim == 3 for circ in self._transpiled_circuits):
+                analyze_leakage(
+                    self._transpiled_circuits, 
+                    filename=self._data_manager._save_path
+                )
             
         def final(self) -> None:
             """Final benchmarking method."""
@@ -483,7 +489,7 @@ def SRB(qpu:             QPU,
             """Save all circuits and data."""
             clear_output(wait=True)
             self._data_manager._exp_id += (
-                f'_SRB_{"".join("Q"+str(q) for q in self._circuits.labels)}'
+                f'_SRB_{"".join("Q" + str(q) for q in self._circuits.labels)}'
             )
             if settings.Settings.save_data:
                 qpu.save(self) 

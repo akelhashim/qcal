@@ -22,7 +22,7 @@ def CDF(df: pd.DataFrame, x: str, color: str) -> None:
         selector=dict(type="histogram")
     )
     fig.update_layout(
-        yaxis_title="Probability",
+        yaxis_title="Cumulative Probability",
         
         # Change axis title font sizes
         xaxis_title_font=dict(size=20),

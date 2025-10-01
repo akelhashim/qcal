@@ -215,10 +215,17 @@ class Calibration:
                     ax.tick_params(axis='both', which='major', labelsize=12)
                     ax.grid(True)
 
-                    ax.plot(
-                        self._param_sweep[q], self._sweep_results[q],
-                        'o', c='blue', label=f'Meas, Q{q}'
-                    )
+                    if isinstance(self._sweep_results[q], Dict):
+                        for label, result in self._sweep_results[q].items():
+                            ax.plot(
+                                self._param_sweep[q], result,
+                                'o-', label=label
+                            )
+                    else:
+                        ax.plot(
+                            self._param_sweep[q], self._sweep_results[q],
+                            'o', c='blue', label=f'Meas, Q{q}'
+                        )
                     if self._fit and self._fit[q].fit_success:
                         x = np.linspace(
                             self._param_sweep[q][0],

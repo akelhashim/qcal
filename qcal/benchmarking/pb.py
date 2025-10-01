@@ -237,9 +237,22 @@ def XRB(qpu:             QPU,
                 )
             plt.show()
 
-            if any(res.dim == 3 for res in self._circuits.results):
+            if any(
+                res.dim == 3 for res in 
+                self._circuits.subset(protocol='XRB').results
+            ):
                 analyze_leakage(
-                    self._circuits, filename=self._data_manager._save_path
+                    self._circuits.subset(protocol='XRB'), 
+                    filename=self._data_manager._save_path + 'XRB_'
+                )
+
+            if self._include_srb and any(
+                res.dim == 3 for res in 
+                self._circuits.subset(protocol='SRB').results
+            ):
+                analyze_leakage(
+                    self._circuits.subset(protocol='SRB'), 
+                    filename=self._data_manager._save_path + 'SRB_'
                 )
 
         def final(self) -> None:
