@@ -648,7 +648,7 @@ def Fidelity(
                 for q in self._qubits:
                     for n in range(self._n_levels):
                         self._fid[q][n].append(
-                            self._rcal.confusion_matrix[f'Q{q}'].loc[
+                            self._rcal.cmat[f'Q{q}'].loc[
                                     'Prep State', 'Meas State'
                                 ].loc[n][n]
                         )

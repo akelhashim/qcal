@@ -270,8 +270,8 @@ def CRB(qpu:             QPU,
             import pygsti
             
             self._data = pygsti.io.read_data_from_dir(
-                     self._data_manager._save_path
-                )
+                self._data_manager._save_path
+            )
             self._results = self._protocol.run(self._data)
             if not self._sim_RB:
                 try:

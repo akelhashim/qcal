@@ -400,6 +400,8 @@ def T2(qpu:        QPU,
                         Cycle({VirtualZ(q, phase/2, subspace=self._subspace) 
                                for q in self._qubits}),
                         Barrier(self._qubits),
+                        # Cycle({X(q, subspace=self._subspace) 
+                        #        for q in self._qubits}),
                         Cycle({X90(q, subspace=self._subspace) 
                                for q in self._qubits}),
                         Barrier(self._qubits),

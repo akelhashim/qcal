@@ -361,7 +361,7 @@ def AmpFreqSweep(
             logger.info(' Analyzing the data...')
 
             # Compute the conditionality for each amp/freq
-            qubits = sorted(flatten(self._qubits))
+            qubits = sorted(set(flatten(self._qubits)))
             for pair in self._qubits:
                 self._R[pair] = np.zeros((
                     self._frequencies[pair].size,
@@ -692,7 +692,7 @@ def Amplitude(
             logger.info(' Analyzing the data...')
 
             # Compute the conditionality and fit to a parabola
-            qubits = sorted(flatten(self._qubits))
+            qubits = sorted(set(flatten(self._qubits)))
             for pair in self._qubits:
                 i = qubits.index(pair[1])
 
@@ -1034,7 +1034,7 @@ def Frequency(
             logger.info(' Analyzing the data...')
 
             # Compute the conditionality and fit to a parabola
-            qubits = sorted(flatten(self._qubits))
+            qubits = sorted(set(flatten(self._qubits)))
             for pair in self._qubits:
                 i = qubits.index(pair[1])
 
@@ -1356,7 +1356,7 @@ def RelativeAmp(
             logger.info(' Analyzing the data...')
 
             # Compute the conditionality and fit to a parabola
-            qubits = sorted(flatten(self._qubits))
+            qubits = sorted(set(flatten(self._qubits)))
             for pair in self._qubits:
                 i = qubits.index(pair[1])
 
@@ -1594,7 +1594,7 @@ def RelativePhase(
             logger.info(' Analyzing the data...')
 
             # Compute the conditionality and fit to a parabola
-            qubits = sorted(flatten(self._qubits))
+            qubits = sorted(set(flatten(self._qubits)))
             for pair in self._qubits:
                 i = qubits.index(pair[1])
 
@@ -1832,7 +1832,7 @@ def LocalPhases(
         def generate_circuits(self) -> None:
             """Generate all amplitude calibration circuits."""
             logger.info(' Generating circuits...')
-            qubits = sorted(flatten(self._qubits))
+            qubits = sorted(set(flatten(self._qubits)))
 
             circuit_C0_X = Circuit([
                 # Y90 on target qubit
@@ -1934,7 +1934,7 @@ def LocalPhases(
             logger.info(' Analyzing the data...')
 
             # Compute the conditionality and fit to a parabola
-            qubits = sorted(flatten(self._qubits))
+            qubits = sorted(set(flatten(self._qubits)))
             for pair in self._qubits:
                 c = qubits.index(pair[0])
                 t = qubits.index(pair[1])
@@ -2373,7 +2373,7 @@ def SpectatorPhase(
             return self._R
 
         def generate_circuits(self) -> None:
-            """Generate all amplitude calibration circuits."""
+            """Generate all spectator phase calibration circuits."""
             logger.info(' Generating circuits...')
             qubits = sorted(flatten(self._qubits + self._squbits))
 
@@ -2469,31 +2469,38 @@ def SpectatorPhase(
                     'X_C0': X_C0, 'X_C1': X_C1
                 }
 
+                est_freq = est_freq_fft(self._phases[q], X_C0)
+                params = Parameters()
+                params.add('amp', value=1.0, min=-1., max=1.)  
+                params.add('freq', value=est_freq, min=0.)
+                params.add('phase', value=0., min=-np.pi, max=np.pi)
+                params.add('offset', value=0., min=-0.1, max=0.1)
                 self._fit[q]['X_C0'].fit(
-                    self._phases[q], X_C0, p0=(1, 1/(2*np.pi), 0, 0),
-                    bounds=(
-                        [0., 0., -np.pi, -0.1], 
-                        [1., np.inf, np.pi, 0.1]
-                    )
+                    self._phases[q], X_C0, params=params
                 )
+
+                est_freq = est_freq_fft(self._phases[q], X_C1)
+                params = Parameters()
+                params.add('amp', value=1.0, min=-1., max=1.)  
+                params.add('freq', value=est_freq, min=0.)
+                params.add('phase', value=0., min=-np.pi, max=np.pi)
+                params.add('offset', value=0., min=-0.1, max=0.1)
                 self._fit[q]['X_C1'].fit(
-                    self._phases[q], X_C1, p0=(1, 1/(2*np.pi), 0, 0),
-                    bounds=(
-                        [0., 0., -np.pi, -0.1], 
-                        [1., np.inf, np.pi, 0.1]
-                    )
+                    self._phases[q], X_C1, params=params
                 )
                 
                 newvals = []
                 if  self._fit[q]['X_C0'].fit_success:
-                    _, freq, phase, _ = self._fit[q]['X_C0'].fit_params
+                    freq = self._fit[q]['X_C0'].fit_params['freq'].value
+                    phase = self._fit[q]['X_C0'].fit_params['phase'].value
                     self._phase_C0[q] = wrap_phase(
                         -phase / (2 * np.pi * freq)
                     )
                     newvals.append(self._phase_C0[q])
 
                 if self._fit[q]['X_C1'].fit_success:
-                    _, freq, phase, _ = self._fit[q]['X_C1'].fit_params
+                    freq = self._fit[q]['X_C1'].fit_params['freq'].value
+                    phase = self._fit[q]['X_C1'].fit_params['phase'].value
                     self._phase_C1[q] = wrap_phase(
                         -phase / (2 * np.pi * freq)
                     )
@@ -2538,7 +2545,7 @@ def SpectatorPhase(
                     elif axes.ndim == 2:
                         ax = axes[i,j]
 
-                    if k < len(self._qubits):
+                    if k < len(self._squbits):
                         q = self._squbits[k]
 
                     ax.set_xlabel(f'Phase Q{q} (rad.)', fontsize=15)
