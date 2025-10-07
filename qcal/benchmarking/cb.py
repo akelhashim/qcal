@@ -125,7 +125,7 @@ def CB(qpu:                  QPU,
 
     class CB(qpu):
         """True-Q CB protocol."""
-        import trueq as tq
+        # import trueq as tq
 
         def __init__(self,
                 qpu:                  QPU,
@@ -220,7 +220,10 @@ def CB(qpu:                  QPU,
             if self._include_ref_cycle:
                 cycle_subset = self._circuits.subset(cycles=[(tq.Cycle({}),)])
                 ref_subset = self._circuits.subset(
-                        cycles=[(tq.Cycle(self._cycle),)]
+                        cycles=[
+                            (self._cycle,) if isinstance(self._cycle, tq.Cycle)
+                            else (tq.Cycle(self._cycle),)
+                        ]
                 )
                 try:
                     print(cycle_subset.fit(analyze_dim=2))
@@ -244,7 +247,7 @@ def CB(qpu:                  QPU,
             """Save all circuits and data."""
             clear_output(wait=True)
             self._data_manager._exp_id += (
-                f'_CB{"".join("Q"+str(q) for q in self._circuits.labels)}'
+                f'_CB{"".join("Q" + str(q) for q in self._circuits.labels)}'
             )
             if settings.Settings.save_data:
                 qpu.save(self) 
