@@ -1,4 +1,4 @@
-"""Submodule for calibrating leakage parameters, such as DRAG.
+"""Submodule for performing generic parameter sweeps for calibration.
 
 """
 import qcal.settings as settings
@@ -6,6 +6,7 @@ import qcal.settings as settings
 from .calibration import Calibration
 from qcal.circuit import Circuit, CircuitSet
 from qcal.config import Config
+from qcal.utils import flatten
 from qcal.qpu.qpu import QPU
 
 import logging
@@ -14,37 +15,47 @@ import pandas as pd
 
 from collections.abc import Iterable
 from IPython.display import clear_output
-from typing import Callable, Dict
+from typing import Callable, Dict, List
 
 logger = logging.getLogger(__name__)
 
 
-def Leakage(
+def ParamSweep(
         qpu:         QPU,
         config:      Config,
         circuit:     Circuit,
         params:      Dict,
         param_sweep: Dict,
-        maximize:    bool = False,
+        maximize:    List[str] = None,
+        minimize:    List[str] = None,
         **kwargs
     ) -> Callable:
-    """Leakage calibration.
+    """Parameter sweep calibration.
 
     This calibration finds the param value for which the leakage on
     `leakage_qubit` is minimized.
 
     Basic example useage:
     ```
-    # Amplify the leakage in an X90 gate
-    circuit = Circuit([Cycle({X90(0)}) for _ in range(102)])
+    # Calibrate the frequency of the 11 <-> 02 transition of a CZ gate
+    circuit = qc.Circuit([
+        qc.Cycle({qc.X90(0), qc.X90(1)}),
+        qc.Cycle({qc.X90(0), qc.X90(1)}),
+        qc.Cycle({qc.CZ((0, 1))}),
+    ])
     circuit.measure()
+
+    # Sweep +/- 10 MHz around the expected 11 <-> 02 transition frequency
+    freqs = np.linspace(-10, 10, 31) * MHz + config['two_qubit/(0, 1)/CZ/freq']
     
-    cal = Leakage(
+    cal = ParamSweep(
         CustomQPU, 
         config, 
         circuit=circuit,
-        params={0: 'single_qubit/0/GE/X90/pulse/1/kwargs/alpha'},
-        param_sweep={0: np.linspace(0.5, 1.5, 21)}
+        params={(0, 1): 'two_qubit/(0, 1)/CZ/freq'},
+        param_sweep={(0, 1): freqs},
+        maximize=['02'],
+        minimize=['11']
     )
     cal.run()
     ```
@@ -58,19 +69,19 @@ def Leakage(
             the config parameter which is causing the leakage.
         param_sweep (Dict): dictionary mapping the qubits on which leakage 
             occurs to sweep values for the parameter to be optimized.
-        maximize (bool, optional): whether to select the parameter that 
-            maximizes leakage, instead of minimze. Defaults to False. This can
-            be used to find gate parameters that amplify leakage, such that one
-            can better tune other parameters to cancel leakage.
+        maximize (List[str], optional): list of dit strings specifying on which
+            state(s) to maximize the population. Defaults to None.
+        minimize (List[str], optional): list of dit strings specifying on which
+            state(s) to minimize the population. Defaults to None.
 
     Returns:
-        Callable: Leakage calibration class.
+        Callable: ParamSweep calibration class.
     """
 
-    class Leakage(qpu, Calibration):
-        """Leakage calibration class.
+    class ParamSweep(qpu, Calibration):
+        """Parameter sweep calibration class.
         
-        This class inherits a custom QPU from the Leakage calibration
+        This class inherits a custom QPU from the ParamSweep calibration
         function.
         """
 
@@ -79,10 +90,11 @@ def Leakage(
                 circuit:     Circuit,
                 params:      Dict,
                 param_sweep: Dict,
-                maximize:    bool = False,
+                maximize:    List[str] = None,
+                minimize:    List[str] = None,
                 **kwargs
             ) -> None:
-            """Initialize the Leakage class within the function."""
+            """Initialize the ParamSweep class within the function."""
             qpu.__init__(self, config=config, **kwargs)
             Calibration.__init__(self, config)
 
@@ -90,13 +102,20 @@ def Leakage(
             self._params = params
             self._param_sweep = param_sweep
             self._maximize = maximize
+            self._minimize = minimize
+
+            if not maximize and not minimize:
+                raise ValueError(
+                    'You must specify a dit string for at least one of maximize'
+                    ' or minimize!'
+                )
 
             self._qubits = list(self._params.keys())
-            self._loss = {}
+            self._populations = {}
 
         @property
         def circuit(self) -> Circuit:
-            """Circuit used for calibrating leakage.
+            """Circuit used for calibrating the params.
 
             Returns:
                 Circuit: circuit.
@@ -105,10 +124,10 @@ def Leakage(
         
         @property
         def params(self) -> Dict:
-            """Parameters which are optimized to reducing leakage.
+            """Parameters which are optimized.
 
             Returns:
-                Dict: dictionary mapping leakage qubits to parameters.
+                Dict: dictionary mapping qubit labels to parameters.
             """
             return self._params
         
@@ -117,20 +136,18 @@ def Leakage(
             """Value sweeps for the parameters to be optimized.
 
             Returns:
-                Dict: dictionary mapping leakage qubits to parameter sweeps.
+                Dict: dictionary mapping qubit labels to parameter sweeps.
             """
             return self._param_sweep
-    
+        
         @property
-        def loss(self) -> Dict:
-            """Loss for each qubit in terms of the |2> state population.
-
-            This property can be used for parameter optimization.
+        def populations(self) -> Dict:
+            """Populations (i.e., probabilities) across the param sweep.
 
             Returns:
-                Dict: loss for each qubit.
+                Dict: dictionary mapping qubit labels to populations.
             """
-            return self._loss
+            return self._populations
         
         def generate_circuits(self):
             """Generate a CircuitSet that sweeps over all param values."""
@@ -158,60 +175,45 @@ def Leakage(
             """Analyze the data."""
             logger.info(' Analyzing the data...')
 
+            qubits = sorted(set(flatten(self._qubits)))
             for ql in self._qubits:
-                # pop0 = []
-                # pop1 = []
-                pop2 = []
-                if isinstance(ql, Iterable):
-                    for circ in self._circuits:
-                        # val0 = 0
-                        # val1 = 0
-                        val2 = 0
-                        for q in ql:
-                            i = self._circuit.qubits.index(q)
-                            # val0 += circ.results.marginalize(i).populations['0']
-                            # val1 += circ.results.marginalize(i).populations['1']
-                            val2 += circ.results.marginalize(i).populations['2']
-                        # pop0.append(val0)
-                        # pop1.append(val1)
-                        pop2.append(val2)
-                        
-                else:
-                    i = self._circuit.qubits.index(ql)
-                    for circ in self._circuits:
-                        # pop0.append(
-                        #     circ.results.marginalize(i).populations['0']
-                        # )
-                        # pop1.append(
-                        #     circ.results.marginalize(i).populations['1']
-                        # )
-                        pop2.append(
-                            circ.results.marginalize(i).populations['2']
+                qindx = tuple([qubits.index(q) for q in ql])
+                states = self._circuits[  # Use middle circuit to find states
+                    int(self._circuits.n_circuits / 2)
+                ].results.marginalize(qindx).states
+                self._populations[ql] = {
+                    state: [] for state in states
+                }
+                for circ in self._circuits:
+                    results = circ.results.marginalize(qindx)
+                    for state in states:
+                        self._populations[ql][state].append(
+                            results.populations[state]
                         )
                 
-                self._sweep_results[ql] = pop2
-                # self._sweep_results[ql] = {
-                #     'Prob(0)': pop0,
-                #     'Prob(1)': pop1,
-                #     'Prob(2)': pop2
-                # }
-                self._circuits[f'Q{ql}: Prob(2)'] = pop2
+                cal_values = []
                 if self._maximize:
-                    self._cal_values[ql] = float(
-                        self._param_sweep[ql][np.array(pop2).argmax()]
-                    )
-                else:
-                    self._cal_values[ql] = float(
-                        self._param_sweep[ql][np.array(pop2).argmin()]
-                    )
-                
-                self._loss[ql] = np.array([np.array(pop2).min()])
+                    for state in self._maximize:
+                        cal_values.append(float(
+                            self._param_sweep[ql][np.array(
+                                self._populations[ql][state]
+                            ).argmax()]
+                        ))
+                if self._minimize:
+                    for state in self._minimize:
+                        cal_values.append(float(
+                            self._param_sweep[ql][np.array(
+                                self._populations[ql][state]
+                            ).argmin()]
+                        ))
+                self._cal_values[ql] = np.mean(cal_values)
+                self._sweep_results[ql] = self._populations[ql]
 
         def save(self) -> None:
             """Save all circuits and data."""
             clear_output(wait=True)
             self._data_manager._exp_id += (
-                f'_Leakage_{"".join("Q" + str(q) for q in self._qubits)}'
+                f'_ParamSweep_{"".join("Q" + str(q) for q in self._qubits)}'
             )
             if settings.Settings.save_data:
                 qpu.save(self)
@@ -225,8 +227,7 @@ def Leakage(
         def plot(self) -> None:
             """Plot the sweep results"""
             Calibration.plot(self,
-                # ylabel=r'$|2\rangle$ Population',
-                ylabel='Probability',
+                ylabel='Population',
                 save_path=self._data_manager._save_path
             )
 
@@ -252,11 +253,12 @@ def Leakage(
             self.plot()
             self.final()
 
-    return Leakage(
+    return ParamSweep(
         config=config,
         circuit=circuit,
         params=params,
         param_sweep=param_sweep,
         maximize=maximize,
+        minimize=minimize,
         **kwargs
     )

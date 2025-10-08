@@ -216,10 +216,15 @@ class Calibration:
                     ax.grid(True)
 
                     if isinstance(self._sweep_results[q], Dict):
-                        for label, result in self._sweep_results[q].items():
+                        colors = plt.cm.viridis(
+                            np.linspace(0, 1, len(self._sweep_results[q]))
+                        )
+                        for i, (label, result) in enumerate(
+                            self._sweep_results[q].items()
+                        ):
                             ax.plot(
                                 self._param_sweep[q], result,
-                                'o-', label=label
+                                'o-', c=colors[i], label=label
                             )
                     else:
                         ax.plot(
@@ -244,10 +249,10 @@ class Calibration:
                     elif self._cal_values[q]:
                         ax.axvline(
                             self._cal_values[q],  
-                            ls='--', c='k', label='Optimal value'
+                            ls='--', c='k', label='Opt. value'
                         )
 
-                    ax.legend(loc=0, fontsize=12)
+                    ax.legend(loc=2, fontsize=10)
 
                 else:
                     ax.axis('off')
