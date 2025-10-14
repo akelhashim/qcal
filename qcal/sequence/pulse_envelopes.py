@@ -26,6 +26,7 @@ __all__ = [
     'FAST_DRAG',
     'gaussian',
     'gaussian_square',
+    'IPM',
     'linear',
     'RAP',
     # 'SATD',
@@ -315,6 +316,43 @@ def gaussian_square(
         ).astype(np.complex64)
 
 
+def IPM(
+       length: float, sample_rate: float, env: str, freq: float, 
+       amp2: float = 1.0, phase2: float = 0.0, **kwargs
+    ) -> NDArray[np.complex64]:
+    """Intra-pulse Modulation (IPM).
+
+    This pulse adds a beat frequency to the envelope, which is implemented
+    on top of the normal envelope carrier frequency.
+
+    Args:
+        length (float): pulse length in seconds.
+        sample_rate (float): sample rate in Hz.
+        env (str): envelope of the underlying pulse.
+        freq (float): beat frequency in Hz.
+        amp2 (float, optional): amplitude of the beat tone. Defaults to 1.0.
+        phase2 (float, optional): phase of the beat tone. Defaults to 0.0.
+        
+    Returns:
+        NDArray[np.complex64]: IPM pulse.
+    """
+    n_points = int(round(length * sample_rate))
+    t = np.linspace(0, length, n_points)
+
+    # Get envelope
+    pulse = pulse_envelopes[env](length, sample_rate, **kwargs)
+
+    # Add the beat frequency
+    ipm_pulse = pulse * (
+        1 + amp2 * np.cos(2. * np.pi * freq * t + phase2)
+    )
+
+    # Normalize
+    ipm_pulse /= np.max(np.abs(ipm_pulse))
+
+    return ipm_pulse
+
+
 def linear(
         length: float, sample_rate: float, amp: float = 1.0, phase: float = 0.0
     ) -> NDArray[np.complex64]:
@@ -347,11 +385,11 @@ def RAP(
     advancing the phase of the pulse in time.
 
     Args:
-        env (str): envelopoe of the underlying pulse.
-        f0 (float): start frequency in Hz.
-        f1 (float): end frequency in Hz.
         length (float): pulse length in seconds.
         sample_rate (float): sample rate in Hz.
+        env (str): envelope of the underlying pulse.
+        f0 (float): start frequency in Hz.
+        f1 (float): end frequency in Hz.
 
     Returns:
         NDArray[np.complex64]: RAP pulse.
@@ -700,19 +738,20 @@ def virtualz(
     return np.exp(1j*phase).astype(np.complex64)
 
 
-pulse_envelopes = defaultdict(lambda: 'Pulse envelope not available!', {
-    'cosine_square':        cosine_square,
-    'custom':               custom,
-    'DRAG':                 DRAG, 
-    'FAST':                 FAST,
-    'FAST_DRAG':            FAST_DRAG,
-    'gaussian':             gaussian, 
-    'gaussian_square':      gaussian_square,
-    'linear':               linear, 
-    'RAP':                  RAP,
-    # 'SATD':                 SATD,
-    'STARAP':               STARAP,
-    'sine':                 sine, 
-    'square':               square,
-    'virtualz':             virtualz,
+pulse_envelopes = defaultdict(lambda: 'Pulse envelope not supported!', {
+    'cosine_square':   cosine_square,
+    'custom':          custom,
+    'DRAG':            DRAG, 
+    'FAST':            FAST,
+    'FAST_DRAG':       FAST_DRAG,
+    'gaussian':        gaussian, 
+    'gaussian_square': gaussian_square,
+    'IPM':             IPM,
+    'linear':          linear, 
+    'RAP':             RAP,
+    # 'SATD':            SATD,
+    'STARAP':          STARAP,
+    'sine':            sine, 
+    'square':          square,
+    'virtualz':        virtualz,
 })
