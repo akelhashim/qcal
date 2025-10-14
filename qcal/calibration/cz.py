@@ -340,7 +340,8 @@ def AmpFreqSweep(
                 self._qubits,
                 (self._amplitudes[self._qubits[0]][0].size * 
                  self._frequencies[self._qubits[0]].size
-                )
+                ),
+                self._n_gates
             )
 
             for pair in self._qubits:
@@ -676,7 +677,8 @@ def Amplitude(
 
             self._circuits = tomography_circuits(
                 self._qubits,
-                self._amplitudes[self._qubits[0]][0].size
+                self._amplitudes[self._qubits[0]][0].size,
+                self._n_gates
             )
 
             for pair in self._qubits:
@@ -1021,7 +1023,8 @@ def Frequency(
 
             self._circuits = tomography_circuits(
                 self._qubits,
-                self._frequencies[self._qubits[0]].size
+                self._frequencies[self._qubits[0]].size,
+                self._n_gates
             )
 
             for pair in self._qubits:

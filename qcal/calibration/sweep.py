@@ -177,7 +177,9 @@ def ParamSweep(
 
             qubits = sorted(set(flatten(self._qubits)))
             for ql in self._qubits:
-                qindx = tuple([qubits.index(q) for q in ql])
+                qindx = qubits.index(ql) if isinstance(ql, int) else (
+                    tuple([qubits.index(q) for q in ql])
+                )
                 states = self._circuits[  # Use middle circuit to find states
                     int(self._circuits.n_circuits / 2)
                 ].results.marginalize(qindx).states

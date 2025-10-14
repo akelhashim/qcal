@@ -219,17 +219,17 @@ class Calibration:
                         colors = plt.cm.viridis(
                             np.linspace(0, 1, len(self._sweep_results[q]))
                         )
-                        for i, (label, result) in enumerate(
+                        for l, (label, result) in enumerate(
                             self._sweep_results[q].items()
                         ):
                             ax.plot(
                                 self._param_sweep[q], result,
-                                'o-', c=colors[i], label=label
+                                'o-', c=colors[l], label=label
                             )
                     else:
                         ax.plot(
                             self._param_sweep[q], self._sweep_results[q],
-                            'o', c='blue', label=f'Meas, Q{q}'
+                            'o', c='blue', label=f'Meas'
                         )
                     if self._fit and self._fit[q].fit_success:
                         x = np.linspace(
@@ -252,6 +252,10 @@ class Calibration:
                             ls='--', c='k', label='Opt. value'
                         )
 
+                    ax.text(
+                            0.9, 0.9, f'Q{q}', size=15, 
+                            transform=ax.transAxes
+                        )
                     ax.legend(loc=2, fontsize=10)
 
                 else:
@@ -271,4 +275,4 @@ class Calibration:
             param (str): config param.
             newvalue (Any): new value for the param.
         """
-        self._config[param] = newvalue
+        self._config[param] = float(newvalue)
