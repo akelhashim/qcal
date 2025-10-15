@@ -253,10 +253,10 @@ class Calibration:
                         )
 
                     ax.text(
-                            0.9, 0.9, f'Q{q}', size=15, 
+                            0.05, 0.95, f'Q{q}', size=12, 
                             transform=ax.transAxes
                         )
-                    ax.legend(loc=2, fontsize=10)
+                    ax.legend(loc=1, fontsize=10)
 
                 else:
                     ax.axis('off')
@@ -275,4 +275,6 @@ class Calibration:
             param (str): config param.
             newvalue (Any): new value for the param.
         """
-        self._config[param] = float(newvalue)
+        self._config[param] = (
+            float(newvalue) if isinstance(newvalue, float) else newvalue
+        )

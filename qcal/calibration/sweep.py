@@ -180,11 +180,19 @@ def ParamSweep(
                 qindx = qubits.index(ql) if isinstance(ql, int) else (
                     tuple([qubits.index(q) for q in ql])
                 )
-                states = self._circuits[  # Use middle circuit to find states
-                    int(self._circuits.n_circuits / 2)
-                ].results.marginalize(qindx).states
+                
+                # Use middle circuit to find states
+                states = set(self._circuits[
+                        int(self._circuits.n_circuits / 2)
+                    ].results.marginalize(qindx).states
+                )
+                for state in self._minimize:
+                    states.add(state)
+                for state in self._maximize:
+                    states.add(state)
+
                 self._populations[ql] = {
-                    state: [] for state in states
+                    state: [] for state in sorted(states)
                 }
                 for circ in self._circuits:
                     results = circ.results.marginalize(qindx)
