@@ -329,6 +329,7 @@ class Reset(Gate):
             self, 
             qubit:         int,
             measure_first: bool = True,
+            method:        List[str] = ['active'],
             dd_qubits:     List | Tuple = [],
             dd_method:     str = 'XY',
             n_dd_pulses:   int = 8,
@@ -340,6 +341,9 @@ class Reset(Gate):
             measure_first (bool, optional): whether to measure before the
                 reset. Defauls to True. This is unnecessary if a previous
                 measurement was already made for a mid-circuit operation.
+            method (List[str], optional): what method to use for resetting the
+                qubit in the middle of the circuit. Defaults to `['active']`.
+                Also accepted is `['unconditional']` or both in the same list.
             dd_qubits (List | Tuple, optional): which qubits to dynamical 
                 decouple during a mid-circuit measurement. Defaults to [].
             dd_method (str): dynamical decoupling protocol. Defaults to 'XY'.
@@ -352,6 +356,10 @@ class Reset(Gate):
             qubit, 
             dd_qubits=dd_qubits, dd_method=dd_method, n_dd_pulses=n_dd_pulses
         )
+        if not all(elem in ['active', 'unconditional'] for elem in method):
+            raise ValueError('Unsupported reset method!')
+        else:
+            self._properties['params']['method'] = method
 
 class RandSU2(Gate):
     """Class for a random SU(2) gate."""

@@ -65,9 +65,6 @@ def generate_pulse_env(
         NDArray[np.complex64]: complex pulse array.
     """
     channel_map = {'qdrv': 'DAC', 'cdrv': 'DAC', 'rdrv': 'DAC', 'rdlo': 'ADC'}
-    length_time = {
-        'qdrv': 'length', 'cdrv': 'length', 'rdrv': 'time', 'rdlo': 'time'
-    }
     channel = (
         channel if channel is not None else pulse['channel'].split('.')[-1]
     )
@@ -81,7 +78,7 @@ def generate_pulse_env(
         kwargs = {key: val for key, val in pulse['kwargs'].items()}
 
     pulse = pulse_envelopes[pulse['env']](
-        pulse[length_time[channel]],
+        pulse['time'],
         config[f'hardware/sample_rate/{channel_map[channel]}'] / 
             config[f'hardware/interpolation_ratio/{channel}'],
         **kwargs

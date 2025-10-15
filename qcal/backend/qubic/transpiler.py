@@ -67,8 +67,8 @@ def readout_time(config: Config, qubit: int) -> float:
         float: total readout time (readout + demod - integration delay)
     """
     time = (
-        config[f'readout/{qubit}/delay'] + 
-        config[f'readout/{qubit}/demod_time']
+        config[f'readout/{qubit}/demod/delay'] + 
+        config[f'readout/{qubit}/demod/time']
     )
     return time
 
@@ -86,7 +86,7 @@ def initialize(config: Config, circuit: List, ) -> None:
              'env':    None, 
              'freq':   None, 
              'amp':    config[f'initialize/{ch}/amp'],
-             'twidth': config[f'initialize/{ch}/length'], 
+             'twidth': config[f'initialize/{ch}/time'], 
              'dest':   ch
             }
         )
@@ -133,15 +133,15 @@ def add_reset(
     elif isinstance(qubits_or_reset, Reset):
         qubits = qubits_or_reset.qubits
 
-    if config['reset/active/enable'] or isinstance(qubits_or_reset, Reset):
-        reset_circuit = []
-        for n in range(config['reset/active/n_resets']):
-            for q in qubits:
-                if isinstance(qubits_or_reset, (list, tuple)):
-                    add_measurement(config, q, reset_circuit, None, reset=True)
-                elif isinstance(qubits_or_reset, Reset):
-                    if (n==0 and 
-                        qubits_or_reset.properties['params']['measure_first']):
+    reset_circuit = []
+    if isinstance(qubits_or_reset, Reset):
+        if 'active' in qubits_or_reset.properties['params']['method']:
+            for n in range(config['reset/active/n_resets']):
+                for q in qubits:
+                    if (
+                        n==0 and 
+                        qubits_or_reset.properties['params']['measure_first']
+                    ):
                         add_measurement(
                             config, 
                             qubits_or_reset.properties['params']['meas'], 
@@ -158,56 +158,177 @@ def add_reset(
                             reset=True
                         )
 
-                # Reset pulse w/ qutrit reset; TODO: add qutrit support
-                reset_q_pulse = []
-                if config.parameters['readout']['esp']['enable']:
-                    if q in config.parameters['readout']['esp']['qubits']:
-                        reset_q_pulse.extend(
-                            cycle_pulse(config, Cycle({X(q, subspace='EF')}))
-                        )
-                        reset_q_pulse.extend(
-                            cycle_pulse(config, Cycle({X(q, subspace='GE')}))
-                        )
+                    # Reset pulse w/ qutrit reset
+                    reset_q_pulse = []
+                    if config['readout/esp/enable']:
+                        if q in config['readout/esp/qubits']:
+                            reset_q_pulse.extend(
+                                cycle_pulse(
+                                    config, Cycle({X(q, subspace='EF')})
+                                )
+                            )
+                            reset_q_pulse.extend(
+                                cycle_pulse(
+                                    config, Cycle({X(q, subspace='GE')})
+                                )
+                            )
+                        else:
+                            reset_q_pulse.extend(
+                                cycle_pulse(
+                                    config, Cycle({X(q, subspace='GE')})
+                                )
+                            )
+                            reset_q_pulse.extend(
+                                cycle_pulse(
+                                    config, Cycle({X(q, subspace='EF')})
+                                )
+                            )
                     else:
                         reset_q_pulse.extend(
                             cycle_pulse(config, Cycle({X(q, subspace='GE')}))
                         )
-                        reset_q_pulse.extend(
-                            cycle_pulse(config, Cycle({X(q, subspace='EF')}))
-                        )
-                else:
-                    reset_q_pulse.extend(
-                        cycle_pulse(config, Cycle({X(q, subspace='GE')}))
+
+                    reset_circuit.append(
+                        {'name': 'barrier', 'scope': [f'Q{q}']}
+                    )
+                    reset_circuit.append(
+                        {'name':     'branch_fproc',
+                         'alu_cond': 'eq',
+                         'cond_lhs': 1,
+                         'func_id':  f'Q{q}.meas',
+                         'scope':    [f'Q{q}'],
+                         'true':     reset_q_pulse,
+                         'false':    []
+                        },
                     )
 
-                reset_circuit.append({'name': 'barrier', 'scope': [f'Q{q}']})
                 reset_circuit.append(
-                    {'name':     'branch_fproc',
-                     'alu_cond': 'eq',
-                     'cond_lhs': 1,
-                     'func_id':  f'Q{q}.meas',
-                     'scope':    [f'Q{q}'],
-                     'true':     reset_q_pulse,
-                     'false':    []
-                    },
+                    {'name': 'barrier', 
+                    #  'qubit': [f'Q{q}' for q in qubits]
+                    }
+                )
+
+        if 'unconditional' in qubits_or_reset.properties['params']['method']:
+            for q in qubits:
+                pulse = config[f'reset/unconditional/{q}']
+                reset_circuit.append(
+                    {'name':   'pulse',
+                     'tag':    'Reset',
+                     'dest':   pulse['channel'], 
+                     'freq':   pulse['freq'],
+                     'amp':    clip_amplitude(pulse['kwargs']['amp']),
+                     'phase':  pulse['kwargs']['phase'],
+                     'twidth': pulse['time'],
+                     'env':    generate_pulse_env(
+                                   config=config,
+                                   pulse=pulse,
+                                   include_amp_phase=False
+                               )
+                    }
                 )
 
             reset_circuit.append(
-                {'name': 'barrier', 'qubit': [f'Q{q}' for q in qubits]}
+                {'name': 'barrier', 
+                #  'qubit': [f'Q{q}' for q in qubits]
+                }
             )
 
-        if isinstance(qubits_or_reset, Reset):
-            pulses[f'ResetGE:{qubits}'] = reset_circuit
+        # Add the reset pulse to the hash table; TODO: check this works for all
+        pulses[f'ResetGE:{qubits}'] = reset_circuit
 
-        circuit.extend(reset_circuit)
-    
     else:
-         circuit.extend((
-            {'name':  'delay',
-             't':     config['reset/passive/delay'],
-             'qubit': [f'Q{q}' for q in qubits]},
-            {'name': 'barrier', 'qubit': [f'Q{q}' for q in qubits]}
-         ))
+        if config['reset/passive/enable']:
+            reset_circuit.extend([
+                {'name':  'delay',
+                 't':     config['reset/passive/delay'],
+                 'qubit': [f'Q{q}' for q in qubits]
+                },
+                {'name': 'barrier', 
+                #  'qubit': [f'Q{q}' for q in qubits]
+                }
+            ])
+
+        if config['reset/active/enable']:
+            for n in range(config['reset/active/n_resets']):
+                for q in qubits:
+                    add_measurement(config, q, reset_circuit, None, reset=True)
+
+                    # Reset pulse w/ qutrit reset
+                    reset_q_pulse = []
+                    if config.parameters['readout']['esp']['enable']:
+                        if q in config.parameters['readout']['esp']['qubits']:
+                            reset_q_pulse.extend(
+                                cycle_pulse(
+                                    config, Cycle({X(q, subspace='EF')})
+                                )
+                            )
+                            reset_q_pulse.extend(
+                                cycle_pulse(
+                                    config, Cycle({X(q, subspace='GE')})
+                                )
+                            )
+                        else:
+                            reset_q_pulse.extend(
+                                cycle_pulse(
+                                    config, Cycle({X(q, subspace='GE')})
+                                )
+                            )
+                            reset_q_pulse.extend(
+                                cycle_pulse(
+                                    config, Cycle({X(q, subspace='EF')})
+                                )
+                            )
+                    else:
+                        reset_q_pulse.extend(
+                            cycle_pulse(config, Cycle({X(q, subspace='GE')}))
+                        )
+
+                    reset_circuit.append(
+                        {'name': 'barrier', 'scope': [f'Q{q}']}
+                    )
+                    reset_circuit.append(
+                        {'name':     'branch_fproc',
+                         'alu_cond': 'eq',
+                         'cond_lhs': 1,
+                         'func_id':  f'Q{q}.meas',
+                         'scope':    [f'Q{q}'],
+                         'true':     reset_q_pulse,
+                         'false':    []
+                        },
+                    )
+
+                reset_circuit.append(
+                    {'name': 'barrier', 
+                    # 'qubit': [f'Q{q}' for q in qubits]
+                    }
+                )
+
+        if config[f'reset/unconditional/enable']:
+            for q in qubits:
+                pulse = config[f'reset/unconditional/{q}']
+                reset_circuit.append(
+                    {'name':   'pulse',
+                    'tag':    'Reset',
+                    'dest':   pulse['channel'], 
+                    'freq':   pulse['freq'],
+                    'amp':    clip_amplitude(pulse['kwargs']['amp']),
+                    'phase':  pulse['kwargs']['phase'],
+                    'twidth': pulse['time'],
+                    'env':    generate_pulse_env(
+                                config=config,
+                                pulse=pulse,
+                                include_amp_phase=False
+                            )
+                    }
+                )
+
+            reset_circuit.append(
+                {'name': 'barrier', 
+                #  'qubit': [f'Q{q}' for q in qubits]
+                }
+            )
+            
+    circuit.extend(reset_circuit)
 
 
 def add_heralding(
@@ -270,13 +391,14 @@ def add_measurement(
                 #     cycle_pulse(config, Cycle({X90(qubit, subspace='EF')}))
                 # )
             else:
-                length = 0.
+                time = 0.
                 for pulse in config[f'single_qubit/{qubit}/EF/X/pulse']:
-                    length += pulse['length']
+                    time += pulse['time']
                 meas_pulse.append(
                     {'name':  'delay',
-                     't':     length, 
-                     'qubit': [f'Q{qubit}']}
+                     't':     time, 
+                     'qubit': [f'Q{qubit}']
+                    }
                 )
 
     # Barrier before readout
@@ -318,7 +440,7 @@ def add_dynamical_decoupling(
         config:      Config, 
         dd_method:   str, 
         qubit:       int, 
-        length:      float, 
+        time:      float, 
         n_dd_pulses: int, 
         pulse: List
     ) -> None:
@@ -328,11 +450,11 @@ def add_dynamical_decoupling(
         config (Config): qcal Config object.
         dd_method (str): dynamical decoupling method.
         qubit (int): qubit label.
-        length (float): length of time over which to perform the DD.
+        time (float): time of time over which to perform the DD.
         n_dd_pulses (int): number of dynamical decoupling pulses.
         pulse (List): qubic pulse.
     """
-    dd_circuit = dd_sequences[dd_method](config, qubit, length, n_dd_pulses)
+    dd_circuit = dd_sequences[dd_method](config, qubit, time, n_dd_pulses)
     for cycle in dd_circuit: 
         if cycle.is_barrier:
             pulse.append({'name': 'barrier', 'qubit': [f'Q{qubit}']})
@@ -511,7 +633,7 @@ def add_single_qubit_gate(
                  'freq':   config[f'single_qubit/{qubit}/{subspace}/freq'],
                  'amp':    clip_amplitude(pulse['kwargs']['amp']),
                  'phase':  pulse['kwargs']['phase'],
-                 'twidth': pulse['length'],
+                 'twidth': pulse['time'],
                  'env':    generate_pulse_env(
                                config=config,
                                pulse=pulse,
@@ -568,7 +690,7 @@ def add_multi_qubit_gate(
                 config,
                 sub_config['method'],
                 q,
-                config[f'two_qubit/{qubits}/{name}/pulse'][idx]['length'],
+                config[f'two_qubit/{qubits}/{name}/pulse'][idx]['time'],
                 sub_config['n_pulses'],
                 mq_pulse
             )
@@ -599,7 +721,7 @@ def add_multi_qubit_gate(
                  'freq':   freq,
                  'amp':    clip_amplitude(pulse['kwargs']['amp']),
                  'phase':  pulse['kwargs']['phase'],
-                 'twidth': pulse['length'], 
+                 'twidth': pulse['time'], 
                  'env':    generate_pulse_env(
                                config=config,
                                pulse=pulse,
@@ -644,7 +766,7 @@ def add_pre_post_pulse(
                     'freq':   freq,
                     'amp':    clip_amplitude(p['kwargs']['amp']),
                     'phase':  p['kwargs']['phase'],
-                    'twidth': p['length'],
+                    'twidth': p['time'],
                     'env':    generate_pulse_env(
                                   config=config,
                                   pulse=p,
@@ -714,7 +836,7 @@ def cycle_pulse(config: Config, cycle: Cycle) -> List:
                          ),
                          'amp':    clip_amplitude(p['kwargs']['amp']),
                          'phase':  p['kwargs']['phase'],
-                         'twidth': p['length'],
+                         'twidth': p['time'],
                          'env':    generate_pulse_env(
                                        config=config,
                                        pulse=p,
@@ -737,19 +859,19 @@ def cycle_pulse(config: Config, cycle: Cycle) -> List:
                 else:
                     pulse.append(
                         {'name':   'pulse',
-                        'tag':    f'X {subspace}',
-                        'dest':   p['channel'], 
-                        'freq':   (
-                            config[f'single_qubit/{qubit}/{subspace}/freq']
-                        ),
-                        'amp':    clip_amplitude(p['kwargs']['amp']),
-                        'phase':  p['kwargs']['phase'],
-                        'twidth': p['length'],
-                        'env':    generate_pulse_env(
-                                    config=config,
-                                    pulse=p,
-                                    include_amp_phase=False
-                                )
+                         'tag':    f'X {subspace}',
+                         'dest':   p['channel'], 
+                         'freq':   (
+                                config[f'single_qubit/{qubit}/{subspace}/freq']
+                            ),
+                         'amp':    clip_amplitude(p['kwargs']['amp']),
+                         'phase':  p['kwargs']['phase'],
+                         'twidth': p['time'],
+                         'env':    generate_pulse_env(
+                                        config=config,
+                                        pulse=p,
+                                        include_amp_phase=False
+                                   )
                         }
                     )
 
@@ -968,7 +1090,7 @@ def to_qubic(
 
                 qubic_circuit.append(
                     {'name':    'loop', 
-                     'cond_lhs': n_reps - 1,  # TODO: n_reps with new firmware
+                     'cond_lhs': n_reps,
                      'alu_cond': 'ge', 
                      'cond_rhs': 'loop_ind',
                      'scope':    [f'Q{q}' for q in circuit.qubits],
