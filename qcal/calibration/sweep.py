@@ -28,6 +28,7 @@ def ParamSweep(
         param_sweep: Dict,
         maximize:    List[str] = None,
         minimize:    List[str] = None,
+        xlabel:      str = 'Value Sweep',
         **kwargs
     ) -> Callable:
     """Parameter sweep calibration.
@@ -73,6 +74,7 @@ def ParamSweep(
             state(s) to maximize the population. Defaults to None.
         minimize (List[str], optional): list of dit strings specifying on which
             state(s) to minimize the population. Defaults to None.
+        xlabel (str, optional): x-axis label. Defaults to 'Value Sweep'.
 
     Returns:
         Callable: ParamSweep calibration class.
@@ -92,6 +94,7 @@ def ParamSweep(
                 param_sweep: Dict,
                 maximize:    List[str] = None,
                 minimize:    List[str] = None,
+                xlabel:      str = 'Value Sweep',
                 **kwargs
             ) -> None:
             """Initialize the ParamSweep class within the function."""
@@ -103,6 +106,7 @@ def ParamSweep(
             self._param_sweep = param_sweep
             self._maximize = maximize
             self._minimize = minimize
+            self._xlabel = xlabel
 
             if not maximize and not minimize:
                 raise ValueError(
@@ -238,7 +242,8 @@ def ParamSweep(
             """Plot the sweep results"""
             Calibration.plot(self,
                 ylabel='Population',
-                save_path=self._data_manager._save_path
+                xlabel=self._xlabel,
+                save_path=self._data_manager._save_path,
             )
 
         def final(self) -> None:
@@ -270,5 +275,6 @@ def ParamSweep(
         param_sweep=param_sweep,
         maximize=maximize,
         minimize=minimize,
+        xlabel=xlabel,
         **kwargs
     )

@@ -157,16 +157,16 @@ class Cycle:
         Returns:
             Gate: Gate object.
         """
-        return self._gates[idx]
+        return self.gates[idx]
     
     def __call__(self) -> Set:
         return self._gates
     
     def __copy__(self) -> List:
-        return Cycle({copy.deepcopy(gate) for gate in self._gates})
+        return Cycle({copy.deepcopy(gate) for gate in self.gates})
     
     def __iter__(self):
-        return iter(self._gates)
+        return iter(self.gates)
     
     def __repr__(self) -> str:
         """Draw the cycle/layer as a string."""
@@ -186,11 +186,11 @@ class Cycle:
                 .hide(axis='columns')
                 .set_table_attributes('class="matrix"')
                 .to_html()
-            ) for gate in self._gates]
+            ) for gate in self.gates]
         ], dtype="object").transpose()
-        df.index = [gate.qubits for gate in self._gates]
+        df.index = [gate.qubits for gate in self.gates]
         df.columns = ['Matrix']
-        df.insert(0, 'Gate', [gate.name for gate in self._gates])
+        df.insert(0, 'Gate', [gate.name for gate in self.gates])
 
         df_styler = df.style.set_table_styles([
             {"selector": ".matrix", "props": "position: relative;"},
@@ -246,7 +246,7 @@ class Cycle:
         Returns:
             List: gates in cycle/layer.
         """
-        return [gate for gate in self._gates]
+        return sorted(self._gates, key=lambda x: x.qubits)
     
     @property
     def qubits(self) -> Tuple:
@@ -282,9 +282,9 @@ class Cycle:
             pd.DataFrame: table of matrices.
         """
         df = pd.DataFrame(
-            data=[[gate.matrix] for gate in self._gates], 
+            data=[[gate.matrix] for gate in self.gates], 
             columns=['Matrix'], 
-            index=[gate.qubits for gate in self._gates]
+            index=[gate.qubits for gate in self.gates]
         )
         return df
     
@@ -295,7 +295,7 @@ class Cycle:
             str: string representation of the cycle.
         """
         str_rep = 'Cycle'
-        for gate in self._gates:
+        for gate in self.gates:
             str_rep += f' {gate.name}:{gate.qubits}'
         return str_rep
 
@@ -318,7 +318,7 @@ class Layer(Cycle):
             str: string representation of the cycle.
         """
         str_rep = 'Layer'
-        for gate in self._gates:
+        for gate in self.gates:
             str_rep += f' {gate.name}:{gate.qubits}'
         return str_rep
     

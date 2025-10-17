@@ -106,8 +106,11 @@ def draw_circuit(circuit: Circuit, show: bool = True):
                     for q in gate.qubits:
                         node_x.append(c)
                         node_y.append(circuit.qubits.index(q))
+                    name = gate.name
+                    if 'phase' in gate.properties['params'].keys():
+                        name += str(gate.properties['params']['phase'])
                     text = qnode_text[
-                        f'{gate.name}{gate.subspace}:{gate.qubits}'
+                        f'{name}{gate.subspace}:{gate.qubits}'
                     ]
                     if not text:
                         text = format_gate_text(gate)

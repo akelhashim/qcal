@@ -42,8 +42,11 @@ def analyze_leakage(circuits: Any, filename: str | None = None) -> Dict:
     for circuit in circuits:
         circuit_depth = len(circuit)
         circuit_depths.add(circuit_depth)
+        
         if not isinstance(circuit.results, Results):
             results = Results(circuit.results)
+        else:
+            results = circuit.results
 
         for q, i in zip(qubits, q_index):
             if circuit_depth in leakage[q].keys():
@@ -75,7 +78,7 @@ def analyze_leakage(circuits: Any, filename: str | None = None) -> Dict:
             print(label[q])
 
     # Plot the data
-    fig = plt.figure(figsize=(6, 4))
+    fig = plt.figure(figsize=(10, 6))
     colors = plt.cm.viridis(np.linspace(0, 1, len(qubits)))
 
     for i, q in enumerate(qubits):
@@ -95,7 +98,8 @@ def analyze_leakage(circuits: Any, filename: str | None = None) -> Dict:
     plt.ylabel(r'$|2\rangle$ State Population', fontsize=15)
     plt.xticks(fontsize=12)
     plt.yticks(fontsize=12)
-    plt.legend(fontsize=10)
+    plt.grid(True)
+    plt.legend(fontsize=12, bbox_to_anchor=(1.02, 1), loc='upper left')
 
     if settings.Settings.save_data and filename is not None:         
         fig.savefig(filename + 'leakage.png', dpi=300)
