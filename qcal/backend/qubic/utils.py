@@ -76,7 +76,6 @@ def generate_pulse_env(
                 kwargs[key] = val
     else:
         kwargs = {key: val for key, val in pulse['kwargs'].items()}
-
     pulse = pulse_envelopes[pulse['env']](
         pulse['time'],
         config[f'hardware/sample_rate/{channel_map[channel]}'] / 

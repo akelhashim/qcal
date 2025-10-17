@@ -158,177 +158,153 @@ def add_reset(
                             reset=True
                         )
 
-                    # Reset pulse w/ qutrit reset
-                    reset_q_pulse = []
-                    if config['readout/esp/enable']:
-                        if q in config['readout/esp/qubits']:
-                            reset_q_pulse.extend(
-                                cycle_pulse(
-                                    config, Cycle({X(q, subspace='EF')})
-                                )
-                            )
-                            reset_q_pulse.extend(
-                                cycle_pulse(
-                                    config, Cycle({X(q, subspace='GE')})
-                                )
-                            )
-                        else:
-                            reset_q_pulse.extend(
-                                cycle_pulse(
-                                    config, Cycle({X(q, subspace='GE')})
-                                )
-                            )
-                            reset_q_pulse.extend(
-                                cycle_pulse(
-                                    config, Cycle({X(q, subspace='EF')})
-                                )
-                            )
-                    else:
-                        reset_q_pulse.extend(
-                            cycle_pulse(config, Cycle({X(q, subspace='GE')}))
-                        )
-
-                    reset_circuit.append(
-                        {'name': 'barrier', 'scope': [f'Q{q}']}
-                    )
-                    reset_circuit.append(
-                        {'name':     'branch_fproc',
-                         'alu_cond': 'eq',
-                         'cond_lhs': 1,
-                         'func_id':  f'Q{q}.meas',
-                         'scope':    [f'Q{q}'],
-                         'true':     reset_q_pulse,
-                         'false':    []
-                        },
-                    )
+                    add_active_reset(config, q, reset_circuit)
 
                 reset_circuit.append(
                     {'name': 'barrier', 
-                    #  'qubit': [f'Q{q}' for q in qubits]
+                     'qubit': [f'Q{q}' for q in qubits]
                     }
                 )
 
         if 'unconditional' in qubits_or_reset.properties['params']['method']:
-            for q in qubits:
-                pulse = config[f'reset/unconditional/{q}']
-                reset_circuit.append(
-                    {'name':   'pulse',
-                     'tag':    'Reset',
-                     'dest':   pulse['channel'], 
-                     'freq':   pulse['freq'],
-                     'amp':    clip_amplitude(pulse['kwargs']['amp']),
-                     'phase':  pulse['kwargs']['phase'],
-                     'twidth': pulse['time'],
-                     'env':    generate_pulse_env(
-                                   config=config,
-                                   pulse=pulse,
-                                   include_amp_phase=False
-                               )
-                    }
-                )
-
-            reset_circuit.append(
-                {'name': 'barrier', 
-                #  'qubit': [f'Q{q}' for q in qubits]
-                }
-            )
+            add_unconditional_reset(config, qubits, reset_circuit)
 
         # Add the reset pulse to the hash table; TODO: check this works for all
-        pulses[f'ResetGE:{qubits}'] = reset_circuit
+        # pulses[f'ResetGE:{qubits}'] = reset_circuit
 
     else:
         if config['reset/passive/enable']:
-            reset_circuit.extend([
-                {'name':  'delay',
-                 't':     config['reset/passive/delay'],
-                 'qubit': [f'Q{q}' for q in qubits]
-                },
-                {'name': 'barrier', 
-                #  'qubit': [f'Q{q}' for q in qubits]
-                }
-            ])
+            add_passive_reset(config, qubits, reset_circuit)
 
         if config['reset/active/enable']:
             for n in range(config['reset/active/n_resets']):
                 for q in qubits:
                     add_measurement(config, q, reset_circuit, None, reset=True)
-
-                    # Reset pulse w/ qutrit reset
-                    reset_q_pulse = []
-                    if config.parameters['readout']['esp']['enable']:
-                        if q in config.parameters['readout']['esp']['qubits']:
-                            reset_q_pulse.extend(
-                                cycle_pulse(
-                                    config, Cycle({X(q, subspace='EF')})
-                                )
-                            )
-                            reset_q_pulse.extend(
-                                cycle_pulse(
-                                    config, Cycle({X(q, subspace='GE')})
-                                )
-                            )
-                        else:
-                            reset_q_pulse.extend(
-                                cycle_pulse(
-                                    config, Cycle({X(q, subspace='GE')})
-                                )
-                            )
-                            reset_q_pulse.extend(
-                                cycle_pulse(
-                                    config, Cycle({X(q, subspace='EF')})
-                                )
-                            )
-                    else:
-                        reset_q_pulse.extend(
-                            cycle_pulse(config, Cycle({X(q, subspace='GE')}))
-                        )
-
-                    reset_circuit.append(
-                        {'name': 'barrier', 'scope': [f'Q{q}']}
-                    )
-                    reset_circuit.append(
-                        {'name':     'branch_fproc',
-                         'alu_cond': 'eq',
-                         'cond_lhs': 1,
-                         'func_id':  f'Q{q}.meas',
-                         'scope':    [f'Q{q}'],
-                         'true':     reset_q_pulse,
-                         'false':    []
-                        },
-                    )
+                    add_active_reset(config, q, reset_circuit)
 
                 reset_circuit.append(
                     {'name': 'barrier', 
-                    # 'qubit': [f'Q{q}' for q in qubits]
+                     'qubit': [f'Q{q}' for q in qubits]
                     }
                 )
 
         if config[f'reset/unconditional/enable']:
-            for q in qubits:
-                pulse = config[f'reset/unconditional/{q}']
-                reset_circuit.append(
-                    {'name':   'pulse',
-                    'tag':    'Reset',
-                    'dest':   pulse['channel'], 
-                    'freq':   pulse['freq'],
-                    'amp':    clip_amplitude(pulse['kwargs']['amp']),
-                    'phase':  pulse['kwargs']['phase'],
-                    'twidth': pulse['time'],
-                    'env':    generate_pulse_env(
-                                config=config,
-                                pulse=pulse,
-                                include_amp_phase=False
-                            )
-                    }
-                )
-
-            reset_circuit.append(
-                {'name': 'barrier', 
-                #  'qubit': [f'Q{q}' for q in qubits]
-                }
-            )
+            add_unconditional_reset(config, qubits, reset_circuit)
             
     circuit.extend(reset_circuit)
+
+
+def add_passive_reset(
+       config: Config, qubits: List[int] | Tuple[int], circuit: List,
+    ) -> None:
+    """Add passive reset.
+
+    Args:
+        config (Config):       qcal Config object.
+        qubits (List | Tuple): qubits to reset.
+        circuit (List):        reset sub-circuit.
+    """
+    circuit.extend([
+        {'name':  'delay',
+          't':     config['reset/passive/delay'],
+          'qubit': [f'Q{q}' for q in qubits]
+        },
+        {'name': 'barrier', 
+         'qubit': [f'Q{q}' for q in qubits]
+        }
+    ])
+
+
+def add_active_reset(
+       config: Config, qubit: int, circuit: List,
+    ) -> None:
+    """Add active reset.
+
+    Args:
+        config (Config): qcal Config object.
+        qubit (int):     qubits to reset.
+        circuit (List):  reset sub-circuit.
+    """
+    # Reset pulse w/ qutrit reset
+    reset_q_pulse = []
+    if config['readout/esp/enable']:
+        if qubit in config['readout/esp/qubits']:
+            reset_q_pulse.extend(
+                cycle_pulse(
+                    config, Cycle({X(qubit, subspace='EF')})
+                )
+            )
+            reset_q_pulse.extend(
+                cycle_pulse(
+                    config, Cycle({X(qubit, subspace='GE')})
+                )
+            )
+        else:
+            reset_q_pulse.extend(
+                cycle_pulse(
+                    config, Cycle({X(qubit, subspace='GE')})
+                )
+            )
+            reset_q_pulse.extend(
+                cycle_pulse(
+                    config, Cycle({X(qubit, subspace='EF')})
+                )
+            )
+    else:
+        reset_q_pulse.extend(
+            cycle_pulse(config, Cycle({X(qubit, subspace='GE')}))
+        )
+
+    circuit.append(
+        {'name': 'barrier', 'scope': [f'Q{qubit}']}
+    )
+    circuit.append(
+        {'name':     'branch_fproc',
+            'alu_cond': 'eq',
+            'cond_lhs': 1,
+            'func_id':  f'Q{qubit}.meas',
+            'scope':    [f'Q{qubit}'],
+            'true':     reset_q_pulse,
+            'false':    []
+        },
+    )
+
+
+def add_unconditional_reset(
+       config: Config, qubits: List[int] | Tuple[int], circuit: List,
+    ) -> None:
+    """Add unconditional reset.
+
+    Args:
+        config (Config):       qcal Config object.
+        qubits (List | Tuple): qubits to reset.
+        circuit (List):        reset sub-circuit.
+    """
+    for q in qubits:
+        freq = config[f'reset/unconditional/{q}/freq']
+        pulse = config[f'reset/unconditional/{q}/pulse']
+        for p in pulse:
+            circuit.append(
+                {'name':   'pulse',
+                 'tag':    'Reset',
+                 'dest':   p['channel'], 
+                 'freq':   freq,
+                 'amp':    clip_amplitude(p['kwargs']['amp']),
+                 'phase':  p['kwargs']['phase'],
+                 'twidth': p['time'],
+                 'env':    generate_pulse_env(
+                                config=config,
+                                pulse=p,
+                                include_amp_phase=False
+                            )
+                }
+            )
+
+    circuit.append(
+        {'name': 'barrier', 
+         'qubit': [f'Q{q}' for q in qubits]
+        }
+    )
 
 
 def add_heralding(
@@ -409,6 +385,9 @@ def add_measurement(
     for qubit in qubits:
         meas_pulse.extend(cycle_pulse(config, Cycle({Meas(qubit)})))
 
+        # if reset:  # If measurement is for active reset, don't save results
+        #     meas_pulse[-1]['save_result'] = False
+
     # Barrier after readout
     meas_pulse.append(
         {'name': 'barrier', 'qubit': [f'Q{q}' for q in qubits]}
@@ -429,9 +408,8 @@ def add_measurement(
         # if pulses is not None:
         #     pulses[f'MCMGE:{qubits}'] = meas_pulse
     
-    else:
-        if pulses is not None:
-            pulses[f'MeasGE:{qubits}'] = meas_pulse
+    elif not reset and pulses is not None:
+        pulses[f'MeasGE:{qubits}'] = meas_pulse
     
     circuit.extend(meas_pulse)
 
@@ -440,7 +418,7 @@ def add_dynamical_decoupling(
         config:      Config, 
         dd_method:   str, 
         qubit:       int, 
-        time:      float, 
+        time:        float, 
         n_dd_pulses: int, 
         pulse: List
     ) -> None:
