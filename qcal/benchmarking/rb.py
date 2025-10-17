@@ -342,11 +342,11 @@ def CRB(qpu:             QPU,
                         else:
                             self._results[qtup].for_protocol['RB'].plot()
 
-            if any(circ.results.dim == 3 for circ in self._transpiled_circuits):
-                analyze_leakage(
-                    self._transpiled_circuits, 
-                    filename=self._data_manager._save_path
-                )
+            # if any(circ.results.dim == 3 for circ in self._transpiled_circuits):
+            #     analyze_leakage(
+            #         self._transpiled_circuits, 
+            #         filename=self._data_manager._save_path
+            #     )
             
         def final(self) -> None:
             """Final benchmarking method."""

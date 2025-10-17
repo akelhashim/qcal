@@ -2,7 +2,7 @@
 
 """
 from qcal.circuit import Layer, Circuit, CircuitSet
-from qcal.gate.single_qubit import single_qubit_gates
+from qcal.gate.single_qubit import single_qubit_gates, Idle
 from qcal.gate.two_qubit import two_qubit_gates
 from qcal.transpilation.transpiler import Transpiler
 from qcal.units import ns
@@ -16,6 +16,18 @@ logger = logging.getLogger(__name__)
 
 
 __all__ = ('Transpiler',)
+
+
+def add_idle(qubit: int) -> Idle:
+    """Add idle gate.
+
+    Args:
+        qubit (int): qubit label.
+
+    Returns:
+        Idle: idle gate of duration 100 ns.
+    """
+    return Idle(qubit, duration=100*ns)
 
 
 def to_qcal(
@@ -46,7 +58,7 @@ def to_qcal(
             if isinstance(layer, LabelTupTup):  
                 if len(layer) == 0:  # Idling cycle
                     tcircuit.append(
-                        Layer({gate_mapper['Gidle'](q) for q in qubits})
+                        Layer({gate_mapper['Gi'](q) for q in qubits})
                     )
                 else:
                     tlayer = Layer()
@@ -54,13 +66,7 @@ def to_qcal(
                         gqubits = tuple(
                             int(str(q).replace('Q','')) for q in gate.qubits
                         )
-                        if gate.name == 'Gidle':
-                            tlayer.append(
-                                gate_mapper['Gidle'](
-                                    gqubits, duration=100*ns  # Hardcoded
-                                )
-                            )
-                        elif gate.name == 'Gzr':
+                        if gate.name == 'Gzr':
                             tlayer.append(
                                 gate_mapper['Gzr'](
                                     gqubits, float(gate.args[0])
@@ -77,13 +83,7 @@ def to_qcal(
                 gqubits = tuple(
                     int(str(q).replace('Q','')) for q in layer.qubits
                 )
-                if layer.name == 'Gidle':
-                    tcircuit.append(
-                        Layer(
-                            {gate_mapper['Gidle'](gqubits, duration=100*ns)}
-                        )
-                    )
-                elif layer.name == 'Gzr':
+                if layer.name == 'Gzr':
                     tcircuit.append(
                         Layer(
                             {gate_mapper['Gzr'](gqubits, float(layer.args[0]))}
@@ -116,7 +116,8 @@ class PyGSTiTranspiler(Transpiler):
                 'Gcnot':   two_qubit_gates['CX'], 
                 'Gcphase': two_qubit_gates['CZ'],
                 'Gi':      single_qubit_gates['Id'],
-                'Gidle':   single_qubit_gates['Idle'],
+                # 'Gidle':   single_qubit_gates['Idle'],
+                'Gidle':   add_idle,
                 'Gxpi2':   single_qubit_gates['X90'], 
                 'Gypi2':   single_qubit_gates['Y90'],
                 'Gzpi2':   single_qubit_gates['Z90'],
