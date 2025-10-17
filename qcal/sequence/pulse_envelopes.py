@@ -20,6 +20,7 @@ logger = logging.getLogger(__name__)
 
 __all__ = [
     'cosine_square',
+    'CW',
     'custom',
     'DRAG',
     'FAST',
@@ -57,20 +58,66 @@ def cosine_square(
     Returns:
         NDArray[np.complex64]: envelope with cosine ramps and a flat top.
     """
-    assert ramp_fraction <= 0.5, 'ramp_fraction cannot be more than 0.5!'
+    # assert ramp_fraction <= 0.5, 'ramp_fraction cannot be more than 0.5!'
     n_points = int(round(length * sample_rate))
-    n_points_cos = int(round(n_points * ramp_fraction))
-    n_points_square = n_points - 2 * n_points_cos
-    freq = 1. / (2 * n_points_cos)
 
-    cos = (
-        np.cos(2. * np.pi * freq * np.arange(0, 2*n_points_cos) - np.pi ) + 1
-    ) / 2.
-    square = np.ones([n_points_square])
-    cos_square = np.concatenate(
-        (cos[:n_points_cos], square, cos[n_points_cos:])
-    )
+    if abs(ramp_fraction) > 0.5:
+        logger.warning(
+            ' ramp_fraction is greater than 0.5!'
+        )
+        n_points_cos = int(round(n_points * abs(ramp_fraction)))
+        n_points_square = n_points - n_points_cos
+        freq = 1. / (2 * n_points_cos)
+        cos = (
+            np.cos(2. * np.pi * freq * np.arange(0, 2*n_points_cos) - np.pi ) 
+            + 1
+        ) / 2.
+        square = np.ones([n_points_square])
+        if ramp_fraction > 0.:
+            cos_square = np.concatenate(
+                (cos[:n_points_cos], square)
+            )
+        elif ramp_fraction < 0.:
+            cos_square = np.concatenate(
+                (square, cos[n_points_cos:])
+            )
+
+    else:
+        n_points_cos = int(round(n_points * ramp_fraction))
+        n_points_square = n_points - 2 * n_points_cos
+        freq = 1. / (2 * n_points_cos)
+        cos = (
+            np.cos(2. * np.pi * freq * np.arange(0, 2*n_points_cos) - np.pi ) 
+            + 1
+        ) / 2.
+        square = np.ones([n_points_square])
+        cos_square = np.concatenate(
+            (cos[:n_points_cos], square, cos[n_points_cos:])
+        )
+
     return np.array(amp * cos_square * np.exp(1j * phase)).astype(np.complex64)
+
+
+def CW(
+        length:        float, 
+        sample_rate:   float, 
+        amp:           float = 1.0,
+        phase:         float = 0.0
+    ) -> str:
+    """Continuous Wave (CW) pulse.
+
+    The arguments here are included for consistency, but unused.
+
+    Args:
+        length (float): pulse length in seconds.
+        sample_rate (float): sample rate in Hz.
+        amp (float, optional): pulse amplitude. Defaults to 1.0.
+        phase (float, optional): pulse phase. Defaults to 0.0.
+
+    Returns:
+        str: 'cw'
+    """
+    return 'cw'
 
 
 def custom(length: float, sample_rate: float, filename: str) -> NDArray:
@@ -740,6 +787,7 @@ def virtualz(
 
 pulse_envelopes = defaultdict(lambda: 'Pulse envelope not supported!', {
     'cosine_square':   cosine_square,
+    'CW':              CW,
     'custom':          custom,
     'DRAG':            DRAG, 
     'FAST':            FAST,
