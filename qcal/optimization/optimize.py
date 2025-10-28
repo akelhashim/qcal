@@ -4,6 +4,7 @@
 import qcal.settings as settings
 
 from qcal.config import Config
+from qcal.fitting.fit import FitLinear
 from qcal.math.utils import uncertainty_of_sum
 from qcal.plotting.utils import calculate_nrows_ncols
 
@@ -11,11 +12,279 @@ import logging
 import matplotlib.pyplot as plt
 import numpy as np
 
+from collections.abc import Iterable
 from numpy.typing import NDArray
 from sklearn.preprocessing import MinMaxScaler
-from typing import Any, Callable, Dict
+from typing import Any, Callable, Dict, Tuple
 
 logger = logging.getLogger(__name__)
+
+
+class NoScaler:
+    """This is a dummy class that returns the same values that are input.
+    
+    It has the same methods as MinMaxScalar for compatibility with the Optimize
+    class, but no rescaling is performed.
+    """
+
+    def __init__(self):
+        pass
+
+    def fit_transform(self, x: Any) -> Any:
+        """Return the values that are passed.
+
+        Args:
+            x (Any): input values.
+
+        Returns:
+            Any: input values.
+        """
+        return x
+    
+    def inverse_transform(self, x: Any) -> Any:
+        """Return the values that are passed.
+
+        Args:
+            x (Any): input values.
+
+        Returns:
+            Any: input values.
+        """
+        return x
+    
+
+class LinearResponse:
+
+    def __init__(self,
+            config:       Config,
+            qubit_labels: Iterable[int | Tuple[int]],
+            params:       Dict[int | tuple[int], str | list[str]],
+            cost_func:    Any,
+            delta:        float | Dict[int | tuple, float],
+            n_iters:      int = 3,
+            x_label:      str = 'Param Value',
+            y_label:      str = 'Loss'
+        ) -> None:
+        
+        self._config = config
+        self._qubit_labels = qubit_labels
+        self._params = params
+        self._cost_func = cost_func
+        self._n_iters = n_iters
+        self._x_label = x_label
+        self._y_label = y_label
+
+        if not isinstance(delta, Dict):
+            self._delta = {ql: delta for ql in qubit_labels}
+        else:
+            self._delta = delta
+
+        self._fit = {ql: FitLinear() for ql in qubit_labels}
+        self._x = {
+            ql: np.linspace(0, self._delta[ql] * self._n_iters, self._n_iters) 
+                for ql in qubit_labels
+        }
+        self._y = {ql: [] for ql in qubit_labels}
+        self._opt_params = {
+            ql: self._config[self._params[ql][0]] 
+                if isinstance(self._params[ql], list) 
+                else self._config[self._params[ql]]
+                for ql in self._qubit_labels
+        }
+
+    @property
+    def config(self) -> Config:
+        """Optimized config.
+
+        Returns:
+            Config: qcal config object.
+        """
+        return self._config
+    
+    @property
+    def cost_func(self) -> Any:
+        """Cost function used to measure the loss.
+
+        Returns:
+            Any: cost function.
+        """
+        return self._cost_func
+    
+    @property
+    def delta(self) -> Dict:
+        """Parameter perturbation per iteration.
+
+        Returns:
+            Dict: perturbation for each qubit label.
+        """
+        return self._delta
+    
+    @property
+    def n_iters(self) -> int:
+        """Number of iterations for fitting the linear curve.
+
+        Returns:
+            int: number of iterations.
+        """
+        return self._n_iters
+    
+    @property
+    def opt_params(self) -> Dict:
+        """Optimized parameter values for each qubit label.
+
+        Returns:
+            Dict: optimized parameter values.
+        """
+        return self._opt_params
+    
+    @property
+    def params(self) -> Dict:
+        """Parameters to optimize.
+
+        Returns:
+            Dict: dictionary of qubit labels to parameters.
+        """
+        return self._params
+
+    @property
+    def slope(self) -> Dict:
+        """Slope of each linear fit."""
+        m = {}
+        for ql in self._qubit_labels:
+            if self._fit[ql].fit_success:
+                m[ql] = self._fit[ql].fit_params['m'].value
+        
+        return m
+    
+    @property
+    def y_intercept(self) -> Dict:
+        """y-intercept of each linear fit."""
+        b = {}
+        for ql in self._qubit_labels:
+            if self._fit[ql].fit_success:
+                b[ql] = self._fit[ql].fit_params['b'].value
+        
+        return b
+
+    def analyze(self) -> None:
+        """Analyze the data and fit to a linear curve."""
+        for ql in self._qubit_labels:
+            params = self._fit[ql].model.make_params(m=1, b=self._y[ql][0])
+            self._fit[ql].fit(
+                self._x[ql], np.array(self._y[ql]), params=params
+            )
+            if self._fit[ql].result.rsquared > 0.8:
+                self._opt_params[ql] += (
+                    -self._fit[ql].fit_params['b'].value / 
+                     self._fit[ql].fit_params['m'].value
+                )
+            else:
+                self._fit[ql]._fit_success = False
+                self._opt_params[ql] += (
+                    self._x[ql][np.argmin(np.abs(self._y[ql]))]
+                )
+
+    def plot(self) -> None:
+        """Plot the raw data and the fits."""
+        self._config.reload()
+
+        nrows, ncols = calculate_nrows_ncols(len(self._qubit_labels))
+        figsize = (5 * ncols, 4 * nrows)
+        fig, axes = plt.subplots(
+            nrows, ncols, figsize=figsize, layout='constrained'
+        )
+
+        k = -1
+        for i in range(nrows):
+            for j in range(ncols):
+                k += 1
+
+                if len(self._qubit_labels) == 1:
+                    ax = axes
+                elif axes.ndim == 1:
+                    ax = axes[j]
+                elif axes.ndim == 2:
+                    ax = axes[i,j]
+
+                if k < len(self._qubit_labels):
+                    ql = self._qubit_labels[k]
+                    x = self._x[ql] + (
+                        self._config[self._params[ql][0]] 
+                        if isinstance(self._params[ql], list) 
+                        else self._config[self._params[ql]]
+                    )
+                    ax.plot(x, self._y[ql], 'o-', label=f'{ql}')
+                    ax.plot(
+                        x, self._fit[ql].predict(self._x[ql]), '--', 
+                        label=f'{ql} fit'
+                    )
+                    ax.axvline(
+                        self._opt_params[ql], 
+                        ls='--',
+                        c='k',
+                        label='Opt. value',
+                    )
+
+                    ax.set_xlabel(f'{self._x_label}', fontsize=15)
+                    ax.set_ylabel(f'{self._y_label}', fontsize=15)
+                    ax.tick_params(axis='both', which='major', labelsize=12)
+                    ax.grid(True)
+                    ax.legend(loc=1, fontsize=12)
+
+                else:
+                    ax.axis('off')
+
+        fig.set_tight_layout(True)
+        if settings.Settings.save_data:
+            save_path = self._cost_func.data_manager.save_path
+            fig.savefig(save_path + 'linear_response.png', dpi=600)
+            fig.savefig(save_path + 'linear_response.pdf')
+            fig.savefig(save_path + 'linear_response.svg')
+        plt.show()
+
+    def set_params(self) -> None:
+        """Set the optimal parameter values."""
+        for ql, param in self._params.items():
+            if isinstance(param, list):
+                for p in param:
+                    self._config[p] = self._opt_params[ql]
+            else:
+                self._config[param] = self._opt_params[ql]
+
+        if settings.Settings.save_data:
+            self._config.save()
+
+    def run(self) -> None:
+        """Run the sweep."""
+        for i in range(self._n_iters):
+
+            if i > 0:
+                for ql in self._qubit_labels:
+                    if isinstance(self._params[ql], list):
+                        for param in self._params[ql]:
+                            self._config[param] += self._delta[ql]
+                    else:
+                        self._config[self._params[ql]] += self._delta[ql]
+
+                self._cost_func._init_kwargs['config'] = self._config
+                self._cost_func.__init__(
+                    *self._cost_func._init_args,
+                    **self._cost_func._init_kwargs
+                )
+
+            # Run the cost function to measure the loss    
+            self._cost_func.run()
+
+            for ql in self._qubit_labels:
+                self._y[ql].append(
+                    uncertainty_of_sum(self._cost_func.loss[ql]) 
+                    if len(self._cost_func.loss[ql]) > 1 
+                    else self._cost_func.loss[ql][0]
+                )
+
+        self.analyze()
+        self.plot()
+        self.set_params()
 
 
 class Optimize:
@@ -28,7 +297,7 @@ class Optimize:
             opt_kwargs: Dict[int | tuple[int], Dict] | None = None,
             lbounds:    Dict[float | tuple, list] | None = None,
             ubounds:    Dict[float | tuple, list] | None = None,
-            delta:      float | Dict[float | tuple, float] | None = None,
+            delta:      float | Dict[int | tuple, float] | None = None,
             n_iters:    int = 10,
             tol:        float = 0.1
         ) -> None:
@@ -82,14 +351,19 @@ class Optimize:
                 )[1] for ql in self._qubit_labels
             }
         else:
-            self._scaler = {ql: MinMaxScaler() for ql in self._qubit_labels}
+            self._scaler = {ql: NoScaler() for ql in self._qubit_labels}
             self._x0 = {ql: 
                 self._scaler[ql].fit_transform(
-                    np.array(
-                        [self._config[p] for p in self._params[ql]]
-                    ).reshape(-1, 1)
+                    np.array([[self._config[p] for p in self._params[ql]]])
                 ) for ql in self._qubit_labels
             }
+            # self._x0 = {ql: 
+            #     self._scaler[ql].fit_transform(
+            #         np.array(
+            #             [self._config[p] for p in self._params[ql]]
+            #         ).reshape(-1, 1)
+            #     ) for ql in self._qubit_labels
+            # }
         
         opt_kwargs = opt_kwargs if opt_kwargs is not None else {
             ql: {} for ql in self._qubit_labels
@@ -191,7 +465,7 @@ class Optimize:
         """Optimized parameter values for each qubit label.
 
         Returns:
-            Dict: optimized paramter values.
+            Dict: optimized parameter values.
         """
         return self._opt_params
     
@@ -224,10 +498,10 @@ class Optimize:
     
     @property
     def scaler(self) -> Dict:
-        """MinMaxScaler for each qubit label.
+        """MinMaxScaler or NoScaler for each qubit label.
 
-        The scaler rescales all parameter values to between 0 and 1 for improved
-        convergence.
+        The MinMaxScaler rescales all parameter values to between 0 and 1 for 
+        improved convergence. NoScaler does not rescale the parameter values.
 
         Returns:
             Dict: scaler for each qubit label.
@@ -274,9 +548,11 @@ class Optimize:
 
     def compute_loss(self) -> None:
         """Compute the cost using the cost function."""
-        self._loss= {
-            ql: uncertainty_of_sum(
-                self._cost_func.loss[ql]
+        self._loss = {
+            ql: np.array(
+                uncertainty_of_sum(self._cost_func.loss[ql]) 
+                if len(self._cost_func.loss[ql]) > 1 
+                else self._cost_func.loss[ql][0]
             ) for ql in self._qubit_labels
         }
         
@@ -289,19 +565,26 @@ class Optimize:
         """
         for ql in self._qubit_labels:
             self._params_history[ql].append(
-                self._scaler[ql].inverse_transform(values[ql].reshape(1, -1))[0]
+                self._scaler[ql].inverse_transform(
+                    values[ql].reshape(1, -1)
+                )[0].copy()
             )
             for i, param in enumerate(self._params[ql]):
                 self._config[param] = self._params_history[ql][-1][i]
                 
+        # Re-instantiate cost function class with updated config
+        self._cost_func._init_kwargs['config'] = self._config
+        self._cost_func.__init__(
+            *self._cost_func._init_args,
+            **self._cost_func._init_kwargs
+        )
+
         if '_param_sweep' in self._cost_func.__dict__.keys():
             self._cost_func._param_sweep = {
                 ql: self._scaler[ql].inverse_transform(
                     values[ql].reshape(1, -1)
                 )[0] for ql in self._qubit_labels
             }
-
-        self._cost_func._config = self._config
 
     def run(self) -> None:
         """Run the optimization loop."""
@@ -335,8 +618,10 @@ class Optimize:
                     losses[ql].append(self._loss[ql])
             
             for ql in self._qubit_labels:
-                self._loss_history[ql].append(losses[ql])
-                self._optimizer[ql].tell(self._x[ql], losses[ql])
+                self._loss_history[ql].append(losses[ql].copy())
+                self._optimizer[ql].tell(
+                    self._x[ql].copy(), losses[ql].copy()
+                )
             
             self.plot()
 
@@ -376,11 +661,11 @@ class Optimize:
                 if k < len(self._qubit_labels):
                     ql = self._qubit_labels[k]
 
-                    ax.plot(self._loss_history[ql], 'o', alpha=0.2)
+                    ax.plot(np.abs(self._loss_history[ql]), 'o', alpha=0.2)
                     ax.errorbar(
                         np.arange(len(self._loss_history[ql])),
-                        np.mean(self._loss_history[ql], 1), 
-                        yerr=np.std(self._loss_history[ql], 1),
+                        np.mean(np.abs(self._loss_history[ql]), 1), 
+                        yerr=np.std(np.abs(self._loss_history[ql]), 1),
                         color='black', ecolor='blueviolet', 
                         elinewidth=3, capsize=0, label='Mean'
                     )

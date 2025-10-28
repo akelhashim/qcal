@@ -7,12 +7,12 @@ from qcal.gate.gate import Gate
 import logging
 import networkx as nx
 import numpy as np
+import plotly.graph_objects as go
+import plotly.io as pio
 
 from collections import defaultdict
-from typing import Dict
-
-import plotly.graph_objects as go
 from plotly.graph_objs.scatter import Marker
+from typing import Dict
 
 logger = logging.getLogger(__name__)
 
@@ -60,6 +60,8 @@ def draw_circuit(circuit: Circuit, show: bool = True):
             False, the figure object is returned.
 
     """
+    pio.templates.default = 'plotly'
+
     # https://plotly.com/python/marker-style/
     symbol_map = defaultdict(lambda: ['square', 'square'],
         {'Meas':   ['triangle-right'],
@@ -104,8 +106,11 @@ def draw_circuit(circuit: Circuit, show: bool = True):
                     for q in gate.qubits:
                         node_x.append(c)
                         node_y.append(circuit.qubits.index(q))
+                    name = gate.name
+                    if 'phase' in gate.properties['params'].keys():
+                        name += str(gate.properties['params']['phase'])
                     text = qnode_text[
-                        f'{gate.name}{gate.subspace}:{gate.qubits}'
+                        f'{name}{gate.subspace}:{gate.qubits}'
                     ]
                     if not text:
                         text = format_gate_text(gate)
@@ -223,8 +228,7 @@ def draw_circuit(circuit: Circuit, show: bool = True):
     fig = go.Figure(
         data= edge_traces + [node_trace],
         layout=go.Layout(
-        # title='',
-        titlefont_size=16,
+        title=dict(font=dict(size=16)),
         showlegend=False,
         hovermode='closest',
         margin=dict(b=20,l=10,r=5,t=50),
@@ -274,6 +278,8 @@ def draw_DAG(G: nx.Graph):
     Args:
         G (nx.Graph): networkx graph object.
     """
+    pio.templates.default = 'plotly'
+    
     pos = nx.spring_layout(G)
 
     node_x = []
@@ -334,8 +340,7 @@ def draw_DAG(G: nx.Graph):
     fig = go.Figure(
         data=[edge_trace, node_trace],
         layout=go.Layout(
-        # title='',
-        titlefont_size=16,
+        title=dict(font=dict(size=16)),
         showlegend=False,
         hovermode='closest',
         margin=dict(b=20,l=5,r=5,t=40),
@@ -362,7 +367,7 @@ def format_qubit_text(qubit: Dict) -> str:
     text = ''
     for key, value in qubit.items():
         if not isinstance(value, dict):
-            text = f'{key.capitalize()}: {qubit[key]}<br>'
+            text += f'{key.capitalize()}: {qubit[key]}<br>'
         else:
             text += f'{key}:<br>'
             for k, v in qubit[key].items():
@@ -421,9 +426,9 @@ def draw_qpu(config: Config):
             size=30,
             colorbar=dict(
                 thickness=15,
-                title='Qubit Connectivity',
+                title=dict(text='Qubit Connectivity', side='right'),
                 xanchor='left',
-                titleside='right'),
+                ),
             line_width=2)
     )
     node_text = []
@@ -434,7 +439,7 @@ def draw_qpu(config: Config):
             )
         )
     node_adjacencies = []
-    for node, adjacencies in enumerate(G.adjacency()):
+    for node, adjacencies in enumerate(sorted(G.adjacency())):
         node_adjacencies.append(len(adjacencies[1]))
         node_text[node] += 'Connectivity: '+str(len(adjacencies[1]))
     node_trace.marker.color = node_adjacencies
@@ -475,8 +480,7 @@ def draw_qpu(config: Config):
     fig = go.Figure(
         data=[edge_trace, node_trace, qubit_labels, middle_node_trace],
         layout=go.Layout(
-            # title='',
-            titlefont_size=16,
+            title=dict(font=dict(size=16)),
             showlegend=False,
             hovermode='closest',
             margin=dict(b=20,l=5,r=5,t=40),

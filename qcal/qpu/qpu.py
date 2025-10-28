@@ -11,6 +11,7 @@ from qcal.config import Config
 from qcal.circuit import CircuitSet
 from qcal.managers.classification_manager import ClassificationManager
 from qcal.managers.data_manager import DataMananger
+from qcal.utils import load_from_pickle
 
 import qcal.settings as settings
 
@@ -113,14 +114,22 @@ class QPU:
         self._raster_circuits = raster_circuits
         self._rcorr_cmat = rcorr_cmat
 
-        if self._classifier is None:
-            logger.warning(' No classifier has been instantiated!')
-
-        assert n_levels <= 3, 'n_levels > is not currently supported!'
+        assert n_levels <= 3, 'n_levels > 3 is not currently supported!'
         self._n_levels = n_levels
 
-        if classifier is not None:
-            assert n_levels <= classifier[classifier._qubits[0]].n_components,(
+        if self._classifier is None:
+            try:
+                self._classifier = load_from_pickle(
+                    settings.Settings.config_path +
+                    'ClassificationManager.pkl'
+                )
+            except Exception:
+                logger.warning(' No classifier has been instantiated!')
+
+        if self._classifier is not None:
+            assert n_levels <= self._classifier[
+                self._classifier._qubits[0]
+            ].n_components, (
                 "'n_levels' is greater than the number of classified states!"
             )
 
@@ -239,7 +248,7 @@ class QPU:
         """
         self._data_manager.generate_exp_id()  # Create a new experimental id
         
-        if 'n_circuits' not in dir(circuits):
+        if not isinstance(circuits, List) and 'n_circuits' not in dir(circuits):
             circuits = [circuits]
         if isinstance(circuits, List):
             self._circuits = CircuitSet(circuits=circuits)

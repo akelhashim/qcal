@@ -15,6 +15,7 @@ import pandas as pd
 import plotly.graph_objects as go
 
 from collections import defaultdict
+from functools import reduce
 from typing import Dict, Tuple
 from pandas import DataFrame
 
@@ -22,6 +23,76 @@ logger = logging.getLogger(__name__)
 
 
 __all__ = ('readout_correction', 'Results')
+
+
+# def readout_correction(results: Results, confusion_matrix: DataFrame) -> Dict:
+    # """Perform readout correction using a measured confusion matrix.
+
+    # This readout correction is performed individually on each qubit.
+    # Therefore, it is scalable, but will not correct correlated readout
+    # errors.
+
+    # Args:
+    #     results (Results): Results object.
+    #     confusion_matrix (DataFrame): confusion matrix measured using the
+    #         ```qcal.benchmarking.fidelity.ReadoutFidelity``` module.
+
+    # Returns:
+    #     Dict: corrected results dictionary.
+    # """
+#     if confusion_matrix.columns[0][0] == 'Meas State':
+#         cmats = [confusion_matrix.to_numpy().astype(float).T]
+#     else:
+#         cmats = []
+#         qubits = set()
+#         for col in confusion_matrix:
+#             qubits.add(col[0])
+#         qubits = tuple(sorted(qubits))
+#         for q in qubits:
+#             cmats.append(
+#                 confusion_matrix[q].to_numpy().astype(float).T
+#             )
+
+#     if len(cmats) != len(tuple(results._results.keys())[0]):
+#         logger.warning(
+#             ' The number of confusion matrices does not match the length'
+#             ' of the provided bitstrings. No readout correction will be'
+#             ' performed!'
+#         )
+#         return results
+
+#     else:
+#         corrected_results = {}
+#         cmats_inv = [np.linalg.inv(cmat) for cmat in cmats]
+#         btstrs = [
+#             ''.join(i) for i in itertools.product(
+#                 [str(j) for j in results.levels], 
+#                 repeat=len(results.states[0])
+#             )
+#         ]
+#         # Observable, i.e. measured bitstrings (e.g. '00', '10', etc.)
+#         for obsrv in results.states:
+
+#             ideal_dists = []  # List of ideal distributions
+#             for o in obsrv:
+#                 # print(o)
+#                 dist = np.zeros(results.dim)
+#                 # print(dist)
+#                 dist[int(o)] = 1.
+#                 ideal_dists.append(dist)
+
+#             corrected_value = 0.
+#             for btstr in btstrs:  # 00, 01, 10, 11
+#                 coeff = 1.  # Coefficient for capturing readout errors
+#                 for q in range(len(results.states[0])):  # Qubit index
+#                     coeff *= np.dot(
+#                         ideal_dists[q], cmats_inv[q][:, int(btstr[q])]
+#                     )
+#                 corrected_value += coeff * results[btstr].counts
+
+#             corrected_results[obsrv] = max(0, int(corrected_value))
+            
+#         return corrected_results
 
 
 def readout_correction(results: Results, confusion_matrix: DataFrame) -> Dict:
@@ -40,16 +111,16 @@ def readout_correction(results: Results, confusion_matrix: DataFrame) -> Dict:
         Dict: corrected results dictionary.
     """
     if confusion_matrix.columns[0][0] == 'Meas State':
-        cmats = [confusion_matrix.to_numpy().astype(float).T]
+        cmats = [confusion_matrix.to_numpy().astype(float)]
     else:
         cmats = []
         qubits = set()
         for col in confusion_matrix:
             qubits.add(col[0])
-        qubits = tuple(sorted(qubits))
+        qubits = tuple(sorted(qubits, key=lambda x: int(x[1:])))
         for q in qubits:
             cmats.append(
-                confusion_matrix[q].to_numpy().astype(float).T
+                confusion_matrix[q].to_numpy().astype(float)
             )
 
     if len(cmats) != len(tuple(results._results.keys())[0]):
@@ -59,39 +130,67 @@ def readout_correction(results: Results, confusion_matrix: DataFrame) -> Dict:
             ' performed!'
         )
         return results
-
+    
     else:
-        corrected_results = {}
-        cmats_inv = [np.linalg.inv(cmat) for cmat in cmats]
-        btstrs = [
+        # Tensor product of confusion matricies
+        cmat_inv = reduce(np.kron,
+            [np.linalg.inv(cmat) for cmat in cmats]
+        ).astype(float)
+        
+        # Generate all possible dit strings
+        dtstrs = [
             ''.join(i) for i in itertools.product(
                 [str(j) for j in results.levels], 
                 repeat=len(results.states[0])
             )
         ]
-        # Observable, i.e. measured bitstrings (e.g. '00', '10', etc.)
-        for obsrv in results.states:
 
-            ideal_dists = []  # List of ideal distributions
-            for o in obsrv:
-                # print(o)
-                dist = np.zeros(results.dim)
-                # print(dist)
-                dist[int(o)] = 1.
-                ideal_dists.append(dist)
+        # Probability distribution over all possible dit strings
+        probs = {
+            **{bt: 0. for bt in dtstrs}, 
+            **dict(results.probabilities.astype(float))
+        }
+        probs = np.array([prob for prob in probs.values()])#.reshape(-1, 1)
 
-            corrected_value = 0.
-            for btstr in btstrs:  # 00, 01, 10, 11
-                coeff = 1.  # Coefficient for capturing readout errors
-                for q in range(len(results.states[0])):  # Qubit index
-                    coeff *= np.dot(
-                        ideal_dists[q], cmats_inv[q][:, int(btstr[q])]
-                    )
-                corrected_value += coeff * results[btstr].counts
+        # Perform the readout correction
+        corr_probs = np.array(
+            # probs @ np.linalg.inv(cmat) * results.n_shots
+            probs @ cmat_inv * results.n_shots
+        ).astype(int)
 
-            corrected_results[obsrv] = max(0, int(corrected_value))
-            
-        return corrected_results
+        corrected_results = dict(zip(dtstrs, corr_probs))
+
+        # corr_probs = []
+        # # Apply readout correction independently for each qubit
+        # # Then compute the combined probability distribution
+        # for i in range(len(results.states[0])):
+        #     mresults = results.marginalize(i)
+        #     pdist = {
+        #         **{str(level): 0. for level in results.levels},
+        #         **dict(mresults.probabilities.astype(float))
+        #     }
+        #     probs = np.array([prob for prob in pdist.values()])
+
+        #     # Perform the readout correction
+        #     corr_probs.append(probs @ np.linalg.inv(cmats[i]))
+        
+        # # Combined probability distribution
+        # comb_probs = reduce(np.kron, corr_probs)
+        # counts = np.array(
+        #     results.n_shots * comb_probs
+        # ).astype(int)
+
+        # # All possible ditstrings
+        # dtstrs = [
+        #     ''.join(i) for i in itertools.product(
+        #         [str(j) for j in results.levels], 
+        #         repeat=len(results.states[0])
+        #     )
+        # ]
+
+        # corrected_results = dict(zip(dtstrs, counts))
+        
+    return corrected_results
 
 
 # TODO: add fidelity and TVD

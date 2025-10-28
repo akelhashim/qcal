@@ -3,40 +3,46 @@
 Transpilation describes the process of mapping one circuit type to another
 circuit type at the same level of abstraction.
 """
-from collections import defaultdict
-from typing import Any, List
+from qcal.circuit import CircuitSet
+from qcal.transpilation.utils import GateMapper
+
+import logging
+from typing import Any
+
+logger = logging.getLogger(__name__)
+
 
 class Transpiler:
     """Parent Transpiler class."""
 
-    def __init__(self, gate_mapper: defaultdict) -> None:
+    def __init__(self, gate_mapper: GateMapper) -> None:
         """Initialize a transpiler.
 
         Args:
-            gate_mapper (defaultdict | None, optional): a dictionary which maps
+            gate_mapper (GateMapper | None, optional): a dictionary which maps
                 gates of one kind to gates of another kind.
         """
         self._gate_mapper = gate_mapper
 
     @property
-    def gate_mapper(self) -> defaultdict:
+    def gate_mapper(self) -> GateMapper:
         """Gate mapper.
 
         This dictionary controls how gates are mapped from one type to another.
 
         Returns:
-            defaultdict: gate mapper.
+            GateMapper: gate mapper.
         """
         return self._gate_mapper
     
-    def transpile(self, circuits: Any) -> List[Any]:
+    def transpile(self, circuits: Any) -> CircuitSet:
         """Transpile all circuits.
 
         Args:
             circuits (Any): circuits to transpile.
 
         Returns:
-            List[Any]: transpiled circuits.
+            CircuitSet[Any]: transpiled circuits.
         """
         raise NotImplementedError(
             'This method should be handled by the child class!'

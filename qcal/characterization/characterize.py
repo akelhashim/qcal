@@ -10,6 +10,7 @@ import logging
 import matplotlib.pyplot as plt
 import numpy as np
 
+from collections import defaultdict
 from typing import Any, Dict, List, Tuple
 
 logger = logging.getLogger(__name__)
@@ -35,7 +36,7 @@ class Characterize:
         self._param_sweep = {}
         self._results = {}
         self._fit = {}
-        self._char_values = {}
+        self._char_values = defaultdict(lambda: False, {})
         self._errors = {}
 
     @property
@@ -131,8 +132,9 @@ class Characterize:
             elif self._char_values[q]:
                 self.set_param(self._params[q], self._char_values[q])
 
-        self._config.save()
-        self._config.load()
+        if settings.Settings.save_data:
+            self._config.save()
+            # self._config.load()
 
     def plot(
             self, xlabel='Value Sweep', ylabel='Results', flabel='Fit', 

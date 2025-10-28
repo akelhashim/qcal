@@ -8,6 +8,7 @@ https://trueq.quantumbenchmark.com/guides/error_diagnostics/srb.html
 """
 import qcal.settings as settings
 
+from qcal.analysis.leakage import analyze_leakage
 from qcal.config import Config
 from qcal.qpu.qpu import QPU
 from qcal.plotting.utils import calculate_nrows_ncols
@@ -269,8 +270,8 @@ def CRB(qpu:             QPU,
             import pygsti
             
             self._data = pygsti.io.read_data_from_dir(
-                     self._data_manager._save_path
-                )
+                self._data_manager._save_path
+            )
             self._results = self._protocol.run(self._data)
             if not self._sim_RB:
                 try:
@@ -340,6 +341,12 @@ def CRB(qpu:             QPU,
                             )
                         else:
                             self._results[qtup].for_protocol['RB'].plot()
+
+            # if any(circ.results.dim == 3 for circ in self._transpiled_circuits):
+            #     analyze_leakage(
+            #         self._transpiled_circuits, 
+            #         filename=self._data_manager._save_path
+            #     )
             
         def final(self) -> None:
             """Final benchmarking method."""
@@ -482,7 +489,7 @@ def SRB(qpu:             QPU,
             """Save all circuits and data."""
             clear_output(wait=True)
             self._data_manager._exp_id += (
-                f'_SRB_{"".join("Q"+str(q) for q in self._circuits.labels)}'
+                f'_SRB_{"".join("Q" + str(q) for q in self._circuits.labels)}'
             )
             if settings.Settings.save_data:
                 qpu.save(self) 
@@ -568,6 +575,11 @@ def SRB(qpu:             QPU,
                     self._data_manager._save_path + 'SRB_infidelities.svg'
                 )
             plt.show()
+
+            if any(res.dim == 3 for res in self._circuits.results):
+                analyze_leakage(
+                    self._circuits, filename=self._data_manager._save_path
+                )
 
         def final(self) -> None:
             """Final benchmarking method."""

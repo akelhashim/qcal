@@ -2,16 +2,20 @@
 
 """
 from qcal.config import Config
+from qcal.sequence.pulse_envelopes import pulse_envelopes
 from qcal.units import ns, us
 
 import logging
 import numpy as np
 import pandas as pd
 
+from numpy.typing import NDArray
+from typing import Dict
+
 logger = logging.getLogger(__name__)
 
 
-def calculate_n_reads(config: Config, compiled_program) -> dict:
+def calculate_n_reads(compiled_program) -> dict:
     """Calculate the number of reads per qubit per circuit.
 
     The number of reads will depend on:
@@ -21,7 +25,6 @@ def calculate_n_reads(config: Config, compiled_program) -> dict:
     3) readout at the end of the circuit
 
     Args:
-        config (Config): qcal config object.
         compiled_program (distproc.compiler.CompiledProgram): QubiC compiled
             program object.
 
@@ -33,11 +36,54 @@ def calculate_n_reads(config: Config, compiled_program) -> dict:
     
     n_reads = {}
     for q in qubits:
-        n_reads[str(int(config[f"readout/{q.strip('Q')}/channel"]))] = (
-            sum(seq[q] == 'Readout')
-        )
+        n_reads[f'{q}.rdlo'] = sum(seq[q] == 'Readout')
 
     return n_reads
+
+
+def generate_pulse_env(
+        config: Config, 
+        pulse: Dict, 
+        channel: str | None = None, 
+        include_amp_phase: bool = True    
+    ) -> NDArray[np.complex64]:
+    """Generate a pulse in a form compatible with QubiC.
+
+    Args:
+        config (Config): qcal Config object.
+        pulse (Dict): dictionary object of a pulse returned from indexing a
+            config file.
+        channel: (str | None, optional): drive channel (e.g., 'qdrv'). Defaults
+            to None. If None, drive channel is determined from the pulse.
+        include_amp_phase (bool, optional): whether to include the pulse amp and 
+            phase in the generation of the envelope. Defaults to True. By 
+            default, QubiC uses False because the amp and phase are dynamically 
+            included in compilation. This lowers the waveform memory 
+            requirements when generating sequences.
+
+    Returns:
+        NDArray[np.complex64]: complex pulse array.
+    """
+    channel_map = {'qdrv': 'DAC', 'cdrv': 'DAC', 'rdrv': 'DAC', 'rdlo': 'ADC'}
+    channel = (
+        channel if channel is not None else pulse['channel'].split('.')[-1]
+    )
+
+    if not include_amp_phase:
+        kwargs = {}
+        for key, val in pulse['kwargs'].items():
+            if key not in ['amp', 'phase']:
+                kwargs[key] = val
+    else:
+        kwargs = {key: val for key, val in pulse['kwargs'].items()}
+    pulse = pulse_envelopes[pulse['env']](
+        pulse['time'],
+        config[f'hardware/sample_rate/{channel_map[channel]}'] / 
+            config[f'hardware/interpolation_ratio/{channel}'],
+        **kwargs
+    )
+
+    return pulse
 
 
 def qubic_sequence(compiled_program) -> pd.DataFrame:
@@ -65,11 +111,17 @@ def qubic_sequence(compiled_program) -> pd.DataFrame:
                 times.append(pulse['start_time'])
         times = np.array(times) #- times[0]
         times = np.around(times* 2 * ns / us, 3)
-        df = df.join(
-            pd.DataFrame({qubit: tags}, index=times),
-            how='outer'
-        )
+        if qubit in df.columns:
+            if len(pd.DataFrame({qubit: tags}, index=times)) > 0:
+                df = df.combine_first(
+                    pd.DataFrame({qubit: tags}, index=times)
+                )
+        else:
+            df = df.join(
+                pd.DataFrame({qubit: tags}, index=times),
+                how='outer'
+            )
 
-    df = df.reindex(sorted(df.columns), axis=1)
+    df = df.reindex(sorted(df.columns), axis=1).fillna('')
     df.index.name = '[us]'
     return df.fillna('')

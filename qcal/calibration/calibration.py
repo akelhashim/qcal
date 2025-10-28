@@ -10,6 +10,7 @@ import logging
 import matplotlib.pyplot as plt
 import numpy as np
 
+from collections import defaultdict
 from typing import Any, Dict, List, Tuple
 
 logger = logging.getLogger(__name__)
@@ -39,7 +40,7 @@ class Calibration:
         self._param_sweep = {}
         self._sweep_results = {}
         self._fit = {}
-        self._cal_values = {}
+        self._cal_values = defaultdict(lambda: False, {})
         self._errors = {}
 
         if self._config['readout/esp/enable']:
@@ -143,12 +144,21 @@ class Calibration:
                             self.set_param(
                                 self._params[q][i], self._cal_values[q][i]
                             )
+                        elif self._cal_values[q][i]:
+                            self.set_param(
+                                self._params[q][i], self._cal_values[q][i]
+                            )
                 elif isinstance(self._fit[q], dict):
                     if all([fit.fit_success for fit in self._fit[q].values()]):
                         for i, param in enumerate(self._params[q]):
                             self.set_param(
                                 self._params[q][i], self._cal_values[q][i]
                             )
+                    elif self._cal_values[q]:
+                            for i, param in enumerate(self._params[q]):
+                                self.set_param(
+                                    self._params[q][i], self._cal_values[q][i]
+                                )
                 else:
                     if self._fit[q].fit_success or self._cal_values[q]:
                         if (isinstance(self._params[q], (list, tuple)) and
@@ -166,8 +176,9 @@ class Calibration:
                                 self._params[q], self._cal_values[q]
                             )
 
-        self._config.save()
-        self._config.load()
+        if settings.Settings.save_data:
+            self._config.save()
+            # self._config.load()
 
     def plot(
             self, xlabel='Value Sweep', ylabel='Results', save_path=''
@@ -204,10 +215,22 @@ class Calibration:
                     ax.tick_params(axis='both', which='major', labelsize=12)
                     ax.grid(True)
 
-                    ax.plot(
-                        self._param_sweep[q], self._sweep_results[q],
-                        'o', c='blue', label=f'Meas, Q{q}'
-                    )
+                    if isinstance(self._sweep_results[q], Dict):
+                        colors = plt.cm.viridis(
+                            np.linspace(0, 1, len(self._sweep_results[q]))
+                        )
+                        for l, (label, result) in enumerate(
+                            self._sweep_results[q].items()
+                        ):
+                            ax.plot(
+                                self._param_sweep[q], result,
+                                'o-', c=colors[l], label=label
+                            )
+                    else:
+                        ax.plot(
+                            self._param_sweep[q], self._sweep_results[q],
+                            'o', c='blue', label=f'Meas'
+                        )
                     if self._fit and self._fit[q].fit_success:
                         x = np.linspace(
                             self._param_sweep[q][0],
@@ -226,10 +249,14 @@ class Calibration:
                     elif self._cal_values[q]:
                         ax.axvline(
                             self._cal_values[q],  
-                            ls='--', c='k', label='Optimal value'
+                            ls='--', c='k', label='Opt. value'
                         )
 
-                    ax.legend(loc=0, fontsize=12)
+                    ax.text(
+                            0.05, 0.95, f'Q{q}', size=12, 
+                            transform=ax.transAxes
+                        )
+                    ax.legend(loc=1, fontsize=10)
 
                 else:
                     ax.axis('off')
@@ -248,4 +275,6 @@ class Calibration:
             param (str): config param.
             newvalue (Any): new value for the param.
         """
-        self._config[param] = newvalue
+        self._config[param] = (
+            float(newvalue) if isinstance(newvalue, float) else newvalue
+        )

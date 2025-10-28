@@ -1,4 +1,4 @@
-"""Submodule for True-Q compiler based on qcal config and the basis gates.
+"""Submodule for SuperstaQ compiler.
 
 """
 from qcal.circuit import CircuitSet

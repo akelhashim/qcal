@@ -3,12 +3,14 @@
 """
 from qcal.fitting.fit_functions import *
 
+import lmfit
 import logging
 import numpy as np
 
+from lmfit import Model
 from numpy.typing import ArrayLike, NDArray
-from scipy.optimize import curve_fit
-from typing import Callable
+# from scipy.optimize import curve_fit
+from typing import Callable, Dict
 
 logger = logging.getLogger(__name__)
 
@@ -31,7 +33,7 @@ class FitError(Exception):
 class Fit:
     """Main fit class."""
 
-    __slots__ = ('_fit_function', '_fit_success', '_popt', '_pcov')
+    __slots__ = ('_fit_function', '_fit_success', '_model', '_result')
 
     def __init__(self, fit_function: Callable) -> None:
         """Initialize a fitter for a given fit function.
@@ -41,8 +43,8 @@ class Fit:
         """
         self._fit_function = fit_function
         self._fit_success = False
-        self._popt = None
-        self._pcov = None
+        self._model = Model(fit_function)
+        self._result = None
 
     @property
     def fit_fuction(self) -> Callable:
@@ -63,31 +65,40 @@ class Fit:
         return self._fit_success
     
     @property
-    def fit_params(self) -> NDArray:
+    def fit_params(self) -> Dict:
         """Optimized fit params.
 
         Returns:
-            NDArray: param array.
+            Dict: a dictionary of Parameter objects.
         """
-        return self._popt
-    
-    @property
-    def covariance(self) -> NDArray:
-        """The estimated approximate covariance of the optimized fit params.
-
-        Returns:
-            NDArray: covariance matrix.
-        """
-        return self._pcov
+        return self._result.params
     
     @property
     def error(self) -> NDArray:
-        """One standard deviation on the error of the optimized fit params.
+        """Reduced chi-squared error.
 
         Returns:
             NDArray: error array.
         """
-        return np.sqrt(np.diag(self._pcov))
+        return self._result.redchi
+
+    @property
+    def model(self) -> Model:
+        """Model for fitting.
+
+        Returns:
+            lmfit.model: model
+        """
+        return self._model
+
+    @property
+    def result(self) -> lmfit.model.ModelResult:
+        """Model fit result.
+
+        Returns:
+            lmfit.model.ModelResult: result object.
+        """
+        return self._result
     
     def fit(self, x: ArrayLike, y: ArrayLike, **kwargs) -> None:
         """Fit data to the fit_function provided.
@@ -97,10 +108,10 @@ class Fit:
             y (ArrayLike): y data.
         """
         try:
-            self._popt, self._pcov = curve_fit(
-                self._fit_function, x, y, **kwargs
-            )
-            self._fit_success = True
+            self._result = self._model.fit(y, x=x, **kwargs)
+            assert self._result.success
+            self._fit_success = self._result.success
+            # logger.info(f' {self._result.fit_report()}')
         except Exception:
             logger.warning(f' Failed to fit data to {self._fit_function}!')
 
@@ -113,7 +124,7 @@ class Fit:
         Returns:
             ArrayLike: y data.
         """
-        return self._fit_function(x, *self._popt)
+        return self._result.eval(x=x)
     
 
 class FitAbsoluteValue(Fit):

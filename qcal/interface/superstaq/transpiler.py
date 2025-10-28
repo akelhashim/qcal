@@ -1,6 +1,5 @@
-"""Submodule for handling transpilation to/from Bqskit.
+"""Submodule for transpiler from cirq and qiskit circuits..
 
-See: https://github.com/BQSKit/bqskit
 """
 from qcal.circuit import Barrier, Cycle, Layer, Circuit, CircuitSet
 from qcal.gate.single_qubit import Meas, Rz, X90, X
@@ -29,8 +28,9 @@ def cirq_to_qcal(circuit, gate_mapper: defaultdict) -> Circuit:
     for moment in circuit:
         tcycle = Cycle()
         for op in moment:
-            if 'Measurement' in str(op):
-                # tcircuit.measure(tuple([q.x for q in op.qubits]))
+            if 'Barrier' in str(op):
+                tcycle = Barrier(tuple([q.x for q in op.qubits]))
+            elif 'Measurement' in str(op):
                 tcycle = Cycle({Meas(q.x) for q in op.qubits})
             else:
                 if 'Rz' in str(op.gate):
@@ -95,7 +95,7 @@ class CirqTranspiler(Transpiler):
 
     __slots__ = ('_gate_mapper',)
 
-    def __init__(self, gate_mapper:  defaultdict | Dict | None = None) -> None:
+    def __init__(self, gate_mapper: defaultdict | Dict | None = None) -> None:
         """Initialize with gate_mapper.
 
         Args:

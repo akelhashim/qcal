@@ -22,11 +22,12 @@ from qcal.gate.single_qubit import basis_rotation, Meas
 from qcal.results import Results
 
 import copy
+import numpy as np
 import pandas as pd
 
 from collections import deque
+from collections.abc import Iterable
 from itertools import groupby
-import numpy as np
 from typing import Any, Dict, List, Set, Tuple
 
 import plotly.io as pio
@@ -137,16 +138,14 @@ class Cycle:
 
     __slots__ = ('_gates', '_qubits')
 
-    def __init__(self, gates: Set[Gate] = None) -> None:
+    def __init__(self, gate_or_gates: Gate | Iterable[Gate] = None) -> None:
         """
         Args:
-            gates (Set[Gate], optional): Set of gates. Defaults to None.
+            gate_or_gates (Gate | Iterable[Gate], optional): gate or set of 
+                gates. Defaults to None.
         """
-        self._gates = gates if gates is not None else set()
-        
-        self._qubits = set()
-        for gate in self._gates:
-            self._qubits.update(gate.qubits)
+        self._gates = set()
+        self.append(gate_or_gates)
 
     def __getitem__(self, idx: int) -> Gate:
         """Index the gates in the cycle/layer.
@@ -157,16 +156,16 @@ class Cycle:
         Returns:
             Gate: Gate object.
         """
-        return self._gates[idx]
+        return self.gates[idx]
     
     def __call__(self) -> Set:
         return self._gates
     
     def __copy__(self) -> List:
-        return Cycle({copy.deepcopy(gate) for gate in self._gates})
+        return Cycle({copy.deepcopy(gate) for gate in self.gates})
     
     def __iter__(self):
-        return iter(self._gates)
+        return iter(self.gates)
     
     def __repr__(self) -> str:
         """Draw the cycle/layer as a string."""
@@ -186,11 +185,11 @@ class Cycle:
                 .hide(axis='columns')
                 .set_table_attributes('class="matrix"')
                 .to_html()
-            ) for gate in self._gates]
+            ) for gate in self.gates]
         ], dtype="object").transpose()
-        df.index = [gate.qubits for gate in self._gates]
+        df.index = [gate.qubits for gate in self.gates]
         df.columns = ['Matrix']
-        df.insert(0, 'Gate', [gate.name for gate in self._gates])
+        df.insert(0, 'Gate', [gate.name for gate in self.gates])
 
         df_styler = df.style.set_table_styles([
             {"selector": ".matrix", "props": "position: relative;"},
@@ -246,7 +245,7 @@ class Cycle:
         Returns:
             List: gates in cycle/layer.
         """
-        return [gate for gate in self._gates]
+        return sorted(self._gates, key=lambda x: x.qubits)
     
     @property
     def qubits(self) -> Tuple:
@@ -257,14 +256,22 @@ class Cycle:
         """
         return tuple(sorted(set(self._qubits)))
     
-    def append(self, gate: Gate) -> None:
+    def append(self, gate_or_gates: Gate | Iterable[Gate]) -> None:
         """Appends a gate to the existing cycle/layer.
 
         Args:
-            gate (Gate): qcal gate object.
+            gate_or_gates (Gate): qcal gate object.
         """
-        assert isinstance(gate, Gate), "The gate must be a qcal Gate object!"
-        self._gates.add(gate)
+        if isinstance(gate_or_gates, Gate):
+            self._gates.add(gate_or_gates)
+
+        if (
+            hasattr(gate_or_gates, '__iter__') and not 
+            isinstance(gate_or_gates, (str, bytes))
+        ):
+            for gate in gate_or_gates:
+                self._gates.add(gate)
+        
         self._update_qubits()
 
     def copy(self) -> Cycle | Layer:
@@ -282,9 +289,9 @@ class Cycle:
             pd.DataFrame: table of matrices.
         """
         df = pd.DataFrame(
-            data=[[gate.matrix] for gate in self._gates], 
+            data=[[gate.matrix] for gate in self.gates], 
             columns=['Matrix'], 
-            index=[gate.qubits for gate in self._gates]
+            index=[gate.qubits for gate in self.gates]
         )
         return df
     
@@ -295,7 +302,7 @@ class Cycle:
             str: string representation of the cycle.
         """
         str_rep = 'Cycle'
-        for gate in self._gates:
+        for gate in self.gates:
             str_rep += f' {gate.name}:{gate.qubits}'
         return str_rep
 
@@ -318,7 +325,7 @@ class Layer(Cycle):
             str: string representation of the cycle.
         """
         str_rep = 'Layer'
-        for gate in self._gates:
+        for gate in self.gates:
             str_rep += f' {gate.name}:{gate.qubits}'
         return str_rep
     
@@ -396,6 +403,15 @@ class Circuit:
         ]
     
     @property
+    def labels(self) -> Tuple[int]:
+        """The qubit labels in the circuit.
+
+        Returns:
+            Tuple: qubit labels.
+        """ 
+        return tuple(sorted(self._qubits))
+
+    @property
     def layers(self) -> list:
         """The layers in the circuit.
 
@@ -462,11 +478,16 @@ class Circuit:
         """
         circuit_partitions = pd.DataFrame(columns=['Partitions', 'Size'])
         n = max([1, int(np.log2(self.n_cycles / 4))])
-        for block_size in [2**i for i in range(n + 1)]:
+        blocks = [2**i for i in range(n + 1)]
+        add = [3, 5, 6, 7, 9, 10, 11, 12, 15, 20, 21, 24]
+        blocks += list(np.array(add)[np.array(add) < 2**(n + 1)])
+        for block_size in sorted(blocks):
             partitions = partition_circuit(self, block_size=block_size)
             circuit_partitions.loc[block_size] = {
                 'Partitions': partitions, 'Size': len(partitions)
             }
+            if len(partitions) < 5:
+                break
 
         return circuit_partitions[
             circuit_partitions.Size == circuit_partitions.Size.min()
@@ -511,11 +532,10 @@ class Circuit:
         if isinstance(cycle_or_layer, List):
             cycle_or_layer = Cycle(cycle_or_layer)
         else:
-            assert (
-                isinstance(cycle_or_layer, Barrier) or
-                isinstance(cycle_or_layer, Cycle) or 
-                isinstance(cycle_or_layer, Layer)
-            ), "cycle_or_layer must be a Cycle, Layer or Barrier object!"
+            assert isinstance(cycle_or_layer, (Barrier, Cycle, Layer)), (
+                "Expected Barrier, Cycle, or Layer, got "
+                f"{type(cycle_or_layer).__name__}"
+            )
         self._cycles.append(cycle_or_layer)
         self._qubits.update(cycle_or_layer.qubits)
 
@@ -568,11 +588,10 @@ class Circuit:
         if isinstance(cycle_or_layer, List):
             cycle_or_layer = Cycle(cycle_or_layer)
         else:
-            assert (
-                isinstance(cycle_or_layer, Barrier) or
-                isinstance(cycle_or_layer, Cycle) or 
-                isinstance(cycle_or_layer, Layer)
-            ), "cycle_or_layer must be a Cycle, Layer or Barrier object!"
+            assert isinstance(cycle_or_layer, (Barrier, Cycle, Layer)), (
+                "Expected Barrier, Cycle, or Layer, got "
+                f"{type(cycle_or_layer).__name__}"
+            )
         return self._cycles.index(cycle_or_layer, beg, end)
 
     def insert(self,
@@ -588,11 +607,10 @@ class Circuit:
         if isinstance(cycle_or_layer, List):
             cycle_or_layer = Cycle(cycle_or_layer)
         else:
-            assert (
-                isinstance(cycle_or_layer, Barrier) or
-                isinstance(cycle_or_layer, Cycle) or 
-                isinstance(cycle_or_layer, Layer)
-            ), "cycle_or_layer must be a Cycle, Layer or Barrier object!"
+            assert isinstance(cycle_or_layer, (Barrier, Cycle, Layer)), (
+                "Expected Barrier, Cycle, or Layer, got "
+                f"{type(cycle_or_layer).__name__}"
+            )
         self._cycles.insert(idx, cycle_or_layer)
         self._qubits.update(cycle_or_layer.qubits)
 
@@ -639,7 +657,7 @@ class Circuit:
         """Prepends a cycle/layer to the front of the circuit.
 
         Args:
-            cycle_or_layer (Barrier, Cycle, Laye, List): cycle/layer to 
+            cycle_or_layer (Barrier, Cycle, Layer, List): cycle/layer to 
                 prepend.
         """
         if isinstance(cycle_or_layer, List):
@@ -699,11 +717,10 @@ class Circuit:
         if isinstance(cycle_or_layer, List):
             cycle_or_layer = Cycle(cycle_or_layer)
         else:
-            assert (
-                isinstance(cycle_or_layer, Barrier) or
-                isinstance(cycle_or_layer, Cycle) or 
-                isinstance(cycle_or_layer, Layer)
-            ), "cycle_or_layer must be a Cycle, Layer or Barrier object!"
+            assert isinstance(cycle_or_layer, (Barrier, Cycle, Layer)), (
+                "Expected Barrier, Cycle, or Layer, got "
+                f"{type(cycle_or_layer).__name__}"
+            )
         self._cycles.remove(cycle_or_layer)
         self._update_qubits()
 
