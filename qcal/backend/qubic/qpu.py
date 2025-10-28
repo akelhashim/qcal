@@ -288,14 +288,17 @@ class QubicQPU(QPU):
             suppress_duplicate_warnings=True,
             proc_grouping=proc_grouping_from_channelconfig(self._channel_config)
         )
+
         self._sequence = run_assemble_stage(
             self._compiled_program, self._channel_config
         )
 
+        self._n_reads_per_shot = calculate_n_reads(self._compiled_program[0])
+        for ch, n_reads in self._n_reads_per_shot.items():  # Q1.rdlo, 1
+            self._sequence[0].result_channels[ch].reads_per_shot = n_reads
+
     def acquire(self) -> None:
         """Measure all circuits."""
-        self._n_reads_per_shot = calculate_n_reads(self._compiled_program[0])
-
         measurement = self._jobman.build_and_run_circuits(
             self._sequence, 
             self._n_shots, 
