@@ -11,19 +11,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Workflow DAG
 
 ### Changed
-- Changes in existing functionality
 
 ### Deprecated
-- Soon-to-be removed features
 
 ### Removed
-- Now removed features
 
 ### Fixed
-- Bug fixes
 
 ### Security
-- Security fixes
+
+## [0.0.2] - 2025-11-05
+
+### Added
+- Copyright notice
+- License agreement
 
 ## [0.0.1] - 2025-10-28
 
@@ -34,5 +35,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Single- and two-qubit benchmarking methods
 - Advanced compilation tools
 
-[Unreleased]: https://github.com/akelhashim/qcal/compare/v0.0.1...HEAD
+[Unreleased]: https://github.com/akelhashim/qcal/compare/v0.0.2...HEAD
+[0.0.2]: https://github.com/akelhashim/qcal/releases/tag/v0.0.2
 [0.0.1]: https://github.com/akelhashim/qcal/releases/tag/v0.0.1
