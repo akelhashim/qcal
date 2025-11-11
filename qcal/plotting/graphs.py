@@ -228,17 +228,18 @@ def draw_circuit(circuit: Circuit, show: bool = True):
     fig = go.Figure(
         data= edge_traces + [node_trace],
         layout=go.Layout(
-        title=dict(font=dict(size=16)),
-        showlegend=False,
-        hovermode='closest',
-        margin=dict(b=20,l=10,r=5,t=50),
-        annotations=gate_names,
-        xaxis=dict(tick0=0, dtick=1, showgrid=False, zeroline=False, 
-                   showticklabels=True),
-        yaxis=dict(tickmode='array', 
-                   tickvals=[q for q in range(len(circuit.qubits))],
-                   ticktext=circuit.qubits,
-                   showgrid=False, zeroline=False, showticklabels=True))
+            title=dict(font=dict(size=16)),
+            showlegend=False,
+            hovermode='closest',
+            margin=dict(b=20,l=10,r=5,t=50),
+            annotations=gate_names,
+            xaxis=dict(tick0=0, dtick=1, showgrid=False, zeroline=False, 
+                    showticklabels=True),
+            yaxis=dict(tickmode='array', 
+                    tickvals=[q for q in range(len(circuit.qubits))],
+                    ticktext=circuit.qubits,
+                    showgrid=False, zeroline=False, showticklabels=True)
+        )
     )
 
     fig['layout']['yaxis']['autorange'] = "reversed"
@@ -272,15 +273,16 @@ def draw_circuit(circuit: Circuit, show: bool = True):
         return fig
 
 
-def draw_DAG(G: nx.Graph):
+def draw_DAG(G: nx.Graph | nx.DiGraph):
     """Draw a Directed Acyclic Graph (DAG).
 
     Args:
-        G (nx.Graph): networkx graph object.
+        G (nx.Graph | nx.DiGraph): networkx graph object.
     """
     pio.templates.default = 'plotly'
     
-    pos = nx.spring_layout(G)
+    pos = nx.kamada_kawai_layout(G)
+    # pos = nx.nx_agraph.graphviz_layout(G, prog='dot')
 
     node_x = []
     node_y = []
@@ -311,13 +313,26 @@ def draw_DAG(G: nx.Graph):
             #'Greys' | 'YlGnBu' | 'Greens' | 'YlOrRd' | 'Bluered' | 'RdBu' |
             #'Reds' | 'Blues' | 'Picnic' | 'Rainbow' | 'Portland' | 'Jet' |
             #'Hot' | 'Blackbody' | 'Earth' | 'Electric' | 'Viridis' |
-            colorscale='YlGnBu',
+            # colorscale='YlGnBu',
+            colorscale='Tealgrn',
             reversescale=True,
             color=[],
-            size=10,
+            size=40,
             colorbar=dict(
                 thickness=15,
-                title='Dependencies',
+                title=dict(
+                    text="Number of Dependencies",
+                    font=dict(
+                        size=20,
+                        # family="Arial",
+                        # color="darkblue"
+                    )
+                ),
+                tickfont=dict(
+                    size=15,
+                    # family="Arial", 
+                    # color="darkred"
+                ),
                 xanchor='left',
                 titleside='right'),
             line_width=2))
@@ -326,33 +341,63 @@ def draw_DAG(G: nx.Graph):
         x=edge_x, y=edge_y,
         line=dict(width=0.5, color='#888'),
         hoverinfo='none',
-        mode='lines')
+        mode='lines'
+    )
     
-    node_adjacencies = []
     node_text = []
-    for node, adjacencies in enumerate(G.adjacency()):
+    node_adjacencies = []
+    for node, adjacencies in enumerate(sorted(G.adjacency())):
         node_adjacencies.append(len(adjacencies[1]))
-        node_text.append('# of dependencies: ' + str(len(adjacencies[1] - 1)))
-
+        # node_text[node] = 'Connectivity: ' + str(len(adjacencies[1]))
+        node_text.append(adjacencies[0] + '<br>')
+        node_text[node] += 'Dependencies: ' + str(len(adjacencies[1]))
     node_trace.marker.color = node_adjacencies
     node_trace.text = node_text
 
-    fig = go.Figure(
-        data=[edge_trace, node_trace],
-        layout=go.Layout(
-        title=dict(font=dict(size=16)),
-        showlegend=False,
-        hovermode='closest',
-        margin=dict(b=20,l=5,r=5,t=40),
-        annotations=[ dict(
-            text="DAG",
-            showarrow=False,
-            xref="paper", yref="paper",
-            x=0.005, y=-0.002 ) ],
-        xaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
-        yaxis=dict(showgrid=False, zeroline=False, showticklabels=False))
+    node_labels = go.Scatter(
+        x=node_x, y=node_y,
+        text=[node for node in G.nodes],
+        mode='text',
+        hoverinfo='text',
+        marker=dict(color='#5D69B1', size=0.01)
     )
-    fig.show()
+
+    fig = go.Figure(
+        data=[edge_trace, node_trace, node_labels],
+        layout=go.Layout(
+            title=dict(font=dict(size=16)),
+            showlegend=False,
+            hovermode='closest',
+            margin=dict(b=20,l=5,r=5,t=40),
+            annotations=[ dict(
+                text="DAG",
+                showarrow=False,
+                xref="paper", yref="paper",
+                x=0.005, y=-0.002,
+                font=dict(size=25)
+            ) ],
+            xaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
+            yaxis=dict(showgrid=False, zeroline=False, showticklabels=False)
+        )
+    )
+
+    save_properties = {
+        'toImageButtonOptions': {
+            'format': 'png', # one of png, svg, jpeg, webp
+            'filename': 'quantum_circuit',
+            # 'height': 500,
+            # 'width': 1000,
+            'scale': 10 # Multiply title/legend/axis/canvas sizes by this factor
+        }
+    }
+
+    fig.update_layout(
+        autosize=False,
+        width=1250,
+        height=800,
+    )
+
+    fig.show(config=save_properties)
 
 
 def format_qubit_text(qubit: Dict) -> str:
@@ -426,11 +471,25 @@ def draw_qpu(config: Config):
             size=30,
             colorbar=dict(
                 thickness=15,
-                title=dict(text='Qubit Connectivity', side='right'),
-                xanchor='left',
+                title=dict(
+                    text="Qubit Connectivity",
+                    side='right',
+                    font=dict(
+                        size=20,
+                        # family="Arial",
+                        # color="darkblue"
+                    )
                 ),
+                tickfont=dict(
+                    size=15,
+                    # family="Arial", 
+                    # color="darkred"
+                ),
+                xanchor='left',
+            ),
             line_width=2)
     )
+
     node_text = []
     for q in config.qubits:
         node_text.append(
