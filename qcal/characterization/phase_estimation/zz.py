@@ -409,7 +409,7 @@ def JAZZ(
                     )
                     print(
                         f"{qp}: ZZ = {self._char_values[qp]['val'] / kHz:.3f} "
-                        f"({self._char_values[qp]['err'] / kHz:.3f})"
+                        f"({self._char_values[qp]['err'] / kHz:.3f}) kHz"
                     )
 
             if settings.Settings.save_data:
