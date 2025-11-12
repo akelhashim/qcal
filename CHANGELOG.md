@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Added missing dimension for ZZ coupling in JAZZ
 - 'length' -> 'time' in DD XY
+- pygsti transpile bug for parallel gate layer
 ### Security
 
 ## [0.0.2] - 2025-11-05

@@ -119,9 +119,8 @@ def to_qcal(
 
     else:
         for i, layer in enumerate(circuit):
-            
             # Parallel gate layer
-            if isinstance(layer, LabelTupTup):  
+            if isinstance(layer, LabelTupTup): 
                 if len(layer) == 0:  # Idling cycle
                     tcircuit.append(
                         Layer({gate_mapper['Gi'](q) for q in qubits})
@@ -133,11 +132,11 @@ def to_qcal(
                             int(str(q).replace('Q','')) for q in gate.qubits
                         )
                         args = (
-                            (gqubits,) if len(layer.args) == 0 else
-                            (gqubits, float(layer.args[0]))
+                            (gqubits,) if len(gate.args) == 0 else
+                            (gqubits, float(gate.args[0]))
                         )
                         tlayer.append(
-                            gate_mapper.call(layer.name, *args)
+                            gate_mapper.call(gate.name, *args)
                         )
 
                     tcircuit.append(tlayer)
