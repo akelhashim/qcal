@@ -9,6 +9,7 @@ https://trueq.quantumbenchmark.com/guides/error_diagnostics/srb.html
 import qcal.settings as settings
 
 from qcal.analysis.leakage import analyze_leakage
+from qcal.benchmarking.utils import plot_error_rates
 from qcal.config import Config
 from qcal.qpu.qpu import QPU
 from qcal.plotting.utils import calculate_nrows_ncols
@@ -175,6 +176,9 @@ def CRB(qpu:             QPU,
             self._data = None
             self._results = None
 
+            self._error_rates = {}
+            self._uncertainties = {}
+
         @property
         def pspec(self):
             """pyGSTi processor spec."""
@@ -191,6 +195,11 @@ def CRB(qpu:             QPU,
             return self._edesign
         
         @property
+        def error_rates(self):
+            """CRB error rates."""
+            return self._error_rates
+        
+        @property
         def data(self):
             """pyGSTi data object."""
             return self._data
@@ -199,6 +208,11 @@ def CRB(qpu:             QPU,
         def results(self):
             """pyGSTi results object."""
             return self._results
+        
+        @property
+        def uncertainties(self):
+            """CRB uncertainties."""
+            return self._uncertainties
 
         def generate_circuits(self):
             """Generate all pyGSTi clifford RB circuits."""
@@ -279,6 +293,13 @@ def CRB(qpu:             QPU,
                     rstd = self._results.fits['full'].stds['r']
                     rA = self._results.fits['A-fixed'].estimates['r']
                     rAstd = self._results.fits['A-fixed'].stds['r']
+                    if self._randomizeout:
+                        self._error_rates[self._qubit_labels[0]] = rA
+                        self._uncertainties[self._qubit_labels[0]] = rAstd
+                    else:
+                        self._error_rates[self._qubit_labels[0]] = r
+                        self._uncertainties[self._qubit_labels[0]] = rstd
+
                     print(f'\n{self._qubit_labels[0]}:')
                     print(
                         f"Process infidelity: r = {r:1.2e} ({rstd:1.2e}) "
@@ -303,6 +324,13 @@ def CRB(qpu:             QPU,
                         rstd = results.fits['full'].stds['r']
                         rA = results.fits['A-fixed'].estimates['r']
                         rAstd = results.fits['A-fixed'].stds['r']
+                        if self._randomizeout:
+                            self._error_rates[qtup] = rA
+                            self._uncertainties[qtup] = rAstd
+                        else:
+                            self._error_rates[qtup] = r
+                            self._uncertainties[qtup] = rstd
+                    
                         print(f'\n{qtup}:')
                         print(
                             f"Process infidelity: r = {r:1.2e} ({rstd:1.2e}) "
@@ -341,6 +369,13 @@ def CRB(qpu:             QPU,
                             )
                         else:
                             self._results[qtup].for_protocol['RB'].plot()
+
+            plot_error_rates(
+                self._error_rates,
+                self._uncertainties,
+                ylabel='Process Infidelity',
+                save_path=self._data_manager._save_path
+            )
 
             # if any(circ.results.dim == 3 for circ in self._transpiled_circuits):
             #     analyze_leakage(
