@@ -272,7 +272,7 @@ def CRB(qpu:             QPU,
             clear_output(wait=True)
             from qcal.interface.pygsti.datasets import generate_pygsti_dataset
             generate_pygsti_dataset(
-                self._transpiled_circuits,
+                self._circuits,
                 self._data_manager._save_path + 'data/'
             )
             if settings.Settings.save_data:

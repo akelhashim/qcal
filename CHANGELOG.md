@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+
 - Workflow DAG
 - Generic plotter for error rates for randomized benchmarks
 
@@ -18,20 +19,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Removed
 
 ### Fixed
+
 - Added missing dimension for ZZ coupling in JAZZ
 - 'length' -> 'time' in DD XY
 - pygsti transpile bug for parallel gate layer
+- pygsti dataset post-processing issue with transpiled circuits
+
 ### Security
 
 ## [0.0.2] - 2025-11-05
 
 ### Added
+
 - Copyright notice
 - License agreement
 
 ## [0.0.1] - 2025-10-28
 
 ### Added
+
 - Initial release
 - Basic gate calibration framework
 - Single- and two-qubit characterization tools

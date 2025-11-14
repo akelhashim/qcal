@@ -195,7 +195,7 @@ def GST(qpu:            QPU,
             from qcal.interface.pygsti.datasets import generate_pygsti_dataset
             clear_output(wait=True)
             generate_pygsti_dataset(
-                self._transpiled_circuits,
+                self._circuits,
                 self._data_manager._save_path + 'data/'
             )
             if settings.Settings.save_data:
@@ -222,17 +222,6 @@ def GST(qpu:            QPU,
 
         def final(self) -> None:
             """Final method."""
-            # if settings.Settings.save_data:
-            #     self._data_manager.save_to_csv(
-            #         pd.DataFrame([self._angle_estimates]), 'angle_estimates'
-            #     )
-            #     self._data_manager.save_to_csv(
-            #         pd.DataFrame([self._angle_errors]), 'angle_errors'
-            #     )
-            #     self._data_manager.save_to_csv(
-            #         pd.DataFrame([self._last_good_idx]), 'last_good_idx'
-            #     )
-            
             print(f"\nRuntime: {repr(self._runtime)[8:]}\n")
 
         def run(self):
@@ -240,9 +229,7 @@ def GST(qpu:            QPU,
             self.generate_circuits()
             qpu.run(self, self._circuits, save=False)
             self.save()
-            self.generate_pygsti_dataset()
             self.analyze()
-            self.plot()
             self.final()
 
     return GST(
@@ -463,7 +450,7 @@ def TwoQubitGST(
         prep_fiducials: Any | None = None,
         meas_fiducials: Any | None = None,
         germs:          Any | None = None,
-        circuit_depths: List[int] = [1, 2, 4, 8, 16, 32, 64, 128, 256],
+        circuit_depths: List[int] = [1, 2, 4, 8, 16, 32, 64, 128],
         fpr:            bool = False,
         **kwargs
     ) -> Callable:
