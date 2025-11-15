@@ -1,18 +1,18 @@
 """Submodule for plotting networkx style graphs using Plotly.
 """
-from qcal.circuit import Circuit
-from qcal.config import Config
-from qcal.gate.gate import Gate
-
 import logging
+from collections import defaultdict
+from typing import Dict
+
 import networkx as nx
 import numpy as np
 import plotly.graph_objects as go
 import plotly.io as pio
-
-from collections import defaultdict
 from plotly.graph_objs.scatter import Marker
-from typing import Dict
+
+from qcal.circuit import Circuit
+from qcal.config import Config
+from qcal.gate.gate import Gate
 
 logger = logging.getLogger(__name__)
 
@@ -32,8 +32,8 @@ def format_gate_text(gate: Gate):
     text += f'Qubits: {gate.qubits}<br>'
     text += f'Dim: {gate.dim}<br>'
     text += (
-        'Matrix: <br>  ' 
-        + np.array_str(np.around(gate.matrix, 3)).replace("\n ", "<br>" + '   ') 
+        'Matrix: <br>  '
+        + np.array_str(np.around(gate.matrix, 3)).replace("\n ", "<br>" + '   ')
         + '<br>'
     )
     if gate.locally_equivalent is not None:
@@ -44,7 +44,7 @@ def format_gate_text(gate: Gate):
             if isinstance(value, float):
                 if value != 0 and abs(value) < 1e-2:
                     value = '{:.2E}'.format(value)
-                else: 
+                else:
                     value = '{:.2f}'.format(value)
             text += f'{key}: {value}<br>'
 
@@ -124,17 +124,14 @@ def draw_circuit(circuit: Circuit, show: bool = True):
                         [symbol_map[gate.name][0]] * len(gate.qubits)
                     )
                     gate_names.append(
-                        dict(
-                            x=c, 
-                            y=circuit.qubits.index(q), 
-                            text='M' if gate.name in 
-                                ('Meas', 'MCM') else (
-                                    gate.name if len(gate.name) < 3 
-                                    else gate.name[:3]
-                                ),
-                            font=dict(color='black', size=13),
-                            showarrow=False
-                        )
+                        {'x': c,
+                         'y': circuit.qubits.index(q),
+                         'text': 'M' if gate.name in ('Meas', 'MCM') else (
+                             gate.name if len(gate.name) < 3 else gate.name[:3]
+                         ),
+                         'font': {'color': 'black', 'size': 13},
+                         'showarrow': False
+                        }
                     )
                     marker_colors.extend(
                         [color_map[gate.name]] * len(gate.qubits)
@@ -154,13 +151,13 @@ def draw_circuit(circuit: Circuit, show: bool = True):
                     node_text.extend([text] * 2)
                     node_symbols.extend(symbol_map[gate.name])
                     gate_names.append(
-                        dict(
-                            x=c, 
-                            y=circuit.qubits.index(q), 
-                            text='',
-                            font=dict(color='black', size=13),
-                            showarrow=False
-                        ),
+                        {
+                            'x': c,
+                            'y': circuit.qubits.index(q),
+                            'text': '',
+                            'font': {'color': 'black', 'size': 13},
+                            'showarrow': False
+                        },
                     )
                     marker_colors.extend(['white', 'white'])
 
@@ -171,17 +168,18 @@ def draw_circuit(circuit: Circuit, show: bool = True):
         hoverinfo='text',
         marker_symbol=node_symbols,
         marker_line_color="black",
-        marker=dict(
-            showscale=False,
-            reversescale=False,
-            color=marker_colors,
-            size=30,
-            line_width=2),
-        )
+        marker={
+            'showscale': False,
+            'reversescale': False,
+            'color': marker_colors,
+            'size': 30,
+            'line_width': 2
+        },
+    )
     node_trace.text = node_text
 
     edge_traces = []
-    for i, q in enumerate(circuit.qubits):
+    for i, _ in enumerate(circuit.qubits):
         edge_x = []
         for j in range(1, circuit.circuit_depth):
             edge_x.extend([j-1, j])
@@ -189,11 +187,11 @@ def draw_circuit(circuit: Circuit, show: bool = True):
         edge_traces.append(
             go.Scatter(
                 x=edge_x, y=edge_y,
-                line=dict(width=2, color='#888'),
+                line={'width': 2, 'color': '#888'},
                 hoverinfo='none',
                 mode='lines'
         ))
-    
+
     n_barriers = 0
     for c, cycle in enumerate(circuit.cycles):
         if cycle.is_barrier:
@@ -210,35 +208,37 @@ def draw_circuit(circuit: Circuit, show: bool = True):
                     edge_traces.append(
                         go.Scatter(
                         x=edge_x_mq, y=edge_y_mq,
-                        line=dict(width=2, color='#888'),
+                        line={'width': 2, 'color': '#888'},
                         hoverinfo='none',
                         mode='lines'
                         )
                     )
-    
+
     gate_names.append(
-        dict(
-            text="Quantum Circuit",
-            showarrow=False,
-            xref="paper", yref="paper",
-            x=-0.001, y=1.05
-        )
+        {
+            'text': "Quantum Circuit",
+            'showarrow': False,
+            'xref': "paper",
+            'yref': "paper",
+            'x': -0.001,
+            'y': 1.05
+        }
     )
 
     fig = go.Figure(
         data= edge_traces + [node_trace],
         layout=go.Layout(
-            title=dict(font=dict(size=16)),
+            title={'font': {'size': 16}},
             showlegend=False,
             hovermode='closest',
-            margin=dict(b=20,l=10,r=5,t=50),
+            margin={'b': 20, 'l': 10, 'r': 5, 't': 50},
             annotations=gate_names,
-            xaxis=dict(tick0=0, dtick=1, showgrid=False, zeroline=False, 
-                    showticklabels=True),
-            yaxis=dict(tickmode='array', 
-                    tickvals=[q for q in range(len(circuit.qubits))],
-                    ticktext=circuit.qubits,
-                    showgrid=False, zeroline=False, showticklabels=True)
+            xaxis={'tick0': 0, 'dtick': 1, 'showgrid': False, 'zeroline': False,
+                'showticklabels': True},
+            yaxis={'tickmode': 'array',
+                'tickvals': list(range(len(circuit.qubits))),
+                'ticktext': circuit.qubits,
+                'showgrid': False, 'zeroline': False, 'showticklabels': True}
         )
     )
 
@@ -251,12 +251,12 @@ def draw_circuit(circuit: Circuit, show: bool = True):
     # fig.update_yaxes(range=[-2, circuit.circuit_width + 2])
     fig.update_layout(
         autosize=False,
-        width=75 * (circuit.circuit_depth + 0.5) if circuit.circuit_depth > 1 
+        width=75 * (circuit.circuit_depth + 0.5) if circuit.circuit_depth > 1
               else 150,
-        height=75 * (circuit.circuit_width + 0.5) if circuit.circuit_width > 1 
+        height=75 * (circuit.circuit_width + 0.5) if circuit.circuit_width > 1
                else 150,
     )
-    
+
     save_properties = {
         'toImageButtonOptions': {
             'format': 'png', # one of png, svg, jpeg, webp
@@ -280,7 +280,7 @@ def draw_DAG(G: nx.Graph | nx.DiGraph):
         G (nx.Graph | nx.DiGraph): networkx graph object.
     """
     pio.templates.default = 'plotly'
-    
+
     pos = nx.kamada_kawai_layout(G)
     # pos = nx.nx_agraph.graphviz_layout(G, prog='dot')
 
@@ -307,46 +307,49 @@ def draw_DAG(G: nx.Graph | nx.DiGraph):
         x=node_x, y=node_y,
         mode='markers',
         hoverinfo='text',
-        marker=dict(
-            showscale=True,
+        marker={
+            'showscale': True,
             # colorscale options
             #'Greys' | 'YlGnBu' | 'Greens' | 'YlOrRd' | 'Bluered' | 'RdBu' |
             #'Reds' | 'Blues' | 'Picnic' | 'Rainbow' | 'Portland' | 'Jet' |
             #'Hot' | 'Blackbody' | 'Earth' | 'Electric' | 'Viridis' |
             # colorscale='YlGnBu',
-            colorscale='Tealgrn',
-            reversescale=True,
-            color=[],
-            size=40,
-            colorbar=dict(
-                thickness=15,
-                title=dict(
-                    text="Number of Dependencies",
-                    font=dict(
-                        size=20,
+            'colorscale': 'Tealgrn',
+            'reversescale': True,
+            'color': [],
+            'size': 40,
+            'colorbar': {
+                'thickness': 15,
+                'title': {
+                    'text': "Number of Dependencies",
+                    'font': {
+                        'size': 20,
                         # family="Arial",
                         # color="darkblue"
-                    )
-                ),
-                tickfont=dict(
-                    size=15,
-                    # family="Arial", 
+                    }
+                },
+                'tickfont': {
+                    'size': 15,
+                    # family="Arial",
                     # color="darkred"
-                ),
-                xanchor='left',
-                titleside='right'),
-            line_width=2))
+                },
+                'xanchor': 'left',
+                'titleside': 'right'
+            },
+            'line_width': 2
+        }
+    )
 
     edge_trace = go.Scatter(
         x=edge_x, y=edge_y,
-        line=dict(width=0.5, color='#888'),
+        line={'width': 0.5, 'color': '#888'},
         hoverinfo='none',
         mode='lines'
     )
-    
+
     node_text = []
     node_adjacencies = []
-    for node, adjacencies in enumerate(sorted(G.adjacency())):
+    for node, adjacencies in enumerate(G.adjacency()):
         node_adjacencies.append(len(adjacencies[1]))
         # node_text[node] = 'Connectivity: ' + str(len(adjacencies[1]))
         node_text.append(adjacencies[0] + '<br>')
@@ -356,28 +359,32 @@ def draw_DAG(G: nx.Graph | nx.DiGraph):
 
     node_labels = go.Scatter(
         x=node_x, y=node_y,
-        text=[node for node in G.nodes],
+        text=list(G.nodes),
         mode='text',
         hoverinfo='text',
-        marker=dict(color='#5D69B1', size=0.01)
+        marker={'color': '#5D69B1', 'size': 0.01}
     )
 
     fig = go.Figure(
         data=[edge_trace, node_trace, node_labels],
         layout=go.Layout(
-            title=dict(font=dict(size=16)),
+            title={'font': {'size': 16}},
             showlegend=False,
             hovermode='closest',
-            margin=dict(b=20,l=5,r=5,t=40),
-            annotations=[ dict(
-                text="DAG",
-                showarrow=False,
-                xref="paper", yref="paper",
-                x=0.005, y=-0.002,
-                font=dict(size=25)
-            ) ],
-            xaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
-            yaxis=dict(showgrid=False, zeroline=False, showticklabels=False)
+            margin={'b': 20,'l': 5,'r': 5,'t': 40},
+            annotations=[ {
+                'text': "DAG",
+                'showarrow': False,
+                'xref': "paper", 'yref': "paper",
+                'x': 0.005, 'y': -0.002,
+                'font': {'size': 25}
+            } ],
+            xaxis={
+                'showgrid': False, 'zeroline': False, 'showticklabels': False
+            },
+            yaxis={
+                'showgrid': False, 'zeroline': False, 'showticklabels': False
+            }
         )
     )
 
@@ -458,36 +465,37 @@ def draw_qpu(config: Config):
         x=node_x, y=node_y,
         mode='markers',
         hoverinfo='text',
-        marker=dict(
-            showscale=True,
+        marker={
+            'showscale': True,
             # colorscale options
             #'Greys' | 'YlGnBu' | 'Greens' | 'YlOrRd' | 'Bluered' | 'RdBu' |
             #'Reds' | 'Blues' | 'Picnic' | 'Rainbow' | 'Portland' | 'Jet' |
             #'Hot' | 'Blackbody' | 'Earth' | 'Electric' | 'Viridis' |
-            colorscale='Tealgrn',
-            reversescale=False,
-            opacity=0.65,
-            color=[],
-            size=30,
-            colorbar=dict(
-                thickness=15,
-                title=dict(
-                    text="Qubit Connectivity",
-                    side='right',
-                    font=dict(
-                        size=20,
+            'colorscale': 'Tealgrn',
+            'reversescale': False,
+            'opacity': 0.65,
+            'color': [],
+            'size': 30,
+            'colorbar': {
+                'thickness': 15,
+                'title': {
+                    'text': "Qubit Connectivity",
+                    'side': 'right',
+                    'font': {
+                        'size': 20,
                         # family="Arial",
                         # color="darkblue"
-                    )
-                ),
-                tickfont=dict(
-                    size=15,
-                    # family="Arial", 
+                    }
+                },
+                'tickfont': {
+                    'size': 15,
+                    # family="Arial",
                     # color="darkred"
-                ),
-                xanchor='left',
-            ),
-            line_width=2)
+                },
+                'xanchor': 'left',
+            },
+            'line_width': 2
+        }
     )
 
     node_text = []
@@ -503,18 +511,18 @@ def draw_qpu(config: Config):
         node_text[node] += 'Connectivity: '+str(len(adjacencies[1]))
     node_trace.marker.color = node_adjacencies
     node_trace.text = node_text
-    
+
     qubit_labels = go.Scatter(
         x=node_x, y=node_y,
         text=[f'Q{q}' for q in config.qubits],
         mode='text',
         hoverinfo='text',
-        marker=dict(color='#5D69B1', size=0.01)
+        marker={'color': '#5D69B1', 'size': 0.01}
     )
 
     edge_trace = go.Scatter(
         x=edge_x, y=edge_y,
-        line=dict(width=0.5, color='#888'),
+        line={'width': 0.5, 'color': '#888'},
         hoverinfo='none',
         mode='lines')
 
@@ -539,18 +547,23 @@ def draw_qpu(config: Config):
     fig = go.Figure(
         data=[edge_trace, node_trace, qubit_labels, middle_node_trace],
         layout=go.Layout(
-            title=dict(font=dict(size=16)),
+            title={'font': {'size': 16}},
             showlegend=False,
             hovermode='closest',
-            margin=dict(b=20,l=5,r=5,t=40),
-            annotations=[ dict(
-                text="QPU",
-                showarrow=False,
-                xref="paper", yref="paper",
-                x=0.005, y=-0.002,
-                font=dict(size=25) ) ],
-            xaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
-            yaxis=dict(showgrid=False, zeroline=False, showticklabels=False)
+            margin={'b': 20,'l': 5,'r': 5,'t': 40},
+            annotations=[ {
+                'text': "QPU",
+                'showarrow': False,
+                'xref': "paper", 'yref': "paper",
+                'x': 0.005, 'y': -0.002,
+                'font': {'size': 25}
+            } ],
+            xaxis={
+                'showgrid': False, 'zeroline': False, 'showticklabels': False
+            },
+            yaxis={
+                'showgrid': False, 'zeroline': False, 'showticklabels': False
+            }
         )
     )
 

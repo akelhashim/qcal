@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Workflow DAG
 - Generic plotter for error rates for randomized benchmarks
+- Super Guassian pulse envelope
 
 ### Changed
 
@@ -24,6 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 'length' -> 'time' in DD XY
 - pygsti transpile bug for parallel gate layer
 - pygsti dataset post-processing issue with transpiled circuits
+- Node adjacency bug in DAG plotting
 
 ### Security
 
