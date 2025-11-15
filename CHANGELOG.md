@@ -15,6 +15,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Flexible number of params for CZ gate amplitude calibration
+
 ### Deprecated
 
 ### Removed
