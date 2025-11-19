@@ -1,18 +1,17 @@
 """Submodule for handling transpilation from pyGSTi to qcal circuits.
 
 """
-from qcal.circuit import Layer, Circuit, CircuitSet
-from qcal.gate.single_qubit import single_qubit_gates, Idle, X90, Y90
+import logging
+from collections import defaultdict
+from collections.abc import Iterator
+from typing import Dict, List, Tuple
+
+from qcal.circuit import Circuit, CircuitSet, Layer
+from qcal.gate.single_qubit import X90, Y90, Idle, single_qubit_gates
 from qcal.gate.two_qubit import two_qubit_gates
 from qcal.transpilation.transpiler import Transpiler
 from qcal.transpilation.utils import GateMapper
 from qcal.units import ns
-
-import logging
-
-from collections import defaultdict
-from collections.abc import Iterator
-from typing import Dict, List, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -97,7 +96,7 @@ def add_parallel_Y90_X90(qubits: Tuple[int]) -> Iterator[Y90 | X90]:
 
 
 def to_qcal(
-        circuit, 
+        circuit,
         gate_mapper: Dict | defaultdict,
     ) -> Circuit:
     """Transpile a pyGSTi circuit to a qcal circuit.
@@ -111,16 +110,16 @@ def to_qcal(
     """
     from pygsti.baseobjs.label import LabelTupTup
     qubits = [int(str(q).replace('Q','')) for q in circuit.line_labels]
-    
+
     tcircuit = Circuit()
 
     if len(circuit) == 0:
        tcircuit.measure(qubits)
 
     else:
-        for i, layer in enumerate(circuit):
+        for _, layer in enumerate(circuit):
             # Parallel gate layer
-            if isinstance(layer, LabelTupTup): 
+            if isinstance(layer, LabelTupTup):
                 if len(layer) == 0:  # Idling cycle
                     tcircuit.append(
                         Layer({gate_mapper['Gi'](q) for q in qubits})
@@ -140,7 +139,7 @@ def to_qcal(
                         )
 
                     tcircuit.append(tlayer)
-            
+
             # Isolated gate layer
             else:
                 gqubits = tuple(
@@ -155,7 +154,7 @@ def to_qcal(
                 )
 
         tcircuit.measure(qubits=qubits)
-    
+
     return tcircuit
 
 
@@ -165,24 +164,24 @@ class PyGSTiTranspiler(Transpiler):
     # __slots__ = ('_gate_mapper',)
 
     def __init__(
-            self, 
+            self,
             gate_mapper: Dict | GateMapper | None = None,
         ) -> None:
         """Initialize with a GateMapper.
 
         Args:
-            gate_mapper (Dict | GateMapper | None, optional): dictionary which 
+            gate_mapper (Dict | GateMapper | None, optional): dictionary which
                 maps pyGSTi gates to qcal gates. Defaults to None.
         """
         if gate_mapper is None:
             gate_mapper = GateMapper(
                 {
-                    'Gcnot':   two_qubit_gates['CX'], 
+                    'Gcnot':   two_qubit_gates['CX'],
                     'Gcphase': two_qubit_gates['CZ'],
                     'Gi':      single_qubit_gates['Id'],
                     'Gii':     add_global_identity,
                     'Gidle':   add_idle,
-                    'Gxpi2':   single_qubit_gates['X90'], 
+                    'Gxpi2':   single_qubit_gates['X90'],
                     'Gypi2':   single_qubit_gates['Y90'],
                     'Gzpi2':   single_qubit_gates['Z90'],
                     'Gzr':     single_qubit_gates['Rz'],
@@ -192,10 +191,10 @@ class PyGSTiTranspiler(Transpiler):
                     'Gyy':     add_parallel_Y90s
                 }
             )
-        
+
         elif isinstance(gate_mapper, dict):
             gate_mapper = GateMapper(gate_mapper)
-        
+
         super().__init__(gate_mapper=gate_mapper)
 
     def transpile(self, circuits: List | str | CircuitSet) -> CircuitSet:
@@ -217,11 +216,11 @@ class PyGSTiTranspiler(Transpiler):
             circuit_list = circuits['pygsti_circuit']
 
         tcircuits = []
-        for i, circuit in enumerate(circuits):
+        for _, circuit in enumerate(circuits):
             tcircuits.append(
                 to_qcal(circuit, self._gate_mapper)
             )
-        
+
         tcircuits = CircuitSet(circuits=tcircuits)
         tcircuits['pygsti_circuit'] = circuit_list
         return tcircuits

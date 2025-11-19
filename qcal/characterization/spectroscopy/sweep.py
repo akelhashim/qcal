@@ -1,34 +1,29 @@
 """Submodule for qubit spectroscopy.
 
 """
-import qcal.settings as settings
+import logging
+from collections.abc import Iterable
+from typing import Callable, Dict
 
+import matplotlib.pyplot as plt
+import numpy as np
+import seaborn as sns
+from IPython.display import clear_output
+from numpy.typing import NDArray
+
+import qcal.settings as settings
 from qcal.characterization.characterize import Characterize
-from qcal.circuit import Cycle, Circuit, CircuitSet
+from qcal.circuit import Circuit, CircuitSet, Cycle
 from qcal.config import Config
 from qcal.fitting.fit import FitLinear
 from qcal.gate.single_qubit import Meas
 from qcal.qpu.qpu import QPU
 from qcal.units import GHz
 
-import logging
-import matplotlib.pyplot as plt
-import numpy as np
-import pandas as pd
-import plotly.express as px
-import plotly.graph_objects as go
-import seaborn as sns
-
-from collections.abc import Iterable
-from IPython.display import clear_output
-from matplotlib.ticker import ScalarFormatter
-from numpy.typing import NDArray
-from typing import Callable, Dict
-
 logger = logging.getLogger(__name__)
 
 
-def Sweep2D(             
+def Sweep2D(
         qpu:      QPU,
         config:   Config,
         qubits:   Iterable[int],
@@ -46,11 +41,11 @@ def Sweep2D(
         qpu (QPU): custom QPU object.
         config (Config): qcal Config object.
         qubits (List[int] | Tuple[int]): qubits to measure.
-        sweep1 (NDArray | Dict[int, NDArray]): first value to sweep over for 
+        sweep1 (NDArray | Dict[int, NDArray]): first value to sweep over for
             each qubit.
-        sweep2 (NDArray | Dict[int, NDArray]): second value to sweep over for 
+        sweep2 (NDArray | Dict[int, NDArray]): second value to sweep over for
             each qubit.
-        params (Dict[int, Iterable[str]]): dictionary mapping qubit label to 
+        params (Dict[int, Iterable[str]]): dictionary mapping qubit label to
             sweep parameters in the config. Defaults to None.
         prepulse (Cycle | Circuit, optional): optional pre-pulse to add before
             the normal spectroscopy circuit. Defaults to None.
@@ -58,10 +53,10 @@ def Sweep2D(
     Returns:
         Callable: Sweep2D
     """
-    
+
     class Sweep2D(qpu, Characterize):
 
-        def __init__(self, 
+        def __init__(self,
                 config:   Config,
                 qubits:   Iterable[int],
                 sweep1:   NDArray | Dict[int, NDArray],
@@ -81,12 +76,12 @@ def Sweep2D(
             self._qubits = qubits
 
             if not isinstance(sweep1, dict):
-                self._sweep1 = {q: sweep1 for q in qubits}
+                self._sweep1 = dict.fromkeys(qubits, sweep1)
             else:
                 self._sweep1 = sweep1
 
             if not isinstance(sweep2, dict):
-                self._sweep2 = {q: sweep2 for q in qubits}
+                self._sweep2 = dict.fromkeys(qubits, sweep2)
             else:
                 self._sweep2 = sweep2
 
@@ -111,7 +106,7 @@ def Sweep2D(
                 Dict: first sweep for each qubit.
             """
             return self._sweep1
-        
+
         @property
         def sweep2(self) -> Dict:
             """Sweep 2.
@@ -120,7 +115,7 @@ def Sweep2D(
                 Dict: second sweep for each qubit.
             """
             return self._sweep2
-        
+
         @property
         def iq(self) -> Dict:
             """IQ data.
@@ -129,7 +124,7 @@ def Sweep2D(
                 Dict: IQ data for each qubit.
             """
             return self._iq
-        
+
         @property
         def mag(self) -> Dict:
             """Magnitude data.
@@ -138,7 +133,7 @@ def Sweep2D(
                 Dict: magnitude data for each qubit.
             """
             return self._mag
-        
+
         @property
         def phase(self) -> Dict:
             """Phase data.
@@ -170,7 +165,7 @@ def Sweep2D(
                 sweep1 = []
                 for s in self._sweep1[q]:
                     sweep1.extend([s] * self._sweep2[q].size)
-                
+
                 self._circuits[f'param: {self._params[q][0]}'] = (
                     sweep1
                 )
@@ -197,7 +192,7 @@ def Sweep2D(
                     self._iq[q].append(iq)
                     self._mag[q].append(np.abs(iq))
                     self._phase[q].append(np.unwrap(np.angle(iq)))
-                
+
                 self._iq[q] = np.array(self._iq[q])
                 self._mag[q] = np.array(self._mag[q])
                 self._phase[q] = np.array(self._phase[q])
@@ -214,7 +209,7 @@ def Sweep2D(
         def plot(self) -> None:
             """Plot the sweep results."""
             nrows, ncols = len(self._qubits), 2
-            
+
             figsize = (5 * ncols, 4 * nrows)
             fig, axes = plt.subplots(
                 nrows, ncols, figsize=figsize, layout='constrained'
@@ -230,10 +225,10 @@ def Sweep2D(
                     if 'freq' in param:
                         idx = j
                         break
-            
+
                 p = sns.heatmap(
-                    20 * np.log10(self._mag[q]), 
-                    cmap='viridis', 
+                    20 * np.log10(self._mag[q]),
+                    cmap='viridis',
                     cbar=True,
                     ax=ax[0],
                 )
@@ -248,7 +243,7 @@ def Sweep2D(
                 cbar.ax.tick_params(labelsize=10)
                 # ax[0].set_title(f'R{q}', fontsize=12)
                 ax[0].text(
-                        0.05, 0.9, f'Q{q}', size=12, 
+                        0.05, 0.9, f'Q{q}', size=12,
                         transform=ax[0].transAxes
                     )
                 ax[0].set_xlabel(f'{self._xlabel}', fontsize=12)
@@ -270,8 +265,8 @@ def Sweep2D(
                 ax[0].invert_yaxis()
 
                 p = sns.heatmap(
-                    self._phase[q], 
-                    cmap='viridis', 
+                    self._phase[q],
+                    cmap='viridis',
                     cbar=True,
                     ax=ax[1],
                 )
@@ -286,7 +281,7 @@ def Sweep2D(
                 cbar.ax.tick_params(labelsize=10)
                 # ax[1].set_title(f'R{q}', fontsize=12)
                 ax[1].text(
-                        0.05, 0.9, f'Q{q}', size=12, 
+                        0.05, 0.9, f'Q{q}', size=12,
                         transform=ax[1].transAxes
                     )
                 ax[1].set_xlabel(f'{self._xlabel}', fontsize=12)
@@ -309,7 +304,7 @@ def Sweep2D(
 
             if settings.Settings.save_data:
                 fig.savefig(
-                    self._data_manager._save_path + '2D_sweep.png', 
+                    self._data_manager._save_path + '2D_sweep.png',
                     dpi=600
                 )
                 fig.savefig(
@@ -319,7 +314,7 @@ def Sweep2D(
                     self._data_manager._save_path + '2D_sweep.svg'
                 )
             plt.show()
-            
+
         def final(self) -> None:
             """Final calibration method."""
             # Characterize.final(self)

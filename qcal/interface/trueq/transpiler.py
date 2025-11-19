@@ -1,16 +1,17 @@
 """Submodule for handling transpilation from True-Q to qcal circuits.
 
 """
-from qcal.circuit import Barrier, Cycle, Circuit, CircuitSet
+import logging
+from collections import defaultdict, deque
+from typing import Dict
+
+import numpy as np
+
+from qcal.circuit import Barrier, Circuit, CircuitSet, Cycle
 from qcal.gate.single_qubit import single_qubit_gates
 from qcal.gate.two_qubit import two_qubit_gates
 from qcal.transpilation.transpiler import Transpiler
-
-import logging
-import numpy as np
-
-from collections import defaultdict, deque
-from typing import Dict
+from qcal.transpilation.utils import GateMapper
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +31,7 @@ def transpile_cycle(cycle, gate_mapper: defaultdict) -> deque:
     except ImportError:
         logger.warning(' Unable to import trueq!')
 
-    tcycle = deque()
+    tcycle = Cycle()
     for q, gate in cycle:
 
         if isinstance(gate, tq.Meas):
@@ -44,15 +45,15 @@ def transpile_cycle(cycle, gate_mapper: defaultdict) -> deque:
                 subspace = 'EF'
                 gate_name = gate.name.replace('EF', '')
             else:
-                subspace = None
+                subspace = 'GE'
                 gate_name = gate.name
-        
+
             if 'Rz' in gate.name:
                 if subspace is not None:
                     tcycle.append(
                         gate_mapper[gate_name](
-                            q, 
-                            np.deg2rad(gate.parameters['phi']), 
+                            q,
+                            np.deg2rad(gate.parameters['phi']),
                             subspace=subspace
                         )
                     )
@@ -62,20 +63,17 @@ def transpile_cycle(cycle, gate_mapper: defaultdict) -> deque:
                             q, np.deg2rad(gate.parameters['phi'])
                         )
                     )
-            
+
             else:
-                if subspace is not None:
-                    tcycle.append(gate_mapper[gate_name](q, subspace=subspace))
-                else: 
-                    tcycle.append(gate_mapper[gate_name](q))
-            
+                tcycle.append(gate_mapper[gate_name](q, subspace=subspace))
+
     return tcycle
 
 
 def to_qcal(
-        circuit, 
+        circuit,
         gate_mapper:         defaultdict,
-        cycle_replacement:   Cycle | Circuit | Dict | None = None, 
+        cycle_replacement:   Cycle | Circuit | Dict | None = None,
         barrier_between_all: bool = False
     ) -> Circuit:
     """Transpile a True-Q circuit to a qcal circuit.
@@ -84,8 +82,8 @@ def to_qcal(
         circuit (trueq.Circuit): True-Q circuit.
         gate_mapper (defaultdict): map between True-Q to qcal gates.
         cycle_replacement (Cycle | Circuit | Dict | None, optional): dictionary
-            which specifies how a marked cycle should be transpiled. 
-            Defaults to None. For example, ```cycle_replacement = {'marker': 
+            which specifies how a marked cycle should be transpiled.
+            Defaults to None. For example, ```cycle_replacement = {'marker':
             1, 'cycle': qc.Cycle({qc.MCM(0)})}```.
         barrier_between_all (bool, optional): whether to place a barrier
             between all cycles. Defaults to False. This is useful for
@@ -101,7 +99,7 @@ def to_qcal(
         if cycle.marker > 0 and not barrier_between_all:
             tcircuit.append(Barrier(cycle.labels))
 
-        if (cycle.marker > 0 and 
+        if (cycle.marker > 0 and
             cycle_replacement is not None and
             i < len(circuit) -1):
             # If a marker is specified, only replace the specified cycle
@@ -135,7 +133,7 @@ def to_qcal(
             tcircuit.append(Barrier(circuit.labels))
         elif barrier_between_all and i < (len(circuit) - 1):
             tcircuit.append(Barrier(circuit.labels))
-    
+
     tcircuit = Circuit(tcircuit)
     return tcircuit
 
@@ -147,22 +145,22 @@ class TrueqTranspiler(Transpiler):
     except ImportError:
         logger.warning(' Unable to import trueq!')
 
-    __slots__ = ('_gate_mapper', '_barrier_between_all', '_cycle_replacement')
+    # __slots__ = ('_gate_mapper', '_barrier_between_all', '_cycle_replacement')
 
     def __init__(
-            self, 
-            gate_mapper:         Dict | None = None,
-            cycle_replacement:   Cycle | Circuit | Dict | None = None, 
+            self,
+            gate_mapper:         Dict | GateMapper | None = None,
+            cycle_replacement:   Cycle | Circuit | Dict | None = None,
             barrier_between_all: bool = False
         ) -> None:
         """Initialize with a gate_mapper.
 
         Args:
-            gate_mapper (Dict | None, optional): dictionary which maps
-                TrueQ gates to Qubic gates. Defaults to None.
-            cycle_replacement (Cycle | Circuit | Dict | None, optional): 
-                dictionary which specifies how a marked cycle should be 
-                transpiled. Defaults to None. For example, ```cycle_replacement 
+            gate_mapper (Dict | GateMapper | None, optional): dictionary which
+                maps TrueQ gates to Qubic gates. Defaults to None.
+            cycle_replacement (Cycle | Circuit | Dict | None, optional):
+                dictionary which specifies how a marked cycle should be
+                transpiled. Defaults to None. For example, ```cycle_replacement
                 = {1: qc.Cycle({qc.MCM(0)})}```.
             barrier_between_all (bool, optional): whether to place a barrier
                 between all cycles. Defaults to False. This is useful for
@@ -170,7 +168,9 @@ class TrueqTranspiler(Transpiler):
                 preserved.
         """
         if gate_mapper is None:
-            gate_mapper = {**single_qubit_gates, **two_qubit_gates}
+            gate_mapper = GateMapper(
+                {**single_qubit_gates, **two_qubit_gates}
+            )
         super().__init__(gate_mapper=gate_mapper)
         self._cycle_replacement = cycle_replacement
         self._barrier_between_all = barrier_between_all
@@ -181,7 +181,7 @@ class TrueqTranspiler(Transpiler):
         """Transpile all circuits.
 
         Args:
-            circuits (tq.Circuit | tq.CircuitCollection): circuits to 
+            circuits (tq.Circuit | tq.CircuitCollection): circuits to
                 transpile.
 
         Returns:
@@ -196,13 +196,13 @@ class TrueqTranspiler(Transpiler):
         for circuit in circuits:
             tcircuits.append(
                 to_qcal(
-                    circuit, 
+                    circuit,
                     self._gate_mapper,
                     self._cycle_replacement,
                     self._barrier_between_all
                 )
             )
-        
+
         tcircuits = CircuitSet(circuits=tcircuits)
         tcircuits['key'] = [str(circ.key) for circ in circuits]
         return tcircuits

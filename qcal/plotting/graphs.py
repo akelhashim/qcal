@@ -436,7 +436,7 @@ def draw_qpu(config: Config):
     """
     G = nx.Graph()
     G.add_edges_from(config.qubit_pairs)
-    pos = nx.spring_layout(G)
+    pos = nx.kamada_kawai_layout(G)
 
     node_x = []
     node_y = []

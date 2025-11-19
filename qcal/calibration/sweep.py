@@ -1,21 +1,20 @@
 """Submodule for performing generic parameter sweeps for calibration.
 
 """
-import qcal.settings as settings
-
-from .calibration import Calibration
-from qcal.circuit import Circuit, CircuitSet
-from qcal.config import Config
-from qcal.utils import flatten
-from qcal.qpu.qpu import QPU
-
 import logging
+from typing import Callable, Dict, List
+
 import numpy as np
 import pandas as pd
-
-from collections.abc import Iterable
 from IPython.display import clear_output
-from typing import Callable, Dict, List
+
+import qcal.settings as settings
+from qcal.circuit import Circuit, CircuitSet
+from qcal.config import Config
+from qcal.qpu.qpu import QPU
+from qcal.utils import flatten
+
+from .calibration import Calibration
 
 logger = logging.getLogger(__name__)
 
@@ -48,10 +47,10 @@ def ParamSweep(
 
     # Sweep +/- 10 MHz around the expected 11 <-> 02 transition frequency
     freqs = np.linspace(-10, 10, 31) * MHz + config['two_qubit/(0, 1)/CZ/freq']
-    
+
     cal = ParamSweep(
-        CustomQPU, 
-        config, 
+        CustomQPU,
+        config,
         circuit=circuit,
         params={(0, 1): 'two_qubit/(0, 1)/CZ/freq'},
         param_sweep={(0, 1): freqs},
@@ -68,7 +67,7 @@ def ParamSweep(
         leakage_qubit (int): qubit on which leakage should be minimized.
         params (Dict): dictionary mapping the qubits on which leakage occurs to
             the config parameter which is causing the leakage.
-        param_sweep (Dict): dictionary mapping the qubits on which leakage 
+        param_sweep (Dict): dictionary mapping the qubits on which leakage
             occurs to sweep values for the parameter to be optimized.
         maximize (List[str], optional): list of dit strings specifying on which
             state(s) to maximize the population. Defaults to None.
@@ -82,12 +81,12 @@ def ParamSweep(
 
     class ParamSweep(qpu, Calibration):
         """Parameter sweep calibration class.
-        
+
         This class inherits a custom QPU from the ParamSweep calibration
         function.
         """
 
-        def __init__(self, 
+        def __init__(self,
                 config:      Config,
                 circuit:     Circuit,
                 params:      Dict,
@@ -125,7 +124,7 @@ def ParamSweep(
                 Circuit: circuit.
             """
             return self._circuit
-        
+
         @property
         def params(self) -> Dict:
             """Parameters which are optimized.
@@ -134,7 +133,7 @@ def ParamSweep(
                 Dict: dictionary mapping qubit labels to parameters.
             """
             return self._params
-        
+
         @property
         def param_sweep(self) -> Dict:
             """Value sweeps for the parameters to be optimized.
@@ -143,7 +142,7 @@ def ParamSweep(
                 Dict: dictionary mapping qubit labels to parameter sweeps.
             """
             return self._param_sweep
-        
+
         @property
         def populations(self) -> Dict:
             """Populations (i.e., probabilities) across the param sweep.
@@ -152,14 +151,14 @@ def ParamSweep(
                 Dict: dictionary mapping qubit labels to populations.
             """
             return self._populations
-        
+
         def generate_circuits(self):
             """Generate a CircuitSet that sweeps over all param values."""
             logger.info(' Generating circuits...')
 
             self._circuits = CircuitSet(
                 circuits=[
-                    self._circuit.copy() for _ in 
+                    self._circuit.copy() for _ in
                     range(len(list(self._param_sweep.values())[0]))
                 ]
             )
@@ -174,7 +173,7 @@ def ParamSweep(
                     self._circuits[
                             f'param: {param}'
                         ] = self._param_sweep[q]
-            
+
         def analyze(self) -> None:
             """Analyze the data."""
             logger.info(' Analyzing the data...')
@@ -184,7 +183,7 @@ def ParamSweep(
                 qindx = qubits.index(ql) if isinstance(ql, int) else (
                     tuple([qubits.index(q) for q in ql])
                 )
-                
+
                 # Use middle circuit to find states
                 states = set(self._circuits[
                         int(self._circuits.n_circuits / 2)
@@ -204,7 +203,7 @@ def ParamSweep(
                         self._populations[ql][state].append(
                             results.populations[state]
                         )
-                
+
                 cal_values = []
                 if self._maximize:
                     for state in self._maximize:
