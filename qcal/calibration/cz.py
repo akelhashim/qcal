@@ -1142,7 +1142,7 @@ def Frequency(
                     if k < len(self._qubits):
                         q = self._qubits[k]
 
-                        ax.set_xlabel('Frequency (GHz)', fontsize=15)
+                        ax.set_xlabel('Frequency (Hz)', fontsize=15)
                         ax.set_ylabel('Conditionality', fontsize=15)
                         ax.tick_params(
                             axis='both', which='major', labelsize=12

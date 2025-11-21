@@ -38,34 +38,23 @@ def transpile_cycle(cycle, gate_mapper: defaultdict) -> deque:
             tcycle.append(gate_mapper['Meas'](q))
 
         else:
+            args = (q,)
+            kwargs = {}
+            if 'Rz' in gate.name:
+                kwargs['theta'] = np.deg2rad(gate.parameters['phi'])
+
             if 'GE' in gate.name:
-                subspace = 'GE'
+                kwargs['subspace'] = 'GE'
                 gate_name = gate.name.replace('GE', '')
             elif 'EF' in gate.name:
-                subspace = 'EF'
+                kwargs['subspace'] = 'EF'
                 gate_name = gate.name.replace('EF', '')
             else:
-                subspace = 'GE'
                 gate_name = gate.name
 
-            if 'Rz' in gate.name:
-                if subspace is not None:
-                    tcycle.append(
-                        gate_mapper[gate_name](
-                            q,
-                            np.deg2rad(gate.parameters['phi']),
-                            subspace=subspace
-                        )
-                    )
-                else:
-                    tcycle.append(
-                        gate_mapper[gate_name](
-                            q, np.deg2rad(gate.parameters['phi'])
-                        )
-                    )
-
-            else:
-                tcycle.append(gate_mapper[gate_name](q, subspace=subspace))
+            tcycle.append(
+                gate_mapper.call(gate_name, *args, **kwargs)
+            )
 
     return tcycle
 

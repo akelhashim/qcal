@@ -1,10 +1,10 @@
 """Helper functions for transpilation.
 
 """
-from qcal.gate.gate import Gate
-
 import logging
 from collections.abc import Iterable
+
+from qcal.gate.gate import Gate
 
 logger = logging.getLogger(__name__)
 
@@ -53,7 +53,7 @@ class GateMapper(dict):
         Return a callable that raises transpilation_error with the missing key.
         """
         return lambda *args, **kwargs: transpilation_error(key)
-    
+
     def call(self, key, *args, **kwargs):
         result = self[key](*args, **kwargs)
         if isinstance(result, Gate):
