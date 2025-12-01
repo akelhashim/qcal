@@ -1,21 +1,21 @@
 """Custom QPU submodule for QubiC
 
 """
-import qcal.settings as settings
+import logging
+import os
+from typing import Any, Dict, List
 
-from .post_process import post_process
-from .transpiler import Transpiler
-from .utils import calculate_n_reads
+import pandas as pd
+
+import qcal.settings as settings
 from qcal.circuit import CircuitSet
 from qcal.config import Config
 from qcal.managers.classification_manager import ClassificationManager
 from qcal.qpu.qpu import QPU
 
-import logging
-import os
-import pandas as pd
-
-from typing import Any, Dict, List
+from .post_process import post_process
+from .transpiler import Transpiler
+from .utils import calculate_n_reads
 
 logger = logging.getLogger(__name__)
 
@@ -39,12 +39,12 @@ class QubicQPU(QPU):
                 compiler:            Any | None = None,
                 transpiler:          Any | None = None,
                 classifier:          ClassificationManager = None,
-                n_shots:             int = 1024, 
-                n_batches:           int = 1, 
+                n_shots:             int = 1024,
+                n_batches:           int = 1,
                 n_circs_per_seq:     int = 1,
                 n_levels:            int = 2,
-                outputs:             List[str] = ['s11'],
-                hardware_vz_qubits:  List[str] = [],
+                outputs:             List[str] = ['s11'],  # noqa: B006
+                hardware_vz_qubits:  List[str] = [],  # noqa: B006
                 measure_qubits:      List[str] | None = None,
                 rcorr_cmat:          pd.DataFrame | None = None,
                 circuit_for_loop:    bool = False,
@@ -66,17 +66,17 @@ class QubicQPU(QPU):
             config (Config): qcal config object.
             compiler (Any | Compiler | None, optional): a custom compiler to
                 compile the experimental circuits. Defaults to None.
-            transpiler (Any | None, optional): a custom transpiler to 
+            transpiler (Any | None, optional): a custom transpiler to
                 transpile the experimental circuits. Defaults to None.
-            classifier (ClassificationManager, optional): manager used for 
+            classifier (ClassificationManager, optional): manager used for
                 classifying raw data. Defaults to None.
-            n_shots (int, optional): number of measurements per circuit. 
+            n_shots (int, optional): number of measurements per circuit.
                 Defaults to 1024.
-            n_batches (int, optional): number of batches of measurements. 
+            n_batches (int, optional): number of batches of measurements.
                 Defaults to 1.
             n_circs_per_seq (int, optional): maximum number of circuits that
                 can be measured per sequence. Defaults to 1.
-            n_levels (int, optional): number of energy levels to be measured. 
+            n_levels (int, optional): number of energy levels to be measured.
                 Defaults to 2. If n_levels = 3, this assumes that the
                 measurement supports qutrit classification.
             outputs (List[str]): what output data is desired for each
@@ -88,15 +88,15 @@ class QubicQPU(QPU):
                 specifying for which qubits should the virtualz gates be done
                 on hardware (as opposed to software). Defaults to None. This is
                 necessary if doing conditional phase shifts using mid-
-                circuit measurements. Example: ```measure_qubits = ['Q0', 'Q1', 
+                circuit measurements. Example: ```measure_qubits = ['Q0', 'Q1',
                 'Q3']```.
-            measure_qubits (List[str] | None, optional): list of qubit labels 
+            measure_qubits (List[str] | None, optional): list of qubit labels
                 for post-processing measurements. Defaults to None. This will
                 overwrite the measurement qubits listed in the measurement
                 objects. Example: ```measure_qubits = ['Q0', 'Q1', 'Q3']```.
             rcorr_cmat (pd.DataFrame | None, optional): confusion matrix for
                 readout correction. Defaults to None. If passed, the readout
-                correction will be applied to the raw bit strings in 
+                correction will be applied to the raw bit strings in
                 post-processing.
             circuit_for_loop (bool): loops over circuit partitions for circuits
                 with repeated structures. Defaults to False.
@@ -104,7 +104,7 @@ class QubicQPU(QPU):
                 circuits in a batch during measurement. Defaults to False. By
                 default, all circuits in a batch will be measured n_shots times
                 one by one. If True, all circuits in a batch will be measured
-                back-to-back one shot at a time. This can help average out the 
+                back-to-back one shot at a time. This can help average out the
                 effects of drift on the timescale of a measurement.
             reload_pulse (bool): reloads the stored pulses when compiling each
                 circuit. Defaults to True.
@@ -125,11 +125,11 @@ class QubicQPU(QPU):
             save_raw_data (bool, optional): whether to save raw IQ data for each
                 qubit in the CircuitSet. Defaults to False.
             gmm_manager (GMMManager, optional): QubiC GMMManager object.
-                Defaults to None. If None, this is loaded from a previously 
+                Defaults to None. If None, this is loaded from a previously
                 saved manager object: 'gmm_manager.pkl'.
             sd_param (Dict | None, optional): this kwarg is unused and only
                 included for compatiblity with qcal-pro. Defaults to None.
-            ip_address (str, optional): IP address for RPC server. Defaults to 
+            ip_address (str, optional): IP address for RPC server. Defaults to
                 None.
             port (int, option): port for RPC server. Defaults to None.
         """
@@ -138,7 +138,7 @@ class QubicQPU(QPU):
             compiler=compiler,
             transpiler=transpiler,
             classifier=classifier,
-            n_shots=n_shots, 
+            n_shots=n_shots,
             n_batches=n_batches,
             n_circs_per_seq=n_circs_per_seq,
             n_levels=n_levels,
@@ -147,9 +147,8 @@ class QubicQPU(QPU):
         )
 
         try:
-            from qubic import rpc_client, job_manager
+            from qubic import job_manager, rpc_client
             from qubic.rfsoc.hwconfig import FPGAConfig, load_channel_configs
-            from qubic.state_disc import GMMManager
         except ImportError:
             logger.warning(' Unable to import qubic!')
 
@@ -168,7 +167,7 @@ class QubicQPU(QPU):
         self._save_raw_data = save_raw_data
         self._gmm_manager = gmm_manager
         self._sd_param = sd_param
-        
+
         self._qubic_transpiler = Transpiler(
             config,
             hardware_vz_qubits=hardware_vz_qubits,
@@ -200,19 +199,19 @@ class QubicQPU(QPU):
                 )
             if any(f'Q{q}.' in key for key in self._channel_config.keys()):
                 self._channel_config[f'Q{q}.qdrv'].elem_params['interp_ratio']=(
-                    self._config[f'hardware/interpolation_ratio/qdrv']
+                    self._config['hardware/interpolation_ratio/qdrv']
                 )
                 self._channel_config[f'Q{q}.rdrv'].elem_params['interp_ratio']=(
-                    self._config[f'hardware/interpolation_ratio/rdrv']
+                    self._config['hardware/interpolation_ratio/rdrv']
                 )
                 self._channel_config[f'Q{q}.rdlo'].elem_params['interp_ratio']=(
-                    self._config[f'hardware/interpolation_ratio/rdlo']
+                    self._config['hardware/interpolation_ratio/rdlo']
                 )
-                if self._config[f'hardware/interpolation_ratio/cdrv']:
+                if self._config['hardware/interpolation_ratio/cdrv']:
                     self._channel_config[f'C{q}.cdrv'].elem_params[
                             'interp_ratio'
                         ] = (
-                        self._config[f'hardware/interpolation_ratio/cdrv']
+                        self._config['hardware/interpolation_ratio/cdrv']
                     )
 
         self._jobman = job_manager.JobManager(
@@ -222,13 +221,13 @@ class QubicQPU(QPU):
             self._qchip,
             gmm_manager=self._gmm_manager
         )
-        self._compiled_program = None 
+        self._compiled_program = None
 
     @property
     def fpga_config(self):
         """QubiC FPGA config object."""
         return self._fpga_config
-    
+
     @property
     def channel_config(self):
         """QubiC channel config object."""
@@ -238,22 +237,22 @@ class QubicQPU(QPU):
     def qchip(self):
         """QubiC quantum chip object."""
         return self._qchip
-    
+
     @property
     def runner(self):
         """QubiC runner object."""
         return self._runner
-    
+
     @property
     def jobman(self):
         """QubiC job_manager object."""
         return self._jobman
-    
+
     @property
     def compiled_program(self):
         """QubiC compiled_program object."""
         return self._compiled_program
-        
+
     def generate_sequence(self) -> None:
         """Generate a QubiC sequence.
 
@@ -264,7 +263,7 @@ class QubicQPU(QPU):
             "sequence."
         """
         from distproc.compiler import proc_grouping_from_channelconfig
-        from qubic.toolchain import run_compile_stage, run_assemble_stage
+        from qubic.toolchain import run_assemble_stage, run_compile_stage
 
         self._exp_circuits = self._qubic_transpiler.transpile(
             self._exp_circuits
@@ -277,12 +276,12 @@ class QubicQPU(QPU):
             self._exp_circuits = [rastered_circuit]
 
         self._compiled_program = run_compile_stage(
-            self._exp_circuits, 
-            self._fpga_config, 
+            self._exp_circuits,
+            self._fpga_config,
             self._qchip,
             compiler_flags={
-                'scope_control_flow': True, 
-                'multi_board':        True, 
+                'scope_control_flow': True,
+                'multi_board':        True,
                 'optimize_reg_ops':   True
             },
             suppress_duplicate_warnings=True,
@@ -300,9 +299,9 @@ class QubicQPU(QPU):
     def acquire(self) -> None:
         """Measure all circuits."""
         measurement = self._jobman.build_and_run_circuits(
-            self._sequence, 
-            self._n_shots, 
-            self._outputs, 
+            self._sequence,
+            self._n_shots,
+            self._outputs,
             fit_gmm=False,
             reads_per_shot=self._n_reads_per_shot,
             reload_cmd=self._reload_cmd,
@@ -315,12 +314,12 @@ class QubicQPU(QPU):
     def process(self) -> None:
         """Process the measurement data."""
         post_process(
-            self._config, 
+            self._config,
             self._measurements,
             self._circuits,
             measure_qubits=self._measure_qubits,
             n_reads_per_shot=self._n_reads_per_shot,
-            classifier=self._classifier, 
+            classifier=self._classifier,
             raster_circuits=self._raster_circuits,
             rcorr_cmat=self._rcorr_cmat,
             save_raw_data=self._save_raw_data
@@ -333,12 +332,12 @@ class QubicQPU(QPU):
                     self._compiled_circuits[i].results = results
             else:
                 post_process(
-                    self._config, 
+                    self._config,
                     self._measurements,
                     self._compiled_circuits,
                     measure_qubits=self._measure_qubits,
                     n_reads_per_shot=self._n_reads_per_shot,
-                    classifier=self._classifier, 
+                    classifier=self._classifier,
                     raster_circuits=self._raster_circuits,
                     rcorr_cmat=self._rcorr_cmat,
                     save_raw_data=self._save_raw_data
@@ -356,7 +355,7 @@ class QubicQPU(QPU):
                     self._transpiled_circuits,
                     measure_qubits=self._measure_qubits,
                     n_reads_per_shot=self._n_reads_per_shot,
-                    classifier=self._classifier, 
+                    classifier=self._classifier,
                     raster_circuits=self._raster_circuits,
                     rcorr_cmat=self._rcorr_cmat,
                     save_raw_data=self._save_raw_data
