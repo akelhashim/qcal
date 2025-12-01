@@ -122,7 +122,7 @@ def to_qcal(
             if isinstance(layer, LabelTupTup):
                 if len(layer) == 0:  # Idling cycle
                     tcircuit.append(
-                        Layer({gate_mapper['Gi'](q) for q in qubits})
+                        Layer({gate_mapper['Empty'](q) for q in qubits})
                     )
                 else:
                     tlayer = Layer()
@@ -176,6 +176,7 @@ class PyGSTiTranspiler(Transpiler):
         if gate_mapper is None:
             gate_mapper = GateMapper(
                 {
+                    'Empty':   single_qubit_gates['Id'],
                     'Gcnot':   two_qubit_gates['CX'],
                     'Gcphase': two_qubit_gates['CZ'],
                     'Gi':      single_qubit_gates['Id'],

@@ -7,18 +7,17 @@ Relevant code repos:
 - https://www.pygsti.info/
 - https://github.com/sandialabs/pyGSTi
 """
-import qcal.settings as settings
+import logging
+from collections.abc import Iterable
+from typing import Any, Callable, List, Tuple
 
+import numpy as np
+from IPython.display import clear_output
+
+import qcal.settings as settings
 from qcal.config import Config
 from qcal.qpu.qpu import QPU
 from qcal.utils import flatten, save_init
-
-import logging
-import numpy as np
-
-from collections.abc import Iterable
-from IPython.display import clear_output
-from typing import Any, Callable, List, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -31,7 +30,7 @@ def GST(qpu:            QPU,
         prep_fiducials: Any | None = None,
         meas_fiducials: Any | None = None,
         germs:          Any | None = None,
-        circuit_depths: List[int] = [1, 2, 4, 8, 16, 32, 64, 128, 256],
+        circuit_depths: List[int] = [1, 2, 4, 8, 16, 32, 64, 128, 256],  # noqa: B006
         fpr:            bool = False,
         **kwargs
     ) -> Callable:
@@ -42,11 +41,11 @@ def GST(qpu:            QPU,
     Args:
         qpu (QPU): custom QPU object.
         config (Config): qcal Config object.
-        qubit_labels (Iterable[int]): a list specifying sets of system labels 
+        qubit_labels (Iterable[int]): a list specifying sets of system labels
             on which to perform RPE for a given gate.
-       
-        circuit_depths (List[int], optional): a list of positive integers 
-            specifying the circuit depths. Defaults to ```[1, 2, 4, 8, 16, 32, 
+
+        circuit_depths (List[int], optional): a list of positive integers
+            specifying the circuit depths. Defaults to ```[1, 2, 4, 8, 16, 32,
             64, 128, 256]```.
 
     Returns:
@@ -55,7 +54,7 @@ def GST(qpu:            QPU,
 
     class GST(qpu):
         """GST protocol."""
-        
+
         @save_init
         def __init__(self,
                 config:         Config,
@@ -65,12 +64,13 @@ def GST(qpu:            QPU,
                 prep_fiducials: Any | None = None,
                 meas_fiducials: Any | None = None,
                 germs:          Any | None = None,
-                circuit_depths: List[int] = [1, 2, 4, 8, 16, 32, 64, 128, 256],
+                circuit_depths: List[int] = [1, 2, 4, 8, 16, 32, 64, 128, 256],  # noqa: B006
                 fpr:            bool = False,
                 **kwargs
             ) -> None:
             try:
                 import pygsti
+
                 from qcal.interface.pygsti.transpiler import PyGSTiTranspiler
                 logger.info(f" pyGSTi version: {pygsti.__version__}\n")
             except ImportError:
@@ -102,34 +102,35 @@ def GST(qpu:            QPU,
         def pspec(self):
             """pyGSTi processor spec."""
             return self._pspec
-        
+
         @property
         def protocol(self):
             """pyGSTi protocol."""
             return self._protocol
-        
+
         @property
         def edesign(self):
             """pyGSTi edesign."""
             return self._edesign
-        
+
         @property
         def data(self):
             """pyGSTi data object."""
             return self._data
-        
+
         @property
         def results(self):
             """pyGSTi results object."""
             return self._results
-        
+
         def generate_circuits(self):
             """Generate all GST circuits."""
             from pygsti.algorithms.fiducialpairreduction import (
-                find_sufficient_fiducial_pairs_per_germ_greedy
+                find_sufficient_fiducial_pairs_per_germ_greedy,
             )
             from pygsti.io import write_empty_protocol_data
             from pygsti.protocols import StandardGST, StandardGSTDesign
+
             from qcal.interface.pygsti.circuits import load_circuits
 
             print("Prep fiducials:\n", self._prep_fiducials)
@@ -143,36 +144,36 @@ def GST(qpu:            QPU,
 
             if self._fpr:
                 fiducial_pairs = find_sufficient_fiducial_pairs_per_germ_greedy(
-                    target_model=self._target_model, 
+                    target_model=self._target_model,
                     prep_fiducials=self._prep_fiducials,
                     meas_fiducials=self._meas_fiducials,
                     germs=self._germs,
-                    prep_povm_tuples="first", 
+                    prep_povm_tuples="first",
                     constrain_to_tp=True,
-                    inv_trace_tol= 10, 
+                    inv_trace_tol= 10,
                     initial_seed_mode='greedy',
-                    evd_tol=1e-5, 
-                    sensitivity_threshold=1e-5, 
+                    evd_tol=1e-5,
+                    sensitivity_threshold=1e-5,
                     # seed=1222022,
                     verbosity=1,
                     check_complete_fid_set=False
                 )
-            else: 
+            else:
                 fiducial_pairs = None
 
             self._edesign = StandardGSTDesign(
                 processorspec_filename_or_obj=self._pspec,
-                # target_model=self._target_model, 
-                prep_fiducial_list_or_filename=self._prep_fiducials, 
+                # target_model=self._target_model,
+                prep_fiducial_list_or_filename=self._prep_fiducials,
                 meas_fiducial_list_or_filename=self._meas_fiducials,
-                germ_list_or_filename=self._germs, 
+                germ_list_or_filename=self._germs,
                 max_lengths=self._circuit_depths,
                 fiducial_pairs=fiducial_pairs
             )
             print(
-                'Number of circuits: ', 
+                'Number of circuits: ',
                 len(self._edesign.all_circuits_needing_data)
-            )   
+            )
 
             # Save an empty dataset file of all the circuits
             self._data_manager._exp_id += (
@@ -180,8 +181,8 @@ def GST(qpu:            QPU,
             )
             self._data_manager.create_data_path()
             write_empty_protocol_data(
-                self._data_manager._save_path, 
-                self._edesign, 
+                self._data_manager._save_path,
+                self._edesign,
                 sparse=True,
                 clobber_ok=True
             )
@@ -205,15 +206,15 @@ def GST(qpu:            QPU,
             """Analyze the GST results."""
             logger.info(' Analyzing the results...')
             import pygsti
-            
+
             self._data = pygsti.io.read_data_from_dir(
                 self._data_manager._save_path
             )
             self._results = self._protocol.run(self._data)
 
             self._report = pygsti.report.construct_standard_report(
-                self._results, 
-                title="GST Report", 
+                self._results,
+                title="GST Report",
                 verbosity=2
             )
             self._report.write_html(
@@ -238,8 +239,8 @@ def GST(qpu:            QPU,
         pspec=pspec,
         target_model=target_model,
         prep_fiducials=prep_fiducials,
-        meas_fiducials=meas_fiducials, 
-        germs=germs, 
+        meas_fiducials=meas_fiducials,
+        germs=germs,
         circuit_depths=circuit_depths,
         fpr=fpr,
         **kwargs
@@ -255,7 +256,7 @@ def SingleQubitGST(
         prep_fiducials: Any | None = None,
         meas_fiducials: Any | None = None,
         germs:          Any | None = None,
-        circuit_depths: List[int] = [1, 2, 4, 8, 16, 32, 64, 128, 256],
+        circuit_depths: List[int] = [1, 2, 4, 8, 16, 32, 64, 128, 256],  # noqa: B006
         fpr:            bool = False,
         **kwargs
     ) -> Callable:
@@ -263,7 +264,7 @@ def SingleQubitGST(
 
     This protocol requires a valid pyGSTi installation.
 
-    
+
     """
     gst = type(GST(
         qpu=qpu,
@@ -272,8 +273,8 @@ def SingleQubitGST(
         pspec=pspec,
         target_model=target_model,
         prep_fiducials=prep_fiducials,
-        meas_fiducials=meas_fiducials, 
-        germs=germs, 
+        meas_fiducials=meas_fiducials,
+        germs=germs,
         circuit_depths=circuit_depths,
         fpr=fpr,
         **kwargs
@@ -281,7 +282,7 @@ def SingleQubitGST(
 
     class SingleQubitGST(gst):
         """GST protocol."""
-        
+
         @save_init
         def __init__(self,
                 config:         Config,
@@ -291,13 +292,13 @@ def SingleQubitGST(
                 prep_fiducials: Any | None = None,
                 meas_fiducials: Any | None = None,
                 germs:          Any | None = None,
-                circuit_depths: List[int] = [1, 2, 4, 8, 16, 32, 64, 128, 256],
+                circuit_depths: List[int] = [1, 2, 4, 8, 16, 32, 64, 128, 256],  # noqa: B006
                 fpr:            bool = False,
                 **kwargs
             ) -> None:
             try:
                 import pygsti
-                from pygsti.modelpacks import smq1Q_XY
+                from pygsti.modelpacks import smq1Q_XYI
                 logger.info(f" pyGSTi version: {pygsti.__version__}\n")
             except ImportError:
                 logger.warning(' Unable to import pyGSTi!')
@@ -310,37 +311,33 @@ def SingleQubitGST(
 
             if len(qubits) == 1:
                 pspec = (
-                    smq1Q_XY.processor_spec(qubits) if pspec is None 
+                    smq1Q_XYI.processor_spec(qubits) if pspec is None
                     else pspec
                 )
-                
+
                 target_model = (
-                    smq1Q_XY.target_model(qubit_labels=qubits) if target_model
+                    smq1Q_XYI.target_model(qubit_labels=qubits) if target_model
                     is None else target_model
                 )
 
                 prep_fiducials = (
-                    smq1Q_XY.prep_fiducials(qubits) if prep_fiducials is None 
+                    smq1Q_XYI.prep_fiducials(qubits) if prep_fiducials is None
                     else prep_fiducials
                 )
 
                 meas_fiducials = (
-                    smq1Q_XY.meas_fiducials(qubits) if meas_fiducials is None 
+                    smq1Q_XYI.meas_fiducials(qubits) if meas_fiducials is None
                     else meas_fiducials
                 )
 
-                germs = smq1Q_XY.germs(qubits) if germs is None else germs
+                germs = smq1Q_XYI.germs(qubits) if germs is None else germs
 
             elif len(qubits) == 2:
                 from pygsti.algorithms.fiducialselection import find_fiducials
                 from pygsti.algorithms.germselection import find_germs
-                from pygsti.models.modelconstruction import (
-                    create_explicit_model
-                )
+                from pygsti.models.modelconstruction import create_explicit_model
                 from pygsti.processors import QubitProcessorSpec
-                from pygsti.tools.internalgates import (
-                    standard_gatename_unitaries
-                )
+                from pygsti.tools.internalgates import standard_gatename_unitaries
 
                 if pspec is None:
                     gate_names = [
@@ -351,7 +348,7 @@ def SingleQubitGST(
                     global_idle = np.eye(4)
 
                     # Define the unitaries for the parallel gates
-                    standard_gate_unitaries= standard_gatename_unitaries()
+                    standard_gate_unitaries = standard_gatename_unitaries()
                     gxpi2 = standard_gate_unitaries['Gxpi2']
                     gypi2 = standard_gate_unitaries['Gypi2']
 
@@ -361,26 +358,26 @@ def SingleQubitGST(
                     gyy = np.kron(gypi2, gypi2)
 
                     nonstd_gate_unitaries = {
-                        'Gii': global_idle, 
-                        'Gxx': gxx, 
+                        'Gii': global_idle,
+                        'Gxx': gxx,
                         'Gxy': gxy,
-                        'Gyx': gyx, 
+                        'Gyx': gyx,
                         'Gyy': gyy
                     }
 
                     pspec = QubitProcessorSpec(
-                        num_qubits=len(qubits), 
+                        num_qubits=len(qubits),
                         gate_names=gate_names,
-                        nonstd_gate_unitaries= nonstd_gate_unitaries,
-                        prep_names=['rho0'], 
+                        nonstd_gate_unitaries=nonstd_gate_unitaries,
+                        prep_names=['rho0'],
                         povm_names=['Mdefault'],
                         availability={
-                            'Gxpi2': [(q,) for q in qubits], 
-                            'Gzpi2': [(q,) for q in qubits],
+                            'Gxpi2': [(q,) for q in qubits],
+                            'Gypi2': [(q,) for q in qubits],
                             'Gii':   [tuple(qubits)],
-                            'Gxx':   [tuple(qubits)], 
-                            'Gxy':   [tuple(qubits)], 
-                            'Gyx':   [tuple(qubits)], 
+                            'Gxx':   [tuple(qubits)],
+                            'Gxy':   [tuple(qubits)],
+                            'Gyx':   [tuple(qubits)],
                             'Gyy':   [tuple(qubits)]
                         },
                         qubit_labels=qubits
@@ -388,40 +385,40 @@ def SingleQubitGST(
 
                 if target_model is None:
                     target_model = create_explicit_model(
-                        pspec,  
-                        # ideal_gate_type='full TP', 
-                        # ideal_spam_type='full TP',  
+                        pspec,
+                        # ideal_gate_type='full TP',
+                        # ideal_spam_type='full TP',
                         # basis='pp',
                     )
 
                 if prep_fiducials is None and meas_fiducials is None:
                     prep_fiducials, meas_fiducials = find_fiducials(
-                        target_model, 
-                        candidate_fid_counts={3: 'all upto'}, 
+                        target_model,
+                        candidate_fid_counts={3: 'all upto'},
                         assume_clifford=True,
                         verbosity=2
                     )
 
                 if germs is None:
                     germs = find_germs(
-                        target_model, 
-                        randomize=False, 
-                        algorithm='greedy', 
-                        assume_real=True, 
-                        mode='compactEVD', 
+                        target_model,
+                        randomize=False,
+                        algorithm='greedy',
+                        assume_real=True,
+                        mode='compactEVD',
                         float_type=np.double,
-                        candidate_germ_counts={4:'all upto'}, 
+                        candidate_germ_counts={4:'all upto'},
                         verbosity=2
                     )
-            
+
             gst.__init__(self,
                 config=config,
                 qubit_labels=qubits,
                 pspec=pspec,
                 target_model=target_model,
                 prep_fiducials=prep_fiducials,
-                meas_fiducials=meas_fiducials, 
-                germs=germs, 
+                meas_fiducials=meas_fiducials,
+                germs=germs,
                 circuit_depths=circuit_depths,
                 fpr=fpr,
                 **kwargs
@@ -433,8 +430,8 @@ def SingleQubitGST(
         pspec=pspec,
         target_model=target_model,
         prep_fiducials=prep_fiducials,
-        meas_fiducials=meas_fiducials, 
-        germs=germs, 
+        meas_fiducials=meas_fiducials,
+        germs=germs,
         circuit_depths=circuit_depths,
         fpr=fpr,
         **kwargs
@@ -450,7 +447,7 @@ def TwoQubitGST(
         prep_fiducials: Any | None = None,
         meas_fiducials: Any | None = None,
         germs:          Any | None = None,
-        circuit_depths: List[int] = [1, 2, 4, 8, 16, 32, 64, 128],
+        circuit_depths: List[int] = [1, 2, 4, 8, 16, 32, 64, 128],  # noqa: B006
         fpr:            bool = False,
         **kwargs
     ) -> Callable:
@@ -458,7 +455,7 @@ def TwoQubitGST(
 
     This protocol requires a valid pyGSTi installation.
 
-    
+
     """
     gst = type(GST(
         qpu=qpu,
@@ -467,8 +464,8 @@ def TwoQubitGST(
         pspec=pspec,
         target_model=target_model,
         prep_fiducials=prep_fiducials,
-        meas_fiducials=meas_fiducials, 
-        germs=germs, 
+        meas_fiducials=meas_fiducials,
+        germs=germs,
         circuit_depths=circuit_depths,
         fpr=fpr,
         **kwargs
@@ -476,7 +473,7 @@ def TwoQubitGST(
 
     class TwoQubitGST(gst):
         """GST protocol."""
-        
+
         @save_init
         def __init__(self,
                 config:         Config,
@@ -486,7 +483,7 @@ def TwoQubitGST(
                 prep_fiducials: Any | None = None,
                 meas_fiducials: Any | None = None,
                 germs:          Any | None = None,
-                circuit_depths: List[int] = [1, 2, 4, 8, 16, 32, 64, 128, 256],
+                circuit_depths: List[int] = [1, 2, 4, 8, 16, 32, 64, 128, 256],  # noqa: B006
                 fpr:            bool = False,
                 **kwargs
             ) -> None:
@@ -501,37 +498,37 @@ def TwoQubitGST(
                 raise ValueError(
                     'Two-qubit GST is only support for 2 qubits!'
                 )
-            
+
             pspec = (
-                smq2Q_XYCPHASE.processor_spec(qubits) if pspec is None 
+                smq2Q_XYCPHASE.processor_spec(qubits) if pspec is None
                 else pspec
             )
 
             target_model = (
-                smq2Q_XYCPHASE.target_model(qubit_labels=qubits) if 
+                smq2Q_XYCPHASE.target_model(qubit_labels=qubits) if
                 target_model is None else target_model
             )
 
             prep_fiducials = (
-                smq2Q_XYCPHASE.prep_fiducials(qubits) if prep_fiducials is None 
+                smq2Q_XYCPHASE.prep_fiducials(qubits) if prep_fiducials is None
                 else prep_fiducials
             )
 
             meas_fiducials = (
-                smq2Q_XYCPHASE.meas_fiducials(qubits) if meas_fiducials is None 
+                smq2Q_XYCPHASE.meas_fiducials(qubits) if meas_fiducials is None
                 else meas_fiducials
             )
 
             germs = smq2Q_XYCPHASE.germs(qubits) if germs is None else germs
-            
+
             gst.__init__(self,
                 config=config,
                 qubit_labels=qubits,
                 pspec=pspec,
                 target_model=target_model,
                 prep_fiducials=prep_fiducials,
-                meas_fiducials=meas_fiducials, 
-                germs=germs, 
+                meas_fiducials=meas_fiducials,
+                germs=germs,
                 circuit_depths=circuit_depths,
                 fpr=fpr,
                 **kwargs
@@ -543,8 +540,8 @@ def TwoQubitGST(
         pspec=pspec,
         target_model=target_model,
         prep_fiducials=prep_fiducials,
-        meas_fiducials=meas_fiducials, 
-        germs=germs, 
+        meas_fiducials=meas_fiducials,
+        germs=germs,
         circuit_depths=circuit_depths,
         fpr=fpr,
         **kwargs

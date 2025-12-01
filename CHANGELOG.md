@@ -12,10 +12,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Workflow DAG
 - Generic plotter for error rates for randomized benchmarks
 - Super Guassian pulse envelope
+- Empty layer to GateMapper in PyGSTiTranspiler
 
 ### Changed
 
 - Flexible number of params for CZ gate amplitude calibration
+- Default single-qubit GST to smq1Q_XYI (instead of smq1Q_XY)
 
 ### Deprecated
 
