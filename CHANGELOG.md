@@ -13,6 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Generic plotter for error rates for randomized benchmarks
 - Super Guassian pulse envelope
 - Empty layer to GateMapper in PyGSTiTranspiler
+- save_raw_data will save all classified reads in circuits dataframe for qubic
+post-processing
 
 ### Changed
 
