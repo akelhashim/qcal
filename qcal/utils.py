@@ -3,11 +3,11 @@
 import functools
 import inspect
 import logging
-import pandas as pd
 import pickle
-
 from collections.abc import Iterable
 from typing import Any, Callable, List
+
+import pandas as pd
 
 logger = logging.getLogger(__name__)
 
@@ -44,7 +44,7 @@ def flatten(xs: List):
 def save_init(init: Callable) -> Callable:
     """Decorator that saves the arguments passed to a class's __init__ method.
 
-    Stores the initialization arguments in `_init_args` and `_init_kwargs` 
+    Stores the initialization arguments in `_init_args` and `_init_kwargs`
     on the instance, allowing for later re-instantiation or debugging.
 
     Args:

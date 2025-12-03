@@ -17,7 +17,7 @@ from IPython.display import clear_output
 import qcal.settings as settings
 from qcal.config import Config
 from qcal.qpu.qpu import QPU
-from qcal.utils import flatten, save_init
+from qcal.utils import flatten, save_init, save_to_pickle
 
 logger = logging.getLogger(__name__)
 
@@ -210,7 +210,11 @@ def GST(qpu:            QPU,
             self._data = pygsti.io.read_data_from_dir(
                 self._data_manager._save_path
             )
+
             self._results = self._protocol.run(self._data)
+            save_to_pickle(
+                self._results, self._data_manager._save_path + 'results'
+            )
 
             self._report = pygsti.report.construct_standard_report(
                 self._results,
