@@ -8,18 +8,17 @@ Basic example useage:
     cfg.parameters   # Returns a dictionary of the entire config
     cfg.processor()  # Plots the processor connectivity
 """
-import qcal.settings as settings
-
-from qcal.math.utils import round_sig_figures
-
 import copy
 import io
 import logging
+from collections import defaultdict
+from typing import Any, Dict, List, Tuple
+
 import pandas as pd
 import yaml
 
-from collections import defaultdict
-from typing import Any, Dict, List, Tuple
+import qcal.settings as settings
+from qcal.math.utils import round_sig_figures
 
 logger = logging.getLogger(__name__)
 
@@ -42,7 +41,7 @@ def nested_index(dictionary: Dict, n_levels: int = 2) -> List[List]:
         for key, value in dct.items():
             if isinstance(value, dict):
                 lst[idx].extend(
-                    [key] * sum([len(v) if isinstance(v, dict) else 1 for v in 
+                    [key] * sum([len(v) if isinstance(v, dict) else 1 for v in
                                  value.values()]
                             )
                     )
@@ -54,7 +53,7 @@ def nested_index(dictionary: Dict, n_levels: int = 2) -> List[List]:
 
     index = []
     for _ in range(n_levels):
-        index.append(list())
+        index.append([])
 
     itterdict(dictionary, index, 0)
 
@@ -132,7 +131,7 @@ class Config:
             return copy.deepycopy(self._parameters)
         else:
             return self._parameters.copy()
-        
+
     def __getitem__(self, param: str) -> Any:
         """Subscript the config object with a string.
 
@@ -170,16 +169,16 @@ class Config:
 
     def __repr__(self) -> str:
         return repr(dict(self._parameters))
-    
+
     def __str__(self) -> str:
         return str(dict(self._parameters))
-    
+
     @property
     def coherence_times(self) -> pd.DataFrame:
         """Coherences times of all of the qubits.
-        
+
         Args:
-            include_EF (bool, optional): include EF coherences. 
+            include_EF (bool, optional): include EF coherences.
                 Defaults to True.
 
         Returns:
@@ -203,12 +202,12 @@ class Config:
                     coh.append(val)
                     qs.append(q)
                     label.append(c + ' EF')
-            
+
             df = pd.concat([
-                df, 
+                df,
                 pd.DataFrame(
-                    {'Qubit': qs, 
-                     'Coherence Time': coh, 
+                    {'Qubit': qs,
+                     'Coherence Time': coh,
                      'Coherence Type': label
                     }
                 )
@@ -224,7 +223,7 @@ class Config:
             str: filename of the config.yaml file.
         """
         return self._filename
-    
+
     @property
     def hardware(self) -> pd.DataFrame:
         """Hardware parameters in a table format.
@@ -235,7 +234,7 @@ class Config:
         return pd.DataFrame.from_dict(
             self.parameters['hardware'], orient='index', columns=['hardware']
         )
-    
+
     @property
     def n_qubits(self) -> int:
         """Number of qubits on the processor.
@@ -244,7 +243,7 @@ class Config:
             int: number of qubits.
         """
         return len(self.qubits)
-    
+
     @property
     def native_gates(self) -> Dict:
         """Native gates for each qubit (subspace) and qubit pair.
@@ -252,10 +251,10 @@ class Config:
         Returns:
             Dict: native gates.
         """
-        native_gates = dict()
+        native_gates = {}
         native_set = set()
 
-        single_qubit = dict()
+        single_qubit = {}
         for q in self.qubits:
             subspace = {}
             for sbsp in self.parameters['single_qubit'][q].keys():
@@ -268,7 +267,7 @@ class Config:
             single_qubit[q] = subspace
         native_gates['single_qubit'] = single_qubit
 
-        two_qubit = dict()
+        two_qubit = {}
         for p in self.qubit_pairs:
             gates = []
             for k, v in self.parameters['two_qubit'][str(p)].items():
@@ -290,7 +289,7 @@ class Config:
             Dict: config parameters.
         """
         return dict(self._parameters)
-    
+
     @property
     def readout(self) -> pd.DataFrame:
         """Readout parameters in a table format.
@@ -301,10 +300,9 @@ class Config:
         dfs = []
         dfs.append(pd.DataFrame(
                     data=list(map(list, zip(*[
-                            [val for val in recursive_values(
+                            list(recursive_values(
                                     self.parameters['readout'][q]
-                                )
-                            ] for q in self.qubits]
+                                )) for q in self.qubits], strict=False
                         ))),
                     columns=self.qubits,
                     index=[
@@ -314,7 +312,7 @@ class Config:
                     ]
                 )
         )
-                
+
         for key, value in self.parameters['readout'].items():
             if key not in self.qubits:
                 dfs.append(pd.DataFrame.from_dict(
@@ -325,7 +323,7 @@ class Config:
 
         df = pd.concat(dfs, ignore_index=False)
         return df
-    
+
     @property
     def reset(self) -> pd.DataFrame:
         """Reset parameters in table format.
@@ -334,14 +332,14 @@ class Config:
             pd.DataFrame: reset parameters.
         """
         return pd.DataFrame(
-            data=[val for val in recursive_values(self.parameters['reset'])],
+            data=list(recursive_values(self.parameters['reset'])),
             columns=['reset'],
             index=nested_index(
                 self.parameters['reset'],
                 n_levels=2
             )
         )
-    
+
     @property
     def single_qubit(self) -> pd.DataFrame:
         """Single-qubit parameters in a table format.
@@ -351,10 +349,9 @@ class Config:
         """
         df = pd.DataFrame(
             data=list(map(list, zip(*[
-                    [val for val in recursive_values(
+                    list(recursive_values(
                             self.parameters['single_qubit'][q]
-                        )
-                    ] for q in self.qubits]
+                        )) for q in self.qubits], strict=False
                 ))),
             columns=self.qubits,
             index=nested_index(
@@ -373,10 +370,9 @@ class Config:
         """
         df = pd.DataFrame(
             data=list(map(list, zip(*[
-                    [val for val in recursive_values(
+                    list(recursive_values(
                             self.parameters['two_qubit'][str(p)]
-                        )
-                    ] for p in self.qubit_pairs]
+                        )) for p in self.qubit_pairs], strict=False
                 ))),
             columns=self.qubit_pairs,
             index=nested_index(
@@ -385,7 +381,7 @@ class Config:
             )
         )
         return df
-    
+
     @property
     def qubits(self) -> list:
         """Available qubits on the processor.
@@ -394,7 +390,7 @@ class Config:
             list: qubit labels.
         """
         return tuple(self.parameters['single_qubit'].keys())
-    
+
     @property
     def qubits_even(self) -> list:
         """Even labeled qubits on the process
@@ -403,7 +399,7 @@ class Config:
             list: qubit labels.
         """
         return tuple([q for q in self.qubits if q % 2 == 0])
-    
+
     @property
     def qubits_odd(self) -> list:
         """Odd labeled qubits on the process
@@ -412,7 +408,7 @@ class Config:
             list: qubit labels.
         """
         return tuple([q for q in self.qubits if q % 2 == 1])
-    
+
     @property
     def qubit_pairs(self) -> List[tuple]:
         """Available qubit pairs on the processor.
@@ -421,13 +417,13 @@ class Config:
             list[tuple]: qubit pairs.
         """
         return [eval(key) for key in self.parameters['two_qubit'].keys()]
-    
+
     def get(self, param: List[Any]) -> Any:
         """Get the parameter from the config (if it exists).
 
         Args:
             param (List[Any]): parameter of interest. This should be a
-                list of entries used to index the parameters dictionary (e.g. 
+                list of entries used to index the parameters dictionary (e.g.
                 ['single_qubit', 0, 'GE', 'freq']).
 
         Returns:
@@ -442,13 +438,13 @@ class Config:
         except Exception:
             logger.warning(f' Parameter {param} not found in the config!')
             return None
-        
+
     def set(self, param: List[str], newvalue: Any) -> None:
         """Set the parameter in the config to the given value.
 
         Args:
-            param (Union[List[str], str]): parameter of interest.  This should 
-                be a list of entries used to index the parameters dictionary 
+            param (Union[List[str], str]): parameter of interest.  This should
+                be a list of entries used to index the parameters dictionary
                 (e.g. ['single_qubit', 0, 'GE', 'freq']).
             newvalue (Any): new value to assign to the parameter.
         """
@@ -460,7 +456,7 @@ class Config:
         cfg_param = self.get(param[:-1])
         cfg_param[param[-1]] = newvalue
         logger.info(f' Param {param} set to {newvalue}.')
-        
+
     def items(self) -> tuple:
         return self._parameters.items()
 
@@ -490,14 +486,14 @@ class Config:
         from qcal.plotting.graphs import draw_qpu
         draw_qpu(self)
 
-    def plot_coherences(self, 
-            qubits:  List | Tuple | None = None, 
+    def plot_coherences(self,
+            qubits:  List | Tuple | None = None,
             plot_EF: bool = False
         ) -> None:
         """Plot the coherence times in a CDF.
 
         Args:
-            qubits (List | Tuple | None, optional): qubits to plot. Defaults to 
+            qubits (List | Tuple | None, optional): qubits to plot. Defaults to
                 None.
             plot_EF (bool, optional): plot EF coherences. Defaults to False.
         """
@@ -515,21 +511,21 @@ class Config:
             qubit_pairs: List | Tuple | None = None
         ) -> None:
         """Plot all qubit, two_qubit and readout frequencies.
-        
+
         Args:
-            qubits (List | Tuple | None, optional): qubits to plot. Defaults to 
+            qubits (List | Tuple | None, optional): qubits to plot. Defaults to
                 None.
-            qubit_pairs (List | Tuple | None, optional): qubit pairs to plot. 
+            qubit_pairs (List | Tuple | None, optional): qubit pairs to plot.
                 Defaults to None.
         """
         from qcal.plotting.frequency import plot_freq_spectrum
         plot_freq_spectrum(
-            self, 
+            self,
             qubits=qubits,
             qubit_pairs=qubit_pairs,
-            plot_GE=True, 
+            plot_GE=True,
             plot_EF=True, # TODO: add checking EF
-            plot_readout=True, 
+            plot_readout=True,
             plot_two_qubit=True
         )
 
@@ -540,34 +536,34 @@ class Config:
         """Plot all qubit frequencies.
 
         Args:
-            qubits (List | Tuple | None, optional): qubits to plot. Defaults to 
+            qubits (List | Tuple | None, optional): qubits to plot. Defaults to
                 None.
             plot_EF (bool, optional): plot EF frequencies. Defaults to False.
         """
         from qcal.plotting.frequency import plot_freq_spectrum
         plot_freq_spectrum(
-            self, 
+            self,
             qubits=qubits,
-            plot_GE=True, 
+            plot_GE=True,
             plot_EF=plot_EF,
-            plot_readout=False, 
+            plot_readout=False,
             plot_two_qubit=False
         )
 
     def plot_readout_freqs(self, qubits:  List | Tuple | None = None):
         """Plot all readout frequencies.
-        
+
         Args:
-            qubits (List | Tuple | None, optional): qubits to plot. Defaults to 
+            qubits (List | Tuple | None, optional): qubits to plot. Defaults to
                 None.
         """
         from qcal.plotting.frequency import plot_freq_spectrum
         plot_freq_spectrum(
             self,
             qubits=qubits,
-            plot_GE=False, 
+            plot_GE=False,
             plot_EF=False,
-            plot_readout=True, 
+            plot_readout=True,
             plot_two_qubit=False
         )
 
@@ -579,13 +575,13 @@ class Config:
                 Defaults to None.
         """
         with io.open(
-                filename if filename is not None else self._filename, 'w', 
+                filename if filename is not None else self._filename, 'w',
                 encoding='utf8'
             ) as yaml_file:
                 yaml.dump(
-                    dict(self._parameters), 
-                    yaml_file, 
-                    default_flow_style=False, 
+                    dict(self._parameters),
+                    yaml_file,
+                    default_flow_style=False,
                     allow_unicode=True,
                     sort_keys=False
                 )
