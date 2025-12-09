@@ -3,11 +3,11 @@
 Transpilation describes the process of mapping one circuit type to another
 circuit type at the same level of abstraction.
 """
-from qcal.circuit import CircuitSet
-from qcal.transpilation.utils import GateMapper
-
 import logging
 from typing import Any
+
+from qcal.circuit import CircuitSet
+from qcal.transpilation.utils import GateMapper
 
 logger = logging.getLogger(__name__)
 
@@ -34,7 +34,7 @@ class Transpiler:
             GateMapper: gate mapper.
         """
         return self._gate_mapper
-    
+
     def transpile(self, circuits: Any) -> CircuitSet:
         """Transpile all circuits.
 

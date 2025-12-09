@@ -21,7 +21,7 @@ __all__ = ('XY', 'dd_sequences')
 def XY(
         config:   Config, 
         qubits:   Iterable[int], 
-        length:   float, 
+        time:     float, 
         n_pulses: int | None = None,
         phase:    float | None = None,
         subspace: str = 'GE',
@@ -35,7 +35,7 @@ def XY(
     Args:
         config (Config): qcal Config object.
         qubits (Iterable[int]): qubit labels.
-        length (float): length of time over which to perform the DD.
+        time (float): time of time over which to perform the DD.
         n_pulses (int | None, optional): number of pulses. Defaults to 4. For 
             example, for n_pulses = 4, this performs an XY4 DD sequence.
         phase (float | None, optional): optional (virtual) phase to add to the
@@ -50,15 +50,15 @@ def XY(
         config, f'single_qubit/{qubits[0]}/{subspace}/X90/pulse'
     )
     gate_time = config[
-        f'single_qubit/{qubits[0]}/{subspace}/X90/pulse/{idx}/length'
+        f'single_qubit/{qubits[0]}/{subspace}/X90/pulse/{idx}/time'
     ]
 
     if n_pulses is None:
-        n_pulses = max(4, int(length / (gate_time * 8)) * 4)
+        n_pulses = max(4, int(time / (gate_time * 8)) * 4)
 
     assert n_pulses % 4 == 0, "'n_pulses' must be a multiple of 4!"
     
-    tau = length / (2 * n_pulses)  # Base interval
+    tau = time / (2 * n_pulses)  # Base interval
     idle_time = tau - gate_time
     idle_time = idle_time if idle_time > 0 else 0.
     

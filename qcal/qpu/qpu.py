@@ -1,5 +1,5 @@
 """Quantum Processing Unit (QPU)
-    
+
 This submodule is used to run all experiments on hardware.
 
 Basic example useage:
@@ -7,22 +7,21 @@ Basic example useage:
     qpu = QPU(config)
     qpu.run(circuit)
 """
-from qcal.config import Config
+import logging
+import timeit
+from collections.abc import Iterable
+from typing import Any, List
+
+import numpy as np
+import pandas as pd
+from IPython.display import clear_output
+
+import qcal.settings as settings
 from qcal.circuit import CircuitSet
+from qcal.config import Config
 from qcal.managers.classification_manager import ClassificationManager
 from qcal.managers.data_manager import DataMananger
 from qcal.utils import load_from_pickle
-
-import qcal.settings as settings
-
-import logging
-import numpy as np
-import pandas as pd
-import timeit
-
-from collections.abc import Iterable
-from IPython.display import clear_output
-from typing import Any, List
 
 # logger = logging.getLogger(__name__)
 logger = logging.getLogger('QPU')
@@ -34,7 +33,7 @@ __all__ = ('QPU')
 
 class QPU:
     """Quantum Processing Unit.
-    
+
     This class handles the measurement of circuits, processing of data, and
     saving of results.
 
@@ -80,28 +79,28 @@ class QPU:
             config (Config): qcal config object.
             compiler (Any | Compiler | None, optional): a custom compiler to
                 compile the experimental circuits. Defaults to None.
-            transpiler (Any | None, optional): a custom transpiler to 
+            transpiler (Any | None, optional): a custom transpiler to
                 transpile the experimental circuits. Defaults to None.
             classifier (ClassificationManager, optional): manager used for
                 classifying raw data. Defaults to None.
-            n_shots (int, optional): number of measurements per circuit. 
+            n_shots (int, optional): number of measurements per circuit.
                 Defaults to 1024.
-            n_batches (int, optional): number of batches of measurements. 
+            n_batches (int, optional): number of batches of measurements.
                 Defaults to 1.
             n_circs_per_seq (int, optional): maximum number of circuits that
                 can be measured per sequence. Defaults to 1.
-            n_levels (int, optional): number of energy levels to be measured. 
+            n_levels (int, optional): number of energy levels to be measured.
                 Defaults to 2. If n_levels = 3, this assumes that the
                 measurement supports qutrit classification.
             raster_circuits (bool, optional): whether to raster through all
                 circuits in a batch during measurement. Defaults to False. By
                 default, all circuits in a batch will be measured n_shots times
                 one by one. If True, all circuits in a batch will be measured
-                back-to-back one shot at a time. This can help average out the 
+                back-to-back one shot at a time. This can help average out the
                 effects of drift on the timescale of a measurement.
             rcorr_cmat (pd.DataFrame | None, optional): confusion matrix for
                 readout correction. Defaults to None. If passed, the readout
-                correction will be applied to the raw bit strings in 
+                correction will be applied to the raw bit strings in
                 post-processing.
         """
         self._config = config
@@ -150,7 +149,7 @@ class QPU:
             Config: experimental config
         """
         return self._config
-        
+
     @property
     def compiler(self) -> Any | List[Any]:
         """Returns the compiler(s) loaded to the QPU.
@@ -159,7 +158,7 @@ class QPU:
             Any | List[Any]: circuit compiler
         """
         return self._compiler
-    
+
     @property
     def transpiler(self) -> Any | List[Any]:
         """Returns the transpiler(s) loaded to the QPU.
@@ -186,7 +185,7 @@ class QPU:
             Any: all compiled circuits.
         """
         return self._compiled_circuits
-        
+
     @property
     def transpiled_circuits(self) -> Any:
         """Transpiled circuits.
@@ -195,7 +194,7 @@ class QPU:
             Any: all transpiled circuits.
         """
         return self._transpiled_circuits
-    
+
     @property
     def classifier(self) -> ClassificationManager:
         """Classification manager.
@@ -213,16 +212,16 @@ class QPU:
             DataMananger: current DataManager instance.
         """
         return self._data_manager
-    
+
     @property
-    def sequence(self):
+    def sequence(self) -> Any:
         """Returns the current sequence.
-        
+
         Returns:
-            qcal.sequencer.sequencer.Sequence: pulse sequence.
+            Any: pulse sequence. The format will depend on the hardware backend.
         """
         return self._sequence
-    
+
     @property
     def measurements(self) -> List[Any]:
         """Returns the list of measurement objects.
@@ -231,8 +230,8 @@ class QPU:
             List[Any]: measurements.
         """
         return self._measurements
-    
-    def initialize(self, 
+
+    def initialize(self,
             circuits:  Any | List[Any],
             n_shots:   int | None = None,
             n_batches: int | None = None
@@ -241,13 +240,13 @@ class QPU:
 
         Args:
             circuits (Union[Any, List[Any]]): circuits to measure.
-            n_shots (Union[int, None], optional): number of shots per batch. 
+            n_shots (Union[int, None], optional): number of shots per batch.
                 Defaults to None.
             n_batches (Union[int, None], optional): number of batches of shots.
                 Defaults to None.
         """
         self._data_manager.generate_exp_id()  # Create a new experimental id
-        
+
         if not isinstance(circuits, List) and 'n_circuits' not in dir(circuits):
             circuits = [circuits]
         if isinstance(circuits, List):
@@ -264,7 +263,7 @@ class QPU:
         if n_batches is not None:
             self._batches = n_batches
 
-        self._measurements = []    
+        self._measurements = []
         self._runtime = pd.DataFrame({
             'Compile':    0.0,
             'Transpile':  0.0,
@@ -275,7 +274,7 @@ class QPU:
             'Total':      0.0},
           index=['Time (s)']
         )
-        
+
     def compile(self) -> None:
         """Compile the circuits using a custom compiler."""
         if isinstance(self._compiler, Iterable):
@@ -293,7 +292,7 @@ class QPU:
         else:
             self._exp_circuits = self._transpiler.transpile(self._exp_circuits)
         self._transpiled_circuits.append(self._exp_circuits)
-        
+
     def generate_sequence(self, circuits: Iterable) -> None:
         """Generate a sequence from circuits."""
         pass
@@ -311,7 +310,7 @@ class QPU:
 
     def process(self) -> None:
         """Post-process the data.
-        
+
         The method should assign a results dictionary as an attribute to each
         circuit.
         """
@@ -338,7 +337,7 @@ class QPU:
             self._runtime['Transpile'] += round(
                     timeit.default_timer() - t0, 1
                 )
-        
+
         logger.info(' Generating sequences...')
         t0 = timeit.default_timer()
         self.generate_sequence()
@@ -359,14 +358,14 @@ class QPU:
         self._runtime['Measure'] += round(
                 timeit.default_timer() - t0, 1
             )
-        
+
     def batch_measurements(self) -> None:
         """Measurement batcher."""
         if self._circuits.n_circuits <= self._n_circs_per_seq:
             logger.info(' No batching...')
             self.measure()
-        
-        else: 
+
+        else:
             n_circ_batches = int(
                     np.ceil(self._circuits.n_circuits / self._n_circs_per_seq)
                 )
@@ -374,7 +373,7 @@ class QPU:
                 f' Dividing {self._circuits.n_circuits} circuits into '
                 f'{n_circ_batches} batches of size {self._n_circs_per_seq}...'
             )
-            
+
             for i, circuits in enumerate(
                 self._circuits.batch(self._n_circs_per_seq)):
                 self._exp_circuits = circuits
@@ -396,7 +395,7 @@ class QPU:
         """Save all circuits and data.
 
         Args:
-            create_data_path (bool, optional): whether to create a data save 
+            create_data_path (bool, optional): whether to create a data save
                 path. Defaults to True.
         """
         if create_data_path:
@@ -412,7 +411,7 @@ class QPU:
                 self._data_manager._save_path + 'compiled_circuits.qc'
             )
 
-        if len(self._transpiled_circuits) > 0: 
+        if len(self._transpiled_circuits) > 0:
             self._transpiled_circuits.save(
                 self._data_manager._save_path + 'transpiled_circuits.qc'
             )
@@ -423,7 +422,7 @@ class QPU:
 
         if self._classifier:
             self._data_manager.save_to_pickle(
-                    self._classifier, 
+                    self._classifier,
                     'ClassificationManager'
                 )
 
@@ -439,13 +438,13 @@ class QPU:
 
         Args:
             circuits (Union[Any, List[Any]]): circuits to measure.
-            n_shots (Union[int, None], optional): number of shots per batch. 
+            n_shots (Union[int, None], optional): number of shots per batch.
                 Defaults to None.
             n_batches (Union[int, None], optional): number of batches of shots.
                 Defaults to None.
             save (bool): whether or not to save data at the end of the run
                 method. Defaults to True. This should be used for determining
-                when the data is saved for custom QPUs which inherit this 
+                when the data is saved for custom QPUs which inherit this
                 class.
         """
         t_start = timeit.default_timer()
@@ -458,5 +457,5 @@ class QPU:
         clear_output(wait=True)
         if settings.Settings.save_data and save:
             self.save()
-        
+
         print(f"Runtime: {repr(self._runtime)[8:]}\n")

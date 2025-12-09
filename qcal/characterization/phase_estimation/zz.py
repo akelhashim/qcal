@@ -1,29 +1,26 @@
 """Submodule for estimating the ZZ phase (i.e. rate) between qubits.
 
 """
-import qcal.settings as settings
-
-from qcal.characterization.characterize import Characterize
-from qcal.circuit import Barrier, Cycle, Circuit, CircuitSet
-from qcal.config import Config
-from qcal.fitting.fit import FitDecayingCosine
-from qcal.gate.single_qubit import Idle, Rz, X90
-from qcal.math.utils import (
-    uncertainty_of_sum, round_to_order_error
-)
-from qcal.plotting.utils import calculate_nrows_ncols
-from qcal.qpu.qpu import QPU
-from qcal.units import kHz, MHz, us
-from qcal.utils import flatten, save_init
-
 import logging
+from typing import Callable, Dict, List, Tuple
+
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-
 from IPython.display import clear_output
 from lmfit import Parameters
-from typing import Callable, Dict, List, Tuple
+
+import qcal.settings as settings
+from qcal.characterization.characterize import Characterize
+from qcal.circuit import Barrier, Circuit, CircuitSet, Cycle
+from qcal.config import Config
+from qcal.fitting.fit import FitDecayingCosine
+from qcal.gate.single_qubit import X90, Idle, Rz
+from qcal.math.utils import round_to_order_error, uncertainty_of_sum
+from qcal.plotting.utils import calculate_nrows_ncols
+from qcal.qpu.qpu import QPU
+from qcal.units import MHz, kHz, us
+from qcal.utils import flatten, save_init
 
 logger = logging.getLogger(__name__)
 
@@ -54,8 +51,8 @@ def JAZZ(
 
     ```
     cal = LocalPhases(
-        CustomQPU, 
-        config, 
+        CustomQPU,
+        config,
         qubit_pairs=[(0, 1), (2, 3)])
     cal.run()
     ```
@@ -72,13 +69,13 @@ def JAZZ(
 
     class JAZZ(qpu, Characterize):
         """JAZZ characterization class.
-        
+
         This class inherits a custom QPU from the JAZZ characterization
         function.
         """
 
         @save_init
-        def __init__(self, 
+        def __init__(self,
                 config:      Config,
                 qubit_pairs: List[Tuple],
                 t_max:       float = 5*us,
@@ -91,7 +88,7 @@ def JAZZ(
             """Initialize the JAZZ class within the function."""
             qpu.__init__(self, config=config, **kwargs)
             Characterize.__init__(self, config)
-            
+
             self._qubits = qubit_pairs
             self._detuning = detuning
 
@@ -111,18 +108,18 @@ def JAZZ(
                 self._params = {}
                 for qp in qubit_pairs:
                     self._params[qp] = f'two_qubit/{qp}/ZZ'
-                
+
             self._fit = {
                 qp: {
-                    'C0': FitDecayingCosine(), 
-                    'C1': FitDecayingCosine(), 
+                    'C0': FitDecayingCosine(),
+                    'C1': FitDecayingCosine(),
                 } for qp in qubit_pairs
             }
-            
+
             self._circuits = None
-            self._freq_C0 = {q: False for q in qubit_pairs}
-            self._freq_C1 = {q: False for q in qubit_pairs}
-        
+            self._freq_C0 = dict.fromkeys(qubit_pairs, False)
+            self._freq_C1 = dict.fromkeys(qubit_pairs, False)
+
         @property
         def qubit_pairs(self) -> List[Tuple]:
             """Qubit pair labels.
@@ -131,7 +128,7 @@ def JAZZ(
                 List[Tuple]: qubit pairs.
             """
             return self._qubits
-        
+
         @property
         def loss(self) -> Dict:
             """Loss for each qubit pair.
@@ -160,7 +157,7 @@ def JAZZ(
                 phases.extend([phase] * 2)
                 circuit_C0 = Circuit()
                 circuit_C1 = Circuit()
-                
+
                 if self._subspace == 'EF':
                     cycles = [
                         Cycle({X90(q, subspace='GE') for q in qubits}),
@@ -191,7 +188,7 @@ def JAZZ(
                 cycles = [
                     Cycle({Idle(q, duration=t/2) for q in qubits}),
                     # Cycle({
-                    #     Rz(p[1], phase/2, subspace=self._subspace) 
+                    #     Rz(p[1], phase/2, subspace=self._subspace)
                     #     for p in self._qubits
                     # }),
                     Barrier(qubits),
@@ -205,7 +202,7 @@ def JAZZ(
                     Barrier(qubits),
                     Cycle({Idle(q, duration=t/2) for q in qubits}),
                     Cycle({
-                        Rz(p[1], phase, subspace=self._subspace) 
+                        Rz(p[1], phase, subspace=self._subspace)
                         for p in self._qubits
                     }),
                     Barrier(qubits),
@@ -229,7 +226,7 @@ def JAZZ(
                 self._circuits.append(circuit_C1)
 
             self._circuits['sequence'] = sequence
-            self._circuits['phase'] = phases         
+            self._circuits['phase'] = phases
 
         def analyze(self) -> None:
             """Analyze the data."""
@@ -263,7 +260,7 @@ def JAZZ(
                 a = np.array(prob_C0).max() - e
                 b = np.mean( np.diff(prob_C0) / np.diff(self._times[qp]) ) / a
                 params = Parameters()
-                params.add('a', value=a)  
+                params.add('a', value=a)
                 params.add('b', value=b)
                 params.add('c', value=self._detuning)
                 params.add('d', value=0.)
@@ -290,7 +287,7 @@ def JAZZ(
                         self._freq_C0[qp] - self._freq_C1[qp]
                     )
                     err = uncertainty_of_sum([
-                        self._fit[qp]['C0'].error, 
+                        self._fit[qp]['C0'].error,
                         self._fit[qp]['C1'].error
                     ])
                     val, err = round_to_order_error(val, err)
@@ -347,7 +344,7 @@ def JAZZ(
                             self._times[qp], self._results[qp]['C1'],
                             'o', c='red', label=rf'Q{qp[0]} $|1\rangle$'
                         )
-                        
+
                         if self._fit[qp]['C0'].fit_success:
                             freq = (
                                 self._fit[qp]['C0'].fit_params['c'].value
@@ -359,7 +356,7 @@ def JAZZ(
                                 x, self._fit[qp]['C0'].predict(x), 'b-',
                                 label=f'{freq / kHz:.3f} kHz'
                             )
-                            
+
                         if self._fit[qp]['C1'].fit_success:
                             freq = (
                                 self._fit[qp]['C1'].fit_params['c'].value
@@ -380,16 +377,16 @@ def JAZZ(
                                 f': ZZ = {val / kHz:.3f} ({err / kHz:.3f}) kHz'
                             )
                         ax.set_title(title)
-                        
+
                         ax.legend(loc=0, fontsize=12)
 
                     else:
                         ax.axis('off')
-                    
+
             fig.set_tight_layout(True)
             if settings.Settings.save_data:
                 fig.savefig(
-                    self._data_manager._save_path + 'ZZ_characterization.png', 
+                    self._data_manager._save_path + 'ZZ_characterization.png',
                     dpi=300
                 )
                 fig.savefig(
@@ -409,7 +406,7 @@ def JAZZ(
                     )
                     print(
                         f"{qp}: ZZ = {self._char_values[qp]['val'] / kHz:.3f} "
-                        f"({self._char_values[qp]['err'] / kHz:.3f})"
+                        f"({self._char_values[qp]['err'] / kHz:.3f}) kHz"
                     )
 
             if settings.Settings.save_data:

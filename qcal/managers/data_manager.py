@@ -2,15 +2,15 @@
 
 The saving of data is handled by the DataManager class.
 """
-import qcal.settings as settings
-from qcal.utils import save_to_csv, save_to_pickle
-
 import logging
-import pandas as pd
 import pathlib
-
 from datetime import datetime
 from typing import Any
+
+import pandas as pd
+
+import qcal.settings as settings
+from qcal.utils import save_to_csv, save_to_pickle
 
 logger = logging.getLogger(__name__)
 
@@ -44,7 +44,7 @@ class DataMananger:
             str: today's date.
         """
         return self._date
-    
+
     @property
     def exp_id(self) -> str:
         """Experiment id.
@@ -55,7 +55,7 @@ class DataMananger:
             str: experiment id.
         """
         return self._exp_id
-    
+
     @property
     def save_path(self) -> str:
         """Save path.
@@ -64,7 +64,7 @@ class DataMananger:
             str: path where data is saved.
         """
         return self._save_path
-    
+
     def generate_exp_id(self) -> None:
         """Generate a new experimental id."""
         self._exp_id = datetime.now().strftime('%Y%m%d_%H%M%S')

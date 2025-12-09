@@ -658,7 +658,7 @@ def T2XY(
                 DD_sequence = XY(
                     config=self._config, 
                     qubits=self._qubits, 
-                    length=t, 
+                    time=t, 
                     n_pulses=self._n_pulses, 
                     phase=phase,
                     subspace=self._subspace
