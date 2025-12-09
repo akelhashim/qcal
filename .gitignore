@@ -21,8 +21,6 @@ build/
 
 qcal.egg-info/
 
-config.yaml
-
 data/Q0/model.keras
 
 data/Q0/X_test.npy
