@@ -253,6 +253,40 @@ class QubicQPU(QPU):
         """QubiC compiled_program object."""
         return self._compiled_program
 
+    def _update_demod_phase_from_classifier(self) -> None:
+        """Update demod phase and classifier to align IQ blobs along I-axis.
+        
+        When using the GMM classifier (not sd_param), this method:
+        1. Calculates the angle to the midpoint between |0⟩ and |1⟩ blobs
+        2. Updates the config's demod/phase to rotate blobs onto the I-axis
+        3. Rotates the classifier's GMM means to match the new demod phase
+        """
+        if self._classifier is None:
+            return
+            
+        for q in self._classifier._qubits:
+            # Skip if the GMM hasn't been fitted yet
+            if not self._classifier[q].is_fitted:
+                continue
+            means = self._classifier[q].means_
+            # Calculate angle of line connecting |0⟩ and |1⟩ blobs
+            # We want this line to be horizontal so threshold is at I=0
+            # Use means[0] -> means[1] direction so |0⟩ ends up on positive I
+            diff = means[0] - means[1]
+            angle = np.arctan2(diff[1], diff[0])
+            
+            # Update config: rotate demod phase to make blobs horizontal
+            current_phase = self._config[f'readout/{q}/demod/phase']
+            new_phase = current_phase - angle
+            self._config[f'readout/{q}/demod/phase'] = new_phase
+            
+            # Rotate classifier means by -angle to match new demod phase
+            rotation_matrix = np.array([
+                [np.cos(-angle), -np.sin(-angle)],
+                [np.sin(-angle),  np.cos(-angle)]
+            ])
+            self._classifier[q].means_ = (rotation_matrix @ means.T).T
+
     def generate_sequence(self) -> None:
         """Generate a QubiC sequence.
 
@@ -265,6 +299,7 @@ class QubicQPU(QPU):
         from distproc.compiler import proc_grouping_from_channelconfig
         from qubic.toolchain import run_assemble_stage, run_compile_stage
 
+        self._update_demod_phase_from_classifier()
         self._exp_circuits = self._qubic_transpiler.transpile(
             self._exp_circuits
         )
