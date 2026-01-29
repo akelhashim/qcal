@@ -50,7 +50,7 @@ def plot_freq_spectrum(
         #     'xanchor': 'center',
         #     'yanchor': 'top'
         # },
-        titlefont_size=25,
+        title=dict(font=dict(size=25)),
         showlegend=True,
         hovermode='closest',
         margin=dict(b=20,l=5,r=5,t=40),

@@ -110,7 +110,7 @@ def compute_matrix_A(
                     integrand = g_n_hat * np.conj(g_m_hat)
                     
                     # Numerical integration (trapezoidal rule)
-                    integral_sum += weight * np.trapz(integrand.real, dx=df)
+                    integral_sum += weight * np.trapezoid(integrand.real, dx=df) 
             
             A[n, m] = integral_sum
     
