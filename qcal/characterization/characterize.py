@@ -1,30 +1,29 @@
 """Submodule handling the main characterization class.
 
 """
-import qcal.settings as settings
-
-from qcal.plotting.utils import calculate_nrows_ncols
-from qcal.config import Config
-
 import logging
+from collections import defaultdict
+from typing import Any, Dict, List, Tuple
+
 import matplotlib.pyplot as plt
 import numpy as np
 
-from collections import defaultdict
-from typing import Any, Dict, List, Tuple
+import qcal.settings as settings
+from qcal.config import Config
+from qcal.plotting.utils import calculate_nrows_ncols
 
 logger = logging.getLogger(__name__)
 
 
 class Characterize:
     """Main characterization class.
-    
+
     This class will handle basic characterization methods.
     """
 
     def __init__(self, config: Config) -> None:
         """Initialize the main Calibration class.
-        
+
         Args:
             config (Config): qcal Config object.
         """
@@ -47,7 +46,7 @@ class Characterize:
             Dict: qubit to value map.
         """
         return self._char_values
-    
+
     @property
     def gate(self) -> str:
         """Gate being calibration.
@@ -56,7 +55,7 @@ class Characterize:
             str: name of gate.
         """
         return self._gate
-    
+
     @property
     def param_sweep(self) -> Dict:
         """Sweep values for each param.
@@ -65,7 +64,7 @@ class Characterize:
             Dict: qubit to sweep values map.
         """
         return self._param_sweep
-    
+
     @property
     def params(self) -> Dict:
         """Config parameters to sweep over.
@@ -74,16 +73,16 @@ class Characterize:
             Dict: qubit to param map.
         """
         return self._params
-    
+
     @property
     def results(self) -> Dict:
         """Results from the characterization.
-        
+
         Returns:
             Dict: characterization results for each qubit.
         """
         return self._results
-    
+
     @property
     def subspace(self) -> str:
         """Subspace of the gate being characterized.
@@ -92,7 +91,7 @@ class Characterize:
             str: gate subspace.
         """
         return self._subspace
-    
+
     @property
     def qubits(self) -> List | Tuple:
         """Qubits in the calibration.
@@ -101,23 +100,23 @@ class Characterize:
             List | Tuple: qubit labels.
         """
         return self._qubits
-    
+
     def analyze(self) -> None:
         """Analyze the data.
-        
+
         Raises:
-            NotImplementedError: this method should be handled in the child 
+            NotImplementedError: this method should be handled in the child
                 class.
         """
         raise NotImplementedError(
             'This method should be handled by the child class!'
         )
-    
+
     def generate_circuits(self) -> None:
         """Generate all calibration circuits.
-        
+
         Raises:
-            NotImplementedError: this method should be handled in the child 
+            NotImplementedError: this method should be handled in the child
                 class.
         """
         raise NotImplementedError(
@@ -137,7 +136,7 @@ class Characterize:
             # self._config.load()
 
     def plot(
-            self, xlabel='Value Sweep', ylabel='Results', flabel='Fit', 
+            self, xlabel='Value Sweep', ylabel='Results', flabel='Fit',
             save_path=''
         ) -> None:
         """Plot the sweep and fit results.
@@ -179,12 +178,12 @@ class Characterize:
                     if self._fit[q].fit_success:
                         x = np.linspace(
                             self._param_sweep[q][0],
-                            self._param_sweep[q][-1], 
+                            self._param_sweep[q][-1],
                             100
                         )
                         ax.plot(
                             x, self._fit[q].predict(x),
-                            '-', c='orange', 
+                            '-', c='orange',
                             label=f'Fit: {flabel} = '\
                                f'{round(self._char_values[q] / 1.e-6, 1)} '\
                                rf'({round(self._errors[q] / 1.e-6, 2)}) $\mu$s'
@@ -197,14 +196,14 @@ class Characterize:
 
                 else:
                     ax.axis('off')
-            
+
         fig.set_tight_layout(True)
         if settings.Settings.save_data:
             fig.savefig(save_path + 'characterization_results.png', dpi=600)
             fig.savefig(save_path + 'characterization_results.pdf')
             fig.savefig(save_path + 'characterization_results.svg')
         plt.show()
-    
+
     def set_param(self, param: str, newvalue: Any) -> None:
         """Set a config param to a new value.
 
@@ -212,4 +211,8 @@ class Characterize:
             param (str): config param.
             newvalue (Any): new value for the param.
         """
-        self._config[param] = newvalue
+        try:
+            self._config[param] = newvalue
+        except Exception as e:
+            logger.warning(f' Could not set {param} in the config!')
+            raise e

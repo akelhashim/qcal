@@ -1,30 +1,29 @@
 """Submodule handling the main calibration class.
 
 """
-import qcal.settings as settings
-
-from qcal.plotting.utils import calculate_nrows_ncols
-from qcal.config import Config
-
 import logging
+from collections import defaultdict
+from typing import Any, Dict, List, Tuple
+
 import matplotlib.pyplot as plt
 import numpy as np
 
-from collections import defaultdict
-from typing import Any, Dict, List, Tuple
+import qcal.settings as settings
+from qcal.config import Config
+from qcal.plotting.utils import calculate_nrows_ncols
 
 logger = logging.getLogger(__name__)
 
 
 class Calibration:
     """Main calibration class.
-    
+
     This class will handle basic calibration methods.
     """
 
     def __init__(self, config: Config) -> None:
         """Initialize the main Calibration class.
-        
+
         Args:
             config (Config): qcal Config object.
             esp (bool, optional): whether to enable excited state
@@ -57,7 +56,7 @@ class Calibration:
             Dict: qubit to value map.
         """
         return self._cal_values
-    
+
     @property
     def gate(self) -> str:
         """Gate being calibration.
@@ -66,7 +65,7 @@ class Calibration:
             str: name of gate.
         """
         return self._gate
-    
+
     @property
     def param_sweep(self) -> Dict:
         """Sweep values for each param.
@@ -75,7 +74,7 @@ class Calibration:
             Dict: qubit to sweep values map.
         """
         return self._param_sweep
-    
+
     @property
     def params(self) -> Dict:
         """Config parameters to sweep over.
@@ -84,16 +83,16 @@ class Calibration:
             Dict: qubit to param map.
         """
         return self._params
-    
+
     @property
     def sweep_results(self) -> Dict:
         """Results from the calibration.
-        
+
         Returns:
             Dict: calibration results for each qubit.
         """
         return self._sweep_results
-    
+
     @property
     def subspace(self) -> str:
         """Subspace of the gate being calibrated.
@@ -102,7 +101,7 @@ class Calibration:
             str: gate subspace.
         """
         return self._subspace
-    
+
     @property
     def qubits(self) -> List | Tuple:
         """Qubits in the calibration.
@@ -111,23 +110,23 @@ class Calibration:
             List | Tuple: qubit labels.
         """
         return self._qubits
-    
+
     def analyze(self) -> None:
         """Analyze the data.
-        
+
         Raises:
-            NotImplementedError: this method should be handled in the child 
+            NotImplementedError: this method should be handled in the child
                 class.
         """
         raise NotImplementedError(
             'This method should be handled by the child class!'
         )
-    
+
     def generate_circuits(self) -> None:
         """Generate all calibration circuits.
-        
+
         Raises:
-            NotImplementedError: this method should be handled in the child 
+            NotImplementedError: this method should be handled in the child
                 class.
         """
         raise NotImplementedError(
@@ -149,7 +148,7 @@ class Calibration:
                                 self._params[q][i], self._cal_values[q][i]
                             )
                 elif isinstance(self._fit[q], dict):
-                    if all([fit.fit_success for fit in self._fit[q].values()]):
+                    if all(fit.fit_success for fit in self._fit[q].values()):
                         for i, param in enumerate(self._params[q]):
                             self.set_param(
                                 self._params[q][i], self._cal_values[q][i]
@@ -164,7 +163,7 @@ class Calibration:
                         if (isinstance(self._params[q], (list, tuple)) and
                             isinstance(self._cal_values[q], (list, tuple))):
                             for param, val in zip(
-                                self._params[q],self._cal_values[q]):
+                                self._params[q],self._cal_values[q], strict=False):
                                 self.set_param(param, val)
                         elif (
                             isinstance(self._params[q], (list, tuple)) and not
@@ -229,12 +228,12 @@ class Calibration:
                     else:
                         ax.plot(
                             self._param_sweep[q], self._sweep_results[q],
-                            'o', c='blue', label=f'Meas'
+                            'o', c='blue', label='Meas'
                         )
                     if self._fit and self._fit[q].fit_success:
                         x = np.linspace(
                             self._param_sweep[q][0],
-                            self._param_sweep[q][-1], 
+                            self._param_sweep[q][-1],
                             100
                         )
                         ax.plot(
@@ -242,32 +241,32 @@ class Calibration:
                             '-', c='orange', label='Fit'
                         )
                         ax.axvline(
-                            self._cal_values[q],  
+                            self._cal_values[q],
                             ls='--', c='k', label='Fit value'
                         )
 
                     elif self._cal_values[q]:
                         ax.axvline(
-                            self._cal_values[q],  
+                            self._cal_values[q],
                             ls='--', c='k', label='Opt. value'
                         )
 
                     ax.text(
-                            0.05, 0.95, f'Q{q}', size=12, 
+                            0.05, 0.95, f'Q{q}', size=12,
                             transform=ax.transAxes
                         )
                     ax.legend(loc=1, fontsize=10)
 
                 else:
                     ax.axis('off')
-            
+
         fig.set_tight_layout(True)
         if settings.Settings.save_data:
             fig.savefig(save_path + 'calibration_results.png', dpi=600)
             fig.savefig(save_path + 'calibration_results.pdf')
             fig.savefig(save_path + 'calibration_results.svg')
         plt.show()
-    
+
     def set_param(self, param: str, newvalue: Any) -> None:
         """Set a config param to a new value.
 
@@ -275,6 +274,11 @@ class Calibration:
             param (str): config param.
             newvalue (Any): new value for the param.
         """
-        self._config[param] = (
+        try:
+            self._config[param] = (
             float(newvalue) if isinstance(newvalue, float) else newvalue
         )
+        except Exception as e:
+            logger.warning(f' Could not set {param} in the config!')
+            raise e
+
