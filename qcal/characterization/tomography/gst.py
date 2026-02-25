@@ -9,10 +9,15 @@ Relevant code repos:
 """
 import logging
 from collections.abc import Iterable
-from typing import Any, Callable, List, Tuple
+from typing import Any, Callable, Dict, List, Tuple
 
+import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
+import plotly.graph_objects as go
 from IPython.display import clear_output
+from numpy.typing import NDArray
+from plotly.subplots import make_subplots
 
 import qcal.settings as settings
 from qcal.config import Config
@@ -253,6 +258,144 @@ def GST(qpu:            QPU,
                 self._data_manager._save_path, verbosity=2
             )
 
+        def plot(self) -> None:
+            """Plot the PTMs and their associated performance metrics."""
+            save_path = self._data_manager._save_path
+            basis_state = {
+                4: ['I', 'X', 'Y', 'Z'],
+                16: [
+                    'II', 'IX', 'IY', 'IZ', 'XI', 'XX', 'XY', 'XZ',
+                    'YI', 'YX', 'YY', 'YZ', 'ZI', 'ZX', 'ZY', 'ZZ'
+                ]
+            }
+
+            for model, gateset in self.ptm.items():
+                gates = list(gateset.keys())
+                ptms = list(gateset.values())
+                nrows, ncols = calculate_nrows_ncols(len(gateset), max_ncols=3)
+
+                # Matplotlib plot
+                figsize = (5 * ncols, 5 * nrows)
+                fig, axes = plt.subplots(
+                    nrows, ncols, figsize=figsize, layout='constrained'
+                )
+                fig.suptitle(model, fontsize=15)
+
+                # Plotly plot
+                ei = self.entanglement_infidelity[model]
+                dn = self.diamond_norm[model]
+                pfig = make_subplots(
+                    rows=nrows,
+                    cols=ncols,
+                    # title=model,
+                    subplot_titles=[
+                        f"{gate}<br>Proc. Inf. = {ei[gate.split('.')[0]]:.3f}, "
+                        f"Diam. Norm = {dn[gate.split('.')[0]]:.3f}"
+                        for gate in gates
+                    ]
+                )
+
+                k = -1
+                for i in range(nrows):
+                    for j in range(ncols):
+                        k += 1
+
+                        if len(gates) == 1:
+                            ax = axes
+                        elif axes.ndim == 1:
+                            ax = axes[j]
+                        elif axes.ndim == 2:
+                            ax = axes[i,j]
+
+                        if k < len(gates):
+                            gate = gates[k]
+                            ptm = ptms[k]
+
+                            # Matplotlib plot
+                            im = ax.imshow(ptm, cmap='RdBu', vmin=-1, vmax=1)
+                            ax.set_xticks(
+                                range(ptm.shape[0]), basis_state[ptm.shape[0]],
+                                fontsize=12
+                            )
+                            ax.set_yticks(
+                                range(ptm.shape[1]), basis_state[ptm.shape[1]],
+                                fontsize=12
+                            )
+                            fig.colorbar(im, ax=ax)
+                            # Add text annotations
+                            for m in range(ptm.shape[0]):
+                                for n in range(ptm.shape[1]):
+                                    value = ptm[m, n]
+                                    ax.text(
+                                        n, m,
+                                        f"{value:.2f}",
+                                        ha='center',
+                                        va='center',
+                                        color='w' if abs(value) > 0.5 else 'k'
+                                    )
+                            inf = self.entanglement_infidelity[model][
+                                gate.split('.')[0]
+                            ]
+                            dn = self.diamond_norm[model][gate.split('.')[0]]
+                            ax.set_title(
+                                f'{gate}\n'
+                                f'Proc. Inf. = {inf:.3f}, '
+                                f'Diam. Norm = {dn:.3f}'
+                            )
+
+                            # Plotly plot
+                            pfig.add_trace(
+                                go.Heatmap(
+                                    z=ptm,
+                                    x=basis_state[ptm.shape[0]],
+                                    y=basis_state[ptm.shape[1]],
+                                    coloraxis="coloraxis",
+                                ),
+                                row=i + 1,
+                                col=j + 1
+                            )
+                            pfig.update_yaxes(
+                                categoryorder="array",
+                                categoryarray=list(
+                                    reversed(basis_state[ptm.shape[1]])
+                                ),
+                                row=i + 1,
+                                col=j + 1
+                            )
+
+                        else:
+                            ax.axis('off')
+                            pfig.update_xaxes(
+                                visible=False, row=i + 1, col=j + 1
+                            )
+                            pfig.update_yaxes(
+                                visible=False, row=i + 1, col=j + 1
+                            )
+
+                pfig.update_layout(
+                    coloraxis={
+                        'colorscale': 'RdBu',
+                        'cmin': -1,
+                        'cmax': 1,
+                        'colorbar': {'title': 'Value'}
+                    },
+                    height=400 * nrows + 50,
+                    width=400 * ncols
+                )
+                pfig.update_layout(
+                    title_text=model
+                )
+                pfig.show()
+
+                if settings.Settings.save_data:
+                    fig.savefig(
+                        save_path + f"{model.replace(' ', '')}.png",
+                        dpi=600
+                    )
+                    fig.savefig(save_path + f"{model.replace(' ', '')}.pdf")
+                    fig.savefig(save_path + f"{model.replace(' ', '')}.svg")
+                plt.close(fig)
+
         def final(self) -> None:
             """Final method."""
             print(f"\nRuntime: {repr(self._runtime)[8:]}\n")
@@ -263,6 +406,7 @@ def GST(qpu:            QPU,
             qpu.run(self, self._circuits, save=False)
             self.save()
             self.analyze()
+            self.plot()
             self.final()
 
     return GST(
