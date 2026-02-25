@@ -23,8 +23,8 @@ from qcal.managers.classification_manager import ClassificationManager
 from qcal.managers.data_manager import DataMananger
 from qcal.utils import load_from_pickle
 
-# logger = logging.getLogger(__name__)
-logger = logging.getLogger('QPU')
+logger = logging.getLogger(__name__)
+# logger = logging.getLogger('QPU')
 logging.getLogger().setLevel(logging.INFO)
 
 

@@ -59,8 +59,8 @@ def post_process(
         measure_qubits (List[str] | None, optional): list of qubit labels
             for post-processing measurements. Defaults to None. If None, these
             will be extracted from the measurements.
-         n_reads_per_shot (int | dict | None, optional): number of reads per
-                shot per circuit. Defaults to None.
+        n_reads_per_shot (int | dict | None, optional): number of reads per
+            shot per circuit. Defaults to None.
         classifier (ClassificationManager, None): manager used for classifying
             raw data. Defaults to None.
         raster_circuits (bool, optional): whether to raster through all

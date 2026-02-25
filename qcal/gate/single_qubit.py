@@ -3,6 +3,7 @@
 See https://threeplusone.com/pubs/on_gates.pdf for relevant definitions.
 """
 from collections import defaultdict
+from collections.abc import Callable, Mapping
 from random import gauss, randint
 from typing import Dict, List, Tuple, Union
 
@@ -182,7 +183,7 @@ def u3(theta: float, phi: float, gamma: float) -> NDArray:
 class C(Gate):
     """Class for the axis cycling (C) gate."""
 
-    def __init__(self, qubit: int) -> None:
+    def __init__(self, qubit: int, **kwargs) -> None:
         """Initialize using the rn function.
 
         Args:
@@ -199,7 +200,7 @@ class C(Gate):
 class H(Gate):
     """Class for the Hadamard (H) gate."""
 
-    def __init__(self, qubit: int) -> None:
+    def __init__(self, qubit: int, **kwargs) -> None:
         """Initialize using the h gate.
 
         Args:
@@ -213,7 +214,7 @@ class H(Gate):
 class Id(Gate):
     """Class for the identity gate."""
 
-    def __init__(self, qubit: int) -> None:
+    def __init__(self, qubit: int, **kwargs) -> None:
         """Initialize using the id gate.
 
         Args:
@@ -230,7 +231,7 @@ class Id(Gate):
 class Idle(Gate):
     """Class for the idle gate."""
 
-    def __init__(self, qubit: int, duration: float = 0*ns) -> None:
+    def __init__(self, qubit: int, duration: float = 0*ns, **kwargs) -> None:
         """Initialize using the id gate.
 
         Args:
@@ -249,7 +250,7 @@ class Idle(Gate):
 class Meas(Gate):
     """Class for a single-qubit measurement operation."""
 
-    def __init__(self, qubit: int, basis: str = 'Z') -> None:
+    def __init__(self, qubit: int, basis: str = 'Z', **kwargs) -> None:
         """Initialize using the meas matrix.
 
         Args:
@@ -281,7 +282,7 @@ class MCM(Gate):
             dd_qubits:   List | Tuple = [],  # noqa: B006
             dd_method:   str = 'XY',
             n_dd_pulses: int = 8,
-        ) -> None:
+    ) -> None:
         """Initialize using the meas matrix.
 
         Args:
@@ -326,14 +327,14 @@ class Reset(Gate):
     """Class for qubit reset in the middle of a circuit."""
 
     def __init__(
-            self,
-            qubit:         int,
-            measure_first: bool = True,
-            method:        List[str] = ['active'],  # noqa: B006
-            dd_qubits:     List | Tuple = [],  # noqa: B006
-            dd_method:     str = 'XY',
-            n_dd_pulses:   int = 8,
-        ) -> None:
+        self,
+        qubit:         int,
+        measure_first: bool = True,
+        method:        List[str] = ['active'],  # noqa: B006
+        dd_qubits:     List | Tuple = [],  # noqa: B006
+        dd_method:     str = 'XY',
+        n_dd_pulses:   int = 8,
+    ) -> None:
         """Initialize using the meas matrix.
 
         Args:
@@ -364,7 +365,7 @@ class Reset(Gate):
 class RandSU2(Gate):
     """Class for a random SU(2) gate."""
 
-    def __init__(self, qubit: int) -> None:
+    def __init__(self, qubit: int, **kwargs) -> None:
         """Initialize using the rn function.
 
         Args:
@@ -392,11 +393,12 @@ class Rn(Gate):
         rn.matrix  # Numpy array of the matrix
     """
 
-    def __init__(self,
-            qubit: int,
-            theta: float,
-            n: Union[List, Tuple, NDArray]
-        ) -> None:
+    def __init__(
+        self,
+        qubit: int,
+        theta: float,
+        n: Union[List, Tuple, NDArray]
+    ) -> None:
         """Initialize using the rn function.
 
         Args:
@@ -422,7 +424,7 @@ class Rx(Gate):
         rx.matrix  # Numpy array of the matrix
     """
 
-    def __init__(self, qubit: int, theta: float) -> None:
+    def __init__(self, qubit: int, theta: float, **kwargs) -> None:
         """Initialize using the rx function.
 
         Args:
@@ -447,7 +449,7 @@ class Ry(Gate):
         ry.matrix  # Numpy array of the matrix
     """
 
-    def __init__(self, qubit: int, theta: float) -> None:
+    def __init__(self, qubit: int, theta: float, **kwargs) -> None:
         """Initialize using the ry function.
 
         Args:
@@ -472,9 +474,9 @@ class Rz(Gate):
         rz.matrix  # Numpy array of the matrix
     """
 
-    def __init__(self,
-            qubit: int, theta: float, subspace: str = 'GE'
-        ) -> None:
+    def __init__(
+        self, qubit: int, theta: float, subspace: str = 'GE', **kwargs
+    ) -> None:
         """Initialize using the rz function.
 
         Args:
@@ -495,7 +497,7 @@ class Rz(Gate):
 class S(Gate):
     """Class for the phase S = sqrt(Z) gate."""
 
-    def __init__(self, qubit: int) -> None:
+    def __init__(self, qubit: int, **kwargs) -> None:
         """Initialize using the Rz gate.
 
         Args:
@@ -513,7 +515,7 @@ class S(Gate):
 class SX(Gate):
     """Class for the SX = X90 gate."""
 
-    def __init__(self, qubit: int) -> None:
+    def __init__(self, qubit: int, **kwargs) -> None:
         """Initialize using the rx gate.
 
         Args:
@@ -531,7 +533,7 @@ class SX(Gate):
 class SY(Gate):
     """Class for the SY = Y90 gate."""
 
-    def __init__(self, qubit: int) -> None:
+    def __init__(self, qubit: int, **kwargs) -> None:
         """Initialize using the ry gate.
 
         Args:
@@ -549,7 +551,7 @@ class SY(Gate):
 class Sdag(Gate):
     """Class for the phase S^dagger gate."""
 
-    def __init__(self, qubit: int) -> None:
+    def __init__(self, qubit: int, **kwargs) -> None:
         """Initialize using the Rz gate.
 
         Args:
@@ -567,7 +569,7 @@ class Sdag(Gate):
 class SXdag(Gate):
     """Class for the SXdag = X-90 gate."""
 
-    def __init__(self, qubit: int) -> None:
+    def __init__(self, qubit: int, **kwargs) -> None:
         """Initialize using the rx gate.
 
         Args:
@@ -585,7 +587,7 @@ class SXdag(Gate):
 class SYdag(Gate):
     """Class for the SYdag = Y-90 gate."""
 
-    def __init__(self, qubit: int) -> None:
+    def __init__(self, qubit: int, **kwargs) -> None:
         """Initialize using the ry gate.
 
         Args:
@@ -603,7 +605,7 @@ class SYdag(Gate):
 class T(Gate):
     """Class for the fourth-root of Z (T) gate."""
 
-    def __init__(self, qubit: int) -> None:
+    def __init__(self, qubit: int, **kwargs) -> None:
         """Initialize using the t gate.
 
         Args:
@@ -621,7 +623,7 @@ class T(Gate):
 class Tdag(Gate):
     """Class for the inverse fourth-root of Z gate."""
 
-    def __init__(self, qubit: int) -> None:
+    def __init__(self, qubit: int, **kwargs) -> None:
         """Initialize using the tdag gate.
 
         Args:
@@ -639,9 +641,14 @@ class Tdag(Gate):
 class U3(Gate):
     """Class for the U3 gate."""
 
-    def __init__(self,
-            qubit: int, theta: float, phi: float, gamma: float,
-        ) -> None:
+    def __init__(
+        self,
+        qubit: int,
+        theta: float,
+        phi: float,
+        gamma: float,
+        **kwargs
+    ) -> None:
         """Initialize using the u3 function.
 
         Args:
@@ -662,7 +669,7 @@ class U3(Gate):
 class V(Gate):
     """Class for the V = X90 gate."""
 
-    def __init__(self, qubit: int) -> None:
+    def __init__(self, qubit: int, **kwargs) -> None:
         """Initialize using the rx gate.
 
         Args:
@@ -680,7 +687,7 @@ class V(Gate):
 class Vdag(Gate):
     """Class for the Vdag = X-90 gate."""
 
-    def __init__(self, qubit: int) -> None:
+    def __init__(self, qubit: int, **kwargs) -> None:
         """Initialize using the rx gate.
 
         Args:
@@ -698,9 +705,13 @@ class Vdag(Gate):
 class VirtualZ(Gate):
     """Class for virtual Z gate."""
 
-    def __init__(self,
-            qubit: int, theta: float, subspace: str = 'GE'
-        ) -> None:
+    def __init__(
+        self,
+        qubit: int,
+        theta: float,
+        subspace: str = 'GE',
+        **kwargs
+    ) -> None:
         """Initialize using the rz function.
 
         Args:
@@ -721,7 +732,7 @@ class VirtualZ(Gate):
 class X(Gate):
     """Class for the Pauli X gate."""
 
-    def __init__(self, qubit: int, subspace: str = 'GE') -> None:
+    def __init__(self, qubit: int, subspace: str = 'GE', **kwargs) -> None:
         """Initialize using the x gate.
 
         Args:
@@ -741,7 +752,7 @@ class X(Gate):
 class X90(Gate):
     """Class for the X90 = sqrt(X) gate."""
 
-    def __init__(self, qubit: int, subspace: str = 'GE') -> None:
+    def __init__(self, qubit: int, subspace: str = 'GE', **kwargs) -> None:
         """Initialize using the rx gate.
 
         Args:
@@ -762,7 +773,7 @@ class X90(Gate):
 class Y(Gate):
     """Class for the Pauli Y gate."""
 
-    def __init__(self, qubit: int, subspace: str = 'GE') -> None:
+    def __init__(self, qubit: int, subspace: str = 'GE', **kwargs) -> None:
         """Initialize using the Y gate.
 
         Args:
@@ -782,7 +793,7 @@ class Y(Gate):
 class Y90(Gate):
     """Class for the Y90 = sqrt(Y) gate."""
 
-    def __init__(self, qubit: int, subspace: str = 'GE') -> None:
+    def __init__(self, qubit: int, subspace: str = 'GE', **kwargs) -> None:
         """Initialize using the ry gate.
 
         Args:
@@ -802,7 +813,7 @@ class Y90(Gate):
 class Z(Gate):
     """Class for the Pauli Z gate."""
 
-    def __init__(self, qubit: int, subspace: str = 'GE') -> None:
+    def __init__(self, qubit: int, subspace: str = 'GE', **kwargs) -> None:
         """Initialize using the z gate.
 
         Args:
@@ -822,7 +833,7 @@ class Z(Gate):
 class Z90(Gate):
     """Class for the Z90 = sqrt(Z) gate."""
 
-    def __init__(self, qubit: int, subspace: str = 'GE') -> None:
+    def __init__(self, qubit: int, subspace: str = 'GE', **kwargs) -> None:
         """Initialize using the Rz gate.
 
         Args:
@@ -838,35 +849,37 @@ class Z90(Gate):
         self._properties['subspace'] = subspace
 
 
-single_qubit_gates = defaultdict(lambda: 'Gate not currently supported!', {
-    'C':        C,
-    'H':        H,
-    'Id':       Id,
-    'Idle':     Idle,
-    'Meas':     Meas,
-    'MCM':      MCM,
-    'RandSU2':  RandSU2,
-    'Reset':    Reset,
-    'Rn':       Rn,
-    'Rx':       Rx,
-    'Ry':       Ry,
-    'Rz':       Rz,
-    'S':        S,
-    'SX':       SX,
-    'SY':       SY,
-    'Sdag':     Sdag,
-    'SXdag':    SXdag,
-    'SYdag':    SYdag,
-    'T':        T,
-    'Tdag':     Tdag,
-    'U3':       U3,
-    'V':        V,
-    'Vdag':     Vdag,
-    'VirtualZ': VirtualZ,
-    'X':        X,
-    'X90':      X90,
-    'Y':        Y,
-    'Y90':      Y90,
-    'Z':        Z,
-    'Z90':      Z90
-})
+single_qubit_gates: Mapping[str, Callable] = defaultdict(
+    lambda: 'Gate not currently supported!', {
+        'C':        C,
+        'H':        H,
+        'Id':       Id,
+        'Idle':     Idle,
+        'Meas':     Meas,
+        'MCM':      MCM,
+        'RandSU2':  RandSU2,
+        'Reset':    Reset,
+        'Rn':       Rn,
+        'Rx':       Rx,
+        'Ry':       Ry,
+        'Rz':       Rz,
+        'S':        S,
+        'SX':       SX,
+        'SY':       SY,
+        'Sdag':     Sdag,
+        'SXdag':    SXdag,
+        'SYdag':    SYdag,
+        'T':        T,
+        'Tdag':     Tdag,
+        'U3':       U3,
+        'V':        V,
+        'Vdag':     Vdag,
+        'VirtualZ': VirtualZ,
+        'X':        X,
+        'X90':      X90,
+        'Y':        Y,
+        'Y90':      Y90,
+        'Z':        Z,
+        'Z90':      Z90
+    }
+)

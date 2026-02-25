@@ -1,10 +1,11 @@
 """Submodule for handling pyGSTi reports.
 
 """
-from qcal.circuit import CircuitSet
+import logging
 
 import pandas as pd
-import logging
+
+from qcal.circuit import CircuitSet
 
 logger = logging.getLogger(__name__)
 

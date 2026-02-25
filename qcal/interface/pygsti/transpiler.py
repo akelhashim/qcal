@@ -192,7 +192,8 @@ class PyGSTiTranspiler(Transpiler):
                     'Gxx':     add_parallel_X90s,
                     'Gxy':     add_parallel_X90_Y90,
                     'Gyx':     add_parallel_Y90_X90,
-                    'Gyy':     add_parallel_Y90s
+                    'Gyy':     add_parallel_Y90s,
+                    'Iz':      single_qubit_gates['MCM']
                 }
             )
 

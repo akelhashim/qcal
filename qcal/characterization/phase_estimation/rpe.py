@@ -6,31 +6,36 @@ https://journals.aps.org/prl/abstract/10.1103/PhysRevLett.118.190502
 
 Relevant pyRPE code: https://gitlab.com/quapack/pyrpe
 """
-import qcal.settings as settings
-
-from qcal.characterization.phase_estimation.analysis import (
-    analyze_idle, analyze_x90, analyze_cz, analyze_zz
-)
-from qcal.characterization.phase_estimation.circuits import (
-    make_idle_circuits, make_x90_circuits, make_cz_circuits
-)
-from qcal.config import Config
-from qcal.math.utils import round_to_order_error
-from qcal.qpu.qpu import QPU
-from qcal.plotting.utils import calculate_nrows_ncols
-from qcal.utils import save_init
-
 import logging
+from collections.abc import Iterable
+from typing import Callable, Dict, List
+
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import scipy
-
-from collections.abc import Iterable
 from IPython.display import clear_output
 from matplotlib.lines import Line2D
-from numpy.typing import NDArray, ArrayLike
-from typing import Callable, Dict, List
+from numpy.typing import ArrayLike, NDArray
+
+import qcal.settings as settings
+from qcal.characterization.phase_estimation.analysis import (
+    analyze_cz,
+    analyze_idle,
+    analyze_x90,
+    analyze_zz,
+)
+from qcal.characterization.phase_estimation.circuits import (
+    make_cz_circuits,
+    make_idle_circuits,
+    make_x90_circuits,
+)
+from qcal.config import Config
+from qcal.math.utils import round_to_order_error
+from qcal.plotting.utils import calculate_nrows_ncols
+from qcal.qpu.qpu import QPU
+from qcal.results import Results
+from qcal.utils import save_init
 
 logger = logging.getLogger(__name__)
 
@@ -74,17 +79,17 @@ def CZ(theta_iz: float, theta_zi: float, theta_zz: float) -> NDArray:
 
     return scipy.linalg.expm(
         -1j / 2 * (
-            theta_iz * pygsti.sigmaiz + 
-            theta_zi * pygsti.sigmazi + 
+            theta_iz * pygsti.sigmaiz +
+            theta_zi * pygsti.sigmazi +
             theta_zz * pygsti.sigmazz
         )
     )
 
 
 def plot_signal(
-        signal:         Dict, 
+        signal:         Dict,
         circuit_depths: ArrayLike,
-        ax:             plt.axes = None, 
+        ax:             plt.axes = None,
         title:          str = None
     ) -> None:
     """Plot RPE signal decay.
@@ -102,11 +107,11 @@ def plot_signal(
     # Plot the signals on the complex plane with a colormap for the depth
     n = 0
     for label, data in signal.items():
-        for i, d in enumerate(circuit_depths):
+        for i, _d in enumerate(circuit_depths):
             ax.scatter(
-                data[i].real, 
+                data[i].real,
                 data[i].imag,
-                marker=mt[n], 
+                marker=mt[n],
                 color=plt.cm.viridis(i / (len(circuit_depths) - 1)),
                 label=label if i == 0 else None
             )
@@ -118,9 +123,9 @@ def plot_signal(
     ax.grid()
     ax.legend(loc=1)
 
-    # Add colorbar 
+    # Add colorbar
     sm = plt.cm.ScalarMappable(
-        cmap=plt.cm.viridis, 
+        cmap=plt.cm.viridis,
         norm=plt.Normalize(vmin=0, vmax=len(circuit_depths))
     )
     sm.set_array([])
@@ -139,7 +144,7 @@ def RPE(qpu:            QPU,
         config:         Config,
         qubit_labels:   Iterable[int],
         gate:           str,
-        circuit_depths: List[int] = [1, 2, 4, 8, 16, 32, 64, 128, 256],
+        circuit_depths: List[int] = [1, 2, 4, 8, 16, 32, 64, 128, 256],  # noqa: B006
         gate_layer:     List = None,
         loss_angle:     str | List[str] | None = None,
         **kwargs
@@ -151,17 +156,17 @@ def RPE(qpu:            QPU,
     Args:
         qpu (QPU): custom QPU object.
         config (Config): qcal Config object.
-        qubit_labels (Iterable[int]): a list specifying sets of system labels 
+        qubit_labels (Iterable[int]): a list specifying sets of system labels
             on which to perform RPE for a given gate.
         gate (str): gate on which to perform RPE.
-        circuit_depths (List[int], optional): a list of positive integers 
-            specifying the circuit depths. Defaults to ```[1, 2, 4, 8, 16, 32, 
+        circuit_depths (List[int], optional): a list of positive integers
+            specifying the circuit depths. Defaults to ```[1, 2, 4, 8, 16, 32,
             64, 128, 256]```.
         gate_layer (List, optional): custom gate layer for the gate of interest.
             Defaults to None.
-        loss_angle (str | list[str] | None, optional): a string or list of 
-            strings specifying which angle to use for calculating the loss from 
-            RPE. Defaults to None. If None, all angles are used. For example, 
+        loss_angle (str | list[str] | None, optional): a string or list of
+            strings specifying which angle to use for calculating the loss from
+            RPE. Defaults to None. If None, all angles are used. For example,
             for the X90 gate, the possible options are `'X'` or `'Z'`.
 
     Returns:
@@ -170,13 +175,13 @@ def RPE(qpu:            QPU,
 
     class RPE(qpu):
         """pyRPE protocol."""
-        
+
         @save_init
         def __init__(self,
                 config:         Config,
                 qubit_labels:   Iterable[int],
                 gate:           str,
-                circuit_depths: List[int] = [1, 2, 4, 8, 16, 32, 64, 128, 256],
+                circuit_depths: List[int] = [1, 2, 4, 8, 16, 32, 64, 128, 256],  # noqa: B006
                 gate_layer:     List = None,
                 loss_angle:     str | None = None,
                 **kwargs
@@ -185,8 +190,7 @@ def RPE(qpu:            QPU,
 
             try:
                 import pygsti
-                from pygsti.modelpacks import smq2Q_XXYYII
-                from pygsti.modelpacks import smq2Q_XYICPHASE
+                from pygsti.modelpacks import smq2Q_XXYYII, smq2Q_XYICPHASE
                 logger.info(f" pyGSTi version: {pygsti.__version__}\n")
             except ImportError:
                 logger.warning(' Unable to import pyGSTi!')
@@ -218,7 +222,6 @@ def RPE(qpu:            QPU,
                 'I':   None,
                 'X90': smq2Q_XXYYII.target_model(),
                 'CZ':  smq2Q_XYICPHASE.target_model(),
-                'I':   None
             }
             self._make_circuits = {
                 'I':   make_idle_circuits,
@@ -282,7 +285,7 @@ def RPE(qpu:            QPU,
                 Dict: last good index.
             """
             return self._last_good_idx
-        
+
         @property
         def loss(self) -> Dict:
             """Loss for each qubit using the most trusted RPE estimates.
@@ -310,7 +313,7 @@ def RPE(qpu:            QPU,
                 loss[ql] = vals
 
             return loss
-        
+
         @property
         def signal(self) -> Dict:
             """Signal decay.
@@ -321,23 +324,23 @@ def RPE(qpu:            QPU,
                 Dict: signal as a function of cirucit depth for each experiment.
             """
             return self._signal
-        
+
         @property
         def trusted_angle_est(self) -> Dict:
             """Most trusted angle estimates.
 
             Returns:
-                Dict: trusted angle estimates and uncertainties for each qubit 
+                Dict: trusted angle estimates and uncertainties for each qubit
                     label and error type.
             """
             return self._trusted_angle_est
-        
+
         @property
         def trusted_error_est(self) -> Dict:
             """Most trusted error estimates.
 
             Returns:
-                Dict: trusted error estimates and uncertainties for each qubit 
+                Dict: trusted error estimates and uncertainties for each qubit
                     label and error type.
             """
             return self._trusted_err_est
@@ -348,8 +351,8 @@ def RPE(qpu:            QPU,
 
             logger.info(' Generating circuits from pyGSTi...')
             circuits = self._make_circuits[self._gate](
-                self._circuit_depths, 
-                self._qubit_labels, 
+                self._circuit_depths,
+                self._qubit_labels,
                 self._gate_layer
             )
             self._circuits = load_circuits(circuits)
@@ -357,33 +360,33 @@ def RPE(qpu:            QPU,
         def save(self):
             """Save all circuits and data."""
             self._data_manager._exp_id += (
-                f'_RPE_Q{"".join(str(q) for q in self._qubit_labels)}'
+                f'_RPE_{"".join("Q" + str(q) for q in self._qubit_labels)}'
             )
 
             if settings.Settings.save_data:
                 logger.info(' Saving the circuits...')
                 qpu.save(self)
-                
+
         def generate_pygsti_dataset(self):
             """Generate a pyGSTi dataset for each qubit label."""
             logger.info(' Generating pyGSTi reports...')
-            
+
             circuits = self._transpiled_circuits
             fileloc = self.data_manager.save_path
             for ql in self._qubit_labels:
                 if isinstance(ql, Iterable):
                     q_index = tuple([self._qubits.index(q) for q in ql])
-                    qs = ''.join(str(q) for q in ql)
+                    qs = '_'.join(str(q) for q in ql)
                 else:
-                    q_index = tuple([self._qubits.index(ql)])
+                    q_index = (self._qubits.index(ql),)
                     qs = str(ql)
 
                 results_dfs = []
-                for i, circuit in enumerate(circuits):
+                for i, result in enumerate(circuits['results']):
                     results_dfs.append(
                         pd.DataFrame(
-                            [circuit.results.marginalize(q_index).dict], 
-                            index=[circuits['pygsti_circuit'][i]]
+                            [Results(result).marginalize(q_index).dict],
+                            index=[self._circuits[i].str]
                         )
                     )
                 results_df = pd.concat(results_dfs)
@@ -398,9 +401,9 @@ def RPE(qpu:            QPU,
                     )
                     f.close()
                 results_df.to_csv(
-                    f'{fileloc}dataset_{qs}.txt', 
-                    sep=' ', 
-                    mode='a', 
+                    f'{fileloc}dataset_{qs}.txt',
+                    sep=' ',
+                    mode='a',
                     header=False
                 )
 
@@ -408,23 +411,23 @@ def RPE(qpu:            QPU,
             """Analyze the RPE results."""
             logger.info(' Analyzing the results...')
             import pygsti
-            
+
             clear_output(wait=True)
             for ql in self._qubit_labels:
                 if isinstance(ql, Iterable):
                     qs = ''.join(str(q) for q in ql)
                 else:
                     qs = str(ql)
-                
+
                 dataset = pygsti.io.read_dataset(
                     self.data_manager.save_path + f'dataset_{qs}.txt'
                 )
                 self._datasets[ql] = dataset
 
                 results = self._analyze_results[self._gate](
-                    dataset, 
-                    self._qubit_labels, 
-                    self._circuit_depths, 
+                    dataset,
+                    self._qubit_labels,
+                    self._circuit_depths,
                     self._gate_layer
                 )
                 angle_estimates, angle_errors, last_good_idx, signal = results
@@ -488,7 +491,7 @@ def RPE(qpu:            QPU,
                         ql = self._qubit_labels[k]
                         for angle, errors in self._angle_errors[ql].items():
                             ax.errorbar(
-                                self._circuit_depths[:len(errors)], 
+                                self._circuit_depths[:len(errors)],
                                 errors,
                                 yerr=np.pi/(2*np.array(
                                     self._circuit_depths[:len(errors)]
@@ -499,14 +502,14 @@ def RPE(qpu:            QPU,
                                 label=angle
                             )
                         ax.axvline(
-                            2**self._last_good_idx[ql], 
+                            2**self._last_good_idx[ql],
                             ls='--',
                             c='k',
                             label='Last good depth',
                         )
 
                         maxval = np.nanmax(np.abs(np.concatenate(
-                            [err for err in self._angle_errors[ql].values()]
+                            list(self._angle_errors[ql].values())
                         )))
                         ax.set_ylim((-1.1 * maxval, 1.1 * maxval))
 
@@ -518,16 +521,16 @@ def RPE(qpu:            QPU,
                         )
                         ax.set_xscale('log')
                         # ax.set_yscale('log')
-                        ax.legend(prop=dict(size=12))
+                        ax.legend(prop={'size': 12})
                         ax.grid(True)
 
                     else:
                         ax.axis('off')
-                
+
             fig.set_tight_layout(True)
             if settings.Settings.save_data:
                 fig.savefig(
-                    self._data_manager._save_path + 'RPE.png', 
+                    self._data_manager._save_path + 'RPE.png',
                     dpi=300
                 )
                 fig.savefig(
@@ -562,7 +565,7 @@ def RPE(qpu:            QPU,
                         ql = self._qubit_labels[k]
 
                         plot_signal(
-                            signal=self._signal[ql], 
+                            signal=self._signal[ql],
                             circuit_depths=self._circuit_depths,
                             ax=ax,
                             title=f'Q{ql}'
@@ -574,7 +577,7 @@ def RPE(qpu:            QPU,
             # fig.set_tight_layout(True)
             if settings.Settings.save_data:
                 fig.savefig(
-                    self._data_manager._save_path + 'RPE_signal.png', 
+                    self._data_manager._save_path + 'RPE_signal.png',
                     dpi=300
                 )
                 fig.savefig(
@@ -597,7 +600,7 @@ def RPE(qpu:            QPU,
                 self._data_manager.save_to_csv(
                     pd.DataFrame([self._last_good_idx]), 'last_good_idx'
                 )
-            
+
             print(f"\nRuntime: {repr(self._runtime)[8:]}\n")
 
         def run(self):
@@ -613,7 +616,7 @@ def RPE(qpu:            QPU,
     return RPE(
         config=config,
         qubit_labels=qubit_labels,
-        gate=gate,   
+        gate=gate,
         circuit_depths=circuit_depths,
         gate_layer=gate_layer,
         loss_angle=loss_angle,
