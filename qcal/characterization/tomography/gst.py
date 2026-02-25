@@ -132,29 +132,338 @@ def GST(qpu:            QPU,
             qpu.__init__(self, config=config, transpiler=transpiler, **kwargs)
 
         @property
-        def pspec(self):
-            """pyGSTi processor spec."""
-            return self._pspec
+        def avg_gate_infidelity(self) -> Dict[str, Dict[str, float]]:
+            """Average gate infidelity for the gates in the gate set.
+
+            Returns:
+                Dict[str, Dict[str, float]]: average gate infidelity for each
+                    gate in the gate set for each model.
+            """
+            infidelity = {}
+            for mode, model in self.models.items():
+                infidelity[mode] = {
+                    str(gate): metrics.avg_gate_infidelity(
+                        self.target_model.operations[gate].to_dense(),
+                        op.to_dense(),
+                        'pp'
+                    )
+                    for gate, op in model.operations.items()
+                }
+            return infidelity
 
         @property
-        def protocol(self):
+        def circuit_depths(self) -> List[int]:
+            """GST circuit depths.
+
+            Returns:
+                List[int]: GST max circuit depths.
+            """
+            return self._circuit_depths
+
+        @property
+        def data(self) -> ProtocolData:
+            """pyGSTi data object.
+
+            Returns:
+                ProtocolData: pyGSTi data object.
+            """
+            return self._data
+
+        @property
+        def diamond_norm(self) -> Dict[str, Dict[str, float]]:
+            """Diamond norm for the gates in the gate set.
+
+            Returns:
+                Dict[str, Dict[str, float]]: diamond norm for each gate in the
+                    gate set for each model.
+            """
+            diamondnorm = {}
+            for mode, model in self.models.items():
+                diamondnorm[mode] = {
+                    str(gate): metrics.half_diamond_norm(
+                        self.target_model.operations[gate].to_dense(),
+                        op.to_dense(),
+                        'pp'
+                    )
+                    for gate, op in model.operations.items()
+                }
+            return diamondnorm
+
+        @property
+        def edesign(self) -> StandardGSTDesign:
+            """pyGSTi edesign.
+
+            Returns:
+                StandardGSTDesign: pyGSTi edesign.
+            """
+            return self._edesign
+
+        @property
+        def eigenvalue_avg_gate_infidelity(self) -> Dict[str, Dict[str, float]]:
+            """Eigenvalue average gate infidelity for the gates in the gate set.
+
+            Returns:
+                Dict[str, Dict[str, float]]: eigenvalue average gate infidelity
+                    for each gate in the gate set for each model.
+            """
+            infidelity = {}
+            for mode, model in self.models.items():
+                infidelity[mode] = {
+                    str(gate): metrics.eigenvalue_avg_gate_infidelity(
+                        self.target_model.operations[gate].to_dense(),
+                        op.to_dense(),
+                        'pp'
+                    )
+                    for gate, op in model.operations.items()
+                }
+            return infidelity
+
+        @property
+        def eigenvalue_diamond_norm(self) -> Dict[str, Dict[str, float]]:
+            """Eigenvalue diamond norm for the gates in the gate set.
+
+            Returns:
+                Dict[str, Dict[str, float]]: eigenvalue diamond norm for each
+                    gate in the gate set for each model.
+            """
+            diamondnorm = {}
+            for mode, model in self.models.items():
+                diamondnorm[mode] = {
+                    str(gate): metrics.eigenvalue_diamondnorm(
+                        self.target_model.operations[gate].to_dense(),
+                        op.to_dense(),
+                        'pp'
+                    )
+                    for gate, op in model.operations.items()
+                }
+            return diamondnorm
+
+        @property
+        def eigenvalue_entanglement_infidelity(self) -> Dict[str, Dict[str, float]]:
+            """Eigenvalue entanglement infidelity for the gates in the gate set.
+
+            Returns:
+                Dict[str, Dict[str, float]]: eigenvalue entanglement infidelity
+                    for each gate in the gate set for each model.
+            """
+            infidelity = {}
+            for mode, model in self.models.items():
+                infidelity[mode] = {
+                    str(gate): metrics.eigenvalue_entanglement_infidelity(
+                        self.target_model.operations[gate].to_dense(),
+                        op.to_dense(),
+                        'pp'
+                    )
+                    for gate, op in model.operations.items()
+                }
+            return infidelity
+
+        @property
+        def entanglement_infidelity(self) -> Dict[str, Dict[str, float]]:
+            """Entanglement infidelity for the gates in the gate set.
+
+            Returns:
+                Dict[str, Dict[str, float]]: entanglement infidelity for each
+                    gate in the gate set for each model.
+            """
+            infidelity = {}
+            for mode, model in self.models.items():
+                infidelity[mode] = {
+                    str(gate): metrics.entanglement_infidelity(
+                        self.target_model.operations[gate].to_dense(),
+                        op.to_dense(),
+                        'pp'
+                    )
+                    for gate, op in model.operations.items()
+                }
+            return infidelity
+
+        @property
+        def germs(self) -> List[Circuit]:
+            """GST germs.
+
+            Returns:
+                List[Circuit]: GST germs.
+            """
+            return self._germs
+
+        @property
+        def jtrace_diff(self) -> Dict[str, Dict[str, float]]:
+            """Jamiolkowski trace distance for the gates in the gate set.
+
+            Returns:
+                Dict[str, Dict[str, float]]: Jamiolkowski trace distance for
+                    each gate in the gate set for each model.
+            """
+            jtrace_diff = {}
+            for mode, model in self.models.items():
+                jtrace_diff[mode] = {
+                    str(gate): metrics.jtrace_diff(
+                        self.target_model.operations[gate].to_dense(),
+                        op.to_dense(),
+                        'pp'
+                    )
+                    for gate, op in model.operations.items()
+                }
+            return jtrace_diff
+
+        @property
+        def meas_fiducials(self) -> List[Circuit]:
+            """GST measurement fiducials.
+
+            Returns:
+                List[Circuit]: GST measurement fiducials.
+            """
+            return self._meas_fiducials
+
+        @property
+        def models(self) -> Dict[str, ExplicitOpModel]:
+            """pyGSTi models object.
+
+            Returns:
+                Dict[str, ExplicitOpModel]: pyGSTi models object.
+            """
+            return {
+                mode: self._results.estimates[mode].models['stdgaugeopt']
+                for mode in self._modes
+            }
+
+        @property
+        def modes(self) -> Tuple[str]:
+            """GST model types.
+
+            Returns:
+                Tuple[str]: GST modes.
+            """
+            return self._modes
+
+        @property
+        def POVM(self) -> Dict[str, Dict[str, NDArray]]:
+            """Estimated Hilbert-Schmidt vectors for the POVM effects.
+
+            Returns:
+                Dict[str, Dict[str, NDArray]]: POVM effects.
+            """
+            return {
+                mode: {
+                    effect: model.effects[effect].to_dense()
+                    for effect in model.effects
+                }
+                for mode, model in self.models.items()
+            }
+
+        @property
+        def prep_fiducials(self) -> List[Circuit]:
+            """GST preparation fiducials.
+
+            Returns:
+                List[Circuit]: GST preparation fiducials.
+            """
+            return self._prep_fiducials
+
+        @property
+        def process_infidelity(self) -> Dict[str, Dict[str, float]]:
+            """Process infidelity for the gates in the gate set.
+
+            Returns:
+                Dict[str, Dict[str, float]]: process infidelity for each
+                    gate in the gate set for each model.
+            """
+            return self.entanglement_infidelity
+
+        @property
+        def protocol(self) -> Any:
             """pyGSTi protocol."""
             return self._protocol
 
         @property
-        def edesign(self):
-            """pyGSTi edesign."""
-            return self._edesign
+        def pspec(self) -> QubitProcessorSpec:
+            """pyGSTi processor spec.
+
+            Returns:
+                QubitProcessorSpec: pyGSTi processor spec.
+            """
+            return self._pspec
 
         @property
-        def data(self):
-            """pyGSTi data object."""
-            return self._data
+        def ptm(self) -> Dict[str, Dict[str, NDArray]]:
+            """Pauli Transfer Matrices for each gate in the gate set.
+
+            Returns:
+                Dict[str, Dict[str, NDArray]]: PTM for each gate in the gate
+                    set for each fitted model.
+            """
+            ptm = {}
+            for mode, model in self.models.items():
+                ptm[mode] = {
+                    str(gate): op.to_dense()
+                    for gate, op in model.operations.items()
+                }
+            return ptm
 
         @property
-        def results(self):
-            """pyGSTi results object."""
+        def results(self) -> ModelEstimateResults:
+            """pyGSTi results object.
+
+            Returns:
+                ModelEstimateResults: pyGSTi results object.
+            """
             return self._results
+
+        @property
+        def state_prep(self) -> Dict[str, NDArray]:
+            """Estimated Hilbert-Schmidt vector for the initial state rho_0.
+
+            Returns:
+                Dict[str, NDArray]: rho_0.
+            """
+            return {
+                mode: model.prep.to_dense()
+                for mode, model in self.models.items()
+            }
+
+        @property
+        def state_prep_fidelity(self) -> Dict[str, float]:
+            """State fidelity for the initial state rho_0.
+
+            Returns:
+                Dict[str, float]: state fidelity for each model.
+            """
+            from pygsti.tools import ppvec_to_stdmx
+            from pygsti.tools.optools import fidelity
+            return {
+                mode: fidelity(
+                    ppvec_to_stdmx(self._target_model.prep.to_dense()),
+                    ppvec_to_stdmx(model.prep.to_dense()),
+                )
+                for mode, model in self.models.items()
+            }
+
+        @property
+        def target_model(self) -> ExplicitOpModel:
+            """GST target model.
+
+            Returns:
+                ExplicitOpModel: GST target model.
+            """
+            return self._target_model
+
+        @property
+        def unitarity(self) -> Dict[str, float]:
+            """Unitarity for each gate in the gate set.
+
+            Returns:
+                Dict[str, float]: unitarity for each gate in the gate set for
+                    each model.
+            """
+            from pygsti.tools.optools import unitarity
+            uni = {}
+            for mode, model in self.models.items():
+                uni[mode] = {
+                    str(gate): unitarity(op.to_dense())
+                    for gate, op in model.operations.items()
+                }
+            return uni
 
         def generate_circuits(self):
             """Generate all GST circuits."""
@@ -244,7 +553,11 @@ def GST(qpu:            QPU,
                 self._data_manager._save_path
             )
 
-            self._results = self._protocol.run(self._data)
+            self._results = self._protocol.run(
+                self._data,
+                checkpoint_path=self._data_manager._save_path
+                + 'gst_checkpoints/checkpoint'
+            )
             save_to_pickle(
                 self._results, self._data_manager._save_path + 'results'
             )
@@ -257,6 +570,18 @@ def GST(qpu:            QPU,
             self._report.write_html(
                 self._data_manager._save_path, verbosity=2
             )
+
+            # Print the models
+            clear_output(wait=True)
+            for key, model in self.models.items():
+                print('-------------------------------------------------------')
+                print(f'Model: {key}\n')
+                print(model)
+
+            if settings.Settings.save_data:
+                save_to_pickle(
+                    self.ptm, self._data_manager._save_path + 'PTMs'
+                )
 
         def plot(self) -> None:
             """Plot the PTMs and their associated performance metrics."""
