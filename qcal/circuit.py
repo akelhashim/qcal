@@ -1,6 +1,6 @@
 """Submodule for handling cycles, circuits, and sets of circuits.
 
-A Cycle or Layer defines a single clock-cycle in a quantum circuit (i.e. a set
+A Cycle or Layer defines a single clock-cycle in a quantum circuit (i.e., a set
 of gates defined in parallel on disjoin sets of qubits).
 
 A Circuit is a collection of cycles or layers defining the set of operations
@@ -11,30 +11,32 @@ used to store other useful information about the circuits, enabling fast and
 easy sorting of circuits by arbitrary variables.
 
 Basic example useage:
-```    
+```
 cs = CircuitSet([list of circuits])
 ```
 """
 from __future__ import annotations
 
-from qcal.gate.gate import Gate
-from qcal.gate.single_qubit import basis_rotation, Meas
-from qcal.results import Results
-
 import copy
-import numpy as np
-import pandas as pd
-
 from collections import deque
 from collections.abc import Iterable
 from itertools import groupby
 from typing import Any, Dict, List, Set, Tuple
 
+import numpy as np
+import pandas as pd
 import plotly.io as pio
+
+from qcal.gate.gate import Gate
+from qcal.gate.single_qubit import Meas, basis_rotation
+from qcal.results import Results
+
 pio.renderers.default = 'colab'  # TODO: replace with settings
 
 
-__all__ = ('Barrier', 'Cycle', 'Layer', 'Circuit', 'CircuitSet')
+__all__ = [
+    'Barrier', 'Cycle', 'Layer', 'Circuit', 'CircuitSet'
+]
 
 
 def partition_circuit(circuit: Circuit, block_size: int = 1) -> List:
@@ -42,7 +44,7 @@ def partition_circuit(circuit: Circuit, block_size: int = 1) -> List:
 
     Args:
         circuit (Circuit): qcal Circuit.
-        block_size (int, optional): maximum number of consecutive cycles to 
+        block_size (int, optional): maximum number of consecutive cycles to
             group together. Defaults to 1.
 
     Returns:
@@ -59,10 +61,10 @@ def partition_circuit(circuit: Circuit, block_size: int = 1) -> List:
     blocks = [
         list(cycles[i:i+block_size]) for i in range(0, len(cycles), block_size)
     ]
-    
+
     # Use groupby to count consecutive occurrences of the same block
     partitions = [
-        ([cycle_map[key] for key in keys], len(list(group))) 
+        ([cycle_map[key] for key in keys], len(list(group)))
         for keys, group in groupby(blocks)
     ]
 
@@ -74,9 +76,9 @@ class Barrier:
 
     __slots__ = '_qubits'
 
-    def __init__(self, qubits: Tuple[int] = tuple()) -> None:
-        """Initialize the Barrier class. 
-        
+    def __init__(self, qubits: Tuple[int] = ()) -> None:
+        """Initialize the Barrier class.
+
         Barrier takes an option qubits kwarg. If qubits does not include every
         qubit in full quantum register, then only a partial barrier is
         implemented.
@@ -93,7 +95,7 @@ class Barrier:
     def __repr__(self) -> str:
         """Draw the circuit as a string."""
         return self.name
-    
+
     def __str__(self) -> str:
         """Draw the circuit as a string."""
         return self.name
@@ -106,7 +108,7 @@ class Barrier:
             bool: True
         """
         return True
-    
+
     @property
     def name(self) -> str:
         """Name of the barrier cycle.
@@ -115,7 +117,7 @@ class Barrier:
             str: 'Barrier'
         """
         return 'Barrier'
-    
+
     @property
     def qubits(self) -> Tuple:
         """Empty tuple of qubit labels.
@@ -124,7 +126,7 @@ class Barrier:
             Tuple: empty tuple.
         """
         return self._qubits
-    
+
     def copy(self) -> Barrier:
         """Deep copy of the Barrier.
 
@@ -141,7 +143,7 @@ class Cycle:
     def __init__(self, gate_or_gates: Gate | Iterable[Gate] = None) -> None:
         """
         Args:
-            gate_or_gates (Gate | Iterable[Gate], optional): gate or set of 
+            gate_or_gates (Gate | Iterable[Gate], optional): gate or set of
                 gates. Defaults to None.
         """
         self._gates = set()
@@ -157,24 +159,24 @@ class Cycle:
             Gate: Gate object.
         """
         return self.gates[idx]
-    
+
     def __call__(self) -> Set:
         return self._gates
-    
+
     def __copy__(self) -> List:
         return Cycle({copy.deepcopy(gate) for gate in self.gates})
-    
+
     def __iter__(self):
         return iter(self.gates)
-    
+
     def __repr__(self) -> str:
         """Draw the cycle/layer as a string."""
         return self.to_str()
-    
+
     def __str__(self) -> str:
         """Draw the cycle/layer as a string."""
         return self.to_str()
-    
+
     def _repr_html_(self):
         """Draw the circuit as an html string."""
         df = pd.DataFrame([
@@ -193,24 +195,24 @@ class Cycle:
 
         df_styler = df.style.set_table_styles([
             {"selector": ".matrix", "props": "position: relative;"},
-            {"selector": ".matrix:before, .matrix:after", 
+            {"selector": ".matrix:before, .matrix:after",
              "props":  'content: ""; position: absolute; top: 0; border: 1px \
                 solid #000; width: 6px; height: 100%;'
             },
-            {"selector": ".matrix:before", 
+            {"selector": ".matrix:before",
              "props": "left: -0px; border-right: -0;"},
             {"selector": ".matrix:after",
               "props": "right: -0px; border-left: 0;"}
         ])
 
         return df_styler.to_html()
-    
+
     def _update_qubits(self) -> None:
         """Update the qubits in the cycle."""
         self._qubits = set()
         for gate in self._gates:
             self._qubits.update(gate.qubits)
-    
+
     @property
     def is_barrier(self) -> bool:
         """Whether or not the cycle is a barrier.
@@ -219,7 +221,7 @@ class Cycle:
             bool: False
         """
         return False
-    
+
     @property
     def n_gates(self) -> int:
         """The number of gates in the cycle/layer.
@@ -237,7 +239,7 @@ class Cycle:
             int: number of qubits.
         """
         return len(self.qubits)
-    
+
     @property
     def gates(self) -> List:
         """The gates in the cycle/layer.
@@ -246,7 +248,7 @@ class Cycle:
             List: gates in cycle/layer.
         """
         return sorted(self._gates, key=lambda x: x.qubits)
-    
+
     @property
     def qubits(self) -> Tuple:
         """The qubit labels for the cycle/layer.
@@ -255,7 +257,7 @@ class Cycle:
             Tuple: qubit labels.
         """
         return tuple(sorted(set(self._qubits)))
-    
+
     def append(self, gate_or_gates: Gate | Iterable[Gate]) -> None:
         """Appends a gate to the existing cycle/layer.
 
@@ -266,12 +268,12 @@ class Cycle:
             self._gates.add(gate_or_gates)
 
         if (
-            hasattr(gate_or_gates, '__iter__') and not 
+            hasattr(gate_or_gates, '__iter__') and not
             isinstance(gate_or_gates, (str, bytes))
         ):
             for gate in gate_or_gates:
                 self._gates.add(gate)
-        
+
         self._update_qubits()
 
     def copy(self) -> Cycle | Layer:
@@ -289,12 +291,12 @@ class Cycle:
             pd.DataFrame: table of matrices.
         """
         df = pd.DataFrame(
-            data=[[gate.matrix] for gate in self.gates], 
-            columns=['Matrix'], 
+            data=[[gate.matrix] for gate in self.gates],
+            columns=['Matrix'],
             index=[gate.qubits for gate in self.gates]
         )
         return df
-    
+
     def to_str(self) -> str:
         """Convert the cycle to a string.
 
@@ -317,7 +319,7 @@ class Layer(Cycle):
 
     def __copy__(self) -> Layer:
         return Layer({copy.deepcopy(gate) for gate in self._gates})
-    
+
     def to_str(self) -> str:
         """Convert the cycle to a string.
 
@@ -328,24 +330,24 @@ class Layer(Cycle):
         for gate in self.gates:
             str_rep += f' {gate.name}:{gate.qubits}'
         return str_rep
-    
+
 
 class Circuit:
 
-    __slots__ = ('_cycles', '_qubits', '_results')
+    __slots__ = ('_cycles', '_qubits', '_results', '_mcm_results')
 
     def __init__(self,
-            cycles_or_layers: List[Cycle | Layer] | deque[Cycle | Layer] = []
+            cycles_or_layers: List[Cycle | Layer] | deque[Cycle | Layer] = []  # noqa: B006
         ) -> None:
         """qcal Circuit.
 
         Args:
-            cycles_or_layers (List[Cycle | Layer] | deque[Cycle | Layer], 
+            cycles_or_layers (List[Cycle | Layer] | deque[Cycle | Layer],
                 optional): list of qcal cycles or layers. Defaults to [].
         """
         if cycles_or_layers:
             cycles_or_layers = [
-                cycle if isinstance(cycle, (Cycle, Layer, Barrier)) else 
+                cycle if isinstance(cycle, (Cycle, Layer, Barrier)) else
                 Cycle(cycle) for cycle in cycles_or_layers
             ]
         self._cycles = deque(cycles_or_layers)
@@ -355,6 +357,7 @@ class Circuit:
             self._qubits.update(cycle.qubits)
 
         self._results = Results()
+        self._mcm_results = []
 
     def __copy__(self) -> Circuit:
         """Make a deep copy of the Circuit."""
@@ -373,16 +376,16 @@ class Circuit:
 
     def __iter__(self):
         return iter(self._cycles)
-    
+
     def __len__(self) -> int:
         return len(self._cycles)
-    
+
     def _repr_html_(self) -> str:  # TODO: sometimes causes notebook to crash
         """Draw the html formatted circuit."""
         from qcal.plotting.graphs import draw_circuit
         fig = draw_circuit(self, show=False)
         return pio.to_html(fig)
-    
+
     def _update_qubits(self) -> None:
         """Update the qubits in the circuit."""
         self._qubits = set()
@@ -401,14 +404,14 @@ class Circuit:
             Cycle(sorted(cycle, key=lambda gate: gate.qubits))
             for cycle in self._cycles
         ]
-    
+
     @property
     def labels(self) -> Tuple[int]:
         """The qubit labels in the circuit.
 
         Returns:
             Tuple: qubit labels.
-        """ 
+        """
         return tuple(sorted(self._qubits))
 
     @property
@@ -423,7 +426,7 @@ class Circuit:
             Layer(sorted(layer, key=lambda gate: gate.qubits))
             for layer in self._cycles
         ]
-    
+
     @property
     def circuit_depth(self) -> int:  # TODO: exclude measurement cycle?
         """The number of layers/cycles in the circuit.
@@ -432,7 +435,7 @@ class Circuit:
             int: circuit depth in terms of layers/cycles.
         """
         return len([cycle for cycle in self._cycles if not cycle.is_barrier])
-    
+
     @property
     def circuit_width(self) -> int:
         """The number of qubits in the circuit.
@@ -441,7 +444,16 @@ class Circuit:
             int: number of qubits.
         """
         return len(self.qubits)
-    
+
+    @property
+    def mcm_results(self) -> List[Results]:
+        """Mid-circuit Measurement results.
+
+        Returns:
+            List[Results]: list of Results objects.
+        """
+        return self._mcm_results
+
     @property
     def n_cycles(self) -> int:
         """The number of cycles in the circuit.
@@ -450,7 +462,7 @@ class Circuit:
             int: number of cycles.
         """
         return self.circuit_depth
-    
+
     @property
     def n_layers(self) -> int:
         """The number of layers in the circuit.
@@ -459,7 +471,7 @@ class Circuit:
             int: number of layers.
         """
         return self.circuit_depth
-    
+
     @property
     def n_qubits(self) -> int:
         """The number of qubits in the circuit.
@@ -468,7 +480,7 @@ class Circuit:
             int: number of qubits.
         """
         return len(self.qubits)
-    
+
     @property
     def partitions(self) -> List:
         """Repeated circuit partitions.
@@ -492,7 +504,7 @@ class Circuit:
         return circuit_partitions[
             circuit_partitions.Size == circuit_partitions.Size.min()
         ].Partitions.iloc[0]
-    
+
     @property
     def results(self) -> Results:
         """Circuit results.
@@ -501,16 +513,41 @@ class Circuit:
             Results: Results object.
         """
         return self._results
-    
+
     @property
     def qubits(self) -> Tuple[int]:
         """The qubits in the circuit.
 
         Returns:
             Tuple: qubit labels.
-        """ 
+        """
         return tuple(sorted(self._qubits))
-    
+
+    @mcm_results.setter
+    def mcm_results(self, results: List[Dict | Results] | Dict | Results):
+        """Write a dictionary of results to the circuit Results object.
+
+        Args:
+            results (List[Dict | Results] | Dict | Results): dictionary of
+                bitstring and counts.
+        """
+        if isinstance(results, list):
+            if all(isinstance(result, dict) for result in results):
+                self._mcm_results.extend(
+                    [Results(result) for result in results]
+                )
+            elif all(isinstance(result, Results) for result in results):
+                self._mcm_results.extend(results)
+            else:
+                raise ValueError(
+                    "All elements in the list must be either a dict or Results "
+                    "object!"
+                )
+        elif isinstance(results, dict):
+            self._mcm_results.append(Results(results))
+        elif isinstance(results, Results):
+            self._mcm_results.append(results)
+
     @results.setter
     def results(self, results: Dict):
         """Write a dictionary of results to the circuit Results object.
@@ -519,14 +556,14 @@ class Circuit:
             results (Dict): dictionary of bitstring and counts.
         """
         self._results = Results(results)
-    
+
     def append(
             self, cycle_or_layer: Barrier | Cycle | Layer | List
         ) -> None:
         """Appends a cycle/layer to the end of the circuit.
 
         Args:
-            cycle_or_layer (Barrier, Cycle, Layer, List): cycle/layer to 
+            cycle_or_layer (Barrier, Cycle, Layer, List): cycle/layer to
                 append.
         """
         if isinstance(cycle_or_layer, List):
@@ -551,7 +588,7 @@ class Circuit:
         """Appends another circuit to the end of the current circuit.
 
         Args:
-            circuit (Circuit | List[Barrier | Cycle | Layer]): circuit to 
+            circuit (Circuit | List[Barrier | Cycle | Layer]): circuit to
                 append.
         """
         if isinstance(circuit, List):
@@ -574,7 +611,7 @@ class Circuit:
         ) -> int:
         """Returns the first index of the cycle_or_layer in the circuit.
 
-        The search is performed starting from the `beg` index and ending with 
+        The search is performed starting from the `beg` index and ending with
         the `end` index.
 
         Args:
@@ -600,7 +637,7 @@ class Circuit:
         """Inserts a cycle/layer at index `idx`.
 
         Args:
-            cycle_or_layer (Barrier, Cycle, Layer, List): cycle/layer to 
+            cycle_or_layer (Barrier, Cycle, Layer, List): cycle/layer to
                 insert.
             idx (int): index at which the cycle/layer is inserted.
         """
@@ -631,9 +668,13 @@ class Circuit:
         if basis is None:
             basis = ('Z',) * len(qubits)
 
-        meas_cycle = Cycle({Meas(q, b) for q, b in zip(qubits, basis)})
-        if all([meas.properties['params']['basis'].upper() == 'Z' for meas in 
-                meas_cycle]):
+        meas_cycle = Cycle(
+            {Meas(q, b) for q, b in zip(qubits, basis, strict=False)}
+        )
+        if all(
+            meas.properties['params']['basis'].upper() == 'Z' for meas in
+            meas_cycle
+        ):
             # self.append(Barrier(self.qubits))
             self.append(meas_cycle)
         else:
@@ -657,7 +698,7 @@ class Circuit:
         """Prepends a cycle/layer to the front of the circuit.
 
         Args:
-            cycle_or_layer (Barrier, Cycle, Layer, List): cycle/layer to 
+            cycle_or_layer (Barrier, Cycle, Layer, List): cycle/layer to
                 prepend.
         """
         if isinstance(cycle_or_layer, List):
@@ -665,7 +706,7 @@ class Circuit:
         else:
             assert (
                 isinstance(cycle_or_layer, Barrier) or
-                isinstance(cycle_or_layer, Cycle) or 
+                isinstance(cycle_or_layer, Cycle) or
                 isinstance(cycle_or_layer, Layer)
             ), "cycle_or_layer must be a Cycle, Layer or Barrier object!"
         self._cycles.appendleft(cycle_or_layer)
@@ -705,13 +746,13 @@ class Circuit:
                     )
                 cycle._update_qubits()
         self._update_qubits()
-    
+
     # TODO
     def remove(self, cycle_or_layer: Barrier | Cycle | Layer | List) -> None:
         """Removes the first instance of the cycle/layer found in the circuit.
 
         Args:
-            cycle_or_layer (Barrier, Cycle, Layer, List): cycle/layer to 
+            cycle_or_layer (Barrier, Cycle, Layer, List): cycle/layer to
                 remove.
         """
         if isinstance(cycle_or_layer, List):
@@ -724,15 +765,15 @@ class Circuit:
         self._cycles.remove(cycle_or_layer)
         self._update_qubits()
 
-    # TODO    
-    def replace(self, 
+    # TODO
+    def replace(self,
             old_cycle_or_layer: Barrier | Cycle | Layer | List,
             new_cycle_or_layer: Barrier | Cycle | Layer | List
         ) -> None:
         """Replaces an old cycle/layer with a new one in the circuit.
 
         Args:
-            old_cycle_or_layer (Barrier, Cycle, Layer, List): cycle/layer to 
+            old_cycle_or_layer (Barrier, Cycle, Layer, List): cycle/layer to
                 replace.
             new_cycle_or_layer (Barrier, Cycle, Layer, List): new cycle/layer.
         """
@@ -740,20 +781,20 @@ class Circuit:
             old_cycle_or_layer = Cycle(old_cycle_or_layer)
         else:
             assert (
-                isinstance(old_cycle_or_layer, Barrier) or 
-                isinstance(old_cycle_or_layer, Cycle) or 
+                isinstance(old_cycle_or_layer, Barrier) or
+                isinstance(old_cycle_or_layer, Cycle) or
                 isinstance(old_cycle_or_layer, Layer)
             ), "old_cycle_or_layer must be a Barrier, Cycle, or Layer object!"
-        
+
         if isinstance(new_cycle_or_layer, List):
             new_cycle_or_layer = Cycle(new_cycle_or_layer)
         else:
             assert (
-                isinstance(new_cycle_or_layer, Barrier) or 
-                isinstance(new_cycle_or_layer, Cycle) or 
+                isinstance(new_cycle_or_layer, Barrier) or
+                isinstance(new_cycle_or_layer, Cycle) or
                 isinstance(new_cycle_or_layer, Layer)
             ), "new_cycle_or_layer must be a Barrier, Cycle, or Layer object!"
-        
+
         for i, cycle in enumerate(self._cycles):
             if cycle == old_cycle_or_layer:
                 self.remove(old_cycle_or_layer)
@@ -778,17 +819,17 @@ class CircuitSet:
     """Class for storing multiple circuits in a single set."""
 
     __slots__ = '_df'
-    
-    def __init__(self, 
-            circuits: List[Any] | deque[Any] | None = None, 
+
+    def __init__(self,
+            circuits: List[Any] | deque[Any] | None = None,
             index: List[int] | None = None
         ) -> None:
         """Initialize a CircuitSet.
 
         Args:
-            circuits (List[Any] | deque[Any] | None, optional): circuits to 
+            circuits (List[Any] | deque[Any] | None, optional): circuits to
                 store in a CircuitSet. Defaults to None.
-            index (List[int] | None, optional): Indices for the circuits in the 
+            index (List[int] | None, optional): Indices for the circuits in the
                 DataFrame. Defaults to None.
         """
         if circuits is not None:
@@ -802,7 +843,7 @@ class CircuitSet:
                 self._df['circuit'] = [circuits]
         else:
             self._df = pd.DataFrame(columns=['circuit'], dtype='object')
-        
+
         if index is not None:
             self._df = self._df.set_index(pd.Index(index))
 
@@ -819,7 +860,7 @@ class CircuitSet:
             return self._df.iloc[idx_or_label].circuit
         else:
             return self._df[idx_or_label]
-        
+
     def __setitem__(self, label: str, value: Any) -> None:
         """Assign a new column in the dataframe.
 
@@ -827,7 +868,7 @@ class CircuitSet:
             label (str): column header.
             value (Any): column data.
         """
-        self._df[label] = value    
+        self._df[label] = value
 
     def __call__(self) -> pd.DataFrame:
         return self._df
@@ -838,7 +879,7 @@ class CircuitSet:
         for col in self._df.columns:
             cs[col] = [copy.deepcopy(c) for c in self._df[col]]
         return cs
-    
+
     def __len__(self) -> int:
         return len(self._df)
 
@@ -847,7 +888,7 @@ class CircuitSet:
 
     def __repr__(self) -> str:
         return repr(self._df)
-    
+
     def _repr_html_(self) -> str:
         return self._df.to_html()
 
@@ -868,7 +909,7 @@ class CircuitSet:
             pd.Series: circuits
         """
         return self._df['circuit']
-    
+
     @property
     def circuits(self) -> List[Circuit]:
         """A list of the circuits in the CircuitSet.
@@ -886,7 +927,29 @@ class CircuitSet:
             bool: whether or not the dataframe is empty.
         """
         return False if self.n_circuits > 0 else True
-    
+
+    @property
+    def mcm_results(self) -> pd.Series:
+        """The MCM results in the CircuitSet.
+
+        Returns:
+            pd.Series: MCM results
+        """
+        if 'mcm_results' not in self._df.columns:
+            return None
+        return self._df['mcm_results']
+
+    @property
+    def results(self) -> pd.Series:
+        """The terminating results in the CircuitSet.
+
+        Returns:
+            pd.Series: terminatingresults
+        """
+        if 'results' not in self._df.columns:
+            return None
+        return self._df['results']
+
     def append(self, circuits, index=None):
         """Appends circuit(s) to the circuit collection."""
         if not isinstance(circuits, CircuitSet):
@@ -939,8 +1002,8 @@ class CircuitSet:
     #         df = df.loc[self._df[key] == kwargs[key]]
     #     return df
 
-    # def union_results(self, idx: int = None) -> Dict:
-    #     """Compute the union of all of the results.
+    # def combine_results(self, idx: int = None) -> Dict:
+    #     """Combine all of the results.
 
     #     This can take in an optional index, for which the results will only
     #     be unioned for columns of matching indices.
