@@ -21,8 +21,15 @@ from plotly.subplots import make_subplots
 
 import qcal.settings as settings
 from qcal.config import Config
+from qcal.plotting.utils import calculate_nrows_ncols
+from qcal.post_processing.passes import (
+    compute_conditional_counts,
+    discard_heralded_shots,
+    relabel_esp,
+)
+from qcal.post_processing.post_process import PostProcessor
 from qcal.qpu.qpu import QPU
-from qcal.utils import flatten, save_init, save_to_pickle
+from qcal.utils import flatten, load_from_pickle, save_init, save_to_pickle
 
 logger = logging.getLogger(__name__)
 
@@ -1083,5 +1090,256 @@ def TwoQubitGST(
         circuit_depths=circuit_depths,
         modes=modes,
         fpr=fpr,
+        **kwargs
+    )
+
+
+def QuantumInstrumentGST(
+        qpu:            QPU,
+        config:         Config,
+        qubits:         Iterable[int],
+        pspec:          Any | None = None,
+        target_model:   Any | None = None,
+        prep_fiducials: Any | None = None,
+        meas_fiducials: Any | None = None,
+        germs:          Any | None = None,
+        circuit_depths: List[int] = [1],  # noqa: B006
+        modes:          Tuple[str] = ('Target', 'full TP'),  # noqa: B006
+        **kwargs
+    ) -> Callable:
+    """Quantum Instrument Gate Set Tomography.
+
+    This protocol requires a valid pyGSTi installation.
+    """
+    try:
+        import pygsti
+        import pygsti.report.reportables as metrics
+        logger.info(f" pyGSTi version: {pygsti.__version__}\n")
+    except ImportError:
+        logger.warning(' Unable to import pyGSTi!')
+
+    gst = type(GST(
+        qpu=qpu,
+        config=config,
+        qubit_labels=qubits,
+        pspec=pspec,
+        target_model=target_model,
+        prep_fiducials=prep_fiducials,
+        meas_fiducials=meas_fiducials,
+        germs=germs,
+        circuit_depths=circuit_depths,
+        modes=modes,
+        **kwargs
+    ))
+
+    class QuantumInstrumentGST(gst):
+        """QI GST protocol."""
+
+        @save_init
+        def __init__(self,
+                config:         Config,
+                qubits:         Iterable[int],
+                pspec:          Any | None = None,
+                target_model:   Any | None = None,
+                prep_fiducials: Any | None = None,
+                meas_fiducials: Any | None = None,
+                germs:          Any | None = None,
+                circuit_depths: List[int] = [1],  # noqa: B006
+                modes:          Tuple[str] = ('Target', 'full TP'),  # noqa: B006
+                **kwargs
+            ) -> None:
+            import pygsti
+            from pygsti.modelmembers.instruments import Instrument
+            from pygsti.modelpacks import smq1Q_XYI
+
+            if len(qubits) > 2:
+                raise ValueError(
+                    'Quantum Instrument GST is not currently supported for '
+                    'more than 2 qubits!'
+                )
+
+            if len(circuit_depths) > 1 or circuit_depths[0] != 1:
+                raise ValueError(
+                    'Long-sequence GST is not currently supported for '
+                    'Quantum Instrument GST!'
+                )
+
+            if len(modes) > 2 or 'full TP' not in modes:
+                raise ValueError(
+                    "Only 'Target' and 'full TP' modes are currently supported "
+                    "for Quantum Instrument GST!"
+                )
+
+            pspec = (
+                smq1Q_XYI.processor_spec(qubits) if pspec is None
+                else pspec
+            )
+
+            target_model = (
+                smq1Q_XYI.target_model(qubit_labels=qubits) if target_model
+                is None else target_model
+            )
+            target_model.set_all_parameterizations("full TP") # TODO: CPTP
+            # Create and add the ideal quantum instrument to the target model
+            E0 = target_model.effects['0']
+            E1 = target_model.effects['1']
+            target_model[('Iz', qubits[0])] = Instrument(
+                {'p0': np.dot(E0, E0.T), 'p1': np.dot(E1, E1.T)}
+            )
+
+            prep_fiducials = (
+                smq1Q_XYI.prep_fiducials(qubits) if prep_fiducials is None
+                else prep_fiducials
+            )
+
+            meas_fiducials = (
+                smq1Q_XYI.meas_fiducials(qubits) if meas_fiducials is None
+                else meas_fiducials
+            )
+
+            germs = smq1Q_XYI.germs(qubits) if germs is None else germs
+            germs += [ # Add the instrument as a germ
+                pygsti.circuits.Circuit([('Iz', qubits[0])])
+            ]
+
+            gst.__init__(self,
+                config=config,
+                qubit_labels=qubits,
+                pspec=pspec,
+                target_model=target_model,
+                prep_fiducials=prep_fiducials,
+                meas_fiducials=meas_fiducials,
+                germs=germs,
+                circuit_depths=circuit_depths,
+                modes=modes,
+                **kwargs
+            )
+
+        @property
+        def diamond_norm(self) -> Dict[str, Dict[str, float]]:
+            """Diamond norm for the gates in the gate set.
+
+            Returns:
+                Dict[str, Dict[str, float]]: diamond norm for each gate in the
+                    gate set for each model.
+            """
+            diamondnorm = {}
+            for mode, model in self.models.items():
+                diamondnorm[mode] = {
+                    str(gate): metrics.half_diamond_norm(
+                        self.target_model.operations[gate].to_dense(),
+                        op.to_dense(),
+                        'pp'
+                    )
+                    for gate, op in model.operations.items()
+                } | { # TODO: discrepancy between this value and reported value
+                    f'{instr}': metrics.half_diamond_norm(
+                        sum(effect.to_dense() for effect in effects.values()),
+                        sum(
+                            self.target_model.instruments[instr][p].to_dense()
+                            for p in effects.keys()
+                        ),
+                        'pp'
+                    )
+                    for instr, effects in model.instruments.items()
+                }
+            return diamondnorm
+
+        @property
+        def entanglement_infidelity(self) -> Dict[str, Dict[str, float]]:
+            """Entanglement infidelity for the gates in the gate set.
+
+            Returns:
+                Dict[str, Dict[str, float]]: entanglement infidelity for each
+                    gate in the gate set for each model.
+            """
+            infidelity = {}
+            for mode, model in self.models.items():
+                infidelity[mode] = {
+                    str(gate): metrics.entanglement_infidelity(
+                        self.target_model.operations[gate].to_dense(),
+                        op.to_dense(),
+                        'pp'
+                    )
+                    for gate, op in model.operations.items()
+                } | { # TODO: discrepancy between this value and reported value
+                    f'{instr}': metrics.entanglement_infidelity(
+                        sum(effect.to_dense() for effect in effects.values()),
+                        sum(
+                            self.target_model.instruments[instr][p].to_dense()
+                            for p in effects.keys()
+                        ),
+                        'pp'
+                    )
+                    for instr, effects in model.instruments.items()
+                }
+            return infidelity
+
+        @property
+        def ptm(self) -> Dict[str, Dict[str, NDArray]]:
+            """Pauli Transfer Matrices for each gate in the gate set.
+
+            Returns:
+                Dict[str, Dict[str, NDArray]]: PTM for each gate in the gate
+                    set for each fitted model.
+            """
+            ptm = {}
+            for mode, model in self.models.items():
+                ptm[mode] = {
+                    str(gate): op.to_dense()
+                    for gate, op in model.operations.items()
+                } | {
+                    f'{instr}.{p}': effect.to_dense()
+                    for instr, effects in model.instruments.items()
+                    for p, effect in effects.items()
+                }
+            return ptm
+
+        def save(self):
+            """Save all circuits and data."""
+            clear_output(wait=True)
+
+            classified_results = load_from_pickle(
+                self.data_manager.save_path + 'classified_results.pkl'
+            )
+            pp = PostProcessor(
+                self._config,
+                classified_results,
+                passes=[
+                    discard_heralded_shots,
+                    relabel_esp,
+                    compute_conditional_counts
+                ]
+            )
+            pp.run()
+
+            results_df = pd.DataFrame(pp.tm_results)
+            results_df.index = self._circuits['pygsti_circuit'].values
+            results_df = results_df.apply(
+                lambda col: col.round().astype('Int64')
+            ).astype(object)
+            results_df = results_df.fillna('--')
+            results_df = results_df.rename(columns=lambda col: col + ' count')
+
+            logger.info(" Saving the pyGSTi results...")
+            filepath = self.data_manager.save_path + 'data/dataset.txt'
+            with open(filepath, 'w') as f:
+                f.write('## Columns = ' + ', '.join(results_df.columns) + "\n")
+                f.close()
+            results_df.to_csv(filepath, sep=' ', mode='a', header=False)
+
+            if settings.Settings.save_data:
+                qpu.save(self, create_data_path=False)
+
+    return QuantumInstrumentGST(
+        config=config,
+        qubits=qubits,
+        pspec=pspec,
+        target_model=target_model,
+        prep_fiducials=prep_fiducials,
+        meas_fiducials=meas_fiducials,
+        germs=germs,
+        circuit_depths=circuit_depths,
+        modes=modes,
         **kwargs
     )
