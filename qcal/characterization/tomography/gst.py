@@ -24,13 +24,14 @@ logger = logging.getLogger(__name__)
 
 def GST(qpu:            QPU,
         config:         Config,
-        qubit_labels:   Iterable[int],
+        qubit_labels:   Iterable[int | Tuple[int]],
         pspec:          Any | None = None,
         target_model:   Any | None = None,
         prep_fiducials: Any | None = None,
         meas_fiducials: Any | None = None,
         germs:          Any | None = None,
         circuit_depths: List[int] = [1, 2, 4, 8, 16, 32, 64, 128, 256],  # noqa: B006
+        modes:          Tuple[str] = ('full TP','CPTPLND','Target','H+S','S'),  # noqa: B006
         fpr:            bool = False,
         **kwargs
     ) -> Callable:
@@ -41,16 +42,45 @@ def GST(qpu:            QPU,
     Args:
         qpu (QPU): custom QPU object.
         config (Config): qcal Config object.
-        qubit_labels (Iterable[int]): a list specifying sets of system labels
-            on which to perform RPE for a given gate.
-
+        qubit_labels (Iterable[int | Tuple[int]]): a list specifying sets of
+            system labels on which to perform GST.
+        pspec (Any | None, optional): processor spec. Defaults to None.
+        target_model (Any | None, optional): target model. Defaults to None.
+        prep_fiducials (Any | None, optional): prep fiducials. Defaults to None.
+        meas_fiducials (Any | None, optional): meas fiducials. Defaults to None.
+        germs (Any | None, optional): germs. Defaults to None.
         circuit_depths (List[int], optional): a list of positive integers
             specifying the circuit depths. Defaults to ```[1, 2, 4, 8, 16, 32,
             64, 128, 256]```.
+        modes (Tuple[str], optional): a tuple of strings specifying the modes
+            to be used in the GST protocol. Defaults to ```('full TP',
+            'CPTPLND', 'Target', 'H+S', 'S')```. These correspond to different
+            types of parameterizations/constraints to apply to the estimated
+            model. Allowed values are:
+            - 'full': full (completely unconstrained)
+            - 'TP': TP-constrained
+            - 'CPTPLND': Lindbladian CPTP-constrained
+            - 'H+S': Only Hamiltonian + Stochastic errors allowed (CPTP)
+            - 'S': Only Stochastic errors allowed (CPTP)
+            - 'Target': use the target (ideal) gates as the estimate
+            - <model>: any key in the models_to_test argument
+        fpr (bool, optional): whether to use Fiducial Pair Reduction (FPR).
+            Defaults to False.
 
     Returns:
         Callable: GST class instance.
     """
+    try:
+        import pygsti
+        import pygsti.report.reportables as metrics
+        from pygsti.circuits.circuit import Circuit
+        from pygsti.models.explicitmodel import ExplicitOpModel
+        from pygsti.processors.processorspec import QubitProcessorSpec
+        from pygsti.protocols.gst import ModelEstimateResults, StandardGSTDesign
+        from pygsti.protocols.protocol import ProtocolData
+        logger.info(f" pyGSTi version: {pygsti.__version__}\n")
+    except ImportError:
+        logger.warning(' Unable to import pyGSTi!')
 
     class GST(qpu):
         """GST protocol."""
@@ -65,16 +95,13 @@ def GST(qpu:            QPU,
                 meas_fiducials: Any | None = None,
                 germs:          Any | None = None,
                 circuit_depths: List[int] = [1, 2, 4, 8, 16, 32, 64, 128, 256],  # noqa: B006
+                modes:          Tuple[str] = (
+                    'full TP', 'CPTPLND', 'Target', 'H+S', 'S'
+                ),
                 fpr:            bool = False,
                 **kwargs
             ) -> None:
-            try:
-                import pygsti
-
-                from qcal.interface.pygsti.transpiler import PyGSTiTranspiler
-                logger.info(f" pyGSTi version: {pygsti.__version__}\n")
-            except ImportError:
-                logger.warning(' Unable to import pyGSTi!')
+            from qcal.interface.pygsti.transpiler import PyGSTiTranspiler
 
             self._qubit_labels = qubit_labels
             self._qubits = sorted(flatten(qubit_labels))
@@ -84,6 +111,7 @@ def GST(qpu:            QPU,
             self._meas_fiducials = meas_fiducials
             self._germs = germs
             self._circuit_depths = circuit_depths
+            self._modes = modes
             self._fpr = fpr
 
             self._protocol = None
@@ -138,7 +166,7 @@ def GST(qpu:            QPU,
             print("Germs:\n", self._germs)
 
             self._protocol = StandardGST(
-                modes=('full TP','CPTPLND','Target', 'H+S', 'S'),
+                modes=self._modes,
                 target_model=self._target_model
             )
 
@@ -246,6 +274,7 @@ def GST(qpu:            QPU,
         meas_fiducials=meas_fiducials,
         germs=germs,
         circuit_depths=circuit_depths,
+        modes=modes,
         fpr=fpr,
         **kwargs
     )
@@ -261,6 +290,7 @@ def SingleQubitGST(
         meas_fiducials: Any | None = None,
         germs:          Any | None = None,
         circuit_depths: List[int] = [1, 2, 4, 8, 16, 32, 64, 128, 256],  # noqa: B006
+        modes:          Tuple[str] = ('full TP','CPTPLND','Target','H+S','S'),  # noqa: B006
         fpr:            bool = False,
         **kwargs
     ) -> Callable:
@@ -297,6 +327,9 @@ def SingleQubitGST(
                 meas_fiducials: Any | None = None,
                 germs:          Any | None = None,
                 circuit_depths: List[int] = [1, 2, 4, 8, 16, 32, 64, 128, 256],  # noqa: B006
+                modes:          Tuple[str] = (
+                    'full TP', 'CPTPLND', 'Target', 'H+S', 'S'
+                ),
                 fpr:            bool = False,
                 **kwargs
             ) -> None:
@@ -424,6 +457,7 @@ def SingleQubitGST(
                 meas_fiducials=meas_fiducials,
                 germs=germs,
                 circuit_depths=circuit_depths,
+                modes=modes,
                 fpr=fpr,
                 **kwargs
             )
@@ -437,6 +471,7 @@ def SingleQubitGST(
         meas_fiducials=meas_fiducials,
         germs=germs,
         circuit_depths=circuit_depths,
+        modes=modes,
         fpr=fpr,
         **kwargs
     )
@@ -452,6 +487,7 @@ def TwoQubitGST(
         meas_fiducials: Any | None = None,
         germs:          Any | None = None,
         circuit_depths: List[int] = [1, 2, 4, 8, 16, 32, 64, 128],  # noqa: B006
+        modes:          Tuple[str] = ('full TP','CPTPLND','Target','H+S','S'),  # noqa: B006
         fpr:            bool = False,
         **kwargs
     ) -> Callable:
@@ -459,7 +495,31 @@ def TwoQubitGST(
 
     This protocol requires a valid pyGSTi installation.
 
+    Args:
+        qpu (QPU): custom QPU object.
+        config (Config): qcal Config object.
+        qubits (Iterable[int]): a list specifying sets of system labels
+            on which to perform GST.
+        circuit_depths (List[int], optional): a list of positive integers
+            specifying the circuit depths. Defaults to ```[1, 2, 4, 8, 16, 32,
+            64, 128, 256]```.
+        modes (Tuple[str], optional): a tuple of strings specifying the modes
+            to be used in the GST protocol. Defaults to ```('full TP',
+            'CPTPLND', 'Target', 'H+S', 'S')```. These correspond to different
+            types of parameterizations/constraints to apply to the estimated
+            model. Allowed values are:
+            - 'full': full (completely unconstrained)
+            - 'TP': TP-constrained
+            - 'CPTPLND': Lindbladian CPTP-constrained
+            - 'H+S': Only Hamiltonian + Stochastic errors allowed (CPTP)
+            - 'S': Only Stochastic errors allowed (CPTP)
+            - 'Target': use the target (ideal) gates as the estimate
+            - <model>: any key in the models_to_test argument
+        fpr (bool, optional): whether to use Fiducial Pair Reduction (FPR).
+            Defaults to False.
 
+    Returns:
+        Callable: TwoQubitGST class instance.
     """
     gst = type(GST(
         qpu=qpu,
@@ -471,6 +531,7 @@ def TwoQubitGST(
         meas_fiducials=meas_fiducials,
         germs=germs,
         circuit_depths=circuit_depths,
+        modes=modes,
         fpr=fpr,
         **kwargs
     ))
@@ -488,6 +549,9 @@ def TwoQubitGST(
                 meas_fiducials: Any | None = None,
                 germs:          Any | None = None,
                 circuit_depths: List[int] = [1, 2, 4, 8, 16, 32, 64, 128, 256],  # noqa: B006
+                modes:          Tuple[str] = (
+                    'full TP', 'CPTPLND', 'Target', 'H+S', 'S'
+                ),
                 fpr:            bool = False,
                 **kwargs
             ) -> None:
@@ -534,6 +598,7 @@ def TwoQubitGST(
                 meas_fiducials=meas_fiducials,
                 germs=germs,
                 circuit_depths=circuit_depths,
+                modes=modes,
                 fpr=fpr,
                 **kwargs
             )
@@ -547,6 +612,7 @@ def TwoQubitGST(
         meas_fiducials=meas_fiducials,
         germs=germs,
         circuit_depths=circuit_depths,
+        modes=modes,
         fpr=fpr,
         **kwargs
     )
