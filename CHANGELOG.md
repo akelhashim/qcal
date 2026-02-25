@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - GST properties for easier access to results
 - GST for quantum instruments
 - mcm_results property for Circuit object
+- qcal -> pyquil transpiler
 
 ### Changed
 
