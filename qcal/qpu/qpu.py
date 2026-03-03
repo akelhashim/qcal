@@ -401,17 +401,26 @@ class QPU:
         if create_data_path:
             self._data_manager.create_data_path()
 
-        if len(self._circuits) > 0:
+        if (
+            self._circuits is not None
+            and len(self._circuits) > 0
+        ):
             self._circuits.save(
                 self._data_manager._save_path + 'circuits.qc'
             )
 
-        if len(self._compiled_circuits) > 0:
+        if (
+            self._compiled_circuits is not None
+            and len(self._compiled_circuits) > 0
+        ):
             self._compiled_circuits.save(
                 self._data_manager._save_path + 'compiled_circuits.qc'
             )
 
-        if len(self._transpiled_circuits) > 0:
+        if (
+            self._transpiled_circuits is not None
+            and len(self._transpiled_circuits) > 0
+        ):
             self._transpiled_circuits.save(
                 self._data_manager._save_path + 'transpiled_circuits.qc'
             )

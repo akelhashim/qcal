@@ -17,6 +17,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - qcal -> pyquil transpiler
 - PostProcessor class for better handling of post-processing results with 
 optional passes
+- Simultaneous GST
+- Circuit.join() method for easily joining multiple circuits along cycle number
 
 ### Changed
 

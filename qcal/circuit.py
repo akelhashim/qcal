@@ -20,7 +20,7 @@ from __future__ import annotations
 import copy
 from collections import deque
 from collections.abc import Iterable
-from itertools import groupby
+from itertools import groupby, zip_longest
 from typing import Any, Dict, List, Set, Tuple
 
 import numpy as np
@@ -651,6 +651,83 @@ class Circuit:
         self._cycles.insert(idx, cycle_or_layer)
         self._qubits.update(cycle_or_layer.qubits)
 
+    def join(self, circuit: Circuit, how='outer') -> None:
+        """Joins circuit with another circuit cycle-by-cycle.
+
+        Args:
+            circuit (Circuit): circuit to join with.
+            how (str, optional): how to join the circuits. Defaults to 'outer'.
+                ```how='outer'``` takes the union of cycles from both circuits,
+                which will produce a circuit with a number of cycles that is
+                the maximum of the two circuits.
+                ```how='inner'``` takes the intersection of cycles from both
+                circuits, which will produce a circuit with a number of cycles
+                that is the minimum of the two circuits.
+        """
+        new_cycles = []
+        if how == 'outer':
+            for c1, c2 in zip_longest(self.cycles, circuit.cycles):
+                if c1 is None:
+                    new_cycles.append(c2)
+                    continue
+                if c2 is None:
+                    new_cycles.append(c1)
+                    continue
+
+                if isinstance(c1, Barrier) and isinstance(c2, Barrier):
+                    # merge barrier qubits
+                    merged = Barrier(
+                        tuple(sorted(set(c1.qubits) | set(c2.qubits)))
+                    )
+                    new_cycles.append(merged)
+
+                elif isinstance(c1, Barrier) and not isinstance(c2, Barrier):
+                    # keep barrier at same position, insert c2 after it
+                    new_cycles.append(c1)
+                    new_cycles.append(c2)
+
+                elif not isinstance(c1, Barrier) and isinstance(c2, Barrier):
+                    # keep c1, insert barrier after it
+                    new_cycles.append(c1)
+                    new_cycles.append(c2)
+
+                else:
+                    # both non-barrier: merge gates into c1
+                    c1.append(c2.gates)
+                    new_cycles.append(c1)
+
+        elif how == 'inner':
+            for c1, c2 in zip(self.cycles, circuit.cycles, strict=False):
+                if c1 is None or c2 is None:
+                    break
+
+                if isinstance(c1, Barrier) and isinstance(c2, Barrier):
+                    # merge barrier qubits
+                    merged = Barrier(
+                        tuple(sorted(set(c1.qubits) | set(c2.qubits)))
+                    )
+                    new_cycles.append(merged)
+
+                elif isinstance(c1, Barrier) and not isinstance(c2, Barrier):
+                    # keep barrier at same position, insert c2 after it
+                    new_cycles.append(c1)
+                    new_cycles.append(c2)
+
+                elif not isinstance(c1, Barrier) and isinstance(c2, Barrier):
+                    # keep c1, insert barrier after it
+                    new_cycles.append(c1)
+                    new_cycles.append(c2)
+
+                else:
+                    c1.append(c2.gates)
+                    new_cycles.append(c1)
+
+        else:
+            raise ValueError(f"how must be 'outer' or 'inner', got {how}")
+
+        self._cycles = deque(new_cycles)
+        self._update_qubits()
+
     def measure(self,
             qubits: List | Tuple = None,
             basis:  List | Tuple = None,
@@ -949,6 +1026,31 @@ class CircuitSet:
         if 'results' not in self._df.columns:
             return None
         return self._df['results']
+
+    @results.setter
+    def results(self, values) -> None:
+        if values is None:
+            self._df['results'] = None
+            return
+
+        if isinstance(values, pd.Series):
+            if len(values) != len(self._df):
+                raise ValueError(
+                    "Length of 'results' values must match number of circuits."
+                )
+            self._df['results'] = values.to_list()
+            return
+
+        if isinstance(values, (list, tuple, np.ndarray)):
+            if len(values) != len(self._df):
+                raise ValueError(
+                    "Length of 'results' values must match number of circuits."
+                )
+            self._df['results'] = list(values)
+            return
+
+        # If a single value is provided, assign it to all circuits
+        self._df['results'] = [values] * len(self._df)
 
     def append(self, circuits, index=None):
         """Appends circuit(s) to the circuit collection."""

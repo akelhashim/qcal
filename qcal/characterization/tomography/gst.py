@@ -8,7 +8,9 @@ Relevant code repos:
 - https://github.com/sandialabs/pyGSTi
 """
 import logging
+import multiprocessing as mp
 from collections.abc import Iterable
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any, Callable, Dict, List, Tuple
 
 import matplotlib.pyplot as plt
@@ -16,10 +18,12 @@ import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 from IPython.display import clear_output
+from mpl_toolkits.axes_grid1 import make_axes_locatable
 from numpy.typing import NDArray
 from plotly.subplots import make_subplots
 
 import qcal.settings as settings
+from qcal.circuit import CircuitSet
 from qcal.config import Config
 from qcal.plotting.utils import calculate_nrows_ncols
 from qcal.post_processing.passes import (
@@ -29,24 +33,26 @@ from qcal.post_processing.passes import (
 )
 from qcal.post_processing.post_process import PostProcessor
 from qcal.qpu.qpu import QPU
+from qcal.results import Results
 from qcal.utils import flatten, load_from_pickle, save_init, save_to_pickle
 
 logger = logging.getLogger(__name__)
 
 
-def GST(qpu:            QPU,
-        config:         Config,
-        qubit_labels:   Iterable[int | Tuple[int]],
-        pspec:          Any | None = None,
-        target_model:   Any | None = None,
-        prep_fiducials: Any | None = None,
-        meas_fiducials: Any | None = None,
-        germs:          Any | None = None,
-        circuit_depths: List[int] = [1, 2, 4, 8, 16, 32, 64, 128, 256],  # noqa: B006
-        modes:          Tuple[str] = ('full TP','CPTPLND','Target','H+S','S'),  # noqa: B006
-        fpr:            bool = False,
-        **kwargs
-    ) -> Callable:
+def GST(
+    qpu:            QPU,
+    config:         Config,
+    qubit_labels:   Iterable[int | Tuple[int]],
+    pspec:          Any | None = None,
+    target_model:   Any | None = None,
+    prep_fiducials: Any | None = None,
+    meas_fiducials: Any | None = None,
+    germs:          Any | None = None,
+    circuit_depths: List[int] = [1, 2, 4, 8, 16, 32, 64, 128, 256],  # noqa: B006
+    modes:          Tuple[str] = ('full TP','CPTPLND','Target','H+S','S'),  # noqa: B006
+    fpr:            bool = False,
+    **kwargs
+) -> Callable:
     """Gate Set Tomography.
 
     This protocol requires a valid pyGSTi installation.
@@ -56,11 +62,16 @@ def GST(qpu:            QPU,
         config (Config): qcal Config object.
         qubit_labels (Iterable[int | Tuple[int]]): a list specifying sets of
             system labels on which to perform GST.
-        pspec (Any | None, optional): processor spec. Defaults to None.
-        target_model (Any | None, optional): target model. Defaults to None.
-        prep_fiducials (Any | None, optional): prep fiducials. Defaults to None.
-        meas_fiducials (Any | None, optional): meas fiducials. Defaults to None.
-        germs (Any | None, optional): germs. Defaults to None.
+        pspec (Any | Dict[int, Any] | None, optional): a pyGSTi ProcessorSpec
+            object. Defaults to None.
+        target_model (Any | Dict[int, Any] | None, optional): a pyGSTi Model
+            object. Defaults to None.
+        prep_fiducials (Any | Dict[int, Any] | None, optional): a list of pyGSTi
+            fiducial circuits. Defaults to None.
+        meas_fiducials (Any | Dict[int, Any] | None, optional): a list of pyGSTi
+            fiducial circuits. Defaults to None.
+        germs (Any | Dict[int, Any] | None, optional): a list of pyGSTi germ
+            circuits. Defaults to None.
         circuit_depths (List[int], optional): a list of positive integers
             specifying the circuit depths. Defaults to ```[1, 2, 4, 8, 16, 32,
             64, 128, 256]```.
@@ -98,21 +109,22 @@ def GST(qpu:            QPU,
         """GST protocol."""
 
         @save_init
-        def __init__(self,
-                config:         Config,
-                qubit_labels:   Iterable[int | Tuple[int]],
-                pspec:          Any | None = None,
-                target_model:   Any | None = None,
-                prep_fiducials: Any | None = None,
-                meas_fiducials: Any | None = None,
-                germs:          Any | None = None,
-                circuit_depths: List[int] = [1, 2, 4, 8, 16, 32, 64, 128, 256],  # noqa: B006
-                modes:          Tuple[str] = (
-                    'full TP', 'CPTPLND', 'Target', 'H+S', 'S'
-                ),
-                fpr:            bool = False,
-                **kwargs
-            ) -> None:
+        def __init__(
+            self,
+            config:         Config,
+            qubit_labels:   Iterable[int | Tuple[int]],
+            pspec:          Any | None = None,
+            target_model:   Any | None = None,
+            prep_fiducials: Any | None = None,
+            meas_fiducials: Any | None = None,
+            germs:          Any | None = None,
+            circuit_depths: List[int] = [1, 2, 4, 8, 16, 32, 64, 128, 256],  # noqa: B006
+            modes:          Tuple[str] = (
+                'full TP', 'CPTPLND', 'Target', 'H+S', 'S'
+            ),
+            fpr:            bool = False,
+            **kwargs
+        ) -> None:
             from qcal.interface.pygsti.transpiler import PyGSTiTranspiler
 
             self._qubit_labels = qubit_labels
@@ -131,7 +143,6 @@ def GST(qpu:            QPU,
             self._data = None
             self._results = None
             self._circuits = None
-            self._datasets = {}
             self._report = None
 
             transpiler = kwargs.get('transpiler', PyGSTiTranspiler())
@@ -186,7 +197,7 @@ def GST(qpu:            QPU,
             """
             diamondnorm = {}
             for mode, model in self.models.items():
-                diamondnorm[mode] = {
+                dn_ops = {
                     str(gate): metrics.half_diamond_norm(
                         self.target_model.operations[gate].to_dense(),
                         op.to_dense(),
@@ -194,6 +205,28 @@ def GST(qpu:            QPU,
                     )
                     for gate, op in model.operations.items()
                 }
+
+                instruments = getattr(model, 'instruments', {})
+                if instruments and hasattr(self.target_model, 'instruments'):
+                    dn_instr = {
+                        f'{instr}': metrics.half_diamond_norm(
+                            sum(
+                                effect.to_dense() for effect in effects.values()
+                            ),
+                            sum(
+                                self.target_model.instruments[
+                                    instr
+                                ][p].to_dense()
+                                for p in effects.keys()
+                            ),
+                            'pp'
+                        )
+                        for instr, effects in instruments.items()
+                    }
+                    diamondnorm[mode] = dn_ops | dn_instr
+                else:
+                    diamondnorm[mode] = dn_ops
+
             return diamondnorm
 
         @property
@@ -275,7 +308,7 @@ def GST(qpu:            QPU,
             """
             infidelity = {}
             for mode, model in self.models.items():
-                infidelity[mode] = {
+                ei_ops = {
                     str(gate): metrics.entanglement_infidelity(
                         self.target_model.operations[gate].to_dense(),
                         op.to_dense(),
@@ -283,6 +316,26 @@ def GST(qpu:            QPU,
                     )
                     for gate, op in model.operations.items()
                 }
+
+                instruments = getattr(model, 'instruments', {})
+                if instruments and hasattr(self.target_model, 'instruments'):
+                    ei_instr = {
+                        f'{instr}': metrics.entanglement_infidelity(
+                            sum(
+                                effect.to_dense() for effect in effects.values()
+                            ),
+                            sum(
+                                self.target_model.instruments[instr][p].to_dense()
+                                for p in effects.keys()
+                            ),
+                            'pp'
+                        )
+                        for instr, effects in instruments.items()
+                    }
+                    infidelity[mode] = ei_ops | ei_instr
+                else:
+                    infidelity[mode] = ei_ops
+
             return infidelity
 
         @property
@@ -402,11 +455,33 @@ def GST(qpu:            QPU,
             """
             ptm = {}
             for mode, model in self.models.items():
-                ptm[mode] = {
+                ptm_ops = {
                     str(gate): op.to_dense()
                     for gate, op in model.operations.items()
                 }
+
+                instruments = getattr(model, 'instruments', {})
+                if instruments:
+                    ptm_instr = {
+                        f'{instr}.{p}': effect.to_dense()
+                        for instr, effects in instruments.items()
+                        for p, effect in effects.items()
+                    }
+                    ptm[mode] = ptm_ops | ptm_instr
+                else:
+                    ptm[mode] = ptm_ops
+
             return ptm
+
+        @property
+        def qubits(self) -> List[int]:
+            """All qubits used in the GST experiment."""
+            return self._qubits
+
+        @property
+        def qubit_labels(self) -> List[int | Tuple[int, int]]:
+            """Qubit labels used in the GST experiment."""
+            return self._qubit_labels
 
         @property
         def results(self) -> ModelEstimateResults:
@@ -579,12 +654,13 @@ def GST(qpu:            QPU,
             )
 
             # Print the models
-            clear_output(wait=True)
-            for key, model in self.models.items():
-                print('-------------------------------------------------------')
-                print(f'Model: {key}\n')
-                print(model)
+            # clear_output(wait=True)
+            # for key, model in self.models.items():
+            #     print('-------------------------------------------------------')
+            #     print(f'Model: {key}\n')
+            #     print(model)
 
+            clear_output(wait=True)
             if settings.Settings.save_data:
                 save_to_pickle(
                     self.ptm, self._data_manager._save_path + 'PTMs'
@@ -600,14 +676,21 @@ def GST(qpu:            QPU,
                     'YI', 'YX', 'YY', 'YZ', 'ZI', 'ZX', 'ZY', 'ZZ'
                 ]
             }
+            max_ncols = {4: 3, 16: 2} # PTM shape: number of columns
+            size = {4: 5, 16: 7.5}    # PTM shape: size of each row/column
 
             for model, gateset in self.ptm.items():
                 gates = list(gateset.keys())
                 ptms = list(gateset.values())
-                nrows, ncols = calculate_nrows_ncols(len(gateset), max_ncols=3)
+                nrows, ncols = calculate_nrows_ncols(
+                    len(gateset), max_ncols=max_ncols[ptms[0].shape[0]]
+                )
 
                 # Matplotlib plot
-                figsize = (5 * ncols, 5 * nrows)
+                figsize = (
+                    size[ptms[0].shape[0]] * ncols,
+                    size[ptms[0].shape[0]] * nrows
+                )
                 fig, axes = plt.subplots(
                     nrows, ncols, figsize=figsize, layout='constrained'
                 )
@@ -620,12 +703,16 @@ def GST(qpu:            QPU,
                     rows=nrows,
                     cols=ncols,
                     # title=model,
+                    vertical_spacing=0.15,
+                    horizontal_spacing=0.05,
                     subplot_titles=[
                         f"{gate}<br>Proc. Inf. = {ei[gate.split('.')[0]]:.3f}, "
                         f"Diam. Norm = {dn[gate.split('.')[0]]:.3f}"
                         for gate in gates
                     ]
                 )
+                pfig.update_annotations(font_size=12, yshift=5)
+                pfig.update_layout(margin={'t': 100})
 
                 k = -1
                 for i in range(nrows):
@@ -653,7 +740,14 @@ def GST(qpu:            QPU,
                                 range(ptm.shape[1]), basis_state[ptm.shape[1]],
                                 fontsize=12
                             )
-                            fig.colorbar(im, ax=ax)
+                            # fig.colorbar(im, ax=ax)
+                            divider = make_axes_locatable(ax)
+                            cax = divider.append_axes(
+                                "right", size="3%", pad=0.05
+                            )
+                            cb = fig.colorbar(im, cax=cax)
+                            cb.set_ticks([-1, 0, 1])
+                            cb.set_ticklabels(['-1', '0', '1'])
                             # Add text annotations
                             for m in range(ptm.shape[0]):
                                 for n in range(ptm.shape[1]):
@@ -711,13 +805,24 @@ def GST(qpu:            QPU,
                         'cmax': 1,
                         'colorbar': {'title': 'Value'}
                     },
-                    height=400 * nrows + 50,
-                    width=400 * ncols
+                    height=350 * nrows + 50,
+                    width=350 * ncols
                 )
                 pfig.update_layout(
-                    title_text=model
+                    title={'text': model, 'pad': {'t': 10, 'b': 10}},
+                    margin={'t': 100}
                 )
-                pfig.show()
+                save_properties = {
+                    'toImageButtonOptions': {
+                        'format': 'svg', # one of png, svg, jpeg, webp
+                        'filename': 'qpu_layout',
+                        # 'height': 500,
+                        # 'width': 1000,
+                        'scale': 10
+                    }
+                }
+                pfig.show(config=save_properties)
+                # pfig.show()
 
                 if settings.Settings.save_data:
                     fig.savefig(
@@ -756,71 +861,493 @@ def GST(qpu:            QPU,
     )
 
 
-def SingleQubitGST(
-        qpu:            QPU,
-        config:         Config,
-        qubits:         Iterable[int],
-        pspec:          Any | None = None,
-        target_model:   Any | None = None,
-        prep_fiducials: Any | None = None,
-        meas_fiducials: Any | None = None,
-        germs:          Any | None = None,
-        circuit_depths: List[int] = [1, 2, 4, 8, 16, 32, 64, 128, 256],  # noqa: B006
-        modes:          Tuple[str] = ('full TP','CPTPLND','Target','H+S','S'),  # noqa: B006
-        fpr:            bool = False,
-        **kwargs
-    ) -> Callable:
-    """Single-Qubit Gate Set Tomography.
+def SimultaneousGST(
+    qpu:            QPU,
+    config:         Config,
+    qubit_labels:   Iterable[int | Tuple[int]],
+    pspec:          Dict[int | Tuple[int], Any] | None = None,
+    target_model:   Dict[int | Tuple[int], Any] | None = None,
+    prep_fiducials: Dict[int | Tuple[int], Any] | None = None,
+    meas_fiducials: Dict[int | Tuple[int], Any] | None = None,
+    germs:          Dict[int | Tuple[int], Any] | None = None,
+    circuit_depths: List[int] = [1, 2, 4, 8, 16, 32, 64, 128, 256],  # noqa: B006
+    modes:          Tuple[str] = ('full TP','CPTPLND','Target','H+S','S'),  # noqa: B006
+    fpr:            bool = False,
+    **kwargs
+) -> Callable:
+    """Simultaneous Gate Set Tomography.
 
     This protocol requires a valid pyGSTi installation.
 
+    Args:
+        qpu (QPU): custom QPU object.
+        config (Config): qcal Config object.
+        qubit_labels (Iterable[int | Tuple[int]]): a list specifying sets of
+            system labels on which to perform GST.
+        pspec (Dict[int | Tuple[int], Any] | None, optional): a dictionary of
+            pyGSTi ProcessorSpec objects. Defaults to None.
+        target_model (Dict[int | Tuple[int], Any] | None, optional): a
+            dictionary of pyGSTi Model objects. Defaults to None.
+        prep_fiducials (Dict[int | Tuple[int], Any] | None, optional): a
+            dictionary of lists of pyGSTi fiducial circuits. Defaults to None.
+        meas_fiducials (Dict[int | Tuple[int], Any] | None, optional): a
+            dictionary of lists of pyGSTi fiducial circuits. Defaults to None.
+        germs (Dict[int | Tuple[int], Any] | None, optional): a dictionary of
+            lists of pyGSTi germ circuits. Defaults to None.
+        circuit_depths (List[int], optional): a list of positive integers
+            specifying the circuit depths. Defaults to ```[1, 2, 4, 8, 16, 32,
+            64, 128, 256]```.
+        modes (Tuple[str], optional): a tuple of strings specifying the modes
+            to be used in the GST protocol. Defaults to ```('full TP',
+            'CPTPLND', 'Target', 'H+S', 'S')```. These correspond to different
+            types of parameterizations/constraints to apply to the estimated
+            model. Allowed values are:
+            - 'full': full (completely unconstrained)
+            - 'TP': TP-constrained
+            - 'CPTPLND': Lindbladian CPTP-constrained
+            - 'H+S': Only Hamiltonian + Stochastic errors allowed (CPTP)
+            - 'S': Only Stochastic errors allowed (CPTP)
+            - 'Target': use the target (ideal) gates as the estimate
+            - <model>: any key in the models_to_test argument
+        fpr (bool, optional): whether to use Fiducial Pair Reduction (FPR).
+            Defaults to False.
 
+    Returns:
+        Callable: SimultaneousGST class instance.
     """
-    gst = type(GST(
-        qpu=qpu,
+    try:
+        import pygsti
+        logger.info(f" pyGSTi version: {pygsti.__version__}\n")
+    except ImportError:
+        logger.warning(' Unable to import pyGSTi!')
+
+    class SimultaneousGST(qpu):
+        """Simultanous GST protocol."""
+
+        @save_init
+        def __init__(
+            self,
+            config:         Config,
+            qubit_labels:   Iterable[int | Tuple[int]],
+            pspec:          Dict[int | Tuple[int], Any] | None = None,
+            target_model:   Dict[int | Tuple[int], Any] | None = None,
+            prep_fiducials: Dict[int | Tuple[int], Any] | None = None,
+            meas_fiducials: Dict[int | Tuple[int], Any] | None = None,
+            germs:          Dict[int | Tuple[int], Any] | None = None,
+            circuit_depths: List[int] = [1, 2, 4, 8, 16, 32, 64, 128, 256],  # noqa: B006
+            modes:          Tuple[str] = (
+                'full TP', 'CPTPLND', 'Target', 'H+S', 'S'
+            ),
+            fpr:            bool = False,
+            **kwargs
+        ) -> None:
+            self._qubit_labels = qubit_labels
+            self._qubits = sorted(flatten(qubit_labels))
+            self._pspec = (
+                pspec if pspec is not None else dict.fromkeys(qubit_labels)
+            )
+            self._target_model = (
+                target_model if target_model is not None
+                else dict.fromkeys(qubit_labels)
+            )
+            self._prep_fiducials = (
+                prep_fiducials if prep_fiducials is not None
+                else dict.fromkeys(qubit_labels)
+            )
+            self._meas_fiducials = (
+                meas_fiducials if meas_fiducials is not None
+                else dict.fromkeys(qubit_labels)
+            )
+            self._germs = (
+                germs if germs is not None
+                else dict.fromkeys(qubit_labels)
+            )
+            self._circuit_depths = circuit_depths
+            self._modes = modes
+            self._fpr = fpr
+
+            self._gst = {}
+            for ql in self._qubit_labels:
+                self._gst[ql] = GST(
+                    qpu=qpu,
+                    config=config,
+                    qubit_labels=[ql],
+                    pspec=self._pspec[ql],
+                    target_model=self._target_model[ql],
+                    prep_fiducials=self._prep_fiducials[ql],
+                    meas_fiducials=self._meas_fiducials[ql],
+                    germs=self._germs[ql],
+                    circuit_depths=self._circuit_depths,
+                    modes=self._modes,
+                    fpr=self._fpr,
+                    **kwargs
+                )
+
+            # Don't need to pass a transpiler because the circuits are already
+            # in qcal format.
+            kwargs.pop('transpiler', None)
+            qpu.__init__(self, config=config, transpiler=None, **kwargs)
+
+        def __getitem__(self, ql: int | Tuple[int]) -> GST:
+            """Get the GST object for a given qubit label."""
+            return self._gst[ql]
+
+        def _gst_property_by_qubit_label(
+            self, property_name: str
+        ) -> Dict[Any, Any]:
+            """Get a property of the GST object for a given qubit label."""
+            return {
+                ql: getattr(self[ql], property_name)
+                for ql in self._qubit_labels
+            }
+
+        @property
+        def avg_gate_infidelity(self) -> Dict[Any, Any]:
+            return self._gst_property_by_qubit_label('avg_gate_infidelity')
+
+        @property
+        def circuit_depths(self) -> List[int]:
+            return self._circuit_depths
+
+        @property
+        def data(self) -> Dict[Any, Any]:
+            return self._gst_property_by_qubit_label('data')
+
+        @property
+        def diamond_norm(self) -> Dict[Any, Any]:
+            return self._gst_property_by_qubit_label('diamond_norm')
+
+        @property
+        def edesign(self) -> Dict[Any, Any]:
+            return self._gst_property_by_qubit_label('edesign')
+
+        @property
+        def eigenvalue_avg_gate_infidelity(self) -> Dict[Any, Any]:
+            return self._gst_property_by_qubit_label(
+                'eigenvalue_avg_gate_infidelity'
+            )
+
+        @property
+        def eigenvalue_diamond_norm(self) -> Dict[Any, Any]:
+            return self._gst_property_by_qubit_label('eigenvalue_diamond_norm')
+
+        @property
+        def eigenvalue_entanglement_infidelity(self) -> Dict[Any, Any]:
+            return self._gst_property_by_qubit_label(
+                'eigenvalue_entanglement_infidelity'
+            )
+
+        @property
+        def entanglement_infidelity(self) -> Dict[Any, Any]:
+            return self._gst_property_by_qubit_label('entanglement_infidelity')
+
+        @property
+        def germs(self) -> Dict[Any, Any]:
+            return self._gst_property_by_qubit_label('germs')
+
+        @property
+        def jtrace_diff(self) -> Dict[Any, Any]:
+            return self._gst_property_by_qubit_label('jtrace_diff')
+
+        @property
+        def meas_fiducials(self) -> Dict[Any, Any]:
+            return self._gst_property_by_qubit_label('meas_fiducials')
+
+        @property
+        def models(self) -> Dict[Any, Any]:
+            return self._gst_property_by_qubit_label('models')
+
+        @property
+        def modes(self) -> Tuple[str]:
+            return self._modes
+
+        @property
+        def POVM(self) -> Dict[Any, Any]:
+            return self._gst_property_by_qubit_label('POVM')
+
+        @property
+        def prep_fiducials(self) -> Dict[Any, Any]:
+            return self._gst_property_by_qubit_label('prep_fiducials')
+
+        @property
+        def process_infidelity(self) -> Dict[Any, Any]:
+            return self._gst_property_by_qubit_label('process_infidelity')
+
+        @property
+        def protocol(self) -> Dict[Any, Any]:
+            return self._gst_property_by_qubit_label('protocol')
+
+        @property
+        def pspec(self) -> Dict[Any, Any]:
+            return self._gst_property_by_qubit_label('pspec')
+
+        @property
+        def ptm(self) -> Dict[Any, Any]:
+            return self._gst_property_by_qubit_label('ptm')
+
+        @property
+        def results(self) -> Dict[Any, Any]:
+            return self._gst_property_by_qubit_label('results')
+
+        @property
+        def state_prep(self) -> Dict[Any, Any]:
+            return self._gst_property_by_qubit_label('state_prep')
+
+        @property
+        def state_prep_fidelity(self) -> Dict[Any, Any]:
+            return self._gst_property_by_qubit_label('state_prep_fidelity')
+
+        @property
+        def target_model(self) -> Dict[Any, Any]:
+            return self._gst_property_by_qubit_label('target_model')
+
+        @property
+        def unitarity(self) -> Dict[Any, Any]:
+            return self._gst_property_by_qubit_label('unitarity')
+
+        def generate_circuits(self):
+            """Generate all GST circuits."""
+            from qcal.interface.pygsti.transpiler import PyGSTiTranspiler
+            transpiler = PyGSTiTranspiler()
+
+            max_workers = min(
+                len(self._qubit_labels), max(1, mp.cpu_count() - 1)
+            )
+
+            def _generate_one(ql):
+                self._gst[ql].generate_circuits()
+                return ql
+
+            with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                futures = [
+                    executor.submit(_generate_one, ql)
+                    for ql in self._qubit_labels
+                ]
+                for f in as_completed(futures):
+                    f.result()
+
+                csets = [self._gst[ql].circuits for ql in self._qubit_labels]
+
+                tcsets = list(executor.map(transpiler.transpile, csets))
+
+            lengths = [len(cs) for cs in tcsets]
+            if len(set(lengths)) != 1:
+                msg = (
+                    'Inconsistent number of circuits across qubit labels: '
+                    f'{dict(zip(self._qubit_labels, lengths, strict=False))}. '
+                    'This breaks simultaneous circuit joining.'
+                )
+                if self._fpr:
+                    msg += ' Try setting fpr=False.'
+                raise ValueError(msg)
+
+            # Merge per-index circuits into one CircuitSet
+            self._circuits = CircuitSet()
+            for circuits_i in zip(*tcsets, strict=False):
+                base = circuits_i[0].copy()
+                for c in circuits_i[1:]:
+                    base.join(c, how="outer")
+                self._circuits.append(base)
+
+            self._data_manager._save_path = (
+                self[self._qubit_labels[0]].data_manager.save_path
+            )
+
+        def save(self):
+            """Save all circuits and data."""
+            clear_output(wait=True)
+
+            def _save_one(ql):
+                if isinstance(ql, Iterable):
+                    qidx = tuple([self._qubits.index(q) for q in ql])
+                else:
+                    qidx = (self._qubits.index(ql),)
+
+                marginalized_results = []
+                for result in self.circuits.results:
+                    marginalized_results.append(
+                        Results(result).marginalize(qidx).dict
+                    )
+
+                self._gst[ql]._circuits.results = marginalized_results
+                self._gst[ql]._runtime = self._runtime
+                self._gst[ql].save()
+                return ql
+
+            max_workers = min(
+                len(self._qubit_labels), max(1, mp.cpu_count() - 1)
+            )
+            with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                futures = [
+                    executor.submit(_save_one, ql) for ql in self._qubit_labels
+                ]
+                for f in as_completed(futures):
+                    f.result()
+
+        def analyze(self):
+            """Analyze the GST results."""
+
+            def _analyze_one(ql):
+                self._gst[ql].analyze()
+                return ql
+
+            max_workers = min(
+                len(self._qubit_labels), max(1, mp.cpu_count() - 1)
+            )
+            with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                futures = [
+                    executor.submit(_analyze_one, ql)
+                    for ql in self._qubit_labels
+                ]
+                for f in as_completed(futures):
+                    f.result()
+
+        def plot(self):
+            """Plot the GST results."""
+            for ql in self._qubit_labels:
+                print('-------------------------------------------------------')
+                print(f'Qubit Label: {ql}')
+                print('-------------------------------------------------------')
+                self._gst[ql].plot()
+
+        def final(self) -> None:
+            """Final method."""
+            print(f"\nRuntime: {repr(self._runtime)[8:]}\n")
+
+        def run(self):
+            """Run all experimental methods and analyze results."""
+            self.generate_circuits()
+            qpu.run(self, self._circuits, save=False)
+            self.save()
+            self.analyze()
+            self.plot()
+            self.final()
+
+    return SimultaneousGST(
         config=config,
-        qubit_labels=qubits,
+        qubit_labels=qubit_labels,
         pspec=pspec,
         target_model=target_model,
         prep_fiducials=prep_fiducials,
         meas_fiducials=meas_fiducials,
         germs=germs,
         circuit_depths=circuit_depths,
+        modes=modes,
         fpr=fpr,
         **kwargs
-    ))
+    )
 
+
+def SingleQubitGST(
+    qpu:            QPU,
+    config:         Config,
+    qubits:         Iterable[int],
+    pspec:          Any | Dict[int, Any] | None = None,
+    target_model:   Any | Dict[int, Any] | None = None,
+    prep_fiducials: Any | Dict[int, Any] | None = None,
+    meas_fiducials: Any | Dict[int, Any] | None = None,
+    germs:          Any | Dict[int, Any] | None = None,
+    circuit_depths: List[int] = [1, 2, 4, 8, 16, 32, 64, 128, 256],  # noqa: B006
+    modes:          Tuple[str] = ('full TP','CPTPLND','Target','H+S','S'),  # noqa: B006
+    fpr:            bool = False,
+    **kwargs
+) -> Callable:
+    """Single-Qubit Gate Set Tomography.
+
+    This protocol requires a valid pyGSTi installation.
+
+    Args:
+        qpu (QPU): custom QPU object.
+        config (Config): qcal Config object.
+        qubits (Iterable[int]): a list specifying the qubits on which to perform
+            GST.
+        pspec (Any | Dict[int, Any] | None, optional): a pyGSTi ProcessorSpec
+            object or a dictionary of such objects. Defaults to None.
+        target_model (Any | Dict[int, Any] | None, optional): a pyGSTi Model
+            object or a dictionary of such objects. Defaults to None.
+        prep_fiducials (Any | Dict[int, Any] | None, optional): a list of pyGSTi
+            fiducial circuits or a dictionary of such objects. Defaults to None.
+        meas_fiducials (Any | Dict[int, Any] | None, optional): a list of pyGSTi
+            fiducial circuits or a dictionary of such objects. Defaults to None.
+        germs (Any | Dict[int, Any] | None, optional): a list of pyGSTi germ
+            circuits or a dictionary of such objects. Defaults to None.
+        circuit_depths (List[int], optional): a list of positive integers
+            specifying the circuit depths. Defaults to ```[1, 2, 4, 8, 16, 32,
+            64, 128, 256]```.
+        modes (Tuple[str], optional): a tuple of strings specifying the modes
+            to be used in the GST protocol. Defaults to ```('full TP',
+            'CPTPLND', 'Target', 'H+S', 'S')```. These correspond to different
+            types of parameterizations/constraints to apply to the estimated
+            model. Allowed values are:
+            - 'full': full (completely unconstrained)
+            - 'TP': TP-constrained
+            - 'CPTPLND': Lindbladian CPTP-constrained
+            - 'H+S': Only Hamiltonian + Stochastic errors allowed (CPTP)
+            - 'S': Only Stochastic errors allowed (CPTP)
+            - 'Target': use the target (ideal) gates as the estimate
+            - <model>: any key in the models_to_test argument
+        fpr (bool, optional): whether to use Fiducial Pair Reduction (FPR).
+            Defaults to False.
+
+    Returns:
+        Callable: SingleQubitGST class instance.
+    """
+    if len(qubits) <= 2:
+        gst = type(GST(
+            qpu=qpu,
+            config=config,
+            qubit_labels=qubits,
+            pspec=pspec,
+            target_model=target_model,
+            prep_fiducials=prep_fiducials,
+            meas_fiducials=meas_fiducials,
+            germs=germs,
+            circuit_depths=circuit_depths,
+            modes=modes,
+            fpr=fpr,
+            **kwargs
+        ))
+    else:
+        gst = type(SimultaneousGST(
+            qpu=qpu,
+            config=config,
+            qubit_labels=qubits,
+            pspec=pspec,
+            target_model=target_model,
+            prep_fiducials=prep_fiducials,
+            meas_fiducials=meas_fiducials,
+            germs=germs,
+            circuit_depths=circuit_depths,
+            modes=modes,
+            fpr=fpr,
+            **kwargs
+        ))
     class SingleQubitGST(gst):
         """GST protocol."""
 
         @save_init
-        def __init__(self,
-                config:         Config,
-                qubits:         Iterable[int],
-                pspec:          Any | None = None,
-                target_model:   Any | None = None,
-                prep_fiducials: Any | None = None,
-                meas_fiducials: Any | None = None,
-                germs:          Any | None = None,
-                circuit_depths: List[int] = [1, 2, 4, 8, 16, 32, 64, 128, 256],  # noqa: B006
-                modes:          Tuple[str] = (
-                    'full TP', 'CPTPLND', 'Target', 'H+S', 'S'
-                ),
-                fpr:            bool = False,
-                **kwargs
-            ) -> None:
+        def __init__(
+            self,
+            config:         Config,
+            qubits:         Iterable[int],
+            pspec:          Any | Dict[int, Any] | None = None,
+            target_model:   Any | Dict[int, Any] | None = None,
+            prep_fiducials: Any | Dict[int, Any] | None = None,
+            meas_fiducials: Any | Dict[int, Any] | None = None,
+            germs:          Any | Dict[int, Any] | None = None,
+            circuit_depths: List[int] = [1, 2, 4, 8, 16, 32, 64, 128, 256],  # noqa: B006
+            modes:          Tuple[str] = (
+                'full TP', 'CPTPLND', 'Target', 'H+S', 'S'
+            ),
+            fpr:            bool = False,
+            **kwargs
+        ) -> None:
             try:
                 import pygsti
                 from pygsti.modelpacks import smq1Q_XYI
                 logger.info(f" pyGSTi version: {pygsti.__version__}\n")
             except ImportError:
                 logger.warning(' Unable to import pyGSTi!')
-
-            if len(qubits) > 2:
-                raise ValueError(
-                    'Single-qubit GST is not currently supported for more than '
-                    '2 qubits!'
-                )
 
             if len(qubits) == 1:
                 pspec = (
@@ -851,7 +1378,6 @@ def SingleQubitGST(
                 from pygsti.models.modelconstruction import create_explicit_model
                 from pygsti.processors import QubitProcessorSpec
                 from pygsti.tools.internalgates import standard_gatename_unitaries
-
                 if pspec is None:
                     gate_names = [
                         'Gxpi2', 'Gypi2', 'Gii', 'Gxx', 'Gxy','Gyx', 'Gyy'
@@ -924,6 +1450,33 @@ def SingleQubitGST(
                         verbosity=2
                     )
 
+            elif len(qubits) > 2:
+                if pspec is None:
+                    pspec = {
+                        q: smq1Q_XYI.processor_spec((q,)) for q in qubits
+                    }
+
+                if target_model is None:
+                    target_model = {
+                        q: smq1Q_XYI.target_model(qubit_labels=(q,))
+                        for q in qubits
+                }
+
+                if prep_fiducials is None:
+                    prep_fiducials = {
+                        q: smq1Q_XYI.prep_fiducials((q,)) for q in qubits
+                    }
+
+                if meas_fiducials is None:
+                    meas_fiducials = {
+                        q: smq1Q_XYI.meas_fiducials((q,)) for q in qubits
+                    }
+
+                if germs is None:
+                    germs = {
+                        q: smq1Q_XYI.germs((q,)) for q in qubits
+                    }
+
             gst.__init__(self,
                 config=config,
                 qubit_labels=qubits,
@@ -954,19 +1507,19 @@ def SingleQubitGST(
 
 
 def TwoQubitGST(
-        qpu:            QPU,
-        config:         Config,
-        qubits:         Iterable[int],
-        pspec:          Any | None = None,
-        target_model:   Any | None = None,
-        prep_fiducials: Any | None = None,
-        meas_fiducials: Any | None = None,
-        germs:          Any | None = None,
-        circuit_depths: List[int] = [1, 2, 4, 8, 16, 32, 64, 128],  # noqa: B006
-        modes:          Tuple[str] = ('full TP','CPTPLND','Target','H+S','S'),  # noqa: B006
-        fpr:            bool = False,
-        **kwargs
-    ) -> Callable:
+    qpu:            QPU,
+    config:         Config,
+    qubit_labels:   Iterable[Tuple[int]],
+    pspec:          Any | Dict[Tuple[int], Any] | None = None,
+    target_model:   Any | Dict[Tuple[int], Any] | None = None,
+    prep_fiducials: Any | Dict[Tuple[int], Any] | None = None,
+    meas_fiducials: Any | Dict[Tuple[int], Any] | None = None,
+    germs:          Any | Dict[Tuple[int], Any] | None = None,
+    circuit_depths: List[int] = [1, 2, 4, 8, 16, 32, 64, 128],  # noqa: B006
+    modes:          Tuple[str] = ('full TP','CPTPLND','Target','H+S','S'),  # noqa: B006
+    fpr:            bool = False,
+    **kwargs
+) -> Callable:
     """Two-Qubit Gate Set Tomography.
 
     This protocol requires a valid pyGSTi installation.
@@ -974,8 +1527,18 @@ def TwoQubitGST(
     Args:
         qpu (QPU): custom QPU object.
         config (Config): qcal Config object.
-        qubits (Iterable[int]): a list specifying sets of system labels
-            on which to perform GST.
+        qubit_labels (Iterable[Tuple[int]]): a list of tuples of ints specifying
+            sets of qubit labels on which to perform two-qubit GST.
+        pspec (Any | Dict[int, Any] | None, optional): a pyGSTi ProcessorSpec
+            object or a dictionary of such objects. Defaults to None.
+        target_model (Any | Dict[int, Any] | None, optional): a pyGSTi Model
+            object or a dictionary of such objects. Defaults to None.
+        prep_fiducials (Any | Dict[int, Any] | None, optional): a list of pyGSTi
+            fiducial circuits or a dictionary of such objects. Defaults to None.
+        meas_fiducials (Any | Dict[int, Any] | None, optional): a list of pyGSTi
+            fiducial circuits or a dictionary of such objects. Defaults to None.
+        germs (Any | Dict[int, Any] | None, optional): a list of pyGSTi germ
+            circuits or a dictionary of such objects. Defaults to None.
         circuit_depths (List[int], optional): a list of positive integers
             specifying the circuit depths. Defaults to ```[1, 2, 4, 8, 16, 32,
             64, 128, 256]```.
@@ -997,40 +1560,57 @@ def TwoQubitGST(
     Returns:
         Callable: TwoQubitGST class instance.
     """
-    gst = type(GST(
-        qpu=qpu,
-        config=config,
-        qubit_labels=qubits,
-        pspec=pspec,
-        target_model=target_model,
-        prep_fiducials=prep_fiducials,
-        meas_fiducials=meas_fiducials,
-        germs=germs,
-        circuit_depths=circuit_depths,
-        modes=modes,
-        fpr=fpr,
-        **kwargs
-    ))
+    if len(qubit_labels) == 1:
+        gst = type(GST(
+            qpu=qpu,
+            config=config,
+            qubit_labels=qubit_labels,
+            pspec=pspec,
+            target_model=target_model,
+            prep_fiducials=prep_fiducials,
+            meas_fiducials=meas_fiducials,
+            germs=germs,
+            circuit_depths=circuit_depths,
+            modes=modes,
+            fpr=fpr,
+            **kwargs
+        ))
+    elif len(qubit_labels) > 1:
+        gst = type(SimultaneousGST(
+            qpu=qpu,
+            config=config,
+            qubit_labels=qubit_labels,
+            pspec=pspec,
+            target_model=target_model,
+            prep_fiducials=prep_fiducials,
+            meas_fiducials=meas_fiducials,
+            germs=germs,
+            circuit_depths=circuit_depths,
+            modes=modes,
+            fpr=fpr,
+            **kwargs
+        ))
 
     class TwoQubitGST(gst):
         """GST protocol."""
 
         @save_init
-        def __init__(self,
-                config:         Config,
-                qubits:         Iterable[int],
-                pspec:          Any | None = None,
-                target_model:   Any | None = None,
-                prep_fiducials: Any | None = None,
-                meas_fiducials: Any | None = None,
-                germs:          Any | None = None,
-                circuit_depths: List[int] = [1, 2, 4, 8, 16, 32, 64, 128, 256],  # noqa: B006
-                modes:          Tuple[str] = (
-                    'full TP', 'CPTPLND', 'Target', 'H+S', 'S'
-                ),
-                fpr:            bool = False,
-                **kwargs
-            ) -> None:
+        def __init__(
+            self,
+            config:         Config,
+            qubit_labels:   Iterable[Tuple[int]],
+            pspec:          Any | Dict[Tuple[int], Any] | None = None,
+            target_model:   Any | Dict[Tuple[int], Any] | None = None,
+            prep_fiducials: Any | Dict[Tuple[int], Any] | None = None,
+            meas_fiducials: Any | Dict[Tuple[int], Any] | None = None,
+            germs:          Any | Dict[Tuple[int], Any] | None = None,
+            circuit_depths: List[int] = [1, 2, 4, 8, 16, 32, 64, 128, 256],  # noqa: B006
+            modes:          Tuple[str] = (
+                'full TP', 'CPTPLND', 'Target', 'H+S', 'S'
+            ),
+            fpr:            bool = False,
+            **kwargs
+        ) -> None:
             try:
                 import pygsti
                 from pygsti.modelpacks import smq2Q_XYCPHASE
@@ -1038,36 +1618,61 @@ def TwoQubitGST(
             except ImportError:
                 logger.warning(' Unable to import pyGSTi!')
 
-            if len(qubits) != 2:
-                raise ValueError(
-                    'Two-qubit GST is only support for 2 qubits!'
+            if len(qubit_labels) == 1:
+                pspec = (
+                    smq2Q_XYCPHASE.processor_spec(qubit_labels[0])
+                    if pspec is None else pspec
                 )
 
-            pspec = (
-                smq2Q_XYCPHASE.processor_spec(qubits) if pspec is None
-                else pspec
-            )
+                target_model = (
+                    smq2Q_XYCPHASE.target_model(qubit_labels=qubit_labels[0])
+                    if target_model is None else target_model
+                )
 
-            target_model = (
-                smq2Q_XYCPHASE.target_model(qubit_labels=qubits) if
-                target_model is None else target_model
-            )
+                prep_fiducials = (
+                    smq2Q_XYCPHASE.prep_fiducials(qubit_labels[0])
+                    if prep_fiducials is None else prep_fiducials
+                )
 
-            prep_fiducials = (
-                smq2Q_XYCPHASE.prep_fiducials(qubits) if prep_fiducials is None
-                else prep_fiducials
-            )
+                meas_fiducials = (
+                    smq2Q_XYCPHASE.meas_fiducials(qubit_labels[0])
+                    if meas_fiducials is None else meas_fiducials
+                )
 
-            meas_fiducials = (
-                smq2Q_XYCPHASE.meas_fiducials(qubits) if meas_fiducials is None
-                else meas_fiducials
-            )
+                germs = (
+                    smq2Q_XYCPHASE.germs(qubit_labels[0])
+                    if germs is None else germs
+                )
 
-            germs = smq2Q_XYCPHASE.germs(qubits) if germs is None else germs
+            elif len(qubit_labels) > 1:
+                pspec = {
+                    ql: smq2Q_XYCPHASE.processor_spec(ql)
+                    for ql in qubit_labels
+                } if pspec is None else pspec
+
+                target_model = {
+                    ql: smq2Q_XYCPHASE.target_model(qubit_labels=ql)
+                    for ql in qubit_labels
+                } if target_model is None else target_model
+
+                prep_fiducials = {
+                    ql: smq2Q_XYCPHASE.prep_fiducials(ql)
+                    for ql in qubit_labels
+                } if prep_fiducials is None else prep_fiducials
+
+                meas_fiducials = {
+                    ql: smq2Q_XYCPHASE.meas_fiducials(ql)
+                    for ql in qubit_labels
+                } if meas_fiducials is None else meas_fiducials
+
+                germs = {
+                    ql: smq2Q_XYCPHASE.germs(ql)
+                    for ql in qubit_labels
+                } if germs is None else germs
 
             gst.__init__(self,
                 config=config,
-                qubit_labels=qubits,
+                qubit_labels=qubit_labels,
                 pspec=pspec,
                 target_model=target_model,
                 prep_fiducials=prep_fiducials,
@@ -1081,7 +1686,7 @@ def TwoQubitGST(
 
     return TwoQubitGST(
         config=config,
-        qubits=qubits,
+        qubit_labels=qubit_labels,
         pspec=pspec,
         target_model=target_model,
         prep_fiducials=prep_fiducials,
@@ -1095,68 +1700,114 @@ def TwoQubitGST(
 
 
 def QuantumInstrumentGST(
-        qpu:            QPU,
-        config:         Config,
-        qubits:         Iterable[int],
-        pspec:          Any | None = None,
-        target_model:   Any | None = None,
-        prep_fiducials: Any | None = None,
-        meas_fiducials: Any | None = None,
-        germs:          Any | None = None,
-        circuit_depths: List[int] = [1],  # noqa: B006
-        modes:          Tuple[str] = ('Target', 'full TP'),  # noqa: B006
-        **kwargs
-    ) -> Callable:
+    qpu:            QPU,
+    config:         Config,
+    qubits:         Iterable[int],
+    pspec:          Any | Dict[int, Any] | None = None,
+    target_model:   Any | Dict[int, Any] | None = None,
+    prep_fiducials: Any | Dict[int, Any] | None = None,
+    meas_fiducials: Any | Dict[int, Any] | None = None,
+    germs:          Any | Dict[int, Any] | None = None,
+    circuit_depths: List[int] = [1],  # noqa: B006
+    modes:          Tuple[str] = ('Target', 'full TP'),  # noqa: B006
+    fpr:            bool = False,
+    **kwargs
+) -> Callable:
     """Quantum Instrument Gate Set Tomography.
 
     This protocol requires a valid pyGSTi installation.
+
+    Args:
+        qpu (QPU): custom QPU object.
+        config (Config): qcal Config object.
+        qubits (Iterable[int]): a list specifying the qubits on which to perform
+            GST.
+        pspec (Any | Dict[int, Any] | None, optional): a pyGSTi ProcessorSpec
+            object or a dictionary of such objects. Defaults to None.
+        target_model (Any | Dict[int, Any] | None, optional): a pyGSTi Model
+            object or a dictionary of such objects. Defaults to None.
+        prep_fiducials (Any | Dict[int, Any] | None, optional): a list of pyGSTi
+            fiducial circuits or a dictionary of such objects. Defaults to None.
+        meas_fiducials (Any | Dict[int, Any] | None, optional): a list of pyGSTi
+            fiducial circuits or a dictionary of such objects. Defaults to None.
+        germs (Any | Dict[int, Any] | None, optional): a list of pyGSTi germ
+            circuits or a dictionary of such objects. Defaults to None.
+        circuit_depths (List[int], optional): a list of positive integers
+            specifying the circuit depths. Defaults to ```[1, 2, 4, 8, 16, 32,
+            64, 128, 256]```.
+        modes (Tuple[str], optional): a tuple of strings specifying the modes
+            to be used in the GST protocol. Defaults to ```('full TP',
+            'CPTPLND', 'Target', 'H+S', 'S')```. These correspond to different
+            types of parameterizations/constraints to apply to the estimated
+            model. Allowed values are:
+            - 'full': full (completely unconstrained)
+            - 'TP': TP-constrained
+            - 'CPTPLND': Lindbladian CPTP-constrained
+            - 'H+S': Only Hamiltonian + Stochastic errors allowed (CPTP)
+            - 'S': Only Stochastic errors allowed (CPTP)
+            - 'Target': use the target (ideal) gates as the estimate
+            - <model>: any key in the models_to_test argument
+        fpr (bool, optional): whether to use Fiducial Pair Reduction (FPR).
+            Defaults to False.
     """
     try:
         import pygsti
-        import pygsti.report.reportables as metrics
         logger.info(f" pyGSTi version: {pygsti.__version__}\n")
     except ImportError:
         logger.warning(' Unable to import pyGSTi!')
 
-    gst = type(GST(
-        qpu=qpu,
-        config=config,
-        qubit_labels=qubits,
-        pspec=pspec,
-        target_model=target_model,
-        prep_fiducials=prep_fiducials,
-        meas_fiducials=meas_fiducials,
-        germs=germs,
-        circuit_depths=circuit_depths,
-        modes=modes,
-        **kwargs
-    ))
+    if len(qubits) == 1:
+        gst = type(GST(
+            qpu=qpu,
+            config=config,
+            qubit_labels=qubits,
+            pspec=pspec,
+            target_model=target_model,
+            prep_fiducials=prep_fiducials,
+            meas_fiducials=meas_fiducials,
+            germs=germs,
+            circuit_depths=circuit_depths,
+            modes=modes,
+            fpr=fpr,
+            **kwargs
+        ))
+    else:
+        gst = type(SimultaneousGST(
+            qpu=qpu,
+            config=config,
+            qubit_labels=qubits,
+            pspec=pspec,
+            target_model=target_model,
+            prep_fiducials=prep_fiducials,
+            meas_fiducials=meas_fiducials,
+            germs=germs,
+            circuit_depths=circuit_depths,
+            modes=modes,
+            fpr=fpr,
+            **kwargs
+        ))
 
     class QuantumInstrumentGST(gst):
         """QI GST protocol."""
 
         @save_init
-        def __init__(self,
-                config:         Config,
-                qubits:         Iterable[int],
-                pspec:          Any | None = None,
-                target_model:   Any | None = None,
-                prep_fiducials: Any | None = None,
-                meas_fiducials: Any | None = None,
-                germs:          Any | None = None,
-                circuit_depths: List[int] = [1],  # noqa: B006
-                modes:          Tuple[str] = ('Target', 'full TP'),  # noqa: B006
-                **kwargs
-            ) -> None:
+        def __init__(
+            self,
+            config:         Config,
+            qubits:         Iterable[int],
+            pspec:          Any | Dict[int, Any] | None = None,
+            target_model:   Any | Dict[int, Any] | None = None,
+            prep_fiducials: Any | Dict[int, Any] | None = None,
+            meas_fiducials: Any | Dict[int, Any] | None = None,
+            germs:          Any | Dict[int, Any] | None = None,
+            circuit_depths: List[int] = [1],  # noqa: B006
+            modes:          Tuple[str] = ('Target', 'full TP'),  # noqa: B006
+            fpr:            bool = False,
+            **kwargs
+        ) -> None:
             import pygsti
             from pygsti.modelmembers.instruments import Instrument
             from pygsti.modelpacks import smq1Q_XYI
-
-            if len(qubits) > 2:
-                raise ValueError(
-                    'Quantum Instrument GST is not currently supported for '
-                    'more than 2 qubits!'
-                )
 
             if len(circuit_depths) > 1 or circuit_depths[0] != 1:
                 raise ValueError(
@@ -1170,37 +1821,76 @@ def QuantumInstrumentGST(
                     "for Quantum Instrument GST!"
                 )
 
-            pspec = (
-                smq1Q_XYI.processor_spec(qubits) if pspec is None
-                else pspec
-            )
+            if len(qubits) == 1:
+                pspec = (
+                    smq1Q_XYI.processor_spec(qubits) if pspec is None
+                    else pspec
+                )
 
-            target_model = (
-                smq1Q_XYI.target_model(qubit_labels=qubits) if target_model
-                is None else target_model
-            )
-            target_model.set_all_parameterizations("full TP") # TODO: CPTP
-            # Create and add the ideal quantum instrument to the target model
-            E0 = target_model.effects['0']
-            E1 = target_model.effects['1']
-            target_model[('Iz', qubits[0])] = Instrument(
-                {'p0': np.dot(E0, E0.T), 'p1': np.dot(E1, E1.T)}
-            )
+                target_model = (
+                    smq1Q_XYI.target_model(qubit_labels=qubits) if target_model
+                    is None else target_model
+                )
+                target_model.set_all_parameterizations("full TP") # TODO: CPTP
+                # Create and add the ideal quantum instrument to the target model
+                E0 = target_model.effects['0']
+                E1 = target_model.effects['1']
+                target_model[('Iz', qubits[0])] = Instrument(
+                    {'p0': np.dot(E0, E0.T), 'p1': np.dot(E1, E1.T)}
+                )
 
-            prep_fiducials = (
-                smq1Q_XYI.prep_fiducials(qubits) if prep_fiducials is None
-                else prep_fiducials
-            )
+                prep_fiducials = (
+                    smq1Q_XYI.prep_fiducials(qubits) if prep_fiducials is None
+                    else prep_fiducials
+                )
 
-            meas_fiducials = (
-                smq1Q_XYI.meas_fiducials(qubits) if meas_fiducials is None
-                else meas_fiducials
-            )
+                meas_fiducials = (
+                    smq1Q_XYI.meas_fiducials(qubits) if meas_fiducials is None
+                    else meas_fiducials
+                )
 
-            germs = smq1Q_XYI.germs(qubits) if germs is None else germs
-            germs += [ # Add the instrument as a germ
-                pygsti.circuits.Circuit([('Iz', qubits[0])])
-            ]
+                germs = smq1Q_XYI.germs(qubits) if germs is None else germs
+                germs += [ # Add the instrument as a germ
+                    pygsti.circuits.Circuit([('Iz', qubits[0])])
+                ]
+
+            elif len(qubits) > 1:
+                if pspec is None:
+                    pspec = {
+                        q: smq1Q_XYI.processor_spec((q,)) for q in qubits
+                    }
+
+                if target_model is None:
+                    target_model = {
+                        q: smq1Q_XYI.target_model(qubit_labels=(q,))
+                        for q in qubits
+                    }
+                    for q in qubits: # TODO: CPTP
+                        target_model[q].set_all_parameterizations("full TP")
+                        E0 = target_model[q].effects['0']
+                        E1 = target_model[q].effects['1']
+                        target_model[q][('Iz', q)] = Instrument(
+                            {'p0': np.dot(E0, E0.T), 'p1': np.dot(E1, E1.T)}
+                        )
+
+                if prep_fiducials is None:
+                    prep_fiducials = {
+                        q: smq1Q_XYI.prep_fiducials((q,)) for q in qubits
+                    }
+
+                if meas_fiducials is None:
+                    meas_fiducials = {
+                        q: smq1Q_XYI.meas_fiducials((q,)) for q in qubits
+                    }
+
+                if germs is None:
+                    germs = {
+                        q: smq1Q_XYI.germs((q,)) for q in qubits
+                    }
+                    for q in qubits:
+                        germs[q] += [ # Add the instrument as a germ
+                            pygsti.circuits.Circuit([('Iz', q)])
+                        ]
 
             gst.__init__(self,
                 config=config,
@@ -1212,88 +1902,9 @@ def QuantumInstrumentGST(
                 germs=germs,
                 circuit_depths=circuit_depths,
                 modes=modes,
+                # fpr=fpr,
                 **kwargs
             )
-
-        @property
-        def diamond_norm(self) -> Dict[str, Dict[str, float]]:
-            """Diamond norm for the gates in the gate set.
-
-            Returns:
-                Dict[str, Dict[str, float]]: diamond norm for each gate in the
-                    gate set for each model.
-            """
-            diamondnorm = {}
-            for mode, model in self.models.items():
-                diamondnorm[mode] = {
-                    str(gate): metrics.half_diamond_norm(
-                        self.target_model.operations[gate].to_dense(),
-                        op.to_dense(),
-                        'pp'
-                    )
-                    for gate, op in model.operations.items()
-                } | { # TODO: discrepancy between this value and reported value
-                    f'{instr}': metrics.half_diamond_norm(
-                        sum(effect.to_dense() for effect in effects.values()),
-                        sum(
-                            self.target_model.instruments[instr][p].to_dense()
-                            for p in effects.keys()
-                        ),
-                        'pp'
-                    )
-                    for instr, effects in model.instruments.items()
-                }
-            return diamondnorm
-
-        @property
-        def entanglement_infidelity(self) -> Dict[str, Dict[str, float]]:
-            """Entanglement infidelity for the gates in the gate set.
-
-            Returns:
-                Dict[str, Dict[str, float]]: entanglement infidelity for each
-                    gate in the gate set for each model.
-            """
-            infidelity = {}
-            for mode, model in self.models.items():
-                infidelity[mode] = {
-                    str(gate): metrics.entanglement_infidelity(
-                        self.target_model.operations[gate].to_dense(),
-                        op.to_dense(),
-                        'pp'
-                    )
-                    for gate, op in model.operations.items()
-                } | { # TODO: discrepancy between this value and reported value
-                    f'{instr}': metrics.entanglement_infidelity(
-                        sum(effect.to_dense() for effect in effects.values()),
-                        sum(
-                            self.target_model.instruments[instr][p].to_dense()
-                            for p in effects.keys()
-                        ),
-                        'pp'
-                    )
-                    for instr, effects in model.instruments.items()
-                }
-            return infidelity
-
-        @property
-        def ptm(self) -> Dict[str, Dict[str, NDArray]]:
-            """Pauli Transfer Matrices for each gate in the gate set.
-
-            Returns:
-                Dict[str, Dict[str, NDArray]]: PTM for each gate in the gate
-                    set for each fitted model.
-            """
-            ptm = {}
-            for mode, model in self.models.items():
-                ptm[mode] = {
-                    str(gate): op.to_dense()
-                    for gate, op in model.operations.items()
-                } | {
-                    f'{instr}.{p}': effect.to_dense()
-                    for instr, effects in model.instruments.items()
-                    for p, effect in effects.items()
-                }
-            return ptm
 
         def save(self):
             """Save all circuits and data."""
@@ -1302,34 +1913,73 @@ def QuantumInstrumentGST(
             classified_results = load_from_pickle(
                 self.data_manager.save_path + 'classified_results.pkl'
             )
-            pp = PostProcessor(
-                self._config,
-                classified_results,
-                passes=[
-                    discard_heralded_shots,
-                    relabel_esp,
-                    compute_conditional_counts
-                ]
-            )
-            pp.run()
 
-            results_df = pd.DataFrame(pp.tm_results)
-            results_df.index = self._circuits['pygsti_circuit'].values
-            results_df = results_df.apply(
-                lambda col: col.round().astype('Int64')
-            ).astype(object)
-            results_df = results_df.fillna('--')
-            results_df = results_df.rename(columns=lambda col: col + ' count')
+            def _run_post_processing(gst_obj, results):
+                pp = PostProcessor(
+                    self._config,
+                    results,
+                    passes=[
+                        discard_heralded_shots,
+                        relabel_esp,
+                        compute_conditional_counts
+                    ]
+                )
+                pp.run()
 
-            logger.info(" Saving the pyGSTi results...")
-            filepath = self.data_manager.save_path + 'data/dataset.txt'
-            with open(filepath, 'w') as f:
-                f.write('## Columns = ' + ', '.join(results_df.columns) + "\n")
-                f.close()
-            results_df.to_csv(filepath, sep=' ', mode='a', header=False)
+                results_df = pd.DataFrame(pp.tm_results)
+                results_df.index = gst_obj._circuits['pygsti_circuit'].values
+                results_df = results_df.apply(
+                    lambda col: col.round().astype('Int64')
+                ).astype(object)
+                results_df = results_df.fillna('--')
+                results_df = results_df.rename(
+                    columns=lambda col: col + ' count'
+                )
 
-            if settings.Settings.save_data:
-                qpu.save(self, create_data_path=False)
+                logger.info(" Saving the pyGSTi results...")
+                filepath = gst_obj.data_manager.save_path + 'data/dataset.txt'
+                with open(filepath, 'w') as f:
+                    f.write(
+                        '## Columns = ' + ', '.join(results_df.columns) + '\n'
+                    )
+                    f.close()
+                results_df.to_csv(filepath, sep=' ', mode='a', header=False)
+
+                gst_obj._runtime = self._runtime
+                if settings.Settings.save_data:
+                    qpu.save(gst_obj, create_data_path=False)
+
+            if hasattr(self, '_gst'):
+                def _process_qubit_label(ql):
+                    gst_obj = self[ql]
+                    qset = set(ql) if isinstance(ql, tuple) else {ql}
+                    filtered_results = [
+                        {q: res[q] for q in qset}
+                        for res in classified_results
+                    ]
+                    _run_post_processing(gst_obj, filtered_results)
+
+                max_workers = min(
+                    len(self._qubit_labels), max(1, mp.cpu_count() - 1)
+                )
+                with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                    futures = {
+                        executor.submit(_process_qubit_label, ql): ql
+                        for ql in self._qubit_labels
+                    }
+                    for future in as_completed(futures):
+                        ql = futures[future]
+                        try:
+                            future.result()
+                        except Exception:
+                            logger.exception(
+                                " Post-processing failed for qubit label %s",
+                                ql
+                            )
+                            raise
+
+            else:
+                _run_post_processing(self, classified_results)
 
     return QuantumInstrumentGST(
         config=config,
@@ -1341,5 +1991,6 @@ def QuantumInstrumentGST(
         germs=germs,
         circuit_depths=circuit_depths,
         modes=modes,
+        fpr=fpr,
         **kwargs
     )
