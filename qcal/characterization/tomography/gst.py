@@ -17,14 +17,35 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
+import pygsti
+import pygsti.report.reportables as metrics
 from IPython.display import clear_output
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from numpy.typing import NDArray
 from plotly.subplots import make_subplots
+from pygsti.algorithms.fiducialpairreduction import (
+    find_sufficient_fiducial_pairs_per_germ_greedy,
+)
+from pygsti.algorithms.fiducialselection import find_fiducials
+from pygsti.algorithms.germselection import find_germs
+from pygsti.circuits.circuit import Circuit
+from pygsti.io import write_empty_protocol_data
+from pygsti.modelmembers.instruments import Instrument
+from pygsti.modelpacks import smq1Q_XYI, smq2Q_XYCPHASE
+from pygsti.models.explicitmodel import ExplicitOpModel
+from pygsti.models.modelconstruction import create_explicit_model
+from pygsti.processors import QubitProcessorSpec
+from pygsti.protocols import StandardGST, StandardGSTDesign
+from pygsti.protocols.gst import ModelEstimateResults
+from pygsti.protocols.protocol import ProtocolData
+from pygsti.tools.internalgates import standard_gatename_unitaries
 
 import qcal.settings as settings
 from qcal.circuit import CircuitSet
 from qcal.config import Config
+from qcal.interface.pygsti.circuits import load_circuits
+from qcal.interface.pygsti.datasets import generate_pygsti_dataset
+from qcal.interface.pygsti.transpiler import PyGSTiTranspiler
 from qcal.plotting.utils import calculate_nrows_ncols
 from qcal.post_processing.passes import (
     compute_conditional_counts,
@@ -54,8 +75,6 @@ def GST(
     **kwargs
 ) -> Callable:
     """Gate Set Tomography.
-
-    This protocol requires a valid pyGSTi installation.
 
     Args:
         qpu (QPU): custom QPU object.
@@ -93,17 +112,6 @@ def GST(
     Returns:
         Callable: GST class instance.
     """
-    try:
-        import pygsti
-        import pygsti.report.reportables as metrics
-        from pygsti.circuits.circuit import Circuit
-        from pygsti.models.explicitmodel import ExplicitOpModel
-        from pygsti.processors.processorspec import QubitProcessorSpec
-        from pygsti.protocols.gst import ModelEstimateResults, StandardGSTDesign
-        from pygsti.protocols.protocol import ProtocolData
-        logger.info(f" pyGSTi version: {pygsti.__version__}\n")
-    except ImportError:
-        logger.warning(' Unable to import pyGSTi!')
 
     class GST(qpu):
         """GST protocol."""
@@ -125,7 +133,7 @@ def GST(
             fpr:            bool = False,
             **kwargs
         ) -> None:
-            from qcal.interface.pygsti.transpiler import PyGSTiTranspiler
+            logger.info(f" pyGSTi version: {pygsti.__version__}\n")
 
             self._qubit_labels = qubit_labels
             self._qubits = sorted(flatten(qubit_labels))
@@ -549,14 +557,6 @@ def GST(
 
         def generate_circuits(self):
             """Generate all GST circuits."""
-            from pygsti.algorithms.fiducialpairreduction import (
-                find_sufficient_fiducial_pairs_per_germ_greedy,
-            )
-            from pygsti.io import write_empty_protocol_data
-            from pygsti.protocols import StandardGST, StandardGSTDesign
-
-            from qcal.interface.pygsti.circuits import load_circuits
-
             print("Prep fiducials:\n", self._prep_fiducials)
             print("Meas fiducials:\n", self._meas_fiducials)
             print("Germs:\n", self._germs)
@@ -617,7 +617,6 @@ def GST(
 
         def save(self):
             """Save all circuits and data."""
-            from qcal.interface.pygsti.datasets import generate_pygsti_dataset
             clear_output(wait=True)
             generate_pygsti_dataset(
                 self._circuits,
@@ -629,8 +628,6 @@ def GST(
         def analyze(self):
             """Analyze the GST results."""
             logger.info(' Analyzing the results...')
-            import pygsti
-
             self._data = pygsti.io.read_data_from_dir(
                 self._data_manager._save_path
             )
@@ -915,11 +912,6 @@ def SimultaneousGST(
     Returns:
         Callable: SimultaneousGST class instance.
     """
-    try:
-        import pygsti
-        logger.info(f" pyGSTi version: {pygsti.__version__}\n")
-    except ImportError:
-        logger.warning(' Unable to import pyGSTi!')
 
     class SimultaneousGST(qpu):
         """Simultanous GST protocol."""
@@ -1107,7 +1099,6 @@ def SimultaneousGST(
 
         def generate_circuits(self):
             """Generate all GST circuits."""
-            from qcal.interface.pygsti.transpiler import PyGSTiTranspiler
             transpiler = PyGSTiTranspiler()
 
             max_workers = min(
@@ -1342,13 +1333,6 @@ def SingleQubitGST(
             fpr:            bool = False,
             **kwargs
         ) -> None:
-            try:
-                import pygsti
-                from pygsti.modelpacks import smq1Q_XYI
-                logger.info(f" pyGSTi version: {pygsti.__version__}\n")
-            except ImportError:
-                logger.warning(' Unable to import pyGSTi!')
-
             if len(qubits) == 1:
                 pspec = (
                     smq1Q_XYI.processor_spec(qubits) if pspec is None
@@ -1373,11 +1357,6 @@ def SingleQubitGST(
                 germs = smq1Q_XYI.germs(qubits) if germs is None else germs
 
             elif len(qubits) == 2:
-                from pygsti.algorithms.fiducialselection import find_fiducials
-                from pygsti.algorithms.germselection import find_germs
-                from pygsti.models.modelconstruction import create_explicit_model
-                from pygsti.processors import QubitProcessorSpec
-                from pygsti.tools.internalgates import standard_gatename_unitaries
                 if pspec is None:
                     gate_names = [
                         'Gxpi2', 'Gypi2', 'Gii', 'Gxx', 'Gxy','Gyx', 'Gyy'
@@ -1611,13 +1590,6 @@ def TwoQubitGST(
             fpr:            bool = False,
             **kwargs
         ) -> None:
-            try:
-                import pygsti
-                from pygsti.modelpacks import smq2Q_XYCPHASE
-                logger.info(f" pyGSTi version: {pygsti.__version__}\n")
-            except ImportError:
-                logger.warning(' Unable to import pyGSTi!')
-
             if len(qubit_labels) == 1:
                 pspec = (
                     smq2Q_XYCPHASE.processor_spec(qubit_labels[0])
@@ -1710,7 +1682,7 @@ def QuantumInstrumentGST(
     germs:          Any | Dict[int, Any] | None = None,
     circuit_depths: List[int] = [1],  # noqa: B006
     modes:          Tuple[str] = ('Target', 'full TP'),  # noqa: B006
-    fpr:            bool = False,
+    # fpr:            bool = False,
     **kwargs
 ) -> Callable:
     """Quantum Instrument Gate Set Tomography.
@@ -1750,12 +1722,6 @@ def QuantumInstrumentGST(
         fpr (bool, optional): whether to use Fiducial Pair Reduction (FPR).
             Defaults to False.
     """
-    try:
-        import pygsti
-        logger.info(f" pyGSTi version: {pygsti.__version__}\n")
-    except ImportError:
-        logger.warning(' Unable to import pyGSTi!')
-
     if len(qubits) == 1:
         gst = type(GST(
             qpu=qpu,
@@ -1768,7 +1734,7 @@ def QuantumInstrumentGST(
             germs=germs,
             circuit_depths=circuit_depths,
             modes=modes,
-            fpr=fpr,
+            # fpr=fpr,
             **kwargs
         ))
     else:
@@ -1783,7 +1749,7 @@ def QuantumInstrumentGST(
             germs=germs,
             circuit_depths=circuit_depths,
             modes=modes,
-            fpr=fpr,
+            # fpr=fpr,
             **kwargs
         ))
 
@@ -1802,13 +1768,9 @@ def QuantumInstrumentGST(
             germs:          Any | Dict[int, Any] | None = None,
             circuit_depths: List[int] = [1],  # noqa: B006
             modes:          Tuple[str] = ('Target', 'full TP'),  # noqa: B006
-            fpr:            bool = False,
+            # fpr:            bool = False,
             **kwargs
         ) -> None:
-            import pygsti
-            from pygsti.modelmembers.instruments import Instrument
-            from pygsti.modelpacks import smq1Q_XYI
-
             if len(circuit_depths) > 1 or circuit_depths[0] != 1:
                 raise ValueError(
                     'Long-sequence GST is not currently supported for '
@@ -1991,6 +1953,6 @@ def QuantumInstrumentGST(
         germs=germs,
         circuit_depths=circuit_depths,
         modes=modes,
-        fpr=fpr,
+        # fpr=fpr,
         **kwargs
     )

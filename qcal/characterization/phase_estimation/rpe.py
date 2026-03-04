@@ -13,10 +13,12 @@ from typing import Callable, Dict, List
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import pygsti
 import scipy
 from IPython.display import clear_output
 from matplotlib.lines import Line2D
 from numpy.typing import ArrayLike, NDArray
+from pygsti.modelpacks import smq2Q_XXYYII, smq2Q_XYICPHASE
 
 import qcal.settings as settings
 from qcal.characterization.phase_estimation.analysis import (
@@ -31,6 +33,8 @@ from qcal.characterization.phase_estimation.circuits import (
     make_x90_circuits,
 )
 from qcal.config import Config
+from qcal.interface.pygsti.circuits import load_circuits
+from qcal.interface.pygsti.transpiler import PyGSTiTranspiler
 from qcal.math.utils import round_to_order_error
 from qcal.plotting.utils import calculate_nrows_ncols
 from qcal.qpu.qpu import QPU
@@ -49,11 +53,6 @@ def X90(theta):
     Returns:
         pygsti.unitary_to_pauligate: X gate.
     """
-    try:
-        import pygsti
-    except ImportError:
-        logger.warning('Unable to import pyGSTi!')
-
     H = theta/2 * pygsti.sigmax
     U = scipy.linalg.expm(-1j * H)
     return pygsti.unitary_to_pauligate(U)
@@ -72,11 +71,6 @@ def CZ(theta_iz: float, theta_zi: float, theta_zz: float) -> NDArray:
     Returns:
         NDArray: matrix exponential of a CZ gate.
     """
-    try:
-        import pygsti
-    except ImportError:
-        logger.warning('Unable to import pyGSTi!')
-
     return scipy.linalg.expm(
         -1j / 2 * (
             theta_iz * pygsti.sigmaiz +
@@ -87,11 +81,11 @@ def CZ(theta_iz: float, theta_zi: float, theta_zz: float) -> NDArray:
 
 
 def plot_signal(
-        signal:         Dict,
-        circuit_depths: ArrayLike,
-        ax:             plt.axes = None,
-        title:          str = None
-    ) -> None:
+    signal:         Dict,
+    circuit_depths: ArrayLike,
+    ax:             plt.axes = None,
+    title:          str = None
+) -> None:
     """Plot RPE signal decay.
 
     Args:
@@ -140,18 +134,17 @@ def plot_signal(
     ax.set_ylim(-1.1, 1.1)
 
 
-def RPE(qpu:            QPU,
-        config:         Config,
-        qubit_labels:   Iterable[int],
-        gate:           str,
-        circuit_depths: List[int] = [1, 2, 4, 8, 16, 32, 64, 128, 256],  # noqa: B006
-        gate_layer:     List = None,
-        loss_angle:     str | List[str] | None = None,
-        **kwargs
-    ) -> Callable:
+def RPE(
+    qpu:            QPU,
+    config:         Config,
+    qubit_labels:   Iterable[int],
+    gate:           str,
+    circuit_depths: List[int] = [1, 2, 4, 8, 16, 32, 64, 128, 256],  # noqa: B006
+    gate_layer:     List = None,
+    loss_angle:     str | List[str] | None = None,
+    **kwargs
+) -> Callable:
     """Robust Phase Estimation.
-
-    This protocol requires a valid pyGSTi and pyRPE installation.
 
     Args:
         qpu (QPU): custom QPU object.
@@ -177,23 +170,17 @@ def RPE(qpu:            QPU,
         """pyRPE protocol."""
 
         @save_init
-        def __init__(self,
-                config:         Config,
-                qubit_labels:   Iterable[int],
-                gate:           str,
-                circuit_depths: List[int] = [1, 2, 4, 8, 16, 32, 64, 128, 256],  # noqa: B006
-                gate_layer:     List = None,
-                loss_angle:     str | None = None,
-                **kwargs
-            ) -> None:
-            from qcal.interface.pygsti.transpiler import PyGSTiTranspiler
-
-            try:
-                import pygsti
-                from pygsti.modelpacks import smq2Q_XXYYII, smq2Q_XYICPHASE
-                logger.info(f" pyGSTi version: {pygsti.__version__}\n")
-            except ImportError:
-                logger.warning(' Unable to import pyGSTi!')
+        def __init__(
+            self,
+            config:         Config,
+            qubit_labels:   Iterable[int],
+            gate:           str,
+            circuit_depths: List[int] = [1, 2, 4, 8, 16, 32, 64, 128, 256],  # noqa: B006
+            gate_layer:     List = None,
+            loss_angle:     str | None = None,
+            **kwargs
+        ) -> None:
+            logger.info(f" pyGSTi version: {pygsti.__version__}\n")
 
             assert gate.upper() in ('I', 'X90', 'CZ', 'ZZ'), (
                 'Only I, X90, and CZ gates are currently supported!'
@@ -347,8 +334,6 @@ def RPE(qpu:            QPU,
 
         def generate_circuits(self):
             """Generate all RPE circuits."""
-            from qcal.interface.pygsti.circuits import load_circuits
-
             logger.info(' Generating circuits from pyGSTi...')
             circuits = self._make_circuits[self._gate](
                 self._circuit_depths,
@@ -410,12 +395,11 @@ def RPE(qpu:            QPU,
         def analyze(self):
             """Analyze the RPE results."""
             logger.info(' Analyzing the results...')
-            import pygsti
 
             clear_output(wait=True)
             for ql in self._qubit_labels:
                 if isinstance(ql, Iterable):
-                    qs = ''.join(str(q) for q in ql)
+                    qs = '_'.join(str(q) for q in ql)
                 else:
                     qs = str(ql)
 

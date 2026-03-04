@@ -11,12 +11,18 @@ from typing import Any, Callable, List, Tuple
 
 import matplotlib.pyplot as plt
 import numpy as np
+import pygsti
 from IPython.display import clear_output
+from pygsti.processors import CliffordCompilationRules as CCR
 
 import qcal.settings as settings
 from qcal.analysis.leakage import analyze_leakage
 from qcal.benchmarking.utils import plot_error_rates
 from qcal.config import Config
+from qcal.interface.pygsti.circuits import load_circuits
+from qcal.interface.pygsti.datasets import generate_pygsti_dataset
+from qcal.interface.pygsti.processor_spec import pygsti_pspec
+from qcal.interface.pygsti.transpiler import PyGSTiTranspiler
 from qcal.plotting.utils import calculate_nrows_ncols
 from qcal.qpu.qpu import QPU
 from qcal.utils import flatten
@@ -24,17 +30,18 @@ from qcal.utils import flatten
 logger = logging.getLogger(__name__)
 
 
-def CRB(qpu:             QPU,
-        config:          Config,
-        qubit_labels:    List[int | Tuple[int]],
-        circuit_depths:  List[int] | Tuple[int],
-        n_circuits:      int = 30,
-        native_gates:    List[str] | None = None,
-        pspec:           Any | None = None,
-        randomizeout:    bool = True,
-        citerations:     int = 20,
-        **kwargs
-    ) -> Callable:
+def CRB(
+    qpu:            QPU,
+    config:         Config,
+    qubit_labels:   List[int | Tuple[int]],
+    circuit_depths: List[int] | Tuple[int],
+    n_circuits:     int = 30,
+    native_gates:   List[str] | None = None,
+    pspec:          Any | None = None,
+    randomizeout:   bool = True,
+    citerations:    int = 20,
+    **kwargs
+) -> Callable:
     """Clifford Randomized Benchmarking.
 
     This is a pyGSTi protocol and requires pyGSTi to be installed.
@@ -80,27 +87,19 @@ def CRB(qpu:             QPU,
     class CRB(qpu):
         """pyGSTi Clifford RB protocol."""
 
-        def __init__(self,
-                config:          Config,
-                qubit_labels:    List[int | Tuple[int]],
-                circuit_depths:  List[int] | Tuple[int],
-                n_circuits:      int = 30,
-                native_gates:    List[str] | None = None,
-                pspec:           Any | None = None,
-                randomizeout:    bool = True,
-                citerations:     int = 20,
-                **kwargs
-            ) -> None:
-
-            try:
-                import pygsti
-                from pygsti.processors import CliffordCompilationRules as CCR
-
-                from qcal.interface.pygsti.processor_spec import pygsti_pspec
-                from qcal.interface.pygsti.transpiler import PyGSTiTranspiler
-                logger.info(f" pyGSTi version: {pygsti.__version__}\n")
-            except ImportError:
-                logger.warning(' Unable to import pyGSTi!')
+        def __init__(
+            self,
+            config:         Config,
+            qubit_labels:   List[int | Tuple[int]],
+            circuit_depths: List[int] | Tuple[int],
+            n_circuits:     int = 30,
+            native_gates:   List[str] | None = None,
+            pspec:          Any | None = None,
+            randomizeout:   bool = True,
+            citerations:    int = 20,
+            **kwargs
+        ) -> None:
+            logger.info(f" pyGSTi version: {pygsti.__version__}\n")
 
             self._qubit_labels = qubit_labels
             self._qubits = list(flatten(qubit_labels))
@@ -116,7 +115,7 @@ def CRB(qpu:             QPU,
             for ql in self._qubit_labels:
                 qubits = list(flatten([ql]))
                 if not native_gates:
-                    ql_native_gates = ['X90', 'Y90']
+                    ql_native_gates = ['X90', 'Z90']
                 else:
                     ql_native_gates = native_gates
 
@@ -217,9 +216,6 @@ def CRB(qpu:             QPU,
         def generate_circuits(self):
             """Generate all pyGSTi clifford RB circuits."""
             logger.info(' Generating circuits from pyGSTi...')
-            import pygsti
-
-            from qcal.interface.pygsti.circuits import load_circuits
 
             if not self._sim_RB:
                 ql = self._qubit_labels[0]
@@ -271,7 +267,6 @@ def CRB(qpu:             QPU,
         def save(self):
             """Save all circuits and data."""
             clear_output(wait=True)
-            from qcal.interface.pygsti.datasets import generate_pygsti_dataset
             generate_pygsti_dataset(
                 self._circuits,
                 self._data_manager._save_path + 'data/'
@@ -282,8 +277,6 @@ def CRB(qpu:             QPU,
         def analyze(self):
             """Analyze the CRB results."""
             # logger.info(' Analyzing the results...')
-            import pygsti
-
             self._data = pygsti.io.read_data_from_dir(
                 self._data_manager._save_path
             )
@@ -410,16 +403,17 @@ def CRB(qpu:             QPU,
     )
 
 
-def SRB(qpu:             QPU,
-        config:          Config,
-        qubit_labels:    List[int | Tuple[int]],
-        circuit_depths:  List[int] | Tuple[int],
-        n_circuits:      int = 30,
-        tq_config:       str | Any = None,
-        compiled_pauli:  bool = True,
-        include_rcal:    bool = False,
-        **kwargs
-    ) -> Callable:
+def SRB(
+    qpu:            QPU,
+    config:         Config,
+    qubit_labels:   List[int | Tuple[int]],
+    circuit_depths: List[int] | Tuple[int],
+    n_circuits:     int = 30,
+    tq_config:      str | Any = None,
+    compiled_pauli: bool = True,
+    include_rcal:   bool = False,
+    **kwargs
+) -> Callable:
     """Streamlined Randomized Benchmarking.
 
     This is a True-Q protocol and requires a valid True-Q license.
@@ -454,16 +448,17 @@ def SRB(qpu:             QPU,
         """True-Q SRB protocol."""
         import trueq as tq
 
-        def __init__(self,
-                config:          Config,
-                qubit_labels:    List[int | Tuple[int]],
-                circuit_depths:  List[int] | Tuple[int],
-                n_circuits:      int = 30,
-                tq_config:       str | tq.Config = None,
-                compiled_pauli:  bool = True,
-                include_rcal:    bool = False,
-                **kwargs
-            ) -> None:
+        def __init__(
+            self,
+            config:          Config,
+            qubit_labels:    List[int | Tuple[int]],
+            circuit_depths:  List[int] | Tuple[int],
+            n_circuits:      int = 30,
+            tq_config:       str | tq.Config = None,
+            compiled_pauli:  bool = True,
+            include_rcal:    bool = False,
+            **kwargs
+        ) -> None:
             from qcal.interface.trueq.compiler import TrueqCompiler
             from qcal.interface.trueq.transpiler import TrueqTranspiler
 

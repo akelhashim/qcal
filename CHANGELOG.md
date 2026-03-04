@@ -22,6 +22,8 @@ optional passes
 
 ### Changed
 
+- Updated dependencies (added pygsti and pyrpe)
+
 ### Deprecated
 
 ### Removed
