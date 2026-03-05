@@ -8,16 +8,18 @@ Relevant pyRPE code: https://gitlab.com/quapack/pyrpe
 """
 import logging
 from collections.abc import Iterable
-from typing import Callable, Dict, List
+from typing import Callable, Dict, List, Tuple
 
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import plotly.graph_objects as go
 import pygsti
 import scipy
 from IPython.display import clear_output
 from matplotlib.lines import Line2D
 from numpy.typing import ArrayLike, NDArray
+from plotly.subplots import make_subplots
 from pygsti.modelpacks import smq2Q_XXYYII, smq2Q_XYICPHASE
 
 import qcal.settings as settings
@@ -146,12 +148,16 @@ def RPE(
 ) -> Callable:
     """Robust Phase Estimation.
 
+    This is the parent class for all RPE experiments. For gate-specific RPE,
+    use the subclasses: IdleRPE, X90RPE, CZRPE, or ZZRPE.
+
     Args:
         qpu (QPU): custom QPU object.
         config (Config): qcal Config object.
         qubit_labels (Iterable[int]): a list specifying sets of system labels
             on which to perform RPE for a given gate.
-        gate (str): gate on which to perform RPE.
+        gate (str): gate on which to perform RPE. Must be one of 'I', 'X90',
+            'CZ', or 'ZZ'.
         circuit_depths (List[int], optional): a list of positive integers
             specifying the circuit depths. Defaults to ```[1, 2, 4, 8, 16, 32,
             64, 128, 256]```.
@@ -165,6 +171,41 @@ def RPE(
     Returns:
         Callable: RPE class instance.
     """
+    if gate not in ['I', 'X90', 'CZ', 'ZZ']:
+        raise ValueError(
+            f"Gate must be one of 'I', 'X90', 'CZ', or 'ZZ'. Got {gate}."
+        )
+
+    gate_model_map = {
+        'I':   None,
+        'X90': X90,
+        'CZ':  CZ,
+        'ZZ':  None
+    }
+    target_model_map = {
+        'I':   None,
+        'X90': smq2Q_XXYYII.target_model(),
+        'CZ':  smq2Q_XYICPHASE.target_model(),
+        'ZZ':  None
+    }
+    make_circuits_map = {
+        'I':   make_idle_circuits,
+        'X90': make_x90_circuits,
+        'CZ':  make_cz_circuits,
+        'ZZ':  make_cz_circuits
+    }
+    analyze_results_map = {
+        'I':   analyze_idle,
+        'X90': analyze_x90,
+        'CZ':  analyze_cz,
+        'ZZ':  analyze_zz
+    }
+
+    _gate_name = gate.upper()
+    _gate_model_func = gate_model_map[_gate_name]
+    _target_model_obj = target_model_map[_gate_name]
+    _make_circuits_func = make_circuits_map[_gate_name]
+    _analyze_results_func = analyze_results_map[_gate_name]
 
     class RPE(qpu):
         """pyRPE protocol."""
@@ -174,7 +215,6 @@ def RPE(
             self,
             config:         Config,
             qubit_labels:   Iterable[int],
-            gate:           str,
             circuit_depths: List[int] = [1, 2, 4, 8, 16, 32, 64, 128, 256],  # noqa: B006
             gate_layer:     List = None,
             loss_angle:     str | None = None,
@@ -182,11 +222,12 @@ def RPE(
         ) -> None:
             logger.info(f" pyGSTi version: {pygsti.__version__}\n")
 
-            assert gate.upper() in ('I', 'X90', 'CZ', 'ZZ'), (
-                'Only I, X90, and CZ gates are currently supported!'
-            )
             self._qubit_labels = qubit_labels
-            self._gate = gate.upper()
+            self._gate = _gate_name
+            self._gate_model_func = _gate_model_func
+            self._target_model_obj = _target_model_obj
+            self._make_circuits_func = _make_circuits_func
+            self._analyze_results_func = _analyze_results_func
             self._circuit_depths = circuit_depths
             self._loss_angle = loss_angle
             self._gate_layer = gate_layer
@@ -198,30 +239,6 @@ def RPE(
                 else:
                     qubits.append(q)
             self._qubits = sorted(qubits)
-
-            self._gate_model = {
-                'I':   None,
-                'X90': X90,
-                'CZ':  CZ,
-                'ZZ': None
-            }
-            self._target_model = {
-                'I':   None,
-                'X90': smq2Q_XXYYII.target_model(),
-                'CZ':  smq2Q_XYICPHASE.target_model(),
-            }
-            self._make_circuits = {
-                'I':   make_idle_circuits,
-                'X90': make_x90_circuits,
-                'CZ':  make_cz_circuits,
-                'ZZ':  make_cz_circuits
-            }
-            self._analyze_results = {
-                'I':   analyze_idle,
-                'X90': analyze_x90,
-                'CZ':  analyze_cz,
-                'ZZ':  analyze_zz
-            }
 
             self._circuits = None
             self._datasets = {}
@@ -236,6 +253,24 @@ def RPE(
             transpiler = kwargs.get('transpiler', PyGSTiTranspiler())
             kwargs.pop('transpiler', None)
             qpu.__init__(self, config=config, transpiler=transpiler, **kwargs)
+
+        @property
+        def gate_model(self):
+            """Gate model function for this RPE experiment.
+
+            Returns:
+                Callable: gate model function.
+            """
+            return self._gate_model_func
+
+        @property
+        def target_model(self):
+            """Target model for this RPE experiment.
+
+            Returns:
+                Any: pyGSTi target model.
+            """
+            return self._target_model_obj
 
         @property
         def angle_estimates(self) -> Dict:
@@ -335,7 +370,7 @@ def RPE(
         def generate_circuits(self):
             """Generate all RPE circuits."""
             logger.info(' Generating circuits from pyGSTi...')
-            circuits = self._make_circuits[self._gate](
+            circuits = self._make_circuits_func(
                 self._circuit_depths,
                 self._qubit_labels,
                 self._gate_layer
@@ -408,7 +443,7 @@ def RPE(
                 )
                 self._datasets[ql] = dataset
 
-                results = self._analyze_results[self._gate](
+                results = self._analyze_results_func(
                     dataset,
                     self._qubit_labels,
                     self._circuit_depths,
@@ -454,10 +489,23 @@ def RPE(
         def plot(self) -> None:
             """Plot the RPE results."""
             nrows, ncols = calculate_nrows_ncols(len(self._qubit_labels))
+
+            mpl_colors = ['tab:blue', 'tab:orange', 'tab:green']
+            plotly_colors = ['#1f77b4', '#ff7f0e', '#2ca02c']
+
             figsize = (5 * ncols, 4 * nrows)
             fig, axes = plt.subplots(
                 nrows, ncols, figsize=figsize, layout='constrained'
             )
+
+            pfig = make_subplots(
+                rows=nrows,
+                cols=ncols,
+                subplot_titles=[f"Q{ql}" for ql in self._qubit_labels],
+                vertical_spacing=0.15,
+                horizontal_spacing=0.06,
+            )
+            pfig.update_annotations(font_size=12)
 
             k = -1
             for i in range(nrows):
@@ -473,30 +521,71 @@ def RPE(
 
                     if k < len(self._qubit_labels):
                         ql = self._qubit_labels[k]
-                        for angle, errors in self._angle_errors[ql].items():
+                        for idx, angle in enumerate(
+                            sorted(self._angle_errors[ql])
+                        ):
+                            errors = self._angle_errors[ql][angle]
+                            depths = self._circuit_depths[:len(errors)]
+                            yerr = np.pi / (2 * np.array(depths))
+                            mpl_color = mpl_colors[idx % len(mpl_colors)]
+                            plotly_color = plotly_colors[
+                                idx % len(plotly_colors)
+                            ]
+
                             ax.errorbar(
-                                self._circuit_depths[:len(errors)],
+                                depths,
                                 errors,
-                                yerr=np.pi/(2*np.array(
-                                    self._circuit_depths[:len(errors)]
-                                )),
+                                yerr=yerr,
                                 fmt='o-',
                                 elinewidth=0.75,
                                 capsize=7,
+                                color=mpl_color,
+                                ecolor=mpl_color,
                                 label=angle
                             )
+                            pfig.add_trace(
+                                go.Scatter(
+                                    x=depths,
+                                    y=errors,
+                                    mode='lines+markers',
+                                    name=str(angle),
+                                    line={'color': plotly_color},
+                                    marker={'color': plotly_color},
+                                    error_y={
+                                        'type': 'data',
+                                        'array': yerr,
+                                        'visible': True,
+                                        'thickness': 1,
+                                        'width': 6,
+                                    },
+                                    showlegend=(k == 0),
+                                ),
+                                row=i + 1,
+                                col=j + 1,
+                            )
+
+                        # Add vertical line for last good depth
+                        last_good_depth = 2**self._last_good_idx[ql]
                         ax.axvline(
-                            2**self._last_good_idx[ql],
+                            last_good_depth,
                             ls='--',
                             c='k',
                             label='Last good depth',
+                        )
+                        pfig.add_vline(
+                            x=last_good_depth,
+                            line_dash='dash',
+                            line_color='black',
+                            name='Last good depth',
+                            showlegend=(k == 0),
+                            row=i + 1,
+                            col=j + 1,
                         )
 
                         maxval = np.nanmax(np.abs(np.concatenate(
                             list(self._angle_errors[ql].values())
                         )))
                         ax.set_ylim((-1.1 * maxval, 1.1 * maxval))
-
                         ax.set_title(f'Q{ql}', fontsize=20)
                         ax.set_xlabel('Circuit Depth', fontsize=15)
                         ax.set_ylabel('Angle Error (rad.)', fontsize=15)
@@ -504,12 +593,71 @@ def RPE(
                             axis='both', which='major', labelsize=12
                         )
                         ax.set_xscale('log')
-                        # ax.set_yscale('log')
                         ax.legend(prop={'size': 12})
                         ax.grid(True)
 
+                        pfig.update_xaxes(
+                            type='log',
+                            title_text='Circuit Depth',
+                            title_standoff=10,
+                            automargin=True,
+                            showgrid=True,
+                            row=i + 1,
+                            col=j + 1,
+                        )
+                        pfig.update_yaxes(
+                            title_text='Angle Error (rad.)',
+                            title_standoff=10,
+                            automargin=True,
+                            showgrid=True,
+                            range=[-1.1 * maxval, 1.1 * maxval],
+                            row=i + 1,
+                            col=j + 1,
+                        )
+
                     else:
                         ax.axis('off')
+                        pfig.update_xaxes(visible=False, row=i + 1, col=j + 1)
+                        pfig.update_yaxes(visible=False, row=i + 1, col=j + 1)
+
+            pfig.update_layout(
+                height=350 * nrows,
+                width=350 * ncols + 50,
+                margin={'t': 80, 'l': 100, 'r': 100},
+                legend={'orientation': 'h', 'yanchor': 'bottom', 'y': 1.02},
+                template='plotly_white',
+                paper_bgcolor='white',
+                plot_bgcolor='#fbfbfd',
+            )
+
+            pfig.update_xaxes(
+                showline=True,
+                mirror=True,
+                linecolor='#c7c7c7',
+                linewidth=1,
+                gridcolor='#e5e7eb',
+                zeroline=False,
+                ticks='outside',
+            )
+            pfig.update_yaxes(
+                showline=True,
+                mirror=True,
+                linecolor='#c7c7c7',
+                linewidth=1,
+                gridcolor='#e5e7eb',
+                zeroline=False,
+                ticks='outside',
+            )
+            save_properties = {
+                'toImageButtonOptions': {
+                    'format': 'svg', # one of png, svg, jpeg, webp
+                    'filename': 'RPE',
+                    # 'height': 500,
+                    # 'width': 1000,
+                    'scale': 10
+                }
+            }
+            pfig.show(config=save_properties)
 
             fig.set_tight_layout(True)
             if settings.Settings.save_data:
@@ -523,7 +671,7 @@ def RPE(
                 fig.savefig(
                     self._data_manager._save_path + 'RPE.svg'
                 )
-            plt.show()
+            plt.close(fig)
 
         def plot_signal(self) -> None:
             """Plot signal decay."""
@@ -600,7 +748,295 @@ def RPE(
     return RPE(
         config=config,
         qubit_labels=qubit_labels,
-        gate=gate,
+        circuit_depths=circuit_depths,
+        gate_layer=gate_layer,
+        loss_angle=loss_angle,
+        **kwargs
+    )
+
+
+def IdleRPE(
+    qpu:            QPU,
+    config:         Config,
+    qubit_labels:   Iterable[int],
+    circuit_depths: List[int] = [1, 2, 4, 8, 16, 32, 64, 128, 256],  # noqa: B006
+    gate_layer:     List = None,
+    loss_angle:     str | List[str] | None = None,
+    **kwargs
+) -> Callable:
+    """Robust Phase Estimation for the Idle (I) gate.
+
+    Args:
+        qpu (QPU): custom QPU object.
+        config (Config): qcal Config object.
+        qubit_labels (Iterable[int]): a list specifying sets of system labels
+            on which to perform RPE for the idle gate.
+        circuit_depths (List[int], optional): a list of positive integers
+            specifying the circuit depths. Defaults to ```[1, 2, 4, 8, 16, 32,
+            64, 128, 256]```.
+        gate_layer (List, optional): custom gate layer for the gate of interest.
+            Defaults to None.
+        loss_angle (str | list[str] | None, optional): a string or list of
+            strings specifying which angle to use for calculating the loss from
+            RPE. Defaults to None. If None, all angles are used.
+
+    Returns:
+        Callable: IdleRPE class instance.
+    """
+    rpe = type(RPE(
+        qpu=qpu,
+        config=config,
+        qubit_labels=qubit_labels,
+        gate='I',
+        circuit_depths=circuit_depths,
+        gate_layer=gate_layer,
+        loss_angle=loss_angle,
+        **kwargs
+    ))
+
+    class IdleRPE(rpe):
+        """RPE protocol for the Idle (I) gate."""
+
+        @save_init
+        def __init__(
+            self,
+            config:         Config,
+            qubit_labels:   Iterable[int],
+            circuit_depths: List[int] = [1, 2, 4, 8, 16, 32, 64, 128, 256],  # noqa: B006
+            gate_layer:     List = None,
+            loss_angle:     str | None = None,
+            **kwargs
+        ) -> None:
+            rpe.__init__(
+                self,
+                config=config,
+                qubit_labels=qubit_labels,
+                circuit_depths=circuit_depths,
+                gate_layer=gate_layer,
+                loss_angle=loss_angle,
+                **kwargs
+            )
+
+    return IdleRPE(
+        config=config,
+        qubit_labels=qubit_labels,
+        circuit_depths=circuit_depths,
+        gate_layer=gate_layer,
+        loss_angle=loss_angle,
+        **kwargs
+    )
+
+
+def X90RPE(
+    qpu:            QPU,
+    config:         Config,
+    qubit_labels:   Iterable[int],
+    circuit_depths: List[int] = [1, 2, 4, 8, 16, 32, 64, 128, 256],  # noqa: B006
+    gate_layer:     List = None,
+    loss_angle:     str | List[str] | None = None,
+    **kwargs
+) -> Callable:
+    """Robust Phase Estimation for the X90 gate.
+
+    Args:
+        qpu (QPU): custom QPU object.
+        config (Config): qcal Config object.
+        qubit_labels (Iterable[int]): a list specifying sets of system labels
+            on which to perform RPE for the X90 gate.
+        circuit_depths (List[int], optional): a list of positive integers
+            specifying the circuit depths. Defaults to ```[1, 2, 4, 8, 16, 32,
+            64, 128, 256]```.
+        gate_layer (List, optional): custom gate layer for the gate of interest.
+            Defaults to None.
+        loss_angle (str | list[str] | None, optional): a string or list of
+            strings specifying which angle to use for calculating the loss from
+            RPE. Defaults to None. If None, all angles are used. Possible
+            options are `'X'` or `'Z'`.
+
+    Returns:
+        Callable: X90RPE class instance.
+    """
+    rpe = type(RPE(
+        qpu=qpu,
+        config=config,
+        qubit_labels=qubit_labels,
+        gate='X90',
+        circuit_depths=circuit_depths,
+        gate_layer=gate_layer,
+        loss_angle=loss_angle,
+        **kwargs
+    ))
+
+    class X90RPE(rpe):
+        """RPE protocol for the X90 gate."""
+
+        @save_init
+        def __init__(
+            self,
+            config:         Config,
+            qubit_labels:   Iterable[int],
+            circuit_depths: List[int] = [1, 2, 4, 8, 16, 32, 64, 128, 256],  # noqa: B006
+            gate_layer:     List = None,
+            loss_angle:     str | None = None,
+            **kwargs
+        ) -> None:
+            rpe.__init__(
+                self,
+                config=config,
+                qubit_labels=qubit_labels,
+                circuit_depths=circuit_depths,
+                gate_layer=gate_layer,
+                loss_angle=loss_angle,
+                **kwargs
+            )
+
+    return X90RPE(
+        config=config,
+        qubit_labels=qubit_labels,
+        circuit_depths=circuit_depths,
+        gate_layer=gate_layer,
+        loss_angle=loss_angle,
+        **kwargs
+    )
+
+
+def CZRPE(
+    qpu:            QPU,
+    config:         Config,
+    qubit_labels:   Iterable[Tuple[int]],
+    circuit_depths: List[int] = [1, 2, 4, 8, 16, 32, 64, 128, 256],  # noqa: B006
+    gate_layer:     List = None,
+    loss_angle:     str | List[str] | None = None,
+    **kwargs
+) -> Callable:
+    """Robust Phase Estimation for the CZ gate.
+
+    Args:
+        qpu (QPU): custom QPU object.
+        config (Config): qcal Config object.
+        qubit_labels (Iterable[Tuple[int]]): a list specifying sets of system labels
+            on which to perform RPE for the CZ gate.
+        circuit_depths (List[int], optional): a list of positive integers
+            specifying the circuit depths. Defaults to ```[1, 2, 4, 8, 16, 32,
+            64, 128, 256]```.
+        gate_layer (List, optional): custom gate layer for the gate of interest.
+            Defaults to None.
+        loss_angle (str | list[str] | None, optional): a string or list of
+            strings specifying which angle to use for calculating the loss from
+            RPE. Defaults to None. If None, all angles are used.
+
+    Returns:
+        Callable: CZRPE class instance.
+    """
+    rpe = type(RPE(
+        qpu=qpu,
+        config=config,
+        qubit_labels=qubit_labels,
+        gate='CZ',
+        circuit_depths=circuit_depths,
+        gate_layer=gate_layer,
+        loss_angle=loss_angle,
+        **kwargs
+    ))
+
+    class CZRPE(rpe):
+        """RPE protocol for the CZ gate."""
+
+        @save_init
+        def __init__(
+            self,
+            config:         Config,
+            qubit_labels:   Iterable[Tuple[int]],
+            circuit_depths: List[int] = [1, 2, 4, 8, 16, 32, 64, 128, 256],  # noqa: B006
+            gate_layer:     List = None,
+            loss_angle:     str | None = None,
+            **kwargs
+        ) -> None:
+            rpe.__init__(
+                self,
+                config=config,
+                qubit_labels=qubit_labels,
+                circuit_depths=circuit_depths,
+                gate_layer=gate_layer,
+                loss_angle=loss_angle,
+                **kwargs
+            )
+
+    return CZRPE(
+        config=config,
+        qubit_labels=qubit_labels,
+        circuit_depths=circuit_depths,
+        gate_layer=gate_layer,
+        loss_angle=loss_angle,
+        **kwargs
+    )
+
+
+def ZZRPE(
+    qpu:            QPU,
+    config:         Config,
+    qubit_labels:   Iterable[Tuple[int]],
+    circuit_depths: List[int] = [1, 2, 4, 8, 16, 32, 64, 128, 256],  # noqa: B006
+    gate_layer:     List = None,
+    loss_angle:     str | List[str] | None = None,
+    **kwargs
+) -> Callable:
+    """Robust Phase Estimation for the ZZ gate.
+
+    Args:
+        qpu (QPU): custom QPU object.
+        config (Config): qcal Config object.
+        qubit_labels (Iterable[Tuple[int]]): a list specifying sets of system 
+            labels on which to perform RPE for the ZZ gate.
+        circuit_depths (List[int], optional): a list of positive integers
+            specifying the circuit depths. Defaults to ```[1, 2, 4, 8, 16, 32,
+            64, 128, 256]```.
+        gate_layer (List, optional): custom gate layer for the gate of interest.
+            Defaults to None.
+        loss_angle (str | list[str] | None, optional): a string or list of
+            strings specifying which angle to use for calculating the loss from
+            RPE. Defaults to None. If None, all angles are used.
+
+    Returns:
+        Callable: ZZRPE class instance.
+    """
+    rpe = type(RPE(
+        qpu=qpu,
+        config=config,
+        qubit_labels=qubit_labels,
+        gate='ZZ',
+        circuit_depths=circuit_depths,
+        gate_layer=gate_layer,
+        loss_angle=loss_angle,
+        **kwargs
+    ))
+
+    class ZZRPE(rpe):
+        """RPE protocol for the ZZ gate."""
+
+        @save_init
+        def __init__(
+            self,
+            config:         Config,
+            qubit_labels:   Iterable[Tuple[int]],
+            circuit_depths: List[int] = [1, 2, 4, 8, 16, 32, 64, 128, 256],  # noqa: B006
+            gate_layer:     List = None,
+            loss_angle:     str | None = None,
+            **kwargs
+        ) -> None:
+            rpe.__init__(
+                self,
+                config=config,
+                qubit_labels=qubit_labels,
+                circuit_depths=circuit_depths,
+                gate_layer=gate_layer,
+                loss_angle=loss_angle,
+                **kwargs
+            )
+
+    return ZZRPE(
+        config=config,
+        qubit_labels=qubit_labels,
         circuit_depths=circuit_depths,
         gate_layer=gate_layer,
         loss_angle=loss_angle,
