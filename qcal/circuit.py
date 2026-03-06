@@ -1080,6 +1080,17 @@ class CircuitSet:
         """
         return self.__copy__()
 
+    def head(self, n: int = 5) -> pd.DataFrame:
+        """The first n rows of the CircuitSet.
+
+        Args:
+            n (int, optional): number of rows to return. Defaults to 5.
+
+        Returns:
+            pd.DataFrame: first n rows
+        """
+        return self._df.head(n)
+
     def save(self, path: str):
         """Save the CircuitSet dataframe.
 
@@ -1089,6 +1100,17 @@ class CircuitSet:
             path (str): save path.
         """
         self._df.to_pickle(path)
+
+    def tail(self, n: int = 5) -> pd.DataFrame:
+        """The last n rows of the CircuitSet.
+
+        Args:
+            n (int, optional): number of rows to return. Defaults to 5.
+
+        Returns:
+            pd.DataFrame: last n rows
+        """
+        return self._df.tail(n)
 
     # def subset(self, **kwargs) -> pd.DataFrame:
     #     """Subset of the full CircuitSet.
