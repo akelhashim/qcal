@@ -20,9 +20,10 @@ from IPython.display import clear_output
 from matplotlib.lines import Line2D
 from numpy.typing import ArrayLike, NDArray
 from plotly.subplots import make_subplots
+from pygsti.data import DataSet
+from pygsti.io import write_dataset
 from pygsti.modelpacks import smq2Q_XXYYII, smq2Q_XYICPHASE
 
-import qcal.settings as settings
 from qcal.characterization.phase_estimation.analysis import (
     analyze_cz,
     analyze_idle,
@@ -41,6 +42,7 @@ from qcal.math.utils import round_to_order_error
 from qcal.plotting.utils import calculate_nrows_ncols
 from qcal.qpu.qpu import QPU
 from qcal.results import Results
+from qcal.settings import Settings
 from qcal.utils import save_init
 
 logger = logging.getLogger(__name__)
@@ -255,24 +257,6 @@ def RPE(
             qpu.__init__(self, config=config, transpiler=transpiler, **kwargs)
 
         @property
-        def gate_model(self):
-            """Gate model function for this RPE experiment.
-
-            Returns:
-                Callable: gate model function.
-            """
-            return self._gate_model_func
-
-        @property
-        def target_model(self):
-            """Target model for this RPE experiment.
-
-            Returns:
-                Any: pyGSTi target model.
-            """
-            return self._target_model_obj
-
-        @property
         def angle_estimates(self) -> Dict:
             """Angle estimates for each qubit/qubit pair.
 
@@ -291,6 +275,15 @@ def RPE(
             return self._angle_errors
 
         @property
+        def datasets(self) -> Dict[int | Tuple[int], DataSet]:
+            """Datasets for each qubit/qubit pair.
+
+            Returns:
+                Dict[int | Tuple[int], DataSet]: datasets.
+            """
+            return self._datasets
+
+        @property
         def gate(self) -> str:
             """Gate being characterized.
 
@@ -298,6 +291,15 @@ def RPE(
                 str: name of gate.
             """
             return self._gate
+
+        @property
+        def gate_model(self):
+            """Gate model function for this RPE experiment.
+
+            Returns:
+                Callable: gate model function.
+            """
+            return self._gate_model_func
 
         @property
         def last_good_index(self) -> Dict:
@@ -348,6 +350,15 @@ def RPE(
             return self._signal
 
         @property
+        def target_model(self):
+            """Target model for this RPE experiment.
+
+            Returns:
+                Any: pyGSTi target model.
+            """
+            return self._target_model_obj
+
+        @property
         def trusted_angle_est(self) -> Dict:
             """Most trusted angle estimates.
 
@@ -383,7 +394,7 @@ def RPE(
                 f'_RPE_{"".join("Q" + str(q) for q in self._qubit_labels)}'
             )
 
-            if settings.Settings.save_data:
+            if Settings.save_data:
                 logger.info(' Saving the circuits...')
                 qpu.save(self)
 
@@ -401,31 +412,23 @@ def RPE(
                     q_index = (self._qubits.index(ql),)
                     qs = str(ql)
 
-                results_dfs = []
-                for i, result in enumerate(circuits['results']):
-                    results_dfs.append(
-                        pd.DataFrame(
-                            [Results(result).marginalize(q_index).dict],
-                            index=[self._circuits[i].str]
-                        )
-                    )
-                results_df = pd.concat(results_dfs)
-                results_df = results_df.fillna(0).astype(int).rename(
-                    columns=lambda col: col + ' count'
-                )
-                self._df = results_df
+                states = set()
+                all_results = []
+                for result in circuits['results']:
+                    res = Results(result).marginalize(q_index)
+                    states.update(res.states)
+                    all_results.append(res.dict)
 
-                with open(f'{fileloc}dataset_{qs}.txt', 'w') as f:
-                    f.write(
-                        '## Columns = ' + ', '.join(results_df.columns) + "\n"
+                self._datasets[ql] = DataSet(outcome_labels=list(states))
+                for i, result in enumerate(all_results):
+                    self._datasets[ql][self._circuits[i]] = result
+                self._datasets[ql].done_adding_data()
+
+                if Settings.save_data is True:
+                    write_dataset(
+                        f'{fileloc}dataset_{qs}.txt',
+                        self._datasets[ql],
                     )
-                    f.close()
-                results_df.to_csv(
-                    f'{fileloc}dataset_{qs}.txt',
-                    sep=' ',
-                    mode='a',
-                    header=False
-                )
 
         def analyze(self):
             """Analyze the RPE results."""
@@ -433,18 +436,8 @@ def RPE(
 
             clear_output(wait=True)
             for ql in self._qubit_labels:
-                if isinstance(ql, Iterable):
-                    qs = '_'.join(str(q) for q in ql)
-                else:
-                    qs = str(ql)
-
-                dataset = pygsti.io.read_dataset(
-                    self.data_manager.save_path + f'dataset_{qs}.txt'
-                )
-                self._datasets[ql] = dataset
-
                 results = self._analyze_results_func(
-                    dataset,
+                    self._datasets[ql],
                     self._qubit_labels,
                     self._circuit_depths,
                     self._gate_layer
@@ -722,7 +715,7 @@ def RPE(
 
         def final(self) -> None:
             """Final method."""
-            if settings.Settings.save_data:
+            if Settings.save_data:
                 self._data_manager.save_to_csv(
                     pd.DataFrame([self._angle_estimates]), 'angle_estimates'
                 )

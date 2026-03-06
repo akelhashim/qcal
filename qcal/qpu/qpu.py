@@ -10,11 +10,12 @@ Basic example useage:
 import logging
 import timeit
 from collections.abc import Iterable
-from typing import Any, List
+from typing import Any, Dict, List
 
 import numpy as np
 import pandas as pd
 from IPython.display import clear_output
+from numpy.typing import NDArray
 
 import qcal.settings as settings
 from qcal.circuit import CircuitSet
@@ -41,23 +42,24 @@ class QPU:
     methods.
     """
     __slots__ = (
-        '_config',
+        '_circuits',
+        '_classified_results',
+        '_classifier',
+        '_compiled_circuits',
         '_compiler',
-        '_transpiler',
-        '_n_shots',
+        '_config',
+        '_data_manager',
+        '_exp_circuits',
+        '_measurements',
         '_n_batches',
         '_n_circs_per_seq',
         '_n_levels',
+        '_n_shots',
         '_raster_circuits',
-        '_circuits',
-        '_compiled_circuits',
-        '_transpiled_circuits',
-        '_exp_circuits',
-        '_sequence',
-        '_measurements',
         '_runtime',
-        '_classifier',
-        '_data_manager'
+        '_sequence',
+        '_transpiled_circuits',
+        '_transpiler',
     )
 
     def __init__(
@@ -133,40 +135,14 @@ class QPU:
             )
 
         self._circuits = None
+        self._classified_results = None
         self._compiled_circuits = None
-        self._transpiled_circuits = None
         self._exp_circuits = None
-        self._sequence = None
-        self._measurements = []
         self._runtime = None
+        self._sequence = None
+        self._transpiled_circuits = None
+        self._measurements = []
         self._data_manager = DataMananger()
-
-    @property
-    def config(self) -> Config:
-        """Returns the config loaded to the QPU.
-
-        Returns:
-            Config: experimental config
-        """
-        return self._config
-
-    @property
-    def compiler(self) -> Any | List[Any]:
-        """Returns the compiler(s) loaded to the QPU.
-
-        Returns:
-            Any | List[Any]: circuit compiler
-        """
-        return self._compiler
-
-    @property
-    def transpiler(self) -> Any | List[Any]:
-        """Returns the transpiler(s) loaded to the QPU.
-
-        Returns:
-            Any | List[Any]: circuit transpiler
-        """
-        return self._transpiler
 
     @property
     def circuits(self) -> Any:
@@ -178,22 +154,13 @@ class QPU:
         return self._circuits
 
     @property
-    def compiled_circuits(self) -> Any:
-        """Compiled circuits.
+    def classified_results(self) -> List[Dict[int, NDArray]] | None:
+        """Classified results.
 
         Returns:
-            Any: all compiled circuits.
+            List[Dict[int, NDArray]] | None: all classified results.
         """
-        return self._compiled_circuits
-
-    @property
-    def transpiled_circuits(self) -> Any:
-        """Transpiled circuits.
-
-        Returns:
-            Any: all transpiled circuits.
-        """
-        return self._transpiled_circuits
+        return self._classified_results
 
     @property
     def classifier(self) -> ClassificationManager:
@@ -205,6 +172,42 @@ class QPU:
         return self._classifier
 
     @property
+    def compiled_circuits(self) -> Any:
+        """Compiled circuits.
+
+        Returns:
+            Any: all compiled circuits.
+        """
+        return self._compiled_circuits
+
+    @property
+    def exp_circuits(self) -> Any:
+        """Experimental circuits.
+
+        Returns:
+            Any: experimental circuits of the current batch.
+        """
+        return self._exp_circuits
+
+    @property
+    def compiler(self) -> Any | List[Any]:
+        """Returns the compiler(s) loaded to the QPU.
+
+        Returns:
+            Any | List[Any]: circuit compiler
+        """
+        return self._compiler
+
+    @property
+    def config(self) -> Config:
+        """Returns the config loaded to the QPU.
+
+        Returns:
+            Config: experimental config
+        """
+        return self._config
+
+    @property
     def data_manager(self) -> DataMananger:
         """Data manager.
 
@@ -212,6 +215,24 @@ class QPU:
             DataMananger: current DataManager instance.
         """
         return self._data_manager
+
+    @property
+    def measurements(self) -> List[Any]:
+        """Returns the list of measurement objects.
+
+        Returns:
+            List[Any]: measurements.
+        """
+        return self._measurements
+
+    @property
+    def runtime(self) -> pd.DataFrame:
+        """Runtime.
+
+        Returns:
+            pd.DataFrame: breakdown of current runtime.
+        """
+        return self._runtime
 
     @property
     def sequence(self) -> Any:
@@ -223,19 +244,29 @@ class QPU:
         return self._sequence
 
     @property
-    def measurements(self) -> List[Any]:
-        """Returns the list of measurement objects.
+    def transpiled_circuits(self) -> Any:
+        """Transpiled circuits.
 
         Returns:
-            List[Any]: measurements.
+            Any: all transpiled circuits.
         """
-        return self._measurements
+        return self._transpiled_circuits
 
-    def initialize(self,
-            circuits:  Any | List[Any],
-            n_shots:   int | None = None,
-            n_batches: int | None = None
-        ) -> None:
+    @property
+    def transpiler(self) -> Any | List[Any]:
+        """Returns the transpiler(s) loaded to the QPU.
+
+        Returns:
+            Any | List[Any]: circuit transpiler
+        """
+        return self._transpiler
+
+    def _initialize(
+        self,
+        circuits:  Any | List[Any],
+        n_shots:   int | None = None,
+        n_batches: int | None = None
+    ) -> None:
         """Initialize the experiment.
 
         Args:
@@ -359,7 +390,7 @@ class QPU:
                 timeit.default_timer() - t0, 1
             )
 
-    def batch_measurements(self) -> None:
+    def _batch_measurements(self) -> None:
         """Measurement batcher."""
         if self._circuits.n_circuits <= self._n_circs_per_seq:
             logger.info(' No batching...')
@@ -457,8 +488,8 @@ class QPU:
                 class.
         """
         t_start = timeit.default_timer()
-        self.initialize(circuits, n_shots, n_batches)
-        self.batch_measurements()
+        self._initialize(circuits, n_shots, n_batches)
+        self._batch_measurements()
         self._runtime['Total'] += round(
             timeit.default_timer() - t_start, 1
         )

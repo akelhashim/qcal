@@ -15,7 +15,7 @@ from typing import Any, Callable, Dict, List, Tuple
 
 import matplotlib.pyplot as plt
 import numpy as np
-import pandas as pd
+# import pandas as pd
 import plotly.graph_objects as go
 import pygsti
 import pygsti.report.reportables as metrics
@@ -29,7 +29,8 @@ from pygsti.algorithms.fiducialpairreduction import (
 from pygsti.algorithms.fiducialselection import find_fiducials
 from pygsti.algorithms.germselection import find_germs
 from pygsti.circuits.circuit import Circuit
-from pygsti.io import write_empty_protocol_data
+from pygsti.data import DataSet
+from pygsti.io import read_dataset, write_dataset, write_empty_protocol_data
 from pygsti.modelmembers.instruments import Instrument
 from pygsti.modelpacks import smq1Q_XYI, smq2Q_XYCPHASE
 from pygsti.models.explicitmodel import ExplicitOpModel
@@ -40,10 +41,8 @@ from pygsti.protocols.gst import ModelEstimateResults
 from pygsti.protocols.protocol import ProtocolData
 from pygsti.tools.internalgates import standard_gatename_unitaries
 
-import qcal.settings as settings
 from qcal.circuit import CircuitSet
 from qcal.config import Config
-from qcal.interface.pygsti.circuits import load_circuits
 from qcal.interface.pygsti.datasets import generate_pygsti_dataset
 from qcal.interface.pygsti.transpiler import PyGSTiTranspiler
 from qcal.plotting.utils import calculate_nrows_ncols
@@ -55,6 +54,7 @@ from qcal.post_processing.passes import (
 from qcal.post_processing.post_process import PostProcessor
 from qcal.qpu.qpu import QPU
 from qcal.results import Results
+from qcal.settings import Settings
 from qcal.utils import flatten, load_from_pickle, save_init, save_to_pickle
 
 logger = logging.getLogger(__name__)
@@ -149,6 +149,7 @@ def GST(
             self._protocol = None
             self._edesign = None
             self._data = None
+            self._dataset = None
             self._results = None
             self._circuits = None
             self._report = None
@@ -194,6 +195,15 @@ def GST(
                 ProtocolData: pyGSTi data object.
             """
             return self._data
+
+        @property
+        def dataset(self) -> DataSet:
+            """pyGSTi dataset object.
+
+            Returns:
+                DataSet: pyGSTi dataset object.
+            """
+            return self._dataset
 
         @property
         def diamond_norm(self) -> Dict[str, Dict[str, float]]:
@@ -599,69 +609,68 @@ def GST(
                 len(self._edesign.all_circuits_needing_data)
             )
 
-            # Save an empty dataset file of all the circuits
+            self._circuits = CircuitSet(
+                list(self._edesign.all_circuits_needing_data)
+            )
+            self._circuits['pygsti_circuit'] = [
+                circ.str for circ in self._edesign.all_circuits_needing_data
+            ]
+
             self._data_manager._exp_id += (
                 f'_GST_{"".join("Q" + str(q) for q in self._qubits)}'
             )
-            self._data_manager.create_data_path()
-            write_empty_protocol_data(
-                self._data_manager._save_path,
-                self._edesign,
-                sparse=True,
-                clobber_ok=True
-            )
-
-            self._circuits = load_circuits(
-                self._data_manager._save_path + 'data/dataset.txt'
-            )
+            if Settings.save_data:
+                self._data_manager.create_data_path()
+                write_empty_protocol_data(
+                    self._data_manager._save_path,
+                    self._edesign,
+                    sparse=True,
+                    clobber_ok=True
+                )
 
         def save(self):
             """Save all circuits and data."""
             clear_output(wait=True)
-            generate_pygsti_dataset(
-                self._circuits,
-                self._data_manager._save_path + 'data/'
-            )
-            if settings.Settings.save_data:
+            if Settings.save_data:
                 qpu.save(self, create_data_path=False)
 
         def analyze(self):
             """Analyze the GST results."""
             logger.info(' Analyzing the results...')
-            self._data = pygsti.io.read_data_from_dir(
-                self._data_manager._save_path
+            self._dataset = (
+                generate_pygsti_dataset(
+                    self._circuits,
+                    save_path=self._data_manager._save_path + 'data/'
+                    if Settings.save_data else None
+                ) if self._dataset is None else self._dataset
             )
+            self._data = ProtocolData(self._edesign, self._dataset)
 
             self._results = self._protocol.run(
                 self._data,
+                disable_checkpointing=True if not Settings.save_data else False,
                 checkpoint_path=self._data_manager._save_path
-                + 'gst_checkpoints/checkpoint'
+                + 'gst_checkpoints/checkpoint' if Settings.save_data else None
             )
-            save_to_pickle(
-                self._results, self._data_manager._save_path + 'results'
-            )
+            if Settings.save_data:
+                save_to_pickle(
+                    self._results, self._data_manager._save_path + 'results'
+                )
 
-            self._report = pygsti.report.construct_standard_report(
-                self._results,
-                title="GST Report",
-                verbosity=2
-            )
-            self._report.write_html(
-                self._data_manager._save_path, verbosity=2
-            )
+                self._report = pygsti.report.construct_standard_report(
+                    self._results,
+                    title="GST Report",
+                    verbosity=2
+                )
+                self._report.write_html(
+                    self._data_manager._save_path, verbosity=2
+                )
 
-            # Print the models
-            # clear_output(wait=True)
-            # for key, model in self.models.items():
-            #     print('-------------------------------------------------------')
-            #     print(f'Model: {key}\n')
-            #     print(model)
-
-            clear_output(wait=True)
-            if settings.Settings.save_data:
                 save_to_pickle(
                     self.ptm, self._data_manager._save_path + 'PTMs'
                 )
+
+            clear_output(wait=True)
 
         def plot(self) -> None:
             """Plot the PTMs and their associated performance metrics."""
@@ -821,7 +830,7 @@ def GST(
                 pfig.show(config=save_properties)
                 # pfig.show()
 
-                if settings.Settings.save_data:
+                if Settings.save_data:
                     fig.savefig(
                         save_path + f"{model.replace(' ', '')}.png",
                         dpi=600
@@ -1872,9 +1881,10 @@ def QuantumInstrumentGST(
             """Save all circuits and data."""
             clear_output(wait=True)
 
-            classified_results = load_from_pickle(
-                self.data_manager.save_path + 'classified_results.pkl'
-            )
+            if self._classified_results is None:
+                raise ValueError(
+                    "No classified results found. Cannot post-process the data!"
+                )
 
             def _run_post_processing(gst_obj, results):
                 pp = PostProcessor(
@@ -1888,27 +1898,51 @@ def QuantumInstrumentGST(
                 )
                 pp.run()
 
-                results_df = pd.DataFrame(pp.tm_results)
-                results_df.index = gst_obj._circuits['pygsti_circuit'].values
-                results_df = results_df.apply(
-                    lambda col: col.round().astype('Int64')
-                ).astype(object)
-                results_df = results_df.fillna('--')
-                results_df = results_df.rename(
-                    columns=lambda col: col + ' count'
-                )
+                # Old way
+                # results_df = pd.DataFrame(pp.tm_results)
+                # results_df.index = gst_obj._circuits['pygsti_circuit'].values
+                # results_df = results_df.apply(
+                #     lambda col: col.round().astype('Int64')
+                # ).astype(object)
+                # results_df = results_df.fillna('--')
+                # results_df = results_df.rename(
+                #     columns=lambda col: col + ' count'
+                # )
+                # logger.info(" Saving the pyGSTi results...")
+                # filepath = gst_obj.data_manager.save_path + 'data/dataset.txt'
+                # with open(filepath, 'w') as f:
+                #     f.write(
+                #         '## Columns = ' + ', '.join(results_df.columns) + '\n'
+                #     )
+                #     f.close()
+                # results_df.to_csv(filepath, sep=' ', mode='a', header=False)
 
-                logger.info(" Saving the pyGSTi results...")
-                filepath = gst_obj.data_manager.save_path + 'data/dataset.txt'
-                with open(filepath, 'w') as f:
-                    f.write(
-                        '## Columns = ' + ', '.join(results_df.columns) + '\n'
+                # New way
+                gst_obj._dataset = DataSet(
+                    outcome_labels=[
+                        ('0',), ('1',),
+                        ('p0', '0'), ('p0', '1'),
+                        ('p1', '0'), ('p1', '1')
+                    ]
+                )
+                for i, circuit in enumerate(
+                    gst_obj._circuits['pygsti_circuit'].values
+                ):
+                    results = pp.tm_results[i]
+                    results = {
+                        tuple(str(k).split(':')): v for k, v in results.items()
+                    }
+                    gst_obj._dataset[circuit] = results
+
+                if Settings.save_data:
+                    logger.info(" Saving the pyGSTi results...")
+                    filepath = (
+                        gst_obj.data_manager.save_path + 'data/dataset.txt'
                     )
-                    f.close()
-                results_df.to_csv(filepath, sep=' ', mode='a', header=False)
+                    write_dataset(filepath, gst_obj._dataset)
 
                 gst_obj._runtime = self._runtime
-                if settings.Settings.save_data:
+                if Settings.save_data:
                     qpu.save(gst_obj, create_data_path=False)
 
             if hasattr(self, '_gst'):
@@ -1917,7 +1951,7 @@ def QuantumInstrumentGST(
                     qset = set(ql) if isinstance(ql, tuple) else {ql}
                     filtered_results = [
                         {q: res[q] for q in qset}
-                        for res in classified_results
+                        for res in self._classified_results
                     ]
                     _run_post_processing(gst_obj, filtered_results)
 
@@ -1935,13 +1969,13 @@ def QuantumInstrumentGST(
                             future.result()
                         except Exception:
                             logger.exception(
-                                " Post-processing failed for qubit label %s",
+                                " Post-processing failed for qubit label %s!",
                                 ql
                             )
                             raise
 
             else:
-                _run_post_processing(self, classified_results)
+                _run_post_processing(self, self._classified_results)
 
     return QuantumInstrumentGST(
         config=config,

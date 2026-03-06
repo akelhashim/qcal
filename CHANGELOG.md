@@ -15,14 +15,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - GST for quantum instruments
 - mcm_results property for Circuit object
 - qcal -> pyquil transpiler
-- PostProcessor class for better handling of post-processing results with 
-optional passes
+- PostProcessor class for better handling of post-processing results with optional passes
 - Simultaneous GST
 - Circuit.join() method for easily joining multiple circuits along cycle number
 
 ### Changed
 
 - Updated dependencies (added pygsti and pyrpe)
+- RPE, CRB, & GST no longer requires saving to disk
 
 ### Deprecated
 

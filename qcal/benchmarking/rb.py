@@ -14,17 +14,18 @@ import numpy as np
 import pygsti
 from IPython.display import clear_output
 from pygsti.processors import CliffordCompilationRules as CCR
+from pygsti.protocols.protocol import ProtocolData
 
-import qcal.settings as settings
 from qcal.analysis.leakage import analyze_leakage
 from qcal.benchmarking.utils import plot_error_rates
+from qcal.circuit import CircuitSet
 from qcal.config import Config
-from qcal.interface.pygsti.circuits import load_circuits
 from qcal.interface.pygsti.datasets import generate_pygsti_dataset
 from qcal.interface.pygsti.processor_spec import pygsti_pspec
 from qcal.interface.pygsti.transpiler import PyGSTiTranspiler
 from qcal.plotting.utils import calculate_nrows_ncols
 from qcal.qpu.qpu import QPU
+from qcal.settings import Settings
 from qcal.utils import flatten
 
 logger = logging.getLogger(__name__)
@@ -173,6 +174,7 @@ def CRB(
             )
             self._edesign = None
             self._data = None
+            self._dataset = None
             self._results = None
 
             self._error_rates = {}
@@ -202,6 +204,11 @@ def CRB(
         def data(self):
             """pyGSTi data object."""
             return self._data
+
+        @property
+        def dataset(self):
+            """pyGSTi dataset."""
+            return self._dataset
 
         @property
         def results(self):
@@ -248,39 +255,40 @@ def CRB(
                     edesigns
                 )
 
-            # Save an empty dataset file of all the circuits
+            self._circuits = CircuitSet(self._edesign.all_circuits_needing_data)
+            self._circuits['pygsti_circuit'] = [
+                circ.str for circ in self._edesign.all_circuits_needing_data
+            ]
+
             self._data_manager._exp_id += (
                 f'_CRB_{"".join("Q"+str(q) for q in self._qubits)}'
             )
-            self._data_manager.create_data_path()
-            pygsti.io.write_empty_protocol_data(
-                self._data_manager._save_path,
-                self._edesign,
-                sparse=True,
-                clobber_ok=True
-            )
-
-            self._circuits = load_circuits(
-                self._data_manager._save_path + 'data/dataset.txt'
-            )
+            if Settings.save_data:
+                self._data_manager.create_data_path()
+                pygsti.io.write_empty_protocol_data(
+                    self._data_manager._save_path,
+                    self._edesign,
+                    sparse=True,
+                    clobber_ok=True
+                )
 
         def save(self):
             """Save all circuits and data."""
             clear_output(wait=True)
-            generate_pygsti_dataset(
-                self._circuits,
-                self._data_manager._save_path + 'data/'
-            )
-            if settings.Settings.save_data:
+            if Settings.save_data:
                 qpu.save(self, create_data_path=False)
 
         def analyze(self):
             """Analyze the CRB results."""
-            # logger.info(' Analyzing the results...')
-            self._data = pygsti.io.read_data_from_dir(
-                self._data_manager._save_path
+            logger.info(' Analyzing the results...')
+            self._dataset = generate_pygsti_dataset(
+                self._circuits,
+                save_path=self._data_manager._save_path + 'data/'
+                if Settings.save_data else None
             )
+            self._data = ProtocolData(self._edesign, self._dataset)
             self._results = self._protocol.run(self._data)
+
             if not self._sim_RB:
                 try:
                     r = self._results.fits['full'].estimates['r']
@@ -341,10 +349,11 @@ def CRB(
             """Plot the CRB fit results."""
             if not self._sim_RB:
                 if self._results is not None:
-                    if settings.Settings.save_data:
+                    if Settings.save_data:
                         self._results.plot(
                             figpath=self._data_manager._save_path +
-                            'CRB_decay.png'
+                            'CRB_decay.png' if Settings.save_data
+                            else None
                         )
                     else:
                         self._results.plot()
@@ -356,10 +365,11 @@ def CRB(
                     else:
                         qtup = (f'Q{ql}',)
                     if self._results[qtup] is not None:
-                        if settings.Settings.save_data:
+                        if Settings.save_data:
                             self._results[qtup].for_protocol['RB'].plot(
                                 figpath=self._data_manager._save_path +
                                 f'{"".join(qtup)}_CRB_decay.png'
+                                if Settings.save_data else None
                             )
                         else:
                             self._results[qtup].for_protocol['RB'].plot()
@@ -369,6 +379,7 @@ def CRB(
                 self._uncertainties,
                 ylabel='Process Infidelity',
                 save_path=self._data_manager._save_path
+                if Settings.save_data else None
             )
 
             # if any(circ.results.dim == 3 for circ in self._transpiled_circuits):
@@ -522,7 +533,7 @@ def SRB(
             self._data_manager._exp_id += (
                 f'_SRB_{"".join("Q" + str(q) for q in self._circuits.labels)}'
             )
-            if settings.Settings.save_data:
+            if Settings.save_data:
                 qpu.save(self)
 
         def plot(self) -> None:
@@ -566,7 +577,7 @@ def SRB(
                         ax.axis('off')
 
             fig.set_tight_layout(True)
-            if settings.Settings.save_data:
+            if Settings.save_data:
                 fig.savefig(
                     self._data_manager._save_path + 'SRB_decays.png',
                     dpi=600
@@ -594,7 +605,7 @@ def SRB(
             ax.grid(True)
 
             fig.set_tight_layout(True)
-            if settings.Settings.save_data:
+            if Settings.save_data:
                 fig.savefig(
                     self._data_manager._save_path + 'SRB_infidelities.png',
                     dpi=600
