@@ -1,26 +1,34 @@
 """"Submodule for analyzing RPE experiments.
 
 """
-from qcal.characterization.phase_estimation.circuits import (
-    make_idle_cos_circ, make_idle_sin_circ, make_x90_cos_circ,
-    make_x90_sin_circ, make_X90_icos_circ, make_X90_isin_circ,
-    make_cz_cos_circ, make_cz_sin_circ
-)
-
 import logging
-import numpy as np
-
 from typing import List, Tuple
+
+import numpy as np
+import pygsti
+from quapack.pyRPE import RobustPhaseEstimation
+from quapack.pyRPE.quantum import Q
+
+from qcal.characterization.phase_estimation.circuits import (
+    make_cz_cos_circ,
+    make_cz_sin_circ,
+    make_idle_cos_circ,
+    make_idle_sin_circ,
+    make_x90_cos_circ,
+    make_X90_icos_circ,
+    make_X90_isin_circ,
+    make_x90_sin_circ,
+)
 
 logger = logging.getLogger(__name__)
 
 
 def analyze_idle(
-        dataset, 
-        qubits:         List[int], 
-        circuit_depths: List[int],
-        gate_layer:     List = None,
-    ) -> Tuple:
+    dataset:        pygsti.data.dataset,
+    qubits:         List[int],
+    circuit_depths: List[int],
+    gate_layer:     List = None,
+) -> Tuple:
     """Analyze idle RPE dataset.
 
     Args:
@@ -33,18 +41,12 @@ def analyze_idle(
     Returns:
         Tuple: angle estimates, angle errors, and index of last good depth
     """
-    try:
-        from quapack.pyRPE import RobustPhaseEstimation
-        from quapack.pyRPE.quantum import Q
-    except ImportError:
-        logger.warning(' Unable to import pyRPE!')
-
     cos_circs = {
-        d: make_idle_cos_circ(d, qubits, gate_layer) 
+        d: make_idle_cos_circ(d, qubits, gate_layer)
         for d in circuit_depths
     }
     sin_circs = {
-        d: make_idle_sin_circ(d, qubits, gate_layer) 
+        d: make_idle_sin_circ(d, qubits, gate_layer)
         for d in circuit_depths
     }
 
@@ -80,12 +82,12 @@ def analyze_idle(
 
 
 def analyze_x90(
-        dataset, 
-        qubits:         List[int], 
-        circuit_depths: List[int], 
-        gate_layer:     List = None,
-        estimator_type: str = 'linearized',
-    ) -> Tuple:
+    dataset:        pygsti.data.dataset,
+    qubits:         List[int],
+    circuit_depths: List[int],
+    gate_layer:     List = None,
+    estimator_type: str = 'linearized',
+) -> Tuple:
     """Analyze RPE dataset for the X90 gate.
 
     Args:
@@ -99,30 +101,24 @@ def analyze_x90(
     Returns:
         Tuple: angle estimates, angle errors, and index of last good depth
     """
-    try:
-        from quapack.pyRPE import RobustPhaseEstimation
-        from quapack.pyRPE.quantum import Q
-    except ImportError:
-        logger.warning(' Unable to import pyRPE!')
-
     target_x = np.pi / 2
     eps = 1e-8  # Small additive factor to ensure we do not divide by zero
 
     direct_cos_circs = {
-        d: make_x90_cos_circ(d, qubits, gate_layer) 
+        d: make_x90_cos_circ(d, qubits, gate_layer)
         for d in circuit_depths
     }
     direct_sin_circs = {
-        d: make_x90_sin_circ(d, qubits, gate_layer) 
+        d: make_x90_sin_circ(d, qubits, gate_layer)
         for d in circuit_depths
     }
 
     interleaved_cos_circs = {
-        d: make_X90_icos_circ(d, qubits, gate_layer) 
+        d: make_X90_icos_circ(d, qubits, gate_layer)
         for d in circuit_depths
     }
     interleaved_sin_circs = {
-        d: make_X90_isin_circ(d, qubits, gate_layer) 
+        d: make_X90_isin_circ(d, qubits, gate_layer)
         for d in circuit_depths
     }
 
@@ -158,12 +154,12 @@ def analyze_x90(
         interleaved_cos_counts = dataset[interleaved_cos_circs[d]].counts
         interleaved_sin_counts = dataset[interleaved_sin_circs[d]].counts
         experiment.process_cos(d,
-            (int(interleaved_cos_counts['0']), 
+            (int(interleaved_cos_counts['0']),
              int(interleaved_cos_counts['1'])
             )
         )
         experiment.process_sin(d,
-            (int(interleaved_sin_counts['1']), 
+            (int(interleaved_sin_counts['1']),
              int(interleaved_sin_counts['0'])
             )
         )
@@ -185,9 +181,9 @@ def analyze_x90(
     if estimator_type == 'linearized':
         epsilon_estimates = direct_angle_estimates / (np.pi/2) - 1
         theta_estimates = np.array([
-            np.sin(interleaved_angle_estimates[i]/2) / 
-            (2 * np.cos(np.pi * epsilon_estimates[i]/2)) 
-            # (2 * np.cos(np.pi * epsilon_estimates[direct_last_good_idx]/2)) 
+            np.sin(interleaved_angle_estimates[i]/2) /
+            (2 * np.cos(np.pi * epsilon_estimates[i]/2))
+            # (2 * np.cos(np.pi * epsilon_estimates[direct_last_good_idx]/2))
             for i in range(len(direct_angle_estimates))
         ])
 
@@ -219,14 +215,14 @@ def analyze_x90(
     }
 
     return (angle_estimates, angle_errors, last_good_idx, signal)
-        
+
 
 def analyze_cz(
-        dataset, 
-        qubit_pairs:    List[Tuple[int]], 
-        circuit_depths: List[int], 
-        gate_layer:     List = None,
-    ) -> Tuple:
+    dataset:        pygsti.data.dataset,
+    qubit_pairs:    List[Tuple[int]],
+    circuit_depths: List[int],
+    gate_layer:     List = None,
+) -> Tuple:
     """Analyze RPE dataset for the CZ gate.
 
     Args:
@@ -239,12 +235,6 @@ def analyze_cz(
     Returns:
         Tuple: angle estimates, angle errors, and index of last good depth
     """
-    try:
-        from quapack.pyRPE import RobustPhaseEstimation
-        from quapack.pyRPE.quantum import Q
-    except ImportError:
-        logger.warning(' Unable to import pyRPE!')
-
     target_zz = -np.pi/2
     target_iz = target_zi = np.pi/2
     eps = 1e-8  # Small additive factor to ensure we do not divide by zero
@@ -301,11 +291,11 @@ def analyze_cz(
                 )
             )
             p_I = int(dataset[cos_dict[state_pair][d]][cos_plus]) / (
-                int(dataset[cos_dict[state_pair][d]][cos_plus]) + 
+                int(dataset[cos_dict[state_pair][d]][cos_plus]) +
                 int(dataset[cos_dict[state_pair][d]][cos_minus]) + eps
             )
             p_Q = int(dataset[sin_dict[state_pair][d]][sin_plus]) / (
-                int(dataset[sin_dict[state_pair][d]][sin_plus]) + 
+                int(dataset[sin_dict[state_pair][d]][sin_plus]) +
                 int(dataset[sin_dict[state_pair][d]][sin_minus]) + eps
             )
             signal[state_pair].append(1 - 2 * p_I + 1j - 2j * p_Q)
@@ -315,21 +305,21 @@ def analyze_cz(
         analyses[state_pair] = RobustPhaseEstimation(experiments[state_pair])
         if state_pair == (0, 1):
             analyses[state_pair].angle_estimates_rectified = [
-                rectify_angle(theta) for theta in 
+                rectify_angle(theta) for theta in
                 analyses[state_pair].angle_estimates
             ]
         else:
-            analyses[state_pair].angle_estimates_rectified = [
-                theta for theta in analyses[state_pair].angle_estimates
-            ]    
+            analyses[state_pair].angle_estimates_rectified = list(
+                analyses[state_pair].angle_estimates
+            )
 
     # Turn lin. comb. estimates into direct phase estimates
     zz_estimates = 0.5 * (
-        np.array(analyses[(0, 1)].angle_estimates_rectified) - 
+        np.array(analyses[(0, 1)].angle_estimates_rectified) -
         np.array(analyses[(2, 3)].angle_estimates_rectified)
     )
     iz_estimates = 0.5 * (
-        np.array(analyses[(0, 1)].angle_estimates_rectified) + 
+        np.array(analyses[(0, 1)].angle_estimates_rectified) +
         np.array(analyses[(2, 3)].angle_estimates_rectified)
     )
     zi_estimates = (
@@ -349,7 +339,7 @@ def analyze_cz(
         )
     last_good_idx = min(list(last_good_estimates.values()))
     # last_good_depth = 2**last_good_idx
-    
+
     angle_errors = {
         'ZZ': zz_estimates - target_zz,
         'IZ': iz_estimates - target_iz,
@@ -360,12 +350,12 @@ def analyze_cz(
 
 
 def analyze_zz(
-        dataset, 
-        qubit_pairs:    List[Tuple[int]], 
-        circuit_depths: List[int], 
-        gate_layer:     List = None,
-    ) -> Tuple:
-    """Analyze RPE dataset for the CZ gate.
+    dataset:        pygsti.data.dataset,
+    qubit_pairs:    List[Tuple[int]],
+    circuit_depths: List[int],
+    gate_layer:     List = None,
+) -> Tuple:
+    """Analyze RPE dataset for ZZ.
 
     Args:
         dataset (pygsti.data.dataset): pyGSTi dataset.
@@ -377,12 +367,6 @@ def analyze_zz(
     Returns:
         Tuple: angle estimates, angle errors, and index of last good depth
     """
-    try:
-        from quapack.pyRPE import RobustPhaseEstimation
-        from quapack.pyRPE.quantum import Q
-    except ImportError:
-        logger.warning(' Unable to import pyRPE!')
-
     target_zz = target_iz = target_zi = 0
     eps = 1e-8  # Small additive factor to ensure we do not divide by zero
 
@@ -438,11 +422,11 @@ def analyze_zz(
                 )
             )
             p_I = int(dataset[cos_dict[state_pair][d]][cos_plus]) / (
-                int(dataset[cos_dict[state_pair][d]][cos_plus]) + 
+                int(dataset[cos_dict[state_pair][d]][cos_plus]) +
                 int(dataset[cos_dict[state_pair][d]][cos_minus]) + eps
             )
             p_Q = int(dataset[sin_dict[state_pair][d]][sin_plus]) / (
-                int(dataset[sin_dict[state_pair][d]][sin_plus]) + 
+                int(dataset[sin_dict[state_pair][d]][sin_plus]) +
                 int(dataset[sin_dict[state_pair][d]][sin_minus]) + eps
             )
             signal[state_pair].append(1 - 2 * p_I + 1j - 2j * p_Q)
@@ -452,25 +436,25 @@ def analyze_zz(
         analyses[state_pair] = RobustPhaseEstimation(experiments[state_pair])
         if state_pair == (0, 1):
             analyses[state_pair].angle_estimates_rectified = [
-                rectify_angle(theta) for theta in 
+                rectify_angle(theta) for theta in
                 analyses[state_pair].angle_estimates
             ]
         else:
-            analyses[state_pair].angle_estimates_rectified = [
-                theta for theta in analyses[state_pair].angle_estimates
-            ]    
+            analyses[state_pair].angle_estimates_rectified = list(
+                analyses[state_pair].angle_estimates
+            )
 
     # Turn lin. comb. estimates into direct phase estimates
     # Wrap angles to [-π/2, π/2] using arcsin(sin(x))
-    zz_estimates = np.arcsin(np.sin( 
+    zz_estimates = np.arcsin(np.sin(
         0.5 * (
-            np.array(analyses[(0, 1)].angle_estimates_rectified) - 
+            np.array(analyses[(0, 1)].angle_estimates_rectified) -
             np.array(analyses[(2, 3)].angle_estimates_rectified)
         )
     ))
     iz_estimates = np.arcsin(np.sin(
         0.5 * (
-            np.array(analyses[(0, 1)].angle_estimates_rectified) + 
+            np.array(analyses[(0, 1)].angle_estimates_rectified) +
             np.array(analyses[(2, 3)].angle_estimates_rectified)
         )
     ))
@@ -491,7 +475,7 @@ def analyze_zz(
         )
     last_good_idx = min(list(last_good_estimates.values()))
     # last_good_depth = 2**last_good_idx
-    
+
     angle_errors = {
         'ZZ': zz_estimates - target_zz,
         'IZ': iz_estimates - target_iz,

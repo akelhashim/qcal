@@ -6,8 +6,9 @@ Basic example useage:
     cfg.qubits       # Returns a list of the qubits on the processor
     cfg.qubit_pairs  # Returns a list of the qubit pairs on the processor
     cfg.parameters   # Returns a dictionary of the entire config
-    cfg.processor()  # Plots the processor connectivity
+    cfg.draw_qpu()  # Plots the processor connectivity
 """
+import ast
 import copy
 import io
 import logging
@@ -416,7 +417,10 @@ class Config:
         Returns:
             list[tuple]: qubit pairs.
         """
-        return [eval(key) for key in self.parameters['two_qubit'].keys()]
+        return [
+            (ast.literal_eval(key) if isinstance(key, str) else key)
+            for key in self.parameters["two_qubit"].keys()
+        ]
 
     def get(self, param: List[Any]) -> Any:
         """Get the parameter from the config (if it exists).
@@ -574,14 +578,18 @@ class Config:
             filename (str | None, optional): filename for the YAML file.
                 Defaults to None.
         """
-        with io.open(
-                filename if filename is not None else self._filename, 'w',
-                encoding='utf8'
-            ) as yaml_file:
-                yaml.dump(
-                    dict(self._parameters),
-                    yaml_file,
-                    default_flow_style=False,
-                    allow_unicode=True,
-                    sort_keys=False
-                )
+        if filename is None and self._filename is None:
+            logger.warning(" No filename specified; config was not saved!")
+            return
+        else:
+            with io.open(
+                    filename if filename is not None else self._filename, 'w',
+                    encoding='utf8'
+                ) as yaml_file:
+                    yaml.dump(
+                        dict(self._parameters),
+                        yaml_file,
+                        default_flow_style=False,
+                        allow_unicode=True,
+                        sort_keys=False
+                    )

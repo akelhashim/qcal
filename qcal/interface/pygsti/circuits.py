@@ -1,11 +1,10 @@
 """Submodule for handling pyGSTi circuits.
 
 """
-from qcal.circuit import CircuitSet
-
+import logging
 from typing import List
 
-import logging
+from qcal.circuit import CircuitSet
 
 logger = logging.getLogger(__name__)
 

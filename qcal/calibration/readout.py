@@ -1,34 +1,31 @@
 """Submodule for readout calibration.
 
 """
-import qcal.settings as settings
+import inspect
+import logging
+import os
+from typing import Callable, Dict, List, Tuple
 
-from .calibration import Calibration
+import matplotlib.pyplot as plt
+import numpy as np
+from IPython.display import clear_output
+from matplotlib.colors import ListedColormap
+from matplotlib.patches import Patch
+from numpy.typing import ArrayLike
+from sklearn.inspection import DecisionBoundaryDisplay
+
+import qcal.settings as settings
 from qcal.benchmarking.readout import ReadoutFidelity
-from qcal.circuit import Barrier, Cycle, Circuit, CircuitSet
+from qcal.circuit import Barrier, Circuit, CircuitSet, Cycle
 from qcal.config import Config
+from qcal.gate.single_qubit import X90, Id, X
 from qcal.machine_learning.clustering import GaussianMixture
 from qcal.managers.classification_manager import ClassificationManager
-
-from qcal.gate.single_qubit import Id, X, X90
 from qcal.plotting.utils import calculate_nrows_ncols
 from qcal.qpu.qpu import QPU
 from qcal.utils import save_to_pickle
 
-import inspect
-import logging
-import matplotlib.pyplot as plt
-import os
-import numpy as np
-
-from IPython.display import clear_output
-from numpy.typing import ArrayLike
-from sklearn.inspection import DecisionBoundaryDisplay
-
-from typing import Callable, Dict, List, Tuple
-from matplotlib.colors import ListedColormap
-from matplotlib.patches import Patch
-
+from .calibration import Calibration
 
 logger = logging.getLogger(__name__)
 
@@ -52,14 +49,15 @@ def ReadoutCalibration(
     """Readout calibration
 
     Basic example useage for initial calibration:
-        
-        ```
-        cal = ReadoutCalibration(
-            CustomQPU, 
-            config, 
-            qubits=[0, 1, 2])
-        cal.run()
-        ```
+
+    ```
+    cal = ReadoutCalibration(
+        CustomQPU,
+        config,
+        qubits=[0, 1, 2]
+    )
+    cal.run()
+    ```
 
     Args:
         qpu (QPU): custom QPU object.
@@ -67,12 +65,11 @@ def ReadoutCalibration(
         qubits (List | Tuple): qubits to calibrate.
         method (str, optional): calibration method. Must be one of ('pi_pulse',
             'rabi').
-        gate (str, optional): native gate to calibrate. Defaults 
-            to 'X90'.
+        gate (str, optional): native gate to calibrate. Defaults to 'X90'.
         model (str, optional): classification algorithm. Defaults to 'gmm'.
-        classifier (ClassificationManager, optional): manager used for 
+        classifier (ClassificationManager, optional): manager used for
             classifying raw data. Defaults to None.
-        n_levels (int, optional): number of energy levels to classify. 
+        n_levels (int, optional): number of energy levels to classify.
             Defaults to 2.
 
     Returns:
@@ -81,11 +78,11 @@ def ReadoutCalibration(
 
     class ReadoutCalibration(qpu, Calibration):
         """ReadoutCalibration class.
-        
+
         This class inherits a custom QPU from the ReadoutCalibration function.
         """
 
-        def __init__(self, 
+        def __init__(self,
                 config:     Config,
                 qubits:     List | Tuple,
                 method:     str = 'pi_pulse',
@@ -107,9 +104,9 @@ def ReadoutCalibration(
             cm_kwargs = {
                 k: kwargs.pop(k) for k in dict(kwargs) if k in cm_args
             }
-            
+
             qpu.__init__(self,
-                config=config, 
+                config=config,
                 classifier=None,
                 n_levels=n_levels,
                 **qpu_kwargs
@@ -128,7 +125,7 @@ def ReadoutCalibration(
                 "'method' must be one of 'pi_pulse' or 'rabi'!"
             )
             self._method = method
-            
+
             assert gate in ('X90', 'X'), (
                 "'gate' must be one of 'X90' or 'X'!"
             )
@@ -139,7 +136,7 @@ def ReadoutCalibration(
             else:
                 self._classifier = ClassificationManager(
                     qubits=qubits, n_levels=n_levels, model=model,
-                    **cm_kwargs 
+                    **cm_kwargs
                 )
             self._X = {}
             self._y = {}
@@ -156,7 +153,7 @@ def ReadoutCalibration(
         def generate_circuits(self):
             """Generate all amplitude calibration circuits."""
             logger.info(' Generating circuits...')
-            
+
             circuit0 = Circuit([
                 Cycle({Id(q) for q in self._qubits}),
             ])
@@ -199,7 +196,7 @@ def ReadoutCalibration(
                 circuits.append(circuit2)
 
             self._circuits = CircuitSet(circuits=circuits)
-                
+
         def analyze(self) -> None:
             """Analyze the data."""
             logger.info(' Analyzing the data...')
@@ -224,7 +221,7 @@ def ReadoutCalibration(
                     ])
                     X = np.vstack([X, xy_2])
                     y += [2] * self._n_shots
-                
+
                 y = np.array(y)
                 self._X[q] = X
                 self._y[q] = y
@@ -241,9 +238,9 @@ def ReadoutCalibration(
             if settings.Settings.save_data:
                 qpu.save(self)
                 save_to_pickle(
-                    self._classifier, 
+                    self._classifier,
                     os.path.join(
-                        os.path.dirname(self._config.filename), 
+                        settings.Settings.config_path,
                         'ClassificationManager'
                     )
                 )
@@ -290,18 +287,18 @@ def ReadoutCalibration(
 
                         if raw:
                             sc = ax.scatter(
-                                self._X[q][:, 0], self._X[q][:, 1], 
+                                self._X[q][:, 0], self._X[q][:, 1],
                                 c=self._y[q], cmap=cmap, alpha=0.03
                             )
                         else:
                             ax.hexbin(
-                                self._X[q][:, 0], self._X[q][:, 1], 
+                                self._X[q][:, 0], self._X[q][:, 1],
                                 cmap='Greys', gridsize=75
                             )
 
                         DecisionBoundaryDisplay.from_estimator(
-                            self._classifier[q], 
-                            self._X[q], 
+                            self._classifier[q],
+                            self._X[q],
                             response_method="predict",
                             alpha=0.15,
                             ax=ax,
@@ -311,20 +308,20 @@ def ReadoutCalibration(
 
                         # Create a mesh plot
                         x_min, x_max = (
-                            self._X[q][:, 0].min() - 10, 
+                            self._X[q][:, 0].min() - 10,
                             self._X[q][:, 0].max() + 10
                         )
                         y_min, y_max =(
-                            self._X[q][:, 1].min() - 10, 
+                            self._X[q][:, 1].min() - 10,
                             self._X[q][:, 1].max() + 10
                         )
                         # h = int(min([abs(x_min), abs(y_min)]) * 0.025)
                         # xx, yy = np.meshgrid(
-                        #     np.arange(x_min, x_max, h), 
+                        #     np.arange(x_min, x_max, h),
                         #     np.arange(y_min, y_max, h)
                         # )
 
-                        # # Plot the decision boundary by assigning a color to 
+                        # # Plot the decision boundary by assigning a color to
                         # # each point in the mesh [x_min, x_max]x[y_min, y_max].
                         # Z = self._classifier[q].predict(
                         #     np.c_[xx.ravel(), yy.ravel()]
@@ -335,21 +332,21 @@ def ReadoutCalibration(
                         # else:
                         #     cs = ax.contourf(xx, yy, Z, cmap=cmap, alpha=0.15)
                         #     self._cs = cs
-                            
+
                         ax.set_xlim([x_min, x_max])
                         ax.set_ylim([y_min, y_max])
                         ax.ticklabel_format(
                             axis='both', style='sci', scilimits=(0,0)
                         )
                         ax.text(
-                            0.05, 0.9, f'R{q}', size=15, 
+                            0.05, 0.9, f'R{q}', size=15,
                             transform=ax.transAxes
                         )
 
                         if raw:
                             leg = ax.legend(
-                                handles=sc.legend_elements()[0], 
-                                labels=range(0, self._n_levels), 
+                                handles=sc.legend_elements()[0],
+                                labels=range(0, self._n_levels),
                                 fontsize=12,
                                 loc=0
                             )
@@ -360,17 +357,17 @@ def ReadoutCalibration(
                         #             handles.append(cs.legend_elements()[0][l*3])
                         #     leg = ax.legend(
                         #         handles=handles,
-                        #         labels=range(0, self._n_levels), 
+                        #         labels=range(0, self._n_levels),
                         #         fontsize=12,
                         #         loc=0
                         #     )
                             handles = [
-                                Patch(color=cmap(i/(self._n_levels-1)), alpha=1) 
+                                Patch(color=cmap(i/(self._n_levels-1)), alpha=1)
                                 for i in range(self._n_levels)
                             ]
                             leg = ax.legend(
                                 handles=handles,
-                                labels=range(0, self._n_levels), 
+                                labels=range(0, self._n_levels),
                                 fontsize=12,
                                 loc=0
                             )
@@ -379,35 +376,35 @@ def ReadoutCalibration(
 
                     else:
                         ax.axis('off')
-                
+
             fig.set_tight_layout(True)
             if settings.Settings.save_data:
                 if raw:
                     fig.savefig(
-                        self._data_manager._save_path + 
-                        'readout_calibration_raw.png', 
+                        self._data_manager._save_path +
+                        'readout_calibration_raw.png',
                         dpi=300
                     )
                     fig.savefig(
-                        self._data_manager._save_path + 
+                        self._data_manager._save_path +
                         'readout_calibration_raw.pdf'
                     )
                     fig.savefig(
-                        self._data_manager._save_path + 
+                        self._data_manager._save_path +
                         'readout_calibration_raw.svg'
                     )
                 else:
                     fig.savefig(
-                        self._data_manager._save_path + 
-                        'readout_calibration.png', 
+                        self._data_manager._save_path +
+                        'readout_calibration.png',
                         dpi=300
                     )
                     fig.savefig(
-                        self._data_manager._save_path + 
+                        self._data_manager._save_path +
                         'readout_calibration.pdf'
                     )
                     fig.savefig(
-                        self._data_manager._save_path + 
+                        self._data_manager._save_path +
                         'readout_calibration.svg'
                     )
             plt.show()
@@ -416,7 +413,7 @@ def ReadoutCalibration(
             """Final calibration methods."""
             if self._enable_esp:
                 self.set_param('readout/esp/enable', True)
-            
+
             print(f"\nRuntime: {repr(self._runtime)[8:]}\n")
 
         def run(self, plot: bool = True):
@@ -441,7 +438,7 @@ def ReadoutCalibration(
         method,
         gate,
         model,
-        classifier, 
+        classifier,
         n_levels,
         **kwargs
     )
@@ -460,7 +457,6 @@ def Fidelity(
     """Fidelity calibration.
 
     Basic example useage:
-        
     ```
     qubits = [0, 1, 2, 3, 4, 5, 6, 7]
     params = {q: f'readout/{q}/amp' for q in qubits}
@@ -483,13 +479,13 @@ def Fidelity(
         qpu (QPU): custom QPU object.
         config (Config): qcal Config object.
         qubits (List | Tuple): qubits to calibrate.
-        params (Dict[int, str]): dictionary mapping qubit label to param to 
+        params (Dict[int, str]): dictionary mapping qubit label to param to
             sweep over.
-        param_sweep (ArrayLike | Dict[int, ArrayLike]): value sweep for each 
+        param_sweep (ArrayLike | Dict[int, ArrayLike]): value sweep for each
             qubit.
-        gate (str, optional): native gate to used to prepare states. Defaults 
+        gate (str, optional): native gate to used to prepare states. Defaults
             to 'X90'.
-        n_levels (int, optional): number of energy levels to classify. 
+        n_levels (int, optional): number of energy levels to classify.
             Defaults to 2.
 
     Returns:
@@ -498,11 +494,11 @@ def Fidelity(
 
     class Fidelity(qpu, Calibration):
         """Fidelity class.
-        
+
         This class inherits a custom QPU from the Fidelity function.
         """
 
-        def __init__(self, 
+        def __init__(self,
                 config:      Config,
                 qubits:      List | Tuple,
                 params:      Dict[int, str],
@@ -531,9 +527,8 @@ def Fidelity(
 
             self._params = params
             self._param_sweep = (
-                param_sweep if isinstance(param_sweep, Dict) else {
-                    q: param_sweep for q in qubits
-                }
+                param_sweep if isinstance(param_sweep, Dict)
+                else dict.fromkeys(qubits, param_sweep)
             )
 
             self._n_levels = n_levels
@@ -550,12 +545,12 @@ def Fidelity(
                 dict: fidelity of states for each qubit for the param sweep.
             """
             return self._fid
-                
+
         def analyze(self) -> None:
             """Analyze the data."""
             logger.info(' Analyzing the data...')
-            
-            # Find the maximum separation for 
+
+            # Find the maximum separation for
             for q in self._qubits:
                 fid = np.array(self._fid[q][0])
                 for n in range(self._n_levels)[1:]:
@@ -600,7 +595,7 @@ def Fidelity(
 
                         for n in range(self._n_levels):
                             ax.plot(
-                                self._param_sweep[q], 
+                                self._param_sweep[q],
                                 self._fid[q][n],
                                 'o-',
                                 c=colors[n],
@@ -608,22 +603,22 @@ def Fidelity(
                             )
 
                         ax.axvline(
-                            self._cal_values[q],  
+                            self._cal_values[q],
                             ls='--', c='k', label='Max fid.'
                         )
                         ax.text(
-                            0.05, 0.9, f'R{q}', size=15, 
+                            0.05, 0.9, f'R{q}', size=15,
                             transform=ax.transAxes
                         )
                         ax.legend(loc=0, fontsize=12)
 
                     else:
                         ax.axis('off')
-                
+
             fig.set_tight_layout(True)
             if settings.Settings.save_data:
                 fig.savefig(
-                   self._rcal._data_manager._save_path + 'fid_calibration.png', 
+                   self._rcal._data_manager._save_path + 'fid_calibration.png',
                    dpi=300
                 )
             plt.show()
@@ -685,7 +680,7 @@ def Separation(
     """Separation calibration.
 
     Basic example useage:
-        
+
     ```
     qubits = [0, 1, 2, 3, 4, 5, 6, 7]
     params = {q: f'readout/{q}/freq' for q in qubits}
@@ -709,16 +704,16 @@ def Separation(
         qpu (QPU): custom QPU object.
         config (Config): qcal Config object.
         qubits (List | Tuple): qubits to calibrate.
-        params (Dict[int, str]): dictionary mapping qubit label to param to 
+        params (Dict[int, str]): dictionary mapping qubit label to param to
             sweep over.
-        param_sweep (ArrayLike | Dict[int, ArrayLike]): value sweep for each 
+        param_sweep (ArrayLike | Dict[int, ArrayLike]): value sweep for each
             qubit.
         method (str, optional): calibration method. Must be one of ('pi_pulse',
             'rabi').
-        gate (str, optional): native gate used for state preparation. Defaults 
+        gate (str, optional): native gate used for state preparation. Defaults
             to 'X90'.
         model (str, optional): classification algorithm. Defaults to 'gmm'.
-        n_levels (int, optional): number of energy levels to classify. 
+        n_levels (int, optional): number of energy levels to classify.
             Defaults to 2.
 
     Returns:
@@ -727,11 +722,11 @@ def Separation(
 
     class Separation(qpu, Calibration):
         """Separation class.
-        
+
         This class inherits a custom QPU from the Separation function.
         """
 
-        def __init__(self, 
+        def __init__(self,
                 config:      Config,
                 qubits:      List | Tuple,
                 params:      Dict[int, str],
@@ -750,7 +745,7 @@ def Separation(
                 qubits=qubits,
                 method=method,
                 gate=gate,
-                model=model, 
+                model=model,
                 n_levels=n_levels,
                 **kwargs
             )
@@ -764,9 +759,8 @@ def Separation(
 
             self._params = params
             self._param_sweep = (
-                param_sweep if isinstance(param_sweep, Dict) else {
-                    q: param_sweep for q in qubits
-                }
+                param_sweep if isinstance(param_sweep, Dict)
+                else dict.fromkeys(qubits, param_sweep)
             )
 
             self._groupings = []
@@ -785,12 +779,12 @@ def Separation(
                 dict: separation of states for each qubit for the param sweep.
             """
             return self._sep
-                
+
         def analyze(self) -> None:
             """Analyze the data."""
             logger.info(' Analyzing the data...')
-            
-            # Find the maximum separation for 
+
+            # Find the maximum separation for
             for q in self._qubits:
                 sep = np.array(self._sep[q][self._groupings[0]])
                 for g in self._groupings[1:]:
@@ -833,13 +827,13 @@ def Separation(
                             axis='both', which='major', labelsize=12
                         )
                         ax.text(
-                            0.05, 0.9, f'R{q}', size=15, 
+                            0.05, 0.9, f'R{q}', size=15,
                             transform=ax.transAxes
                         )
 
                         for m, g in enumerate(self._groupings):
                             ax.plot(
-                                self._param_sweep[q], 
+                                self._param_sweep[q],
                                 self._sep[q][g],
                                 'o-',
                                 c=colors[m],
@@ -847,7 +841,7 @@ def Separation(
                             )
 
                         ax.axvline(
-                            self._cal_values[q],  
+                            self._cal_values[q],
                             ls='--', c='k', label='Max sep.'
                         )
 
@@ -855,11 +849,11 @@ def Separation(
 
                     else:
                         ax.axis('off')
-                
+
             fig.set_tight_layout(True)
             if settings.Settings.save_data:
                 fig.savefig(
-                   self._rcal._data_manager._save_path + 'sep_calibration.png', 
+                   self._rcal._data_manager._save_path + 'sep_calibration.png',
                    dpi=300
                 )
                 fig.savefig(

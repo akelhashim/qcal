@@ -1,20 +1,19 @@
 """Submodule for analyzing leakage.
 
 """
-import qcal.settings as settings
+import logging
+from typing import Any, Dict
 
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+from lmfit import Parameters
+
+import qcal.settings as settings
 from qcal.fitting.fit import FitExponential
 from qcal.math.utils import round_to_order_error
 from qcal.results import Results
 from qcal.utils import save_to_pickle
-
-import logging
-import matplotlib.pyplot as plt
-import numpy as np
-import pandas as pd
-
-from lmfit import Parameters
-from typing import Any, Dict
 
 logger = logging.getLogger(__name__)
 
@@ -42,13 +41,13 @@ def analyze_leakage(circuits: Any, filename: str | None = None) -> Dict:
     for circuit in circuits:
         circuit_depth = len(circuit)
         circuit_depths.add(circuit_depth)
-        
+
         if not isinstance(circuit.results, Results):
             results = Results(circuit.results)
         else:
             results = circuit.results
 
-        for q, i in zip(qubits, q_index):
+        for q, i in zip(qubits, q_index, strict=False):
             if circuit_depth in leakage[q].keys():
                 leakage[q][circuit_depth].append(
                     results.marginalize(i).populations['2']
@@ -83,11 +82,11 @@ def analyze_leakage(circuits: Any, filename: str | None = None) -> Dict:
 
     for i, q in enumerate(qubits):
         plt.plot(
-            leakage[q].keys(), leakage[q].values(), 
+            leakage[q].keys(), leakage[q].values(),
             'o', c=colors[i], ms=3.0, alpha=0.25
         )
         plt.plot(
-            leakage[q].keys(), np.array(list(leakage[q].values())).mean(axis=1), 
+            leakage[q].keys(), np.array(list(leakage[q].values())).mean(axis=1),
             'o', ms=10.0, c=colors[i], label=label[q]
         )
         if fit[q].fit_success:
@@ -101,7 +100,7 @@ def analyze_leakage(circuits: Any, filename: str | None = None) -> Dict:
     plt.grid(True)
     plt.legend(fontsize=12, bbox_to_anchor=(1.02, 1), loc='upper left')
 
-    if settings.Settings.save_data and filename is not None:         
+    if settings.Settings.save_data and filename is not None:
         fig.savefig(filename + 'leakage.png', dpi=300)
         fig.savefig(filename + 'leakage.pdf')
         fig.savefig(filename + 'leakage.svg')

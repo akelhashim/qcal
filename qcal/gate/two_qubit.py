@@ -2,16 +2,16 @@
 
 See https://threeplusone.com/pubs/on_gates.pdf for relevant definitions.
 """
-from qcal.gate.gate import Gate
-from qcal.gate.single_qubit import id, x, y, z
+from collections import defaultdict
+from collections.abc import Callable, Mapping
+from typing import List, Tuple, Union
 
 import numpy as np
 import scipy
-
-from collections import defaultdict
 from numpy.typing import NDArray
-from typing import List, Tuple, Union
 
+from qcal.gate.gate import Gate
+from qcal.gate.single_qubit import id, x, y, z
 
 __all__ = (
     'AGate',
@@ -392,25 +392,26 @@ def nearest_kronecker_product(C) -> Tuple[NDArray]:
     A = np.sqrt(sv[0]) * u[:, 0].reshape(2, 2)
     B = np.sqrt(sv[0]) * vh[0, :].reshape(2, 2)
     return A, B
-    
+
 
 class AGate(Gate):
     """Class for the A-gate."""
 
     def __init__(self,
-            theta:  int | float, 
+            theta:  int | float,
             phi:    int | float,
-            qubits: Tuple[int]
+            qubits: Tuple[int],
+            **kwargs,
         ) -> None:
         """Initialize using the a_gate gate.
-        
+
         Args:
             theta (int | float):   first gate parameter.
             phi (int | float):     second gate parameter.
             qubits (Tuple[int]): qubit labels.
         """
         super().__init__(a_gate(theta, phi), qubits)
-        
+
         if theta == 0 and phi == 0:
             loc_equiv = 'CX'
         elif theta == np.pi/4 and phi == 0:
@@ -435,10 +436,11 @@ class Barenco(Gate):
             qubits: Tuple[int],
             phi:    int | float,
             alpha:  int | float,
-            theta:  int | float
+            theta:  int | float,
+            **kwargs,
         ) -> None:
         """Initialize using the barenco gate.
-        
+
         Args:
             qubits (Tuple[int]):   qubit labels.
             phi (int | float):     off-diagonal phase angle.
@@ -453,14 +455,14 @@ class Barenco(Gate):
             'alpha': alpha,
             'phi':   phi
         }
-    
+
 
 class BGate(Gate):
     """Class for the Berkeley (B) gate."""
 
     def __init__(self, qubits: Tuple[int]) -> None:
         """Initialize using the berkeley gate.
-        
+
         Args:
             qubits (Tuple[int]): qubit labels.
         """
@@ -474,20 +476,20 @@ class bSWAP(Gate):
 
     def __init__(self, qubits: Tuple[int]) -> None:
         """Initialize using the bSWAP gate.
-        
+
         Args:
             qubits (Tuple[int]): qubit labels.
         """
         super().__init__(bswap, qubits)
         self._properties['name'] = 'bSWAP'
-    
+
 
 class CH(Gate):
     """Class for the Controlled-Hadamard gate."""
 
     def __init__(self, qubits: Tuple[int]) -> None:
         """Initialize using the ch gate.
-        
+
         Args:
             qubits (Tuple[int]): qubit labels.
         """
@@ -500,9 +502,9 @@ class CH(Gate):
 class CNOT(Gate):
     """Class for the Controlled-Not gate."""
 
-    def __init__(self, qubits: Tuple[int]) -> None:
+    def __init__(self, qubits: Tuple[int], **kwargs) -> None:
         """Initialize using the cnot gate.
-        
+
         Args:
             qubits (Tuple[int]): qubit labels.
         """
@@ -515,12 +517,13 @@ class CNOT(Gate):
 class CPhase(Gate):
     """Class for the Controlled-Phase gate."""
 
-    def __init__(self, 
+    def __init__(self,
             qubits: Tuple[int],
             theta:  int | float = 1,
+            **kwargs,
         ) -> None:
         """Initialize using the cphase parametrized gate.
-        
+
         Args:
             qubits (Tuple[int]): qubit labels.
             theta (int | float): phase factor. Defaults to 1.
@@ -551,7 +554,7 @@ class CPhase(Gate):
         self._properties['params'] = {
             'angle': theta,
         }
-    
+
 
 class CRot(Gate):
     """Class for the Controlled-Rotation gate."""
@@ -559,10 +562,11 @@ class CRot(Gate):
     def __init__(self,
             qubits: Tuple[int],
             theta:  int | float,
-            n:      Union[List, NDArray]
-        ) -> None:
+            n:      Union[List, NDArray],
+            **kwargs,
+    ) -> None:
         """Initialize using the crot gate.
-        
+
         Args:
             qubits (Tuple[int]): qubit labels.
             theta (int | float): rotation angle.
@@ -574,14 +578,17 @@ class CRot(Gate):
             'angle': theta,
             'axis':  n
         }
-    
+
 
 class CS(Gate):
     """Class for the Controlled-S gate."""
 
-    def __init__(self, qubits: Tuple[int]) -> None:
+    def __init__(self,
+            qubits: Tuple[int],
+            **kwargs,
+    ) -> None:
         """Initialize using the cphase parametrized gate.
-        
+
         Args:
             qubits (Tuple[int]): qubit labels.
         """
@@ -591,14 +598,17 @@ class CS(Gate):
         self._properties['params'] = {
             'angle': np.pi/2,
         }
-    
+
 
 class CSdag(Gate):
     """Class for the Controlled-S^dagger gate."""
 
-    def __init__(self, qubits: Tuple[int]) -> None:
+    def __init__(self,
+            qubits: Tuple[int],
+            **kwargs,
+    ) -> None:
         """Initialize using the cphase parametrized gate.
-        
+
         Args:
             qubits (Tuple[int]): qubit labels.
         """
@@ -608,14 +618,17 @@ class CSdag(Gate):
         self._properties['params'] = {
             'angle': -np.pi/2,
         }
-    
+
 
 class CT(Gate):
     """Class for the Controlled-T gate."""
 
-    def __init__(self, qubits: Tuple[int]) -> None:
+    def __init__(self,
+            qubits: Tuple[int],
+            **kwargs,
+    ) -> None:
         """Initialize using the cphase parametrized gate.
-        
+
         Args:
             qubits (Tuple[int]): qubit labels.
         """
@@ -625,14 +638,17 @@ class CT(Gate):
         self._properties['params'] = {
             'angle': np.pi/4,
         }
-    
+
 
 class CTdag(Gate):
     """Class for the Controlled-T^dagger gate."""
 
-    def __init__(self, qubits: Tuple[int]) -> None:
+    def __init__(self,
+            qubits: Tuple[int],
+            **kwargs,
+    ) -> None:
         """Initialize using the cphase parametrized gate.
-        
+
         Args:
             qubits (Tuple[int]): qubit labels.
         """
@@ -642,14 +658,17 @@ class CTdag(Gate):
         self._properties['params'] = {
             'angle': -np.pi/4,
         }
-    
+
 
 class CV(Gate):
     """Class for the Controlled-V (Square-root CNOT) gate."""
 
-    def __init__(self, qubits: Tuple[int]) -> None:
+    def __init__(self,
+            qubits: Tuple[int],
+            **kwargs,
+    ) -> None:
         """Initialize using the cv gate.
-        
+
         Args:
             qubits (Tuple[int]): qubit labels.
         """
@@ -660,14 +679,17 @@ class CV(Gate):
         self._properties['params'] = {
             'angle': np.pi/2
         }
-    
+
 
 class CX(Gate):
     """Class for the Controlled-X gate."""
 
-    def __init__(self, qubits: Tuple[int]) -> None:
+    def __init__(self,
+            qubits: Tuple[int],
+            **kwargs,
+    ) -> None:
         """Initialize using the cx gate.
-        
+
         Args:
             qubits (Tuple[int]): qubit labels.
         """
@@ -678,14 +700,17 @@ class CX(Gate):
         self._properties['params'] = {
             'angle': np.pi
         }
-    
+
 
 class CY(Gate):
     """Class for the Controlled-Y gate."""
 
-    def __init__(self, qubits: Tuple[int]) -> None:
+    def __init__(self,
+            qubits: Tuple[int],
+            **kwargs,
+    ) -> None:
         """Initialize using the cy gate.
-        
+
         Args:
             qubits (Tuple[int]): qubit labels.
         """
@@ -695,14 +720,17 @@ class CY(Gate):
         self._properties['params'] = {
             'angle': np.pi
         }
-    
+
 
 class CZ(Gate):
     """Class for the Controlled-Z gate."""
 
-    def __init__(self, qubits: Tuple[int]) -> None:
+    def __init__(self,
+            qubits: Tuple[int],
+            **kwargs,
+    ) -> None:
         """Initialize using the cz gate.
-        
+
         Args:
             qubits (Tuple[int]): qubit labels.
         """
@@ -712,60 +740,69 @@ class CZ(Gate):
         self._properties['params'] = {
             'angle': np.pi
         }
-    
+
 
 class DB(Gate):
     """Class for the Dagwood-Bumstead gate."""
 
-    def __init__(self, qubits: Tuple[int]) -> None:
+    def __init__(self,
+            qubits: Tuple[int],
+            **kwargs,
+    ) -> None:
         """Initialize using the db gate.
-        
+
         Args:
             qubits (Tuple[int]): qubit labels.
         """
         super().__init__(db, qubits)
         self._properties['locally_equivalent'] = 'XY'
         self._properties['name'] = 'DB'
-    
+
 
 class DCNOT(Gate):
     """Class for the Double Controlled-NOT gate."""
 
-    def __init__(self, qubits: Tuple[int]) -> None:
+    def __init__(self,
+            qubits: Tuple[int],
+            **kwargs,
+    ) -> None:
         """Initialize using the dcnot gate.
-        
+
         Args:
             qubits (Tuple[int]): qubit labels.
         """
         super().__init__(dcnot, qubits)
         self._properties['locally_equivalent'] = 'fSWAP, iSWAP'
         self._properties['name'] = 'DCNOT'
-    
+
 
 class ECP(Gate):
     """Class for the ECP gate."""
 
-    def __init__(self, qubits: Tuple[int]) -> None:
+    def __init__(self,
+            qubits: Tuple[int],
+            **kwargs,
+    ) -> None:
         """Initialize using the ecp gate.
-        
+
         Args:
             qubits (Tuple[int]): qubit labels.
         """
         super().__init__(ecp, qubits)
         self._properties['locally_equivalent'] = 'WGate'
         self._properties['name'] = 'ECP'
-    
+
 
 class FSim(Gate):
     """Class for the FSim gate."""
 
     def __init__(self,
             qubits: Tuple[int],
-            theta:  int | float, 
+            theta:  int | float,
             phi:    int | float
         ) -> None:
         """Initialize using the fsim gate.
-        
+
         Args:
             qubits (Tuple[int]): qubit labels.
             theta (int | float): gate rotation angle.
@@ -777,21 +814,24 @@ class FSim(Gate):
             'theta': theta,
             'phi':   phi,
         }
-    
+
 
 class fSWAP(Gate):
     """Class for the fSWAP gate."""
 
-    def __init__(self, qubits: Tuple[int]) -> None:
+    def __init__(self,
+            qubits: Tuple[int],
+            **kwargs,
+    ) -> None:
         """Initialize using the fswap gate.
-        
+
         Args:
             qubits (Tuple[int]): qubit labels.
         """
         super().__init__(fswap, qubits)
         self._properties['locally_equivalent'] = 'iSWAP, DCNOT'
         self._properties['name'] = 'fSWAP'
-    
+
 
 class Givens(Gate):
     """Class for the Givens gate."""
@@ -801,7 +841,7 @@ class Givens(Gate):
             theta:  int | float,
         ) -> None:
         """Initialize using the Givens parametrized gate.
-        
+
         Args:
             qubits (Tuple[int]): qubit labels.
             theta (int | float): rotation angle.
@@ -817,23 +857,29 @@ class Givens(Gate):
 class iSWAP(Gate):
     """Class for the iSWAP gate."""
 
-    def __init__(self, qubits: Tuple[int]) -> None:
+    def __init__(self,
+            qubits: Tuple[int],
+            **kwargs,
+    ) -> None:
         """Initialize using the iswap gate.
-        
+
         Args:
             qubits (Tuple[int]): qubit labels.
         """
         super().__init__(iswap, qubits)
         self._properties['locally_equivalent'] = 'fSWAP, DCNOT'
         self._properties['name'] = 'iSWAP'
-    
+
 
 class M(Gate):
     """Class for the Magic gate."""
 
-    def __init__(self, qubits: Tuple[int]) -> None:
+    def __init__(self,
+            qubits: Tuple[int],
+            **kwargs,
+    ) -> None:
         """Initialize using the m gate.
-        
+
         Args:
             qubits (Tuple[int]): qubit labels.
         """
@@ -841,21 +887,24 @@ class M(Gate):
         self._properties['alias'] = 'Magic'
         self._properties['locally_equivalent'] = 'CX'
         self._properties['name'] = 'M'
-    
+
 
 class MS(Gate):
     """Class for the Mølmer-Sørensen gate."""
 
-    def __init__(self, qubits: Tuple[int]) -> None:
+    def __init__(self,
+            qubits: Tuple[int],
+            **kwargs,
+    ) -> None:
         """Initialize using the ms gate.
-        
+
         Args:
             qubits (Tuple[int]): qubit labels.
         """
         super().__init__(ms, qubits)
         self._properties['locally_equivalent'] = 'CX'
         self._properties['name'] = 'MS'
-    
+
 
 class pSWAP(Gate):
     """Class for the Parametric SWAP (pSWAP) gate."""
@@ -865,7 +914,7 @@ class pSWAP(Gate):
             theta:  int | float,
         ) -> None:
         """Initialize using the pswap gate.
-        
+
         Args:
             qubits (Tuple[int]): qubit labels.
             theta (int | float): rotation angle.
@@ -881,9 +930,12 @@ class pSWAP(Gate):
 class QFT2(Gate):
     """Class for the QFT gate on 2 qubits."""
 
-    def __init__(self, qubits: Tuple[int]) -> None:
-        """Initialize using the pswap gate.
-        
+    def __init__(self,
+            qubits: Tuple[int],
+            **kwargs,
+    ) -> None:
+        """Initialize using the qft2 gate.
+
         Args:
             qubits (Tuple[int]): qubit labels.
         """
@@ -895,15 +947,15 @@ class QFT2(Gate):
 class SWAP(Gate):
     """Class for the SWAP gate."""
 
-    def __init__(self, qubits: Tuple[int]) -> None:
+    def __init__(self, qubits: Tuple[int], **kwargs) -> None:
         """Initialize using the swap gate.
-        
+
         Args:
             qubits (Tuple[int]): qubit labels.
         """
         super().__init__(swap, qubits)
         self._properties['name'] = 'SWAP'
-    
+
 
 class SWAPAlpha(Gate):
     """Class for the SWAP-alpha gate."""
@@ -911,9 +963,10 @@ class SWAPAlpha(Gate):
     def __init__(self,
             qubits: Tuple[int],
             alpha:  int | float,
-        ) -> None:
+            **kwargs
+    ) -> None:
         """Initialize using the swap-alpha gate.
-        
+
         Args:
             qubits (Tuple[int]): qubit labels.
             alpha (int | float): power of the SWAP gate.
@@ -924,63 +977,63 @@ class SWAPAlpha(Gate):
         self._properties['params'] = {
             'alpha': alpha
         }
-    
+
 
 class SqrtSWAP(Gate):
     """Class for the Sqrt SWAP gate."""
 
-    def __init__(self, qubits: Tuple[int]) -> None:
+    def __init__(self, qubits: Tuple[int], **kwargs) -> None:
         """Initialize using the sqrt_swap gate.
-        
+
         Args:
             qubits (Tuple[int]): qubit labels.
         """
         super().__init__(sqrt_swap, qubits)
         self._properties['locally_equivalent'] = 'SWAPAlpha, SqrtSWAPdag'
         self._properties['name'] = 'SqrtSWAP'
-    
+
 
 class SqrtSWAPdag(Gate):
     """Class for the Sqrt(SWAP)^dagger gate."""
 
-    def __init__(self, qubits: Tuple[int]) -> None:
+    def __init__(self, qubits: Tuple[int], **kwargs) -> None:
         """Initialize using the sqrt_swap_dag gate.
-        
+
         Args:
             qubits (Tuple[int]): qubit labels.
         """
         super().__init__(sqrt_swap_dag, qubits)
         self._properties['locally_equivalent'] = 'SWAPAlpha, SqrtSWAP'
         self._properties['name'] = 'SqrtSWAPdag'
-    
+
 
 class Syc(Gate):
     """Class for the Sycamore (Syc) gate."""
 
-    def __init__(self, qubits: Tuple[int]) -> None:
+    def __init__(self, qubits: Tuple[int], **kwargs) -> None:
         """Initialize using the syc gate.
-        
+
         Args:
             qubits (Tuple[int]): qubit labels.
         """
         super().__init__(syc, qubits)
         self._properties['alias'] = 'Sycamore'
         self._properties['name'] = 'Syc'
-    
+
 
 class WGate(Gate):
     """Class for the W gate."""
 
-    def __init__(self, qubits: Tuple[int]) -> None:
+    def __init__(self, qubits: Tuple[int], **kwargs) -> None:
         """Initialize using the w gate.
-        
+
         Args:
             qubits (Tuple[int]): qubit labels.
         """
         super().__init__(w_gate, qubits)
         self._properties['locally_equivalent'] = 'ECP'
         self._properties['name'] = 'WGate'
-    
+
 
 class XX(Gate):
     """Class for the XX gate."""
@@ -988,9 +1041,10 @@ class XX(Gate):
     def __init__(self,
             qubits: Tuple[int],
             t:      int | float = 1,
-        ) -> None:
+            **kwargs,
+    ) -> None:
         """Initialize using the xx parametrized gate.
-        
+
         Args:
             qubits (Tuple[int]): qubit labels.
             t (int | float):     phase factor. Defaults to 1.
@@ -1000,7 +1054,7 @@ class XX(Gate):
         self._properties['params'] = {
             'phase factor': t
         }
-    
+
 
 class XY(Gate):
     """Class for the XY gate."""
@@ -1008,9 +1062,10 @@ class XY(Gate):
     def __init__(self,
             qubits: Tuple[int],
             t:      int | float = 1,
-        ) -> None:
+            **kwargs,
+    ) -> None:
         """Initialize using the xy parametrized gate.
-        
+
         Args:
             qubits (Tuple[int]): qubit labels.
             t (int | float):     phase factor. Defaults to 1.
@@ -1021,7 +1076,7 @@ class XY(Gate):
         self._properties['params'] = {
             'phase factor': t
         }
-    
+
 
 class YY(Gate):
     """Class for the YY gate."""
@@ -1029,9 +1084,10 @@ class YY(Gate):
     def __init__(self,
             qubits: Tuple[int],
             t:      int | float = 1,
-        ) -> None:
+            **kwargs,
+    ) -> None:
         """Initialize using the yy parametrized gate.
-        
+
         Args:
             qubits (Tuple[int]): qubit labels.
             t (int | float):     phase factor. Defaults to 1.
@@ -1041,7 +1097,7 @@ class YY(Gate):
         self._properties['params'] = {
             'phase factor': t
         }
-    
+
 
 class ZZ(Gate):
     """Class for the ZZ gate."""
@@ -1049,12 +1105,13 @@ class ZZ(Gate):
     def __init__(self,
             qubits: Tuple[int],
             t:      int | float = 1,
-        ) -> None:
+            **kwargs,
+    ) -> None:
         """Initialize using the zz parametrized gate.
-        
+
         Args:
             qubits (Tuple[int]): qubit labels.
-            t (int | float):      phase factor. Defaults to 1.
+            t (int | float):     phase factor. Defaults to 1.
         """
         super().__init__(zz(t), qubits)
         self._properties['name'] = 'ZZ'
@@ -1063,42 +1120,44 @@ class ZZ(Gate):
         }
 
 
-two_qubit_gates = defaultdict(lambda: 'Gate not currently supported!', {
-    'AGate':        AGate,
-    'Barenco':      Barenco,
-    'BGate':        BGate,
-    'bSWAP':        bSWAP,
-    'CH':           CH,
-    'CNOT':         CNOT,
-    'CPhase':       CPhase,
-    'CRot':         CRot,
-    'CS':           CS,
-    'CSdag':        CSdag,
-    'CT':           CT,
-    'CTdag':        CTdag,
-    'CV':           CV,
-    'CX':           CX,
-    'CY':           CY,
-    'CZ':           CZ,
-    'DB':           DB,
-    'DCNOT':        DCNOT,
-    'ECP':          ECP,
-    'FSim':         FSim,
-    'fSWAP':        fSWAP,
-    'Givens':       Givens,
-    'iSWAP':        iSWAP,
-    'M':            M,
-    'MS':           MS,
-    'pSWAP':        pSWAP,
-    'QFT2':         QFT2,
-    'SqrtSWAP':     SqrtSWAP,
-    'SqrtSWAPdag':  SqrtSWAPdag,
-    'SWAPAlpha':    SWAPAlpha,
-    'SWAP':         SWAP,
-    'Syc':          Syc,
-    'WGate':        WGate,
-    'XX':           XX,
-    'XY':           XY,
-    'YY':           YY,
-    'ZZ':           ZZ
-})
+two_qubit_gates: Mapping[str, Callable] = defaultdict(
+    lambda: 'Gate not currently supported!', {
+        'AGate':       AGate,
+        'Barenco':     Barenco,
+        'BGate':       BGate,
+        'bSWAP':       bSWAP,
+        'CH':          CH,
+        'CNOT':        CNOT,
+        'CPhase':      CPhase,
+        'CRot':        CRot,
+        'CS':          CS,
+        'CSdag':       CSdag,
+        'CT':          CT,
+        'CTdag':       CTdag,
+        'CV':          CV,
+        'CX':          CX,
+        'CY':          CY,
+        'CZ':          CZ,
+        'DB':          DB,
+        'DCNOT':       DCNOT,
+        'ECP':         ECP,
+        'FSim':        FSim,
+        'fSWAP':       fSWAP,
+        'Givens':      Givens,
+        'iSWAP':       iSWAP,
+        'M':           M,
+        'MS':          MS,
+        'pSWAP':       pSWAP,
+        'QFT2':        QFT2,
+        'SqrtSWAP':    SqrtSWAP,
+        'SqrtSWAPdag': SqrtSWAPdag,
+        'SWAPAlpha':   SWAPAlpha,
+        'SWAP':        SWAP,
+        'Syc':         Syc,
+        'WGate':       WGate,
+        'XX':          XX,
+        'XY':          XY,
+        'YY':          YY,
+        'ZZ':          ZZ
+    }
+)

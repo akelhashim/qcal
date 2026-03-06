@@ -4,14 +4,13 @@ See:
 https://github.com/sandialabs/pyGSTi/blob/master/jupyter_notebooks/Tutorials/objects/ProcessorSpec.ipynb
 https://github.com/sandialabs/pyGSTi/blob/master/pygsti/processors/processorspec.py
 """
+import itertools
+import logging
+from typing import Dict, List, Tuple
+
 from qcal.config import Config
 from qcal.gate.single_qubit import single_qubit_gates
 from qcal.gate.two_qubit import two_qubit_gates
-
-import itertools
-import logging
-
-from typing import Dict, List, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +31,7 @@ __all__ = 'pygsti_pspec'
 def pygsti_pspec(
         config: Config,
         qubits: List[int] | Tuple[int],
-        native_gates: List[str] = ['X90', 'Y90'],
+        native_gates: List[str] = ['X90', 'Y90'],  # noqa: B006
         availability: Dict | None = None,
         nonstd_gate_unitaries: Dict | None = None,
         **kwargs
@@ -42,15 +41,15 @@ def pygsti_pspec(
     Args:
         config (Config): qcal ```Config``` object.
         qubits (List[int] | Tuple[int]): qubit labels.
-        native_gates (List[str], optional): native gates. Defaults to 
-            ['X90', 'Y90']. These can be formatted in qcal or pyGSTi 
+        native_gates (List[str], optional): native gates. Defaults to
+            ['X90', 'Y90']. These can be formatted in qcal or pyGSTi
             format.
         availability (Dict | None, optional): a dictionary whose keys are gate
             names and whose values are a tuple of the qubit labels on which the
             gates act. Defaults to None. If None, this will be automatically
             generated based on the ```config.native_gates``` object.
-        nonstd_gate_unitaries (Dict | None, optional): a dictionary whose keys 
-            are custom gate names and whose values are unitary matrices. 
+        nonstd_gate_unitaries (Dict | None, optional): a dictionary whose keys
+            are custom gate names and whose values are unitary matrices.
             Defaults to None.
 
     Returns:
@@ -65,13 +64,13 @@ def pygsti_pspec(
         GATE_MAPPER[gate] if gate in GATE_MAPPER.keys() else gate 
         for gate in native_gates
     ]
-    
+
     if availability is None:
         availability = {}
         for gate in native_gates:# This will break if formatted as a pygsti gate
             if gate in single_qubit_gates:
                 availability[GATE_MAPPER[gate]] = [(f'Q{q}',) for q in qubits]
-            
+
             elif gate in two_qubit_gates:
                 qubit_pairs = []
                 for qubit_pair in config.native_gates['two_qubit'].keys():

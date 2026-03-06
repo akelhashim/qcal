@@ -1,16 +1,16 @@
 """Helper functions for QubiC
 
 """
+import logging
+from typing import Dict
+
+import numpy as np
+import pandas as pd
+from numpy.typing import NDArray
+
 from qcal.config import Config
 from qcal.sequence.pulse_envelopes import pulse_envelopes
 from qcal.units import ns, us
-
-import logging
-import numpy as np
-import pandas as pd
-
-from numpy.typing import NDArray
-from typing import Dict
 
 logger = logging.getLogger(__name__)
 
@@ -22,7 +22,7 @@ def calculate_n_reads(compiled_program) -> dict:
     1) number of active resets
     2) heralding
     3) number of mid-circuit measurements
-    3) readout at the end of the circuit
+    4) readout at the end of the circuit
 
     Args:
         compiled_program (distproc.compiler.CompiledProgram): QubiC compiled
@@ -33,7 +33,7 @@ def calculate_n_reads(compiled_program) -> dict:
     """
     seq = qubic_sequence(compiled_program)
     qubits = [col for col in seq.columns if 'Q' in col]
-    
+
     n_reads = {}
     for q in qubits:
         n_reads[f'{q}.rdlo'] = sum(seq[q] == 'Readout')
@@ -42,10 +42,10 @@ def calculate_n_reads(compiled_program) -> dict:
 
 
 def generate_pulse_env(
-        config: Config, 
-        pulse: Dict, 
-        channel: str | None = None, 
-        include_amp_phase: bool = True    
+        config: Config,
+        pulse: Dict,
+        channel: str | None = None,
+        include_amp_phase: bool = True
     ) -> NDArray[np.complex64]:
     """Generate a pulse in a form compatible with QubiC.
 
@@ -55,10 +55,10 @@ def generate_pulse_env(
             config file.
         channel: (str | None, optional): drive channel (e.g., 'qdrv'). Defaults
             to None. If None, drive channel is determined from the pulse.
-        include_amp_phase (bool, optional): whether to include the pulse amp and 
-            phase in the generation of the envelope. Defaults to True. By 
-            default, QubiC uses False because the amp and phase are dynamically 
-            included in compilation. This lowers the waveform memory 
+        include_amp_phase (bool, optional): whether to include the pulse amp and
+            phase in the generation of the envelope. Defaults to True. By
+            default, QubiC uses False because the amp and phase are dynamically
+            included in compilation. This lowers the waveform memory
             requirements when generating sequences.
 
     Returns:
@@ -75,10 +75,10 @@ def generate_pulse_env(
             if key not in ['amp', 'phase']:
                 kwargs[key] = val
     else:
-        kwargs = {key: val for key, val in pulse['kwargs'].items()}
+        kwargs = dict(pulse['kwargs'].items())
     pulse = pulse_envelopes[pulse['env']](
         pulse['time'],
-        config[f'hardware/sample_rate/{channel_map[channel]}'] / 
+        config[f'hardware/sample_rate/{channel_map[channel]}'] /
             config[f'hardware/interpolation_ratio/{channel}'],
         **kwargs
     )
@@ -90,7 +90,7 @@ def qubic_sequence(compiled_program) -> pd.DataFrame:
     """Write a qubic sequence from a compiled_program.
 
     Args:
-        compiled_program (distproc.compiler.CompiledProgram): QubiC compiled 
+        compiled_program (distproc.compiler.CompiledProgram): QubiC compiled
             program object.
 
     Returns:

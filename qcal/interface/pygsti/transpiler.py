@@ -6,6 +6,9 @@ from collections import defaultdict
 from collections.abc import Iterator
 from typing import Dict, List, Tuple
 
+from pygsti.baseobjs.label import LabelTupTup
+from pygsti.io import read_circuit_list
+
 from qcal.circuit import Circuit, CircuitSet, Layer
 from qcal.gate.single_qubit import X90, Y90, Idle, single_qubit_gates
 from qcal.gate.two_qubit import two_qubit_gates
@@ -14,7 +17,6 @@ from qcal.transpilation.utils import GateMapper
 from qcal.units import ns
 
 logger = logging.getLogger(__name__)
-
 
 __all__ = ('Transpiler',)
 
@@ -96,19 +98,18 @@ def add_parallel_Y90_X90(qubits: Tuple[int]) -> Iterator[Y90 | X90]:
 
 
 def to_qcal(
-        circuit,
-        gate_mapper: Dict | defaultdict,
-    ) -> Circuit:
+    circuit: Circuit,
+    gate_mapper: Dict | defaultdict,
+) -> Circuit:
     """Transpile a pyGSTi circuit to a qcal circuit.
 
     Args:
-        circuit (pygsti.circuits.circuit.Circuit): pyGSTi circuit.
+        circuit (pyGSTi.circuits.circuit.Circuit): pyGSTi circuit.
         gate_mapper (Dict | defaultdict): map between pyGSTi to qcal gates.
 
     Returns:
         Circuit: qcal circuit.
     """
-    from pygsti.baseobjs.label import LabelTupTup
     qubits = [int(str(q).replace('Q','')) for q in circuit.line_labels]
 
     tcircuit = Circuit()
@@ -164,9 +165,9 @@ class PyGSTiTranspiler(Transpiler):
     # __slots__ = ('_gate_mapper',)
 
     def __init__(
-            self,
-            gate_mapper: Dict | GateMapper | None = None,
-        ) -> None:
+        self,
+        gate_mapper: Dict | GateMapper | None = None,
+    ) -> None:
         """Initialize with a GateMapper.
 
         Args:
@@ -192,7 +193,8 @@ class PyGSTiTranspiler(Transpiler):
                     'Gxx':     add_parallel_X90s,
                     'Gxy':     add_parallel_X90_Y90,
                     'Gyx':     add_parallel_Y90_X90,
-                    'Gyy':     add_parallel_Y90s
+                    'Gyy':     add_parallel_Y90s,
+                    'Iz':      single_qubit_gates['MCM']
                 }
             )
 
@@ -210,7 +212,6 @@ class PyGSTiTranspiler(Transpiler):
         Returns:
             CircuitSet: transpiled circuits.
         """
-        from pygsti.io import read_circuit_list
         if isinstance(circuits, str):
             circuits = read_circuit_list(circuits)
             circuit_list = [circ.str for circ in circuits]
