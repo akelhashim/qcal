@@ -491,12 +491,22 @@ def RPE(
                 nrows, ncols, figsize=figsize, layout='constrained'
             )
 
+            pfig_height = 350 * nrows
+            pfig_width = 350 * ncols + 50
+            pfig_margin = {'t': 50, 'b': 50, 'l': 50, 'r': 50}
+            pfig_gap_px = 60
+            vertical_spacing = (
+                0.0 if nrows <= 1 else min(0.2, pfig_gap_px / pfig_height)
+            )
+            horizontal_spacing = (
+                0.0 if ncols <= 1 else min(0.2, pfig_gap_px / pfig_width)
+            )
             pfig = make_subplots(
                 rows=nrows,
                 cols=ncols,
                 subplot_titles=[f"Q{ql}" for ql in self._qubit_labels],
-                vertical_spacing=0.15,
-                horizontal_spacing=0.06,
+                vertical_spacing=vertical_spacing,
+                horizontal_spacing=horizontal_spacing,
             )
             pfig.update_annotations(font_size=12)
 
@@ -591,7 +601,7 @@ def RPE(
 
                         pfig.update_xaxes(
                             type='log',
-                            title_text='Circuit Depth',
+                            title_text='Circuit Depth' if i == nrows-1 else '',
                             title_standoff=10,
                             automargin=True,
                             showgrid=True,
@@ -599,7 +609,7 @@ def RPE(
                             col=j + 1,
                         )
                         pfig.update_yaxes(
-                            title_text='Angle Error (rad.)',
+                            title_text='Angle Error (rad.)' if j == 0 else '',
                             title_standoff=10,
                             automargin=True,
                             showgrid=True,
@@ -614,9 +624,9 @@ def RPE(
                         pfig.update_yaxes(visible=False, row=i + 1, col=j + 1)
 
             pfig.update_layout(
-                height=350 * nrows,
-                width=350 * ncols + 50,
-                margin={'t': 80, 'l': 100, 'r': 100},
+                height=pfig_height,
+                width=pfig_width,
+                margin=pfig_margin,
                 legend={'orientation': 'h', 'yanchor': 'bottom', 'y': 1.02},
                 template='plotly_white',
                 paper_bgcolor='white',
@@ -624,6 +634,7 @@ def RPE(
             )
 
             pfig.update_xaxes(
+                automargin=True,
                 showline=True,
                 mirror=True,
                 linecolor='#c7c7c7',
@@ -633,6 +644,7 @@ def RPE(
                 ticks='outside',
             )
             pfig.update_yaxes(
+                automargin=True,
                 showline=True,
                 mirror=True,
                 linecolor='#c7c7c7',
@@ -653,7 +665,7 @@ def RPE(
             pfig.show(config=save_properties)
 
             fig.set_tight_layout(True)
-            if settings.Settings.save_data:
+            if Settings.save_data:
                 fig.savefig(
                     self._data_manager._save_path + 'RPE.png',
                     dpi=300
@@ -700,7 +712,7 @@ def RPE(
                         ax.axis('off')
 
             # fig.set_tight_layout(True)
-            if settings.Settings.save_data:
+            if Settings.save_data:
                 fig.savefig(
                     self._data_manager._save_path + 'RPE_signal.png',
                     dpi=300
