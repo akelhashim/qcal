@@ -9,6 +9,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+### Changed
+
+### Deprecated
+
+### Removed
+
+### Fixed
+
+### Security
+
+## [1.0.0] - 2026-03-06
+
+This release makes pyGSTi and pyRPE dependencies for qcal. It also includes 
+support for running pyquil circuits, as well as GST for quantum instruments.
+
+### Added
+
 - GST modes kwarg for optional model fitting
 - GST plotting for easier visualization of results
 - GST properties for easier access to results
@@ -23,14 +40,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Updated dependencies (added pygsti and pyrpe)
 - RPE, CRB, & GST no longer requires saving to disk
-
-### Deprecated
-
-### Removed
-
-### Fixed
-
-### Security
 
 ## [0.0.3] - 2025-12-09
 
@@ -80,7 +89,8 @@ post-processing
 - Single- and two-qubit benchmarking methods
 - Advanced compilation tools
 
-[Unreleased]: https://github.com/akelhashim/qcal/compare/v0.0.3...HEAD
+[Unreleased]: https://github.com/akelhashim/qcal/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/akelhashim/qcal/releases/tag/v1.0.0
 [0.0.3]: https://github.com/akelhashim/qcal/releases/tag/v0.0.3
 [0.0.2]: https://github.com/akelhashim/qcal/releases/tag/v0.0.2
 [0.0.1]: https://github.com/akelhashim/qcal/releases/tag/v0.0.1
