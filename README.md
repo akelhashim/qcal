@@ -21,3 +21,18 @@ such, the U.S. Government has been granted for itself and others acting on
 its behalf a paid-up, nonexclusive, irrevocable, worldwide license in the
 Software to reproduce, distribute copies to the public, prepare derivative 
 works, and perform publicly and display publicly, and to permit others to do so.
+
+# Citation
+If using qcal for research, please [cite](https://www.osti.gov/doecode/biblio/169551):
+```
+@misc{ doecode_169551,
+title = {qcal v0.0.1},
+author = {Hashim, Akel},
+abstractNote = {qcal is a software package for calibration, characterization, and benchmarking of quantum gates. It was developed to operate full-stack superconducting quantum systems at the Advanced Quantum Testbed.},
+doi = {10.11578/dc.20251106.3},
+url = {https://doi.org/10.11578/dc.20251106.3},
+howpublished = {[Computer Software] \url{https://doi.org/10.11578/dc.20251106.3}},
+year = {2025},
+month = {nov}
+}
+```
