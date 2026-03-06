@@ -15,7 +15,6 @@ from typing import Any, Callable, Dict, List, Tuple
 
 import matplotlib.pyplot as plt
 import numpy as np
-# import pandas as pd
 import plotly.graph_objects as go
 import pygsti
 import pygsti.report.reportables as metrics
@@ -30,7 +29,7 @@ from pygsti.algorithms.fiducialselection import find_fiducials
 from pygsti.algorithms.germselection import find_germs
 from pygsti.circuits.circuit import Circuit
 from pygsti.data import DataSet
-from pygsti.io import read_dataset, write_dataset, write_empty_protocol_data
+from pygsti.io import write_dataset, write_empty_protocol_data
 from pygsti.modelmembers.instruments import Instrument
 from pygsti.modelpacks import smq1Q_XYI, smq2Q_XYCPHASE
 from pygsti.models.explicitmodel import ExplicitOpModel
@@ -55,7 +54,7 @@ from qcal.post_processing.post_process import PostProcessor
 from qcal.qpu.qpu import QPU
 from qcal.results import Results
 from qcal.settings import Settings
-from qcal.utils import flatten, load_from_pickle, save_init, save_to_pickle
+from qcal.utils import flatten, save_init, save_to_pickle
 
 logger = logging.getLogger(__name__)
 
