@@ -18,7 +18,7 @@ class _Settings:
             str: config path.
         """
         return self._config_path
-    
+
     @property
     def save_data(self) -> bool:
         """Save data automatically.
@@ -36,13 +36,13 @@ class _Settings:
             str: data save path.
         """
         return self._data_save_path
-    
+
     @config_path.setter
     def config_path(self, value):
         """Setter for config_path."""
         assert isinstance(value, str), "The passed value must be a string!"
         self._config_path = value
-    
+
     @save_data.setter
     def save_data(self, value):
         """Setter for save_data."""
@@ -54,6 +54,6 @@ class _Settings:
         """Setter for data_save_path."""
         assert isinstance(value, str), "The passed value must be a string!"
         self._data_save_path = value
-    
+
 
 Settings = _Settings()

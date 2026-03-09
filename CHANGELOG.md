@@ -9,11 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Vendored pyRPE dependency
+
 ### Changed
 
 ### Deprecated
 
 ### Removed
+
+- External dependency on pyRPE (not supported on pypi)
 
 ### Fixed
 
