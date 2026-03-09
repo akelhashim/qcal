@@ -3,6 +3,20 @@
 qcal is software for quantum calibration, characterization, and benchmarking. 
 More documentation to come soon.
 
+# Installation
+
+Install from PyPI:
+
+```bash
+pip install quantum-calibration
+```
+
+Then import in Python:
+
+```python
+import qcal as qc
+```
+
 qcal is licensed under a [BSD license](https://github.com/akelhashim/qcal/blob/main/LICENSE).
 
 *** Copyright Notice ***
@@ -25,7 +39,7 @@ works, and perform publicly and display publicly, and to permit others to do so.
 # Citation
 If using qcal for research, please [cite](https://www.osti.gov/doecode/biblio/169551):
 ```
-@misc{ doecode_169551,
+@misc{doecode_169551,
 title = {qcal v0.0.1},
 author = {Hashim, Akel},
 abstractNote = {qcal is a software package for calibration, characterization, and benchmarking of quantum gates. It was developed to operate full-stack superconducting quantum systems at the Advanced Quantum Testbed.},

@@ -10,6 +10,8 @@ jobs:
   build:
     name: Build distribution
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
 
     steps:
       - name: Check out repository
@@ -38,13 +40,13 @@ jobs:
     name: Publish distribution to PyPI
     needs: build
     runs-on: ubuntu-latest
-
     permissions:
       id-token: write
+      contents: read
 
     environment:
       name: pypi
-      url: https://pypi.org/project/qcal-py/
+      url: https://pypi.org/project/quantum-calibration/
 
     steps:
       - name: Download build artifacts
