@@ -1,6 +1,6 @@
 """Quantum Calibration (qcal) package."""
 
-__version__ = "1.0.0"
+__version__ = "1.0.1"
 
 from qcal.circuit import *
 from qcal.config import Config

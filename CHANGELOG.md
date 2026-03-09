@@ -9,19 +9,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Vendored pyRPE dependency
-
 ### Changed
 
 ### Deprecated
 
 ### Removed
 
-- External dependency on pyRPE (not supported on pypi)
-
 ### Fixed
 
 ### Security
+
+## [1.0.1] - 2026-03-09
+
+### Added
+
+- Vendored pyRPE dependency
+
+### Removed
+
+- External dependency on pyRPE (not supported on pypi)
 
 ## [1.0.0] - 2026-03-06
 
@@ -93,7 +99,8 @@ post-processing
 - Single- and two-qubit benchmarking methods
 - Advanced compilation tools
 
-[Unreleased]: https://github.com/akelhashim/qcal/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/akelhashim/qcal/compare/v1.0.1...HEAD
+[1.0.1]: https://github.com/akelhashim/qcal/releases/tag/v1.0.1
 [1.0.0]: https://github.com/akelhashim/qcal/releases/tag/v1.0.0
 [0.0.3]: https://github.com/akelhashim/qcal/releases/tag/v0.0.3
 [0.0.2]: https://github.com/akelhashim/qcal/releases/tag/v0.0.2
