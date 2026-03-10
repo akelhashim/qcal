@@ -1,11 +1,35 @@
 # qcal
 
 qcal is software for quantum calibration, characterization, and benchmarking. 
-More documentation to come soon.
+
+# Installation
+
+Install from PyPI:
+
+```bash
+pip install quantum-calibration
+```
+
+# Getting started
+
+Here's an example of creating a Bell state preparation circuit in qcal:
+
+```python
+import qcal as qc
+
+circuit = qc.Circuit([
+  qc.Cycle({qc.H(0)}),
+  qc.Cycle({qc.CNOT((0, 1))})
+])
+circuit.measure()
+circuit.draw()
+```
+
+# License & Copyright
 
 qcal is licensed under a [BSD license](https://github.com/akelhashim/qcal/blob/main/LICENSE).
 
-*** Copyright Notice ***
+***Copyright Notice***
 
 qcal Copyright (c) 2025, The Regents of the University of California,
 through Lawrence Berkeley National Laboratory (subject to receipt of
@@ -25,7 +49,7 @@ works, and perform publicly and display publicly, and to permit others to do so.
 # Citation
 If using qcal for research, please [cite](https://www.osti.gov/doecode/biblio/169551):
 ```
-@misc{ doecode_169551,
+@misc{doecode_169551,
 title = {qcal v0.0.1},
 author = {Hashim, Akel},
 abstractNote = {qcal is a software package for calibration, characterization, and benchmarking of quantum gates. It was developed to operate full-stack superconducting quantum systems at the Advanced Quantum Testbed.},

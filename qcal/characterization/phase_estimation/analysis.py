@@ -6,9 +6,9 @@ from typing import List, Tuple
 
 import numpy as np
 import pygsti
-from quapack.pyRPE import RobustPhaseEstimation
-from quapack.pyRPE.quantum import Q
 
+from qcal._vendor.pyrpe.classical import RobustPhaseEstimation
+from qcal._vendor.pyrpe.quantum import Q
 from qcal.characterization.phase_estimation.circuits import (
     make_cz_cos_circ,
     make_cz_sin_circ,
