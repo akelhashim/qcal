@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - CRB refactor: plotly plotting, error rate calculation, and faster circuit generation
 - BQSKit refactor: parallel compilation and better error handling
+- Release script: updated to handle version bumping and changelog updates
 
 ### Deprecated
 

@@ -300,6 +300,23 @@ def _bump_version_in_init(init_text: str, new_version: str) -> str:
     return new_text
 
 
+def _bump_patch_version(version: str) -> str:
+    m = re.fullmatch(
+        r"(?P<maj>\d+)\.(?P<min>\d+)\.(?P<pat>\d+)", version.strip()
+    )
+    if not m:
+        raise ValueError(
+            (
+                f"Version '{version}' is not in expected X.Y.Z format; please "
+                "pass an explicit version"
+            )
+        )
+    maj = int(m.group("maj"))
+    min_ = int(m.group("min"))
+    pat = int(m.group("pat"))
+    return f"{maj}.{min_}.{pat + 1}"
+
+
 def release(
     *,
     version: str,
@@ -382,7 +399,14 @@ def main(argv: Optional[List[str]] = None) -> int:
             "Create a new qcal release by promoting CHANGELOG [Unreleased]."
         )
     )
-    parser.add_argument("version", help="New version to release (e.g. 0.0.4)")
+    parser.add_argument(
+        "version",
+        nargs="?",
+        default=None,
+        help=(
+            "New version to release (e.g. 0.0.4). If omitted, bumps patch by 1."
+        ),
+    )
     parser.add_argument(
         "--date",
         default=_dt.date.today().isoformat(),
@@ -414,8 +438,13 @@ def main(argv: Optional[List[str]] = None) -> int:
         old_changelog = _read_text(changelog_path)
         old_init = _read_text(init_path)
 
+        version = args.version
+        if version is None:
+            current_version = _extract_current_version_from_init(old_init)
+            version = _bump_patch_version(current_version)
+
         new_changelog, new_init = release(
-            version=args.version,
+            version=version,
             date=args.date,
             changelog_path=changelog_path,
             init_path=init_path,
