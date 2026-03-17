@@ -1,4 +1,4 @@
-"""Submodule for handling transpilation from qcal to quil circuits.
+"""Submodule for handling transpilation from qcal to pyquil circuits.
 
 """
 import logging
@@ -301,17 +301,17 @@ class PyquilTranspiler(Transpiler):
     # __slots__ = ('_gate_mapper',)
 
     def __init__(
-            self,
-            gate_mapper:          Dict | GateMapper | None = None,
-            fence_between_cycles: bool = False,
-        ) -> None:
+        self,
+        gate_mapper:          Dict | GateMapper | None = None,
+        fence_between_cycles: bool = False,
+    ) -> None:
         """Initialize with a GateMapper.
 
         Args:
             gate_mapper (Dict | GateMapper | None, optional): dictionary which
-                maps qcal gates to pyquil gates. Defaults to None.
+                maps qcal gates to pyquil gates. Defaults to ``None``.
             fence_between_cycles (bool, optional): whether to add a fence
-                between every cycle. Defaults to False.
+                between every cycle. Defaults to ``True``.
         """
         try:
             import pyquil  # noqa: F401
