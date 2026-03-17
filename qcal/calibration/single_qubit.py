@@ -3,47 +3,52 @@
 """
 from __future__ import annotations
 
-import qcal.settings as settings
-
-from .calibration import Calibration
-from .utils import find_pulse_index, in_range
-from qcal.circuit import Barrier, Cycle, Circuit, CircuitSet
-from qcal.config import Config
-from qcal.fitting.fit import (
-    FitAbsoluteValue, FitCosine, FitDecayingCosine, FitParabola, FitLinear
-)
-from qcal.fitting.utils import est_freq_fft
-from qcal.math.utils import round_to_order_error, wrap_phase
-from qcal.gate.single_qubit import Idle, Rz, X, X90
-from qcal.plotting.utils import calculate_nrows_ncols
-from qcal.qpu.qpu import QPU
-from qcal.units import MHz, us
-
 import logging
+from typing import Callable, Dict, List, Tuple
+
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-
 from IPython.display import clear_output
 from lmfit import Parameters
-from typing import Any, Callable, Dict, List, Tuple
 from numpy.typing import ArrayLike, NDArray
+
+from qcal.circuit import Barrier, Circuit, CircuitSet, Cycle
+from qcal.config import Config
+from qcal.fitting.fit import (
+    FitAbsoluteValue,
+    FitCosine,
+    FitDecayingCosine,
+    FitLinear,
+    FitParabola,
+)
+from qcal.fitting.utils import est_freq_fft
+from qcal.gate.single_qubit import X90, Idle, Rz, X
+from qcal.math.utils import round_to_order_error, wrap_phase
+from qcal.plotting.utils import calculate_nrows_ncols
+from qcal.qpu.qpu import QPU
+from qcal.settings import Settings
+from qcal.units import MHz, us
+
+from .calibration import Calibration
+from .utils import find_pulse_index, in_range
 
 logger = logging.getLogger(__name__)
 
 
 def Amplitude(
-        qpu:          QPU,
-        config:       Config,
-        qubits:       List | Tuple,
-        amplitudes:   ArrayLike | NDArray | Dict[ArrayLike | NDArray],
-        gate:         str = 'X90',
-        method:       str = 'Rabi',
-        subspace:     str = 'GE',
-        n_gates:      int = 1,
-        relative_amp: bool = False,
-        **kwargs
-    ) -> Callable:
+    qpu:          QPU,
+    config:       Config,
+    qubits:       List | Tuple,
+    amplitudes:   ArrayLike | NDArray | Dict[ArrayLike | NDArray],
+    gate:         str = 'X90',
+    method:       str = 'Rabi',
+    subspace:     str = 'GE',
+    n_gates:      int = 1,
+    relative_amp: bool = False,
+    params:       Dict | None = None,
+    **kwargs
+) -> Callable:
     """Amplitude calibration for single-qubit gates.
 
     Basic example useage for initial calibration:
@@ -51,8 +56,8 @@ def Amplitude(
     ```
     amps = np.linspace(0, 1.0, 21)
     cal = Amplitude(
-        CustomQPU, 
-        config, 
+        CustomQPU,
+        config,
         qubits=[0, 1, 2],
         amplitudes=amps)
     cal.run()
@@ -62,12 +67,12 @@ def Amplitude(
         qpu (QPU): custom QPU object.
         config (Config): qcal Config object.
         qubits (List | Tuple): qubits to calibrate.
-        amplitudes (ArrayLike | NDArray | Dict[ArrayLike | NDArray]): array of 
-            gate amplitudes to sweep over for calibrating the single-qubit gate 
-            amplitude. If calibrating multiple qubits at the same time, this 
+        amplitudes (ArrayLike | NDArray | Dict[ArrayLike | NDArray]): array of
+            gate amplitudes to sweep over for calibrating the single-qubit gate
+            amplitude. If calibrating multiple qubits at the same time, this
             should be a dictionary mapping an array to a qubit label.
         gate (str, optional): native gate to calibrate. Defaults to 'X90'.
-        method (str, optional): method used to calibrate a gate. Defaults to 
+        method (str, optional): method used to calibrate a gate. Defaults to
             'Rabi'. Other option is 'RAP'.
         subspace (str, optional): qubit subspace for the defined gate.
             Defaults to 'GE'.
@@ -84,22 +89,24 @@ def Amplitude(
 
     class Amplitude(qpu, Calibration):
         """Amplitude calibration class.
-        
+
         This class inherits a custom QPU from the Amplitude calibration
         function.
         """
 
-        def __init__(self, 
-                config:       Config,
-                qubits:       List | Tuple,
-                amplitudes:   ArrayLike | NDArray | Dict,
-                gate:         str = 'X90',
-                method:       str = 'Rabi',
-                subspace:     str = 'GE',
-                n_gates:      int = 1,
-                relative_amp: bool = False,
-                **kwargs
-            ) -> None:
+        def __init__(
+            self,
+            config:       Config,
+            qubits:       List | Tuple,
+            amplitudes:   ArrayLike | NDArray | Dict,
+            gate:         str = 'X90',
+            method:       str = 'Rabi',
+            subspace:     str = 'GE',
+            n_gates:      int = 1,
+            relative_amp: bool = False,
+            params:       Dict | None = None,
+            **kwargs
+        ) -> None:
             """Initialize the Amplitude calibration class within the function.
             """
             n_levels = 3 if subspace == 'EF' else 2
@@ -107,7 +114,7 @@ def Amplitude(
             Calibration.__init__(self, config)
 
             self._qubits = qubits
-            
+
             assert gate in ('X90', 'X'), (
                 "'gate' must be one of 'X90' or 'X'!"
             )
@@ -124,17 +131,20 @@ def Amplitude(
             self._subspace = subspace
 
             if not isinstance(amplitudes, dict):
-                self._amplitudes = {q: amplitudes for q in qubits}
+                self._amplitudes = dict.fromkeys(qubits, amplitudes)
             else:
                 self._amplitudes = amplitudes
             self._param_sweep = self._amplitudes
 
-            self._params = {}
-            for q in qubits:
-                param = f'single_qubit/{q}/{subspace}/{gate}/pulse'
-                param += f'/{find_pulse_index(self._config, param)}/'
-                param += 'kwargs/amp'
-                self._params[q] = param
+            if params:
+                self._params = params
+            else:
+                self._params = {}
+                for q in qubits:
+                    param = f'single_qubit/{q}/{subspace}/{gate}/pulse'
+                    param += f'/{find_pulse_index(self._config, param)}/'
+                    param += 'kwargs/amp'
+                    self._params[q] = param
 
             if relative_amp:
                 for q in qubits:
@@ -173,16 +183,16 @@ def Amplitude(
 
             # Prepulse for EF calibration
             if self._subspace == 'EF':
-                
+
                 if self._gate == 'X90':
                     circuit.extend([
                         Cycle({
-                            gate[self._gate](q, subspace='GE') 
+                            gate[self._gate](q, subspace='GE')
                             for q in self._qubits
                         }),
                         Barrier(self._qubits),
                         Cycle({
-                            gate[self._gate](q, subspace='GE') 
+                            gate[self._gate](q, subspace='GE')
                             for q in self._qubits
                         }),
                         Barrier(self._qubits)
@@ -191,7 +201,7 @@ def Amplitude(
                 elif self._gate == 'X':
                     circuit.extend([
                         Cycle({
-                            gate[self._gate](q, subspace='GE') 
+                            gate[self._gate](q, subspace='GE')
                             for q in self._qubits
                         }),
                         Barrier(self._qubits)
@@ -200,13 +210,13 @@ def Amplitude(
             for _ in range(self._n_gates):
                 circuit.extend([
                     Cycle({
-                        gate[self._gate](q, subspace=level[self._n_levels]) 
+                        gate[self._gate](q, subspace=level[self._n_levels])
                         for q in self._qubits
                     }),
                     Barrier(self._qubits)
                 ])
             circuit.measure()
-            
+
             circuits = []
             for _ in range(self._amplitudes[self._qubits[0]].size):
                 circuits.append(circuit.copy())
@@ -216,12 +226,12 @@ def Amplitude(
                 self._circuits[
                         f'param: {self._params[q]}'
                     ] = self._amplitudes[q]
-                
+
         def analyze(self) -> None:
             """Analyze the data."""
             logger.info(' Analyzing the data...')
 
-            # Fit the probability of being in 0 from the gate amplitude sweep 
+            # Fit the probability of being in 0 from the gate amplitude sweep
             # to a cosine or parabola
             level = {'GE': '0', 'EF': '1'}
             for i, q in enumerate(self._qubits):
@@ -236,10 +246,10 @@ def Amplitude(
                 self._circuits[f'Q{q}: Prob({level[self._subspace]})'] = prob
 
                 # Cosine fit
-                if self._n_gates == 1 and self._method.upper() != 'RAP': 
+                if self._n_gates == 1 and self._method.upper() != 'RAP':
                     est_freq = est_freq_fft(self._amplitudes[q], prob)
                     params = Parameters()
-                    params.add('amp', value=0.5, min=0., max=1.)  
+                    params.add('amp', value=0.5, min=0., max=1.)
                     params.add('freq', value=est_freq)
                     params.add('phase', value=0., min=-np.pi, max=np.pi)
                     params.add('offset', value=0.5, min=0., max=1.)
@@ -247,7 +257,7 @@ def Amplitude(
                 # Quadratic fit
                 elif self._n_gates > 1 and self._method.upper() != 'RAP':
                     params = Parameters()
-                    params.add('a', value=-1.)  
+                    params.add('a', value=-1.)
                     params.add('b', value=1.)
                     params.add('c', value=1.)
                     self._fit[q].fit(self._amplitudes[q], prob, params=params)
@@ -259,7 +269,7 @@ def Amplitude(
                     if self._n_gates == 1:  # Cosine fit
                         freq = self._fit[q].fit_params['freq'].value
                         # _, freq, _, _ = self._fit[q].fit_params
-                        newvalue = 1 / freq * period_frac[self._gate] 
+                        newvalue = 1 / freq * period_frac[self._gate]
                         if not in_range(newvalue, self._amplitudes[q]):
                             logger.warning(
                               f'Fit failed for qubit {q} (out of range)!'
@@ -294,12 +304,12 @@ def Amplitude(
 
                 else:
 
-                    if self._n_gates == 1:  
+                    if self._n_gates == 1:
                         self._cal_values[q] = self._param_sweep[q][
                             np.array(prob).argmin()
                         ]
-                         
-                    elif self._n_gates > 1:  
+
+                    elif self._n_gates > 1:
                         self._cal_values[q] = self._param_sweep[q][
                             np.array(prob).argmax()
                         ]
@@ -320,12 +330,12 @@ def Amplitude(
             self._data_manager._exp_id += (
                 f'_amp_cal_{"".join("Q" + str(q) for q in self._qubits)}'
             )
-            if settings.Settings.save_data:
+            if Settings.save_data:
                 self.save()
             self.plot(
                 xlabel='Amplitude (a.u.)',
                 ylabel=(
-                    r'$|0\rangle$ Population' if self._subspace == 'GE' else 
+                    r'$|0\rangle$ Population' if self._subspace == 'GE' else
                     r'$|1\rangle$ Population'
                 ),
                 save_path=self._data_manager._save_path
@@ -342,28 +352,30 @@ def Amplitude(
         subspace=subspace,
         n_gates=n_gates,
         relative_amp=relative_amp,
+        params=params,
         **kwargs
     )
 
 
 def Frequency(
-        qpu:        QPU,
-        config:     Config,
-        qubits:     List | Tuple,
-        t_max:      float = 2*us,
-        detunings:  NDArray = np.array([-2, -1, 1, 2])*MHz,
-        subspace:   str = 'GE',
-        n_elements: int = 30,
-        **kwargs
-    ) -> Callable:
+    qpu:        QPU,
+    config:     Config,
+    qubits:     List | Tuple,
+    t_max:      float = 2*us,
+    detunings:  NDArray = np.array([-2, -1, 1, 2])*MHz,  # noqa: B008
+    subspace:   str = 'GE',
+    n_elements: int = 30,
+    params:     Dict | None = None,
+    **kwargs
+) -> Callable:
     """Frequency calibration for single qubits.
 
     Basic example useage:
 
     ```
     cal = Frequency(
-        CustomQPU, 
-        config, 
+        CustomQPU,
+        config,
         qubits=[0],
         detunings=np.array([-2, -1, 1, 2])*MHz)
     cal.run()
@@ -387,23 +399,25 @@ def Frequency(
 
     class Frequency(qpu, Calibration):
         """Frequency calibration class.
-        
+
         This class inherits a custom QPU from the Frequency calibration
         function.
         """
 
-        def __init__(self, 
-                config:     Config,
-                qubits:     List | Tuple,
-                t_max:      float = 2*us,
-                detunings:  NDArray = np.array([-2, -1, 1, 2])*MHz,
-                subspace:   str = 'GE',
-                n_elements: int = 30,
-                **kwargs
-            ) -> None:
+        def __init__(
+            self,
+            config:     Config,
+            qubits:     List | Tuple,
+            t_max:      float = 2*us,
+            detunings:  NDArray = np.array([-2, -1, 1, 2])*MHz,  # noqa: B008
+            subspace:   str = 'GE',
+            n_elements: int = 30,
+            params:     Dict | None = None,
+            **kwargs
+        ) -> None:
             """Initialize the Frequency experiment class within the function.
             """
-            n_levels = 3 if subspace == 'EF' else 2
+            # n_levels = 3 if subspace == 'EF' else 2
             qpu.__init__(self, config=config, **kwargs)
             Calibration.__init__(self, config)
 
@@ -420,11 +434,14 @@ def Frequency(
             }
             self._param_sweep = self._times
 
-            self._params = {
-                q: f'single_qubit/{q}/{subspace}/freq' for q in qubits
-            }
+            if params:
+                self._params = params
+            else:
+                self._params = {
+                    q: f'single_qubit/{q}/{subspace}/freq' for q in qubits
+                }
             self._sweep_results = {
-                q: list() for q in qubits
+                q: [] for q in qubits
             }
             self._fit = {
                 q: FitAbsoluteValue() for q in qubits
@@ -434,9 +451,9 @@ def Frequency(
                 for q in qubits
             }
 
-            self._freqs = {q: list() for q in qubits}
-            self._fit_detunings = {q: list() for q in self._qubits}
-            
+            self._freqs = {q: [] for q in qubits}
+            self._fit_detunings = {q: [] for q in self._qubits}
+
         @property
         def detunings(self) -> NDArray:
             """Frequency detunings.
@@ -467,7 +484,7 @@ def Frequency(
                     times.append(t)
                     detunings.append(detuning)
                     phase = 2. * np.pi * detuning * t
-                    
+
                     circuit = Circuit()
 
                     # State prepration
@@ -482,36 +499,36 @@ def Frequency(
                           Cycle({X90(q, subspace='EF') for q in self._qubits}),
                           Barrier(self._qubits)
                         ])
-                    
+
                     # Ramsey experiment
                     circuit.extend([
                         Cycle({Idle(q, duration=t) for q in self._qubits}),
                         Barrier(self._qubits),
-                        Cycle({Rz(q, phase, subspace=self._subspace) 
+                        Cycle({Rz(q, phase, subspace=self._subspace)
                               for q in self._qubits}),
                         Barrier(self._qubits),
                     ])
-                    
+
                     # Basis preparation
                     circuit.append(
-                        Cycle({X90(q, subspace=self._subspace) 
+                        Cycle({X90(q, subspace=self._subspace)
                             for q in self._qubits})
                     )
-                    
+
                     circuit.measure()
                     circuits.append(circuit)
-            
+
             self._circuits = CircuitSet(circuits=circuits)
             self._circuits['detuning'] = detunings
             self._circuits['time'] = times
-                
+
         def analyze(self) -> None:
             """Analyze the data."""
             logger.info(' Analyzing the data...')
 
             level = {'GE': '0', 'EF': '1'}
             # Fit the measured frequency for each detuning
-            probs = {q: list() for q in self._qubits}
+            probs = {q: [] for q in self._qubits}
             for i, detuning in enumerate(self._detunings):
                 for j, q in enumerate(self._qubits):
                     prob = []
@@ -529,7 +546,7 @@ def Frequency(
                     a = np.array(prob).max() - e
                     b = -np.mean( np.diff(prob) / np.diff(self._times[q]) ) / a
                     params = Parameters()
-                    params.add('a', value=a)  
+                    params.add('a', value=a)
                     params.add('b', value=b)
                     params.add('c', value=detuning)
                     params.add('d', value=0.)
@@ -544,19 +561,19 @@ def Frequency(
                             abs(self._freq_fit[q][i].fit_params['c'].value)
                         )
                         self._fit_detunings[q].append(detuning)
-                
+
             for q in self._qubits:
                 self._circuits[f'Q{q}: Prob({level[self._subspace]})'] = (
                     probs[q]
                 )
-            
+
             # Fit the characterized frequencies to an absolute value curve
-            for i, q in enumerate(self._qubits):
+            for q in self._qubits:
                 params = Parameters()
-                params.add('a', value=1)  
+                params.add('a', value=1)
                 params.add('b', value=0)
                 params.add('c', value=0)
-                self._fit[q].fit(self._detunings, self._freqs[q], params=params) 
+                self._fit[q].fit(self._detunings, self._freqs[q], params=params)
 
                 if self._fit[q].fit_success:
                     a = self._fit[q].fit_params['a'].value
@@ -611,7 +628,7 @@ def Frequency(
                 ax[0].set_xlabel(r'Time ($\mu$s)', fontsize=15)
                 ax[1].set_xlabel('Detuning (MHz)', fontsize=15)
                 ax[0].set_ylabel(
-                    rf'$|{level[self._subspace]}\rangle$ Population', 
+                    rf'$|{level[self._subspace]}\rangle$ Population',
                     fontsize=15
                 )
                 ax[1].set_ylabel('Measured Detuning (MHz)', fontsize=15)
@@ -625,8 +642,8 @@ def Frequency(
                     ax[0].plot(
                         self._times[q],
                         np.array(self._sweep_results[q][j]) + j,
-                        'o', 
-                        c=colors(j), 
+                        'o',
+                        c=colors(j),
                         label=f'{round(det / MHz, 1)} MHz'
                     )
 
@@ -634,24 +651,24 @@ def Frequency(
                         x = np.linspace(
                             self._times[q][0], self._times[q][-1], 100
                         )
-                        ax[0].plot(x, 
+                        ax[0].plot(x,
                             self._freq_fit[q][j].predict(x) + j,
-                            ls='-', 
+                            ls='-',
                             c=colors(j)
                         )
 
                 # Plot the frequency fit
                 ax[1].plot(
-                    self._fit_detunings[q], 
+                    self._fit_detunings[q],
                     self._freqs[q],
                     'o',
-                    c='blue', 
+                    c='blue',
                     label=f'Meas, Q{q}'
                 )
                 if self._fit[q].fit_success:
                     x = np.linspace(
-                            self._detunings[0], 
-                            self._detunings[-1], 
+                            self._detunings[0],
+                            self._detunings[-1],
                             100
                         )
                     ax[1].plot(x,
@@ -662,7 +679,7 @@ def Frequency(
                     )
                     df = round(self._fit[q].fit_params['b'].value / MHz, 3)
                     ax[1].axvline(
-                        round(self._fit[q].fit_params['b'].value, 2),  
+                        round(self._fit[q].fit_params['b'].value, 2),
                         ls='--', c='k', label=rf'$\Delta f$ = {df} MHz'
                     )
 
@@ -679,9 +696,9 @@ def Frequency(
                     )
 
             fig.set_tight_layout(True)
-            if settings.Settings.save_data:
+            if Settings.save_data:
                 fig.savefig(
-                    self._data_manager._save_path + 'freq_calibration.png', 
+                    self._data_manager._save_path + 'freq_calibration.png',
                     dpi=300
                 )
                 fig.savefig(
@@ -701,7 +718,7 @@ def Frequency(
             self._data_manager._exp_id += (
                 f'_freq_cal_{"".join("Q" + str(q) for q in self._qubits)}'
             )
-            if settings.Settings.save_data:
+            if Settings.save_data:
                 self.save()
             self.plot()
             self.final()
@@ -714,21 +731,22 @@ def Frequency(
         detunings=detunings,
         subspace=subspace,
         n_elements=n_elements,
+        params=params,
         **kwargs
     )
 
 
 def Phase(
-        qpu:            QPU,
-        config:         Config,
-        qubits:         List | Tuple,
-        phases:         ArrayLike | NDArray | Dict[ArrayLike | NDArray],
-        gate:           str = 'X90',
-        subspace:       str = 'GE',
-        relative_phase: bool = False,
-        params:         Dict | None = None,
-        **kwargs
-    ) -> Callable:
+    qpu:            QPU,
+    config:         Config,
+    qubits:         List | Tuple,
+    phases:         ArrayLike | NDArray | Dict[ArrayLike | NDArray],
+    gate:           str = 'X90',
+    subspace:       str = 'GE',
+    relative_phase: bool = False,
+    params:         Dict | None = None,
+    **kwargs
+) -> Callable:
     """Phase calibration for single-qubit gates.
 
     This calibration corrects for phases errors that occur due to stark shifts
@@ -739,8 +757,8 @@ def Phase(
     ```
     phases = np.pi * np.linspace(-1, 1, 21)
     cal = Phase(
-        CustomQPU, 
-        config, 
+        CustomQPU,
+        config,
         qubits=[0, 1, 2],
         phases=phases)
     cal.run()
@@ -751,8 +769,8 @@ def Phase(
         config (Config): qcal Config object.
         qubits (List | Tuple): qubits to calibrate.
         phases (ArrayLike | NDArray | Dict[ArrayLike | NDArray]): array of
-            phases to sweep over for calibrating the single-qubit gate 
-            phases. If calibrating multiple qubits at the same time, this 
+            phases to sweep over for calibrating the single-qubit gate
+            phases. If calibrating multiple qubits at the same time, this
             should be a dictionary mapping an array to a qubit label.
         gate (str, optional): native gate to calibrate. Defaults to 'X90'.
         subspace (str, optional): qubit subspace for the defined gate.
@@ -760,7 +778,7 @@ def Phase(
         relative_phase (bool, optional): whether phase sweep is relative to the
             current phase value. Defaults to False. If true, the phase sweep
             is added to the current value.
-        params (Dict, None): dictionary mapping the qubit labels to the config 
+        params (Dict, None): dictionary mapping the qubit labels to the config
             parameter to sweep over.
 
     Returns:
@@ -769,21 +787,22 @@ def Phase(
 
     class Phase(qpu, Calibration):
         """Phase calibration class.
-        
+
         This class inherits a custom QPU from the Phase calibration
         function.
         """
 
-        def __init__(self, 
-                config:         Config,
-                qubits:         List | Tuple,
-                phases:         ArrayLike | NDArray | Dict,
-                gate:           str = 'X90',
-                subspace:       str = 'GE',
-                relative_phase: bool = False,
-                params:         Dict | None = None,
-                **kwargs
-            ) -> None:
+        def __init__(
+            self,
+            config:         Config,
+            qubits:         List | Tuple,
+            phases:         ArrayLike | NDArray | Dict,
+            gate:           str = 'X90',
+            subspace:       str = 'GE',
+            relative_phase: bool = False,
+            params:         Dict | None = None,
+            **kwargs
+        ) -> None:
             """Initialize the Phase calibration class within the function."""
             n_levels = 3 if subspace == 'EF' else 2
             qpu.__init__(self, config=config, n_levels=n_levels, **kwargs)
@@ -802,7 +821,7 @@ def Phase(
             self._subspace = subspace
 
             if not isinstance(phases, dict):
-                self._phases = {q: phases for q in qubits}
+                self._phases = dict.fromkeys(qubits, phases)
             else:
                 self._phases = phases
 
@@ -851,17 +870,17 @@ def Phase(
 
             # Prepulse for EF calibration
             if self._subspace == 'EF':
-                
+
                 circuit_Y180_X90.extend([
                     Cycle({X90(q, subspace='GE') for q in self._qubits}),
-                    # Barrier(self._qubits),
+                    Barrier(self._qubits),
                     Cycle({X90(q, subspace='GE') for q in self._qubits}),
                     Barrier(self._qubits)
                 ])
 
                 circuit_X180_Y90.extend([
                     Cycle({X90(q, subspace='GE') for q in self._qubits}),
-                    # Barrier(self._qubits),
+                    Barrier(self._qubits),
                     Cycle({X90(q, subspace='GE') for q in self._qubits}),
                     Barrier(self._qubits)
                 ])
@@ -877,12 +896,12 @@ def Phase(
                     for q in self._qubits
                 }),
                 Cycle({
-                    X90(q, subspace=level[self._n_levels]) 
+                    X90(q, subspace=level[self._n_levels])
                     for q in self._qubits
                 }),
-                # Barrier(self._qubits),
+                Barrier(self._qubits),
                 Cycle({
-                    X90(q, subspace=level[self._n_levels]) 
+                    X90(q, subspace=level[self._n_levels])
                     for q in self._qubits
                 }),
                 Cycle({
@@ -891,7 +910,7 @@ def Phase(
                 }),
                 Barrier(self._qubits),
                 Cycle({
-                    X90(q, subspace=level[self._n_levels]) 
+                    X90(q, subspace=level[self._n_levels])
                     for q in self._qubits
                 })
             ])
@@ -900,12 +919,12 @@ def Phase(
             # X180_Y90
             circuit_X180_Y90.extend([
                 Cycle({
-                    X90(q, subspace=level[self._n_levels]) 
+                    X90(q, subspace=level[self._n_levels])
                     for q in self._qubits
                 }),
-                # Barrier(self._qubits),
+                Barrier(self._qubits),
                 Cycle({
-                    X90(q, subspace=level[self._n_levels]) 
+                    X90(q, subspace=level[self._n_levels])
                     for q in self._qubits
                 }),
                 Barrier(self._qubits),
@@ -914,7 +933,7 @@ def Phase(
                     for q in self._qubits
                 }),
                 Cycle({
-                    X90(q, subspace=level[self._n_levels]) 
+                    X90(q, subspace=level[self._n_levels])
                     for q in self._qubits
                 }),
                 Cycle({
@@ -927,20 +946,22 @@ def Phase(
             # X90_X_X90
             circuit_X90_X_X90.extend([
                 Cycle({
-                    X90(q, subspace=level[self._n_levels]) 
+                    X90(q, subspace=level[self._n_levels])
                     for q in self._qubits
                 }),
+                Barrier(self._qubits),
                 Cycle({
-                    X(q, subspace=level[self._n_levels]) 
+                    X(q, subspace=level[self._n_levels])
                     for q in self._qubits
                 }),
+                Barrier(self._qubits),
                 Cycle({
-                    X90(q, subspace=level[self._n_levels]) 
+                    X90(q, subspace=level[self._n_levels])
                     for q in self._qubits
                 }),
             ])
             circuit_X90_X_X90.measure()
-            
+
             circuits = []
             if self._gate == 'X90':
                 for _ in range(self._phases[self._qubits[0]].size):
@@ -961,7 +982,7 @@ def Phase(
                     self._circuits[
                             f'param: {self._params[q][1]}'
                         ] = _phases
-                    
+
             elif self._gate == 'X':
                 for _ in range(self._phases[self._qubits[0]].size):
                     circuits.append(circuit_X90_X_X90.copy())
@@ -974,7 +995,7 @@ def Phase(
                     self._circuits[
                         f'param: {self._params[q]}'
                     ] = self._phases[q]
-                
+
         def analyze(self) -> None:
             """Analyze the data."""
             logger.info(' Analyzing the data...')
@@ -990,22 +1011,22 @@ def Phase(
                             level[self._subspace]
                         ]
                         pops.append(pop)
-                        
+
                         # Y180_X90
                         if j % 2 == 0:
                             pop0.append(pop)
                         # X180_Y90
                         elif j % 2 == 1:
                             pop1.append(pop)
-            
+
                     self._circuits[
                         f'Q{q}: Prob({level[self._subspace]})'
                     ] = pops
-                                        
+
                     self._sweep_results[q] = (
                         np.array(pop0) - np.array(pop1)
                     )**2
-                    
+
                     fit_df = {
                         "data": [pop0, pop1],
                         "params": [Parameters(), Parameters()],
@@ -1015,14 +1036,14 @@ def Phase(
                         params.add('m', value=(-1.)**(fit_idx))
                         params.add('b', value=0.5)
                         self._fit[q][fit_idx].fit(
-                            self._phases[q], 
-                            fit_df["data"][fit_idx], 
+                            self._phases[q],
+                            fit_df["data"][fit_idx],
                             params=params
                         )
 
                     # If the fit was successful, write find the new phase
                     if (
-                        self._fit[q][0].fit_success and 
+                        self._fit[q][0].fit_success and
                         self._fit[q][1].fit_success
                     ):
                         m0 = self._fit[q][0].fit_params['m'].value
@@ -1044,7 +1065,7 @@ def Phase(
                                 ]
                             ] * 2
                         elif (
-                            self._fit[q][0].error > 10 or 
+                            self._fit[q][0].error > 10 or
                             self._fit[q][1].error > 10
                         ):
                             logger.warning(
@@ -1069,7 +1090,7 @@ def Phase(
                 elif self._gate == 'X':
                     pop0 = []
                     pop1 = []
-                    for j, circuit in enumerate(self._circuits):
+                    for circuit in self._circuits:
                         pop0.append(
                             circuit.results.marginalize(i).populations[
                                 str(int(level[self._subspace]) - 1)
@@ -1090,7 +1111,7 @@ def Phase(
                         self._phases[q], self._sweep_results[q]
                     )
                     params = Parameters()
-                    params.add('amp', value=1.0, min=0.75, max=1.)  
+                    params.add('amp', value=1.0, min=0.75, max=1.)
                     params.add('freq', value=est_freq, min=0.)
                     params.add('phase', value=0., min=-np.pi, max=np.pi)
                     params.add('offset', value=0., min=-0.1, max=0.1)
@@ -1108,14 +1129,14 @@ def Phase(
                         self._cal_values[q] = self._phases[q][
                             np.argmax(self._sweep_results[q])
                         ]
-                        
+
         def save(self):
             """Save all circuits and data."""
             clear_output(wait=True)
             self._data_manager._exp_id += (
                 f'_phase_cal{"".join("Q" + str(q) for q in self._qubits)}'
             )
-            if settings.Settings.save_data:
+            if Settings.save_data:
                 qpu.save(self)
                 self._data_manager.save_to_csv(
                     pd.DataFrame([self._sweep_results]), 'sweep_results'
@@ -1152,7 +1173,7 @@ def Phase(
                         ax.set_xlabel('Phase (rad.)', fontsize=15)
                         if self._gate == 'X90':
                             ax.set_ylabel(
-                                r'$|2\rangle$ Population' if 
+                                r'$|2\rangle$ Population' if
                                 self._subspace == 'EF' else
                                 r'$|1\rangle$ Population',
                                 fontsize=15
@@ -1163,18 +1184,18 @@ def Phase(
                             axis='both', which='major', labelsize=12
                         )
                         ax.grid(True)
-                        
+
                         # Plot data
                         if self._gate == 'X90':
                             ax.plot(
-                                self._param_sweep[q], 
+                                self._param_sweep[q],
                                 self._circuits[
                                     self._circuits['sequence'] == 'Y180_X90'
                                 ][f'Q{q}: Prob({level[self._subspace]})'],
                                 '-o', c='blue', label='Y180_X90'
                             )
                             ax.plot(
-                                self._param_sweep[q], 
+                                self._param_sweep[q],
                                 self._circuits[
                                     self._circuits['sequence'] == 'X180_Y90'
                                 ][f'Q{q}: Prob({level[self._subspace]})'],
@@ -1188,7 +1209,7 @@ def Phase(
                         # Plot fitted curves
                         x = np.linspace(
                             self._param_sweep[q][0],
-                            self._param_sweep[q][-1], 
+                            self._param_sweep[q][-1],
                             100
                         )
                         if self._gate == 'X' and self._fit[q].fit_success:
@@ -1196,10 +1217,10 @@ def Phase(
                                 x, self._fit[q].predict(x),
                                 '-', c='orange', label='Fit'
                             )
-                           
+
                            if self._cal_values[q]:
                                 ax.axvline(
-                                    self._cal_values[q],  
+                                    self._cal_values[q],
                                     ls='--', c='k', label='Fit value'
                                 )
 
@@ -1212,13 +1233,13 @@ def Phase(
                                 )
 
                             if (
-                                self._fit[q][0].fit_success and 
+                                self._fit[q][0].fit_success and
                                 self._fit[q][1].fit_success
                             ):
                                 ax.plot(
-                                    x, 
+                                    x,
                                     np.subtract(
-                                        self._fit[q][0].predict(x), 
+                                        self._fit[q][0].predict(x),
                                         self._fit[q][1].predict(x)
                                     )**2,
                                     '-', c='orange'
@@ -1226,7 +1247,7 @@ def Phase(
 
                             if self._cal_values[q]:
                                 ax.axvline(
-                                    self._cal_values[q][0],  
+                                    self._cal_values[q][0],
                                     ls='--', c='k', label='Fit value'
                                 )
 
@@ -1234,11 +1255,11 @@ def Phase(
 
                     else:
                         ax.axis('off')
-                
+
             fig.set_tight_layout(True)
-            if settings.Settings.save_data:
+            if Settings.save_data:
                 fig.savefig(
-                    self._data_manager._save_path + 'calibration_results.png', 
+                    self._data_manager._save_path + 'calibration_results.png',
                     dpi=300
                 )
                 fig.savefig(
@@ -1253,7 +1274,7 @@ def Phase(
             """Final experimental method."""
             Calibration.final(self)
             print(f"\nRuntime: {repr(self._runtime)[8:]}\n")
-        
+
         def run(self):
             """Run all experimental methods and analyze results."""
             self.generate_circuits()

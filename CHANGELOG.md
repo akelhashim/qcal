@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Exponential fit with arbitrary base
 - Native compiler
+- Optional params for single-qubit Amplitude and Frequency calibration
 
 ### Changed
 
