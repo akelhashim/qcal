@@ -11,6 +11,7 @@ logger = logging.getLogger(__name__)
 
 __all__ = (
     'absolute_value',
+    'base_exponential',
     'cosine',
     'decaying_cosine',
     'exponential',
@@ -34,6 +35,28 @@ def absolute_value(x: ArrayLike, a: float, b: float, c: float) -> NDArray:
     return a * np.abs(x - b)  + c
 
 
+def base_exponential(
+        x:    ArrayLike,
+        base: float,
+        a:    float,
+        b:    float,
+        c:    float,
+    ) -> NDArray:
+    """Exponential function.
+
+    Args:
+        x (ArrayLike): data.
+        base (float): base of the exponential.
+        a (float): amplitude.
+        b (float): exponential constant.
+        c (float): y-offset
+
+    Returns:
+        NDArray: exponential curve.
+    """
+    return a * np.power(base, b * x) + c
+
+
 def cosine(
         x: ArrayLike, amp: float, freq: float, phase: float, offset: float
     ) -> NDArray:
@@ -50,6 +73,7 @@ def cosine(
         NDArray: cosine curve.
     """
     return amp * np.cos(2 * np.pi * freq * x + phase) + offset
+
 
 def decaying_cosine(
         x: ArrayLike, a: float, b: float, c: float, d: float, e: float
@@ -112,5 +136,3 @@ def parabola(x: ArrayLike, a: float, b: float, c: float) -> ArrayLike:
         ArrayLike: parabola curve.
     """
     return a * x**2 + b * x + c
-
-

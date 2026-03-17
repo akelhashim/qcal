@@ -19,6 +19,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
+## [1.0.2] - 2026-03-17
+
+### Added
+
+- Exponential fit with arbitrary base
+- Native compiler
+- Optional params for single-qubit Amplitude and Frequency calibration
+- Pyquil utils for setting parameters in defcals
+
+### Changed
+
+- CRB refactor: plotly plotting, error rate calculation, and faster circuit generation
+- BQSKit refactor: parallel compilation and better error handling
+- Release script: updated to handle version bumping and changelog updates
+
+### Fixed
+
+- config does not display native gates if 'pulse' is not specified
+
 ## [1.0.1] - 2026-03-09
 
 ### Added
@@ -99,7 +118,8 @@ post-processing
 - Single- and two-qubit benchmarking methods
 - Advanced compilation tools
 
-[Unreleased]: https://github.com/akelhashim/qcal/compare/v1.0.1...HEAD
+[Unreleased]: https://github.com/akelhashim/qcal/compare/v1.0.2...HEAD
+[1.0.2]: https://github.com/akelhashim/qcal/releases/tag/v1.0.2
 [1.0.1]: https://github.com/akelhashim/qcal/releases/tag/v1.0.1
 [1.0.0]: https://github.com/akelhashim/qcal/releases/tag/v1.0.0
 [0.0.3]: https://github.com/akelhashim/qcal/releases/tag/v0.0.3

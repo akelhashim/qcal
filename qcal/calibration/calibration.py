@@ -151,12 +151,12 @@ class Calibration:
                     if all(fit.fit_success for fit in self._fit[q].values()):
                         for i, param in enumerate(self._params[q]):
                             self.set_param(
-                                self._params[q][i], self._cal_values[q][i]
+                                param, self._cal_values[q][i]
                             )
                     elif self._cal_values[q]:
                             for i, param in enumerate(self._params[q]):
                                 self.set_param(
-                                    self._params[q][i], self._cal_values[q][i]
+                                    param, self._cal_values[q][i]
                                 )
                 else:
                     if self._fit[q].fit_success or self._cal_values[q]:
@@ -218,12 +218,12 @@ class Calibration:
                         colors = plt.cm.viridis(
                             np.linspace(0, 1, len(self._sweep_results[q]))
                         )
-                        for l, (label, result) in enumerate(
+                        for label_idx, (label, result) in enumerate(
                             self._sweep_results[q].items()
                         ):
                             ax.plot(
                                 self._param_sweep[q], result,
-                                'o-', c=colors[l], label=label
+                                'o-', c=colors[label_idx], label=label
                             )
                     else:
                         ax.plot(

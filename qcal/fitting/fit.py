@@ -1,16 +1,22 @@
 """Submodule for different fit classes.
 
 """
-from qcal.fitting.fit_functions import *
+import logging
+from typing import Callable, Dict
 
 import lmfit
-import logging
-import numpy as np
-
 from lmfit import Model
 from numpy.typing import ArrayLike, NDArray
-# from scipy.optimize import curve_fit
-from typing import Callable, Dict
+
+from qcal.fitting.fit_functions import (
+    absolute_value,
+    base_exponential,
+    cosine,
+    decaying_cosine,
+    exponential,
+    linear,
+    parabola,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -54,7 +60,7 @@ class Fit:
             Callable: fit function.
         """
         return self._fit_function
-    
+
     @property
     def fit_success(self) -> bool:
         """Whether or not the data was successfully fit to the function.
@@ -63,7 +69,7 @@ class Fit:
             bool: fit success or not.
         """
         return self._fit_success
-    
+
     @property
     def fit_params(self) -> Dict:
         """Optimized fit params.
@@ -72,7 +78,7 @@ class Fit:
             Dict: a dictionary of Parameter objects.
         """
         return self._result.params
-    
+
     @property
     def error(self) -> NDArray:
         """Reduced chi-squared error.
@@ -99,7 +105,7 @@ class Fit:
             lmfit.model.ModelResult: result object.
         """
         return self._result
-    
+
     def fit(self, x: ArrayLike, y: ArrayLike, **kwargs) -> None:
         """Fit data to the fit_function provided.
 
@@ -125,17 +131,17 @@ class Fit:
             ArrayLike: y data.
         """
         return self._result.eval(x=x)
-    
+
 
 class FitAbsoluteValue(Fit):
     """Absolute value fit class."""
 
     def __init__(self, fit_function: Callable = absolute_value) -> None:
-        """Initialize an absolute value fitter using the absolute value 
+        """Initialize an absolute value fitter using the absolute value
         function.
         """
         super().__init__(fit_function)
-    
+
 
 class FitCosine(Fit):
     """Cosine fit class."""
@@ -149,7 +155,7 @@ class FitDecayingCosine(Fit):
     """Decaying cosine fit class."""
 
     def __init__(self, fit_function: Callable = decaying_cosine) -> None:
-        """Initialize a decaying cosine fitter using the decaying cosine 
+        """Initialize a decaying cosine fitter using the decaying cosine
         function.
         """
         super().__init__(fit_function)
@@ -158,9 +164,24 @@ class FitDecayingCosine(Fit):
 class FitExponential(Fit):
     """Exponential fit class."""
 
-    def __init__(self, fit_function: Callable = exponential) -> None:
+    __slots__ = ('_base',)
+
+    def __init__(
+            self,
+            fit_function: Callable = exponential,
+            base: float | None = None,
+        ) -> None:
         """Initialize an exponential fitter using the exponential function."""
-        super().__init__(fit_function)
+
+        if base is not None:
+            def _fit_function(
+                x: ArrayLike, a: float, b: float, c: float
+            ) -> NDArray:
+                return base_exponential(x, base, a, b, c)
+        else:
+            _fit_function = fit_function
+
+        super().__init__(_fit_function)
 
 
 class FitLinear(Fit):

@@ -7,19 +7,32 @@ For SRB, see:
 https://trueq.quantumbenchmark.com/guides/error_diagnostics/srb.html
 """
 import logging
+import multiprocessing as mp
+from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Callable, List, Tuple
 
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
+import plotly.graph_objects as go
 import pygsti
 from IPython.display import clear_output
+from plotly.subplots import make_subplots
 from pygsti.processors import CliffordCompilationRules as CCR
+from pygsti.processors import QubitProcessorSpec
+from pygsti.protocols import (
+    RB,
+    CliffordRBDesign,
+    DefaultRunner,
+    SimultaneousExperimentDesign,
+)
 from pygsti.protocols.protocol import ProtocolData
 
 from qcal.analysis.leakage import analyze_leakage
 from qcal.benchmarking.utils import plot_error_rates
 from qcal.circuit import CircuitSet
 from qcal.config import Config
+from qcal.fitting.fit_functions import base_exponential
 from qcal.interface.pygsti.datasets import generate_pygsti_dataset
 from qcal.interface.pygsti.processor_spec import pygsti_pspec
 from qcal.interface.pygsti.transpiler import PyGSTiTranspiler
@@ -31,6 +44,43 @@ from qcal.utils import flatten
 logger = logging.getLogger(__name__)
 
 
+def _build_crb_edesign_for_qubit_label(
+    ql: int | Tuple[int],
+    pspec: QubitProcessorSpec,
+    compilations: Any,
+    circuit_depths: List[int] | Tuple[int],
+    n_circuits: int,
+    randomizeout: bool,
+    citerations: int,
+) -> CliffordRBDesign:
+    """
+    Build a CRB experiment design for a given qubit label.
+
+    Args:
+        ql (int | Tuple[int]): Qubit label (int or tuple of ints).
+        pspec (QubitProcessorSpec): PyGSTi processor specification.
+        compilations (Any): Clifford compilation rules.
+        circuit_depths (List[int] | Tuple[int]): List of circuit depths to test.
+        n_circuits (int): Number of circuits per depth.
+        randomizeout (bool): Whether to randomize output.
+        citerations (int): Number of iterations.
+
+    Returns:
+        CliffordRBDesign: CRB experiment design.
+    """
+    qubits = list(flatten([ql]))
+    return CliffordRBDesign(
+        pspec=pspec,
+        clifford_compilations=compilations,
+        depths=circuit_depths,
+        circuits_per_depth=n_circuits,
+        qubit_labels=[f'Q{q}' for q in qubits],
+        randomizeout=randomizeout,
+        citerations=citerations,
+        add_default_protocol=True,
+    )
+
+
 def CRB(
     qpu:            QPU,
     config:         Config,
@@ -40,7 +90,7 @@ def CRB(
     native_gates:   List[str] | None = None,
     pspec:          Any | None = None,
     randomizeout:   bool = True,
-    citerations:    int = 20,
+    citerations:    int = 5,
     **kwargs
 ) -> Callable:
     """Clifford Randomized Benchmarking.
@@ -76,7 +126,7 @@ def CRB(
             in pyGSTi (including the default algorithm) are randomized, and the
             lowest-cost circuit is chosen from all the circuit generated in the
             iterations of the algorithm. This is the number of iterations used.
-            Defaults to 20. The time required to generate a CRB circuit is
+            Defaults to 5. The time required to generate a CRB circuit is
             linear in `citerations * (CRB length + 2)`. Lower-depth / lower
             2-qubit gate count compilations of the Cliffords are important in
             order to successfully implement CRB on more qubits.
@@ -97,7 +147,7 @@ def CRB(
             native_gates:   List[str] | None = None,
             pspec:          Any | None = None,
             randomizeout:   bool = True,
-            citerations:    int = 20,
+            citerations:    int = 5,
             **kwargs
         ) -> None:
             logger.info(f" pyGSTi version: {pygsti.__version__}\n")
@@ -113,7 +163,14 @@ def CRB(
             self._pspec = {}
             self._compilations = {}
 
+            self._qtups = []
             for ql in self._qubit_labels:
+                if isinstance(ql, (list, tuple)):
+                    qtup = (f'Q{q}' for q in ql)
+                else:
+                    qtup = (f'Q{ql}',)
+                self._qtups.append(qtup)
+
                 qubits = list(flatten([ql]))
                 if not native_gates:
                     ql_native_gates = ['X90', 'Z90']
@@ -169,8 +226,7 @@ def CRB(
 
             self._sim_RB = True if len(self._qubit_labels) > 1 else False
             self._protocol = (
-                pygsti.protocols.DefaultRunner() if self._sim_RB else
-                pygsti.protocols.RB()
+                DefaultRunner() if self._sim_RB else RB()
             )
             self._edesign = None
             self._data = None
@@ -178,6 +234,8 @@ def CRB(
             self._results = None
 
             self._error_rates = {}
+            self._fit_params = {}
+            self._success_probabilities = {}
             self._uncertainties = {}
 
         @property
@@ -196,11 +254,6 @@ def CRB(
             return self._edesign
 
         @property
-        def error_rates(self):
-            """CRB error rates."""
-            return self._error_rates
-
-        @property
         def data(self):
             """pyGSTi data object."""
             return self._data
@@ -211,14 +264,30 @@ def CRB(
             return self._dataset
 
         @property
+        def fit_params(self):
+            """CRB fit parameters."""
+            return self._fit_params
+
+        @property
+        def process_infidelity(self):
+            """CRB process infidelity."""
+            process_infidelity = {}
+            for ql, error_rate in self._error_rates.items():
+                process_infidelity[ql] = {
+                    'val': error_rate,
+                    'err': self._uncertainties[ql]
+                }
+            return process_infidelity
+
+        @property
+        def success_probabilities(self):
+            """Success probabilities."""
+            return self._success_probabilities
+
+        @property
         def results(self):
             """pyGSTi results object."""
             return self._results
-
-        @property
-        def uncertainties(self):
-            """CRB uncertainties."""
-            return self._uncertainties
 
         def generate_circuits(self):
             """Generate all pyGSTi clifford RB circuits."""
@@ -226,7 +295,7 @@ def CRB(
 
             if not self._sim_RB:
                 ql = self._qubit_labels[0]
-                self._edesign = pygsti.protocols.CliffordRBDesign(
+                self._edesign = CliffordRBDesign(
                         pspec=self._pspec[ql],
                         clifford_compilations=self._compilations[ql],
                         depths=self._circuit_depths,
@@ -237,21 +306,27 @@ def CRB(
                     )
 
             elif self._sim_RB:
-                edesigns = []
-                for ql in self._qubit_labels:
-                    qubits = list(flatten([ql]))
-                    edesigns.append(pygsti.protocols.CliffordRBDesign(
-                            pspec=self._pspec[ql],
-                            clifford_compilations=self._compilations[ql],
-                            depths=self._circuit_depths,
-                            circuits_per_depth=self._n_circuits,
-                            qubit_labels=[f'Q{q}' for q in qubits],
-                            randomizeout=self._randomizeout,
-                            citerations=self._citerations,
-                            add_default_protocol=True
+                max_workers = min(
+                    len(self._qubit_labels), max(1, mp.cpu_count() - 1)
+                )
+                with ThreadPoolExecutor(
+                    max_workers=max_workers
+                ) as ex:
+                    futures = [
+                        ex.submit(
+                            _build_crb_edesign_for_qubit_label,
+                            ql,
+                            self._pspec[ql],
+                            self._compilations[ql],
+                            self._circuit_depths,
+                            self._n_circuits,
+                            self._randomizeout,
+                            self._citerations,
                         )
-                    )
-                self._edesign = pygsti.protocols.SimultaneousExperimentDesign(
+                        for ql in self._qubit_labels
+                    ]
+                    edesigns = [f.result() for f in futures]
+                self._edesign = SimultaneousExperimentDesign(
                     edesigns
                 )
 
@@ -287,20 +362,36 @@ def CRB(
                 if Settings.save_data else None
             )
             self._data = ProtocolData(self._edesign, self._dataset)
-            self._results = self._protocol.run(self._data)
 
             if not self._sim_RB:
                 try:
+                    self._results = self._protocol.run(self._data)
+                    self._success_probabilities[self._qubit_labels[0]] = (
+                        self._results.data.cache['success_probabilities']
+                    )
                     r = self._results.fits['full'].estimates['r']
                     rstd = self._results.fits['full'].stds['r']
                     rA = self._results.fits['A-fixed'].estimates['r']
                     rAstd = self._results.fits['A-fixed'].stds['r']
-                    if self._randomizeout:
+                    if rAstd < rstd:
                         self._error_rates[self._qubit_labels[0]] = rA
                         self._uncertainties[self._qubit_labels[0]] = rAstd
+                        self._fit_params[self._qubit_labels[0]] = {
+                            'base': self._results.fits['A-fixed'].estimates['p'],
+                            'a': self._results.fits['A-fixed'].estimates['b'],
+                            'b': 1,
+                            'c': self._results.fits['A-fixed'].estimates['a']
+                        }
+
                     else:
                         self._error_rates[self._qubit_labels[0]] = r
                         self._uncertainties[self._qubit_labels[0]] = rstd
+                        self._fit_params[self._qubit_labels[0]] = {
+                            'base': self._results.fits['full'].estimates['p'],
+                            'a': self._results.fits['full'].estimates['b'],
+                            'b': 1,
+                            'c': self._results.fits['full'].estimates['a']
+                        }
 
                     print(f'\n{self._qubit_labels[0]}:')
                     print(
@@ -315,25 +406,71 @@ def CRB(
                     logger.warning(' Unable to fit the RB data!')
 
             elif self._sim_RB:
-                for ql in self._qubit_labels:
-                    if isinstance(ql, (list, tuple)):
-                        qtup = (f'Q{q}' for q in ql)
-                    else:
-                        qtup = (f'Q{ql}',)
-                    results = self._results[qtup].for_protocol['RB']
-                    try:
-                        r = results.fits['full'].estimates['r']
-                        rstd = results.fits['full'].stds['r']
-                        rA = results.fits['A-fixed'].estimates['r']
-                        rAstd = results.fits['A-fixed'].stds['r']
-                        if self._randomizeout:
-                            self._error_rates[qtup] = rA
-                            self._uncertainties[qtup] = rAstd
-                        else:
-                            self._error_rates[qtup] = r
-                            self._uncertainties[qtup] = rstd
+                results = {}
+                fit_success = False
+                try:
+                    self._results = self._protocol.run(self._data)
+                    fit_success = True
+                    for qtup in self._qtups:
+                        results[qtup] = self._results[qtup].for_protocol['RB']
+                except Exception:
+                    logger.warning(' Unable to fit the data simultaneously!')
 
-                        print(f'\n{qtup}:')
+                if not fit_success:
+                    for qtup in self._qtups:
+                        try:
+                            results[qtup] = RB().run(self._data[qtup])
+                        except Exception:
+                            logger.warning(
+                                f' Unable to fit the data for {qtup}!'
+                            )
+                            results[qtup] = None
+
+                self._results = results
+                for i, qtup in enumerate(self._qtups):
+
+                    if self._results[qtup] is not None:
+                        self._success_probabilities[self._qubit_labels[i]] = (
+                            self._results[qtup].data.cache[
+                                'success_probabilities'
+                            ]
+                        )
+                        r = self._results[qtup].fits['full'].estimates['r']
+                        rstd = self._results[qtup].fits['full'].stds['r']
+                        rA = self._results[qtup].fits['A-fixed'].estimates['r']
+                        rAstd = self._results[qtup].fits['A-fixed'].stds['r']
+                        if rAstd < rstd:
+                            self._error_rates[self._qubit_labels[i]] = rA
+                            self._uncertainties[self._qubit_labels[i]] = rAstd
+                            self._fit_params[self._qubit_labels[i]] = {
+                                'base': self._results[qtup].fits[
+                                    'A-fixed'
+                                ].estimates['p'],
+                                'a': self._results[qtup].fits[
+                                    'A-fixed'
+                                ].estimates['b'],
+                                'b': 1,
+                                'c': self._results[qtup].fits[
+                                    'A-fixed'
+                                ].estimates['a']
+                            }
+                        else:
+                            self._error_rates[self._qubit_labels[i]] = r
+                            self._uncertainties[self._qubit_labels[i]] = rstd
+                            self._fit_params[self._qubit_labels[i]] = {
+                                'base': self._results[qtup].fits[
+                                    'full'
+                                ].estimates['p'],
+                                'a': self._results[qtup].fits[
+                                    'full'
+                                ].estimates['b'],
+                                'b': 1,
+                                'c': self._results[qtup].fits[
+                                    'full'
+                                ].estimates['a']
+                            }
+
+                        print(f'\n{self._qubit_labels[i]}:')
                         print(
                             f"Process infidelity: r = {r:1.2e} ({rstd:1.2e}) "
                             "(fit with a free asymptote)"
@@ -342,45 +479,260 @@ def CRB(
                             f"Process infidelity: r = {rA:1.2e} ({rAstd:1.2e}) "
                             "(fit with the asymptote fixed to 1/2^n)"
                         )
-                    except Exception:
-                        logger.warning(' Unable to fit the RB data!')
+
+            if Settings.save_data:
+                # self._data_manager.save_to_pickle(self._results, 'CRB_results')
+                self._data_manager.save_to_csv(
+                    pd.DataFrame(self._success_probabilities),
+                    'CRB_success_probabilities'
+                )
+                self._data_manager.save_to_csv(
+                    pd.DataFrame(self.process_infidelity),
+                    'CRB_process_infidelity'
+                )
+                self._data_manager.save_to_csv(
+                    pd.DataFrame(self._fit_params), 'CRB_fit_params'
+                )
 
         def plot(self) -> None:
             """Plot the CRB fit results."""
             if not self._sim_RB:
-                if self._results is not None:
-                    if Settings.save_data:
-                        self._results.plot(
-                            figpath=self._data_manager._save_path +
-                            'CRB_decay.png' if Settings.save_data
-                            else None
-                        )
-                    else:
-                        self._results.plot()
+                if self._results is not None and Settings.save_data:
+                    self._results.plot(
+                        figpath=self._data_manager._save_path +
+                        'CRB_decay.png' if Settings.save_data
+                        else None
+                    )
+                    plt.close("all")
 
             elif self._sim_RB:
-                for ql in self._qubit_labels:
-                    if isinstance(ql, (list, tuple)):
-                        qtup = (f'Q{q}' for q in ql)
-                    else:
-                        qtup = (f'Q{ql}',)
-                    if self._results[qtup] is not None:
-                        if Settings.save_data:
-                            self._results[qtup].for_protocol['RB'].plot(
-                                figpath=self._data_manager._save_path +
-                                f'{"".join(qtup)}_CRB_decay.png'
-                                if Settings.save_data else None
-                            )
-                        else:
-                            self._results[qtup].for_protocol['RB'].plot()
+                for qtup in self._qtups:
+                    if self._results[qtup] is not None and Settings.save_data:
+                        self._results[qtup].plot(
+                            figpath=self._data_manager._save_path +
+                            f'{"".join(qtup)}_CRB_decay.png'
+                            if Settings.save_data else None
+                        )
+                        plt.close("all")
 
-            plot_error_rates(
-                self._error_rates,
-                self._uncertainties,
-                ylabel='Process Infidelity',
-                save_path=self._data_manager._save_path
-                if Settings.save_data else None
-            )
+            if self._results is not None:
+                if self._sim_RB:
+                    qubit_labels_to_plot = [
+                        self._qubit_labels[i]
+                        for i, qtup in enumerate(self._qtups)
+                        if self._results.get(qtup, None) is not None
+                    ]
+                else:
+                    qubit_labels_to_plot = [self._qubit_labels[0]]
+
+                # qubit_labels_to_plot = [
+                #     ql for ql in qubit_labels_to_plot
+                #     if ql in self._success_probabilities
+                # ]
+
+                if len(qubit_labels_to_plot) > 0:
+                    nrows, ncols = calculate_nrows_ncols(
+                        len(qubit_labels_to_plot)
+                    )
+
+                    pfig_height = 350 * nrows
+                    pfig_width = 300 * ncols + 50
+                    pfig_margin = {'t': 50, 'b': 50, 'l': 50, 'r': 50}
+                    pfig_gap_px = 60
+                    vertical_spacing = (
+                        0.0 if nrows <= 1 else min(
+                            0.2, pfig_gap_px / pfig_height
+                        )
+                    )
+                    horizontal_spacing = (
+                        0.0 if ncols <= 1 else min(
+                            0.2, pfig_gap_px / pfig_width
+                        )
+                    )
+
+                    subplot_titles = []
+                    for ql in qubit_labels_to_plot:
+                        if isinstance(ql, (list, tuple)):
+                            ql_str = "".join([f"Q{q}" for q in ql])
+                        else:
+                            ql_str = f"Q{ql}"
+
+                        er = self._error_rates.get(ql, None)
+                        un = self._uncertainties.get(ql, None)
+                        if er is not None and un is not None:
+                            ql_str = f"{ql_str}<br>r={er:1.2e} ({un:1.2e})"
+                        subplot_titles.append(ql_str)
+
+                    pfig = make_subplots(
+                        rows=nrows,
+                        cols=ncols,
+                        subplot_titles=subplot_titles,
+                        vertical_spacing=vertical_spacing,
+                        horizontal_spacing=horizontal_spacing,
+                    )
+                    pfig.update_annotations(font_size=12)
+
+                    plotly_blue = '#1f77b4'
+
+                    for k, ql in enumerate(qubit_labels_to_plot):
+                        row = (k // ncols) + 1
+                        col = (k % ncols) + 1
+
+                        depth_to_probs = self._success_probabilities[ql]
+                        depths = sorted(depth_to_probs.keys())
+                        means = []
+
+                        for depth in depths:
+                            probs = np.asarray(
+                                depth_to_probs[depth], dtype=float
+                            )
+                            probs = probs[np.isfinite(probs)]
+                            if probs.size == 0:
+                                means.append(np.nan)
+                                continue
+
+                            xvals = [depth] * int(probs.size)
+                            pfig.add_trace(
+                                go.Scatter(
+                                    x=xvals,
+                                    y=probs,
+                                    mode='markers',
+                                    marker={
+                                        'size': 6,
+                                        'opacity': 0.2,
+                                        'color': plotly_blue,
+                                    },
+                                    showlegend=False,
+                                ),
+                                row=row,
+                                col=col,
+                            )
+                            pfig.add_trace(
+                                go.Violin(
+                                    x=xvals,
+                                    y=probs,
+                                    name=str(depth),
+                                    showlegend=False,
+                                    points=False,
+                                    spanmode='hard',
+                                    line={'width': 1, 'color': plotly_blue},
+                                    opacity=0.25,
+                                    fillcolor=plotly_blue,
+                                ),
+                                row=row,
+                                col=col,
+                            )
+                            means.append(float(np.mean(probs)))
+
+                        depths_arr = np.asarray(depths, dtype=float)
+                        means_arr = np.asarray(means, dtype=float)
+                        finite_mask = (
+                            np.isfinite(depths_arr) & np.isfinite(means_arr)
+                        )
+
+                        pfig.add_trace(
+                            go.Scatter(
+                                x=depths_arr[finite_mask],
+                                y=means_arr[finite_mask],
+                                mode='markers',
+                                marker={'size': 11, 'color': plotly_blue},
+                                showlegend=False,
+                            ),
+                            row=row,
+                            col=col,
+                        )
+
+                        if ql in self._fit_params and np.any(finite_mask):
+                            max_depth = float(np.max(depths_arr[finite_mask]))
+                            xfit = np.linspace(
+                                0.0,
+                                max_depth,
+                                200,
+                            )
+                            yfit = base_exponential(
+                                xfit,
+                                **self._fit_params[ql],
+                            )
+                            pfig.add_trace(
+                                go.Scatter(
+                                    x=xfit,
+                                    y=yfit,
+                                    mode='lines',
+                                    line={'color': plotly_blue, 'width': 2},
+                                    name='Fit',
+                                    showlegend=(k == 0),
+                                ),
+                                row=row,
+                                col=col,
+                            )
+
+                        pfig.update_xaxes(
+                            title_text='Circuit Depth' if row == nrows else '',
+                            automargin=True,
+                            showgrid=True,
+                            row=row,
+                            col=col,
+                        )
+                        pfig.update_yaxes(
+                            title_text='Success Probability' if col == 1 else '',
+                            automargin=True,
+                            showgrid=True,
+                            row=row,
+                            col=col,
+                        )
+
+                    pfig.update_layout(
+                        height=pfig_height,
+                        width=pfig_width,
+                        margin=pfig_margin,
+                        legend={
+                            'orientation': 'h', 'yanchor': 'bottom', 'y': 1.02
+                        },
+                        template='plotly_white',
+                        paper_bgcolor='white',
+                        plot_bgcolor='#fbfbfd',
+                    )
+
+                    pfig.update_xaxes(
+                        automargin=True,
+                        showline=True,
+                        mirror=True,
+                        linecolor='#c7c7c7',
+                        linewidth=1,
+                        gridcolor='#e5e7eb',
+                        zeroline=False,
+                        ticks='outside',
+                    )
+                    pfig.update_yaxes(
+                        automargin=True,
+                        showline=True,
+                        mirror=True,
+                        linecolor='#c7c7c7',
+                        linewidth=1,
+                        gridcolor='#e5e7eb',
+                        zeroline=False,
+                        ticks='outside',
+                    )
+
+                    save_properties = {
+                        'toImageButtonOptions': {
+                            'format': 'svg', # one of png, svg, jpeg, webp
+                            'filename': 'RPE',
+                            # 'height': 500,
+                            # 'width': 1000,
+                            'scale': 10
+                        }
+                    }
+                    pfig.show(config=save_properties)
+
+            if len(self._error_rates) > 0:
+                plot_error_rates(
+                    self._error_rates,
+                    self._uncertainties,
+                    ylabel='Process Infidelity',
+                    save_path=self._data_manager._save_path
+                    if Settings.save_data else None
+                )
 
             # if any(circ.results.dim == 3 for circ in self._transpiled_circuits):
             #     analyze_leakage(
