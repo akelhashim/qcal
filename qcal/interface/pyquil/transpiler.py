@@ -3,7 +3,7 @@
 """
 import logging
 from collections.abc import Callable, Iterator, Mapping
-from typing import Dict, List
+from typing import Any, Dict, List
 
 import numpy as np
 
@@ -64,7 +64,7 @@ def add_Idle(qubit: int, duration: float, **kwargs) -> Iterator:
         duration (float): idle duration (in seconds).
 
     Yields:
-        Iterator: DELAY gate.
+        Iterator: DELAY gate with delay rounded to the nearest 4ns.
     """
     try:
         from pyquil.gates import DELAY
@@ -127,9 +127,16 @@ def add_SXdag(qubit: int, **kwargs) -> Iterator:
         logger.warning(' Unable to import pyquil!')
         return
 
-    yield RZ(np.pi, qubit)
-    yield RX(np.pi/2, qubit)
-    yield RZ(-np.pi, qubit)
+    if kwargs['subspace'] == 'GE':
+        yield RZ(np.pi, qubit)
+        yield RX(np.pi/2, qubit)
+        yield RZ(-np.pi, qubit)
+    elif kwargs['subspace'] == 'EF':
+        yield RZ_F12(np.pi, qubit)
+        yield RX_F12(np.pi/2, qubit)
+        yield RZ_F12(-np.pi, qubit)
+    else:
+        raise ValueError(f'Invalid subspace: {kwargs["subspace"]}')
 
 
 def add_SYdag(qubit: int, **kwargs) -> Iterator:
@@ -147,9 +154,16 @@ def add_SYdag(qubit: int, **kwargs) -> Iterator:
         logger.warning(' Unable to import pyquil!')
         return
 
-    yield RZ(np.pi, qubit)
-    yield from add_Y90(qubit, **kwargs)
-    yield RZ(-np.pi, qubit)
+    if kwargs['subspace'] == 'GE':
+        yield RZ(np.pi, qubit)
+        yield from add_Y90(qubit, **kwargs)
+        yield RZ(-np.pi, qubit)
+    elif kwargs['subspace'] == 'EF':
+        yield RZ_F12(np.pi, qubit)
+        yield from add_Y90(qubit, **kwargs)
+        yield RZ_F12(-np.pi, qubit)
+    else:
+        raise ValueError(f'Invalid subspace: {kwargs["subspace"]}')
 
 
 def add_X(qubit: int, **kwargs) -> Iterator:
@@ -168,7 +182,12 @@ def add_X(qubit: int, **kwargs) -> Iterator:
         logger.warning(' Unable to import pyquil!')
         return
 
-    yield RX(np.pi, qubit)
+    if kwargs['subspace'] == 'GE':
+        yield RX(np.pi, qubit)
+    elif kwargs['subspace'] == 'EF':
+        yield RX_F12(np.pi, qubit)
+    else:
+        raise ValueError(f'Invalid subspace: {kwargs["subspace"]}')
 
 
 def add_X90(qubit: int, **kwargs) -> Iterator:
@@ -187,7 +206,12 @@ def add_X90(qubit: int, **kwargs) -> Iterator:
         logger.warning(' Unable to import pyquil!')
         return
 
-    yield RX(np.pi/2, qubit)
+    if kwargs['subspace'] == 'GE':
+        yield RX(np.pi/2, qubit)
+    elif kwargs['subspace'] == 'EF':
+        yield RX_F12(np.pi/2, qubit)
+    else:
+        raise ValueError(f'Invalid subspace: {kwargs["subspace"]}')
 
 
 def add_Y90(qubit: int, **kwargs) -> Iterator:
@@ -205,9 +229,16 @@ def add_Y90(qubit: int, **kwargs) -> Iterator:
         logger.warning(' Unable to import pyquil!')
         return
 
-    yield RZ(np.pi/2, qubit)
-    yield RX(np.pi/2, qubit)
-    yield RZ(-np.pi/2, qubit)
+    if kwargs['subspace'] == 'GE':
+        yield RZ(np.pi/2, qubit)
+        yield RX(np.pi/2, qubit)
+        yield RZ(-np.pi/2, qubit)
+    elif kwargs['subspace'] == 'EF':
+        yield RZ_F12(np.pi/2, qubit)
+        yield RX_F12(np.pi/2, qubit)
+        yield RZ_F12(-np.pi/2, qubit)
+    else:
+        raise ValueError(f'Invalid subspace: {kwargs["subspace"]}')
 
 
 def add_Y(qubit: int, **kwargs) -> Iterator:
@@ -225,9 +256,16 @@ def add_Y(qubit: int, **kwargs) -> Iterator:
         logger.warning(' Unable to import pyquil!')
         return
 
-    yield RZ(np.pi/2, qubit)
-    yield RX(np.pi, qubit)
-    yield RZ(-np.pi/2, qubit)
+    if kwargs['subspace'] == 'GE':
+        yield RZ(np.pi/2, qubit)
+        yield RX(np.pi, qubit)
+        yield RZ(-np.pi/2, qubit)
+    elif kwargs['subspace'] == 'EF':
+        yield RZ_F12(np.pi/2, qubit)
+        yield RX_F12(np.pi, qubit)
+        yield RZ_F12(-np.pi/2, qubit)
+    else:
+        raise ValueError(f'Invalid subspace: {kwargs["subspace"]}')
 
 
 def add_Rz(qubit: int, phase: float, **kwargs) -> Iterator:
@@ -246,7 +284,48 @@ def add_Rz(qubit: int, phase: float, **kwargs) -> Iterator:
         logger.warning(' Unable to import pyquil!')
         return
 
-    yield RZ(phase, qubit)
+    if kwargs['subspace'] == 'GE':
+        yield RZ(phase, qubit)
+    elif kwargs['subspace'] == 'EF':
+        yield RZ_F12(phase, qubit)
+    else:
+        raise ValueError(f'Invalid subspace: {kwargs["subspace"]}')
+
+
+def RX_F12(theta: float, q: int) -> Any:
+    """Create an RX gate in the 1-2 subspace.
+
+    Args:
+        theta (float): rotation angle in radians.
+        q (int): qubit label.
+
+    Returns:
+        pyquil.quilbase.Gate: RX_F12 gate.
+    """
+    try:
+        from pyquil.quilbase import Gate
+    except ImportError:
+        logger.warning(' Unable to import pyquil!')
+        return
+    return Gate("RX_F12", [theta], [q])
+
+
+def RZ_F12(theta, q) -> Any:
+    """Create an RZ gate in the 1-2 subspace.
+
+    Args:
+        theta (float): rotation angle in radians.
+        q (int): qubit label.
+
+    Returns:
+        pyquil.quilbase.Gate: RZ_F12 gate.
+    """
+    try:
+        from pyquil.quilbase import Gate
+    except ImportError:
+        logger.warning(' Unable to import pyquil!')
+        return
+    return Gate("RZ_F12", [theta], [q])
 
 
 def to_pyquil(
@@ -289,7 +368,10 @@ def to_pyquil(
                     )
                 else:
                     tprogram += gate_mapper[gate.name](
-                        *gate.qubits, **gate.properties['params']
+                        *gate.qubits, **{
+                            **{'subspace': gate.properties.get('subspace','GE')},
+                            **gate.properties.get('params',{})
+                        }
                     )
 
     return tprogram

@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - CircuitSet indexing with slices
+- Pyquil transpiler support for subspace parameter
 
 ### Changed
 
