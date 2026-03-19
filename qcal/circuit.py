@@ -924,17 +924,22 @@ class CircuitSet:
         if index is not None:
             self._df = self._df.set_index(pd.Index(index))
 
-    def __getitem__(self, idx_or_label: int | str) -> Circuit | pd.Series:
+    def __getitem__(
+            self, idx_or_label: int | str | slice
+        ) -> Circuit | pd.Series | CircuitSet:
         """Index the CircuitSet dataframe.
 
         Args:
-            idx_or_label (int | str): argument to index by.
+            idx_or_label (int | str | slice): argument to index by.
 
         Returns:
-            Circuit | pd.Series: circuit or data series for the given index.
+            Circuit | pd.Series | CircuitSet: circuit or data series for the
+                given index or string.
         """
         if isinstance(idx_or_label, int):
             return self._df.iloc[idx_or_label].circuit
+        elif isinstance(idx_or_label, slice):
+            return CircuitSet(self._df.iloc[idx_or_label].copy())
         else:
             return self._df[idx_or_label]
 
