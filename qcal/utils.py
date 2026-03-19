@@ -96,7 +96,11 @@ def save_to_pickle(data: Any, filename: str) -> None:
         data (Any): data of any datatype.
         filename (str): filename for saved data.
     """
+    if filename.endswith('.pkl'):
+        pkl_filename = filename
+    else:
+        pkl_filename = f'{filename}.pkl'
     if isinstance(data, pd.DataFrame):
-        data.to_pickle(f'{filename}.pkl')
-    with open(f'{filename}.pkl', 'wb') as handle:
+        data.to_pickle(pkl_filename)
+    with open(pkl_filename, 'wb') as handle:
         pickle.dump(data, handle, protocol=pickle.HIGHEST_PROTOCOL)

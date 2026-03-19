@@ -13,6 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- save_to_pickle checks for .pkl extension in filename
+
 ### Deprecated
 
 ### Removed
