@@ -3,7 +3,9 @@
 """
 import inspect
 import logging
+import multiprocessing as mp
 import os
+from concurrent.futures import ThreadPoolExecutor
 from typing import Callable, Dict, List, Tuple
 
 import matplotlib.pyplot as plt
@@ -12,7 +14,6 @@ from IPython.display import clear_output
 from matplotlib.colors import ListedColormap
 from matplotlib.patches import Patch
 from numpy.typing import ArrayLike
-from sklearn.inspection import DecisionBoundaryDisplay
 
 import qcal.settings as settings
 from qcal.benchmarking.readout import ReadoutFidelity
@@ -264,6 +265,40 @@ def ReadoutCalibration(
             ]
             cmap = ListedColormap(colors[:self._n_levels])
 
+            n_jobs = min(
+                len(self._qubits),
+                max(1, mp.cpu_count() - 1)
+            )
+            grid_resolution = 200
+
+            def _compute_decision_boundary(q):
+                x_min, x_max = (
+                    self._X[q][:, 0].min() - 1,
+                    self._X[q][:, 0].max() + 1
+                )
+                y_min, y_max =(
+                    self._X[q][:, 1].min() - 1,
+                    self._X[q][:, 1].max() + 1
+                )
+                xx, yy = np.meshgrid(
+                    np.linspace(x_min, x_max, grid_resolution),
+                    np.linspace(y_min, y_max, grid_resolution)
+                )
+                Z = self._classifier[q].predict(np.c_[xx.ravel(), yy.ravel()])
+                Z = Z.reshape(xx.shape)
+                return xx, yy, Z, x_min, x_max, y_min, y_max
+
+            decision_boundaries = None
+            if n_jobs > 1:
+                decision_boundaries = {}
+                with ThreadPoolExecutor(max_workers=n_jobs) as executor:
+                    futures = {
+                        executor.submit(_compute_decision_boundary, q): q
+                        for q in self._qubits
+                    }
+                    for fut, q in ((f, futures[f]) for f in futures):
+                        decision_boundaries[q] = fut.result()
+
             k = -1
             for i in range(nrows):
                 for j in range(ncols):
@@ -296,29 +331,24 @@ def ReadoutCalibration(
                                 cmap='Greys', gridsize=75
                             )
 
-                        DecisionBoundaryDisplay.from_estimator(
-                            self._classifier[q],
-                            self._X[q],
-                            response_method="predict",
-                            alpha=0.15,
-                            ax=ax,
-                            grid_resolution=50,
-                            cmap=cmap
-                        )
+                        if decision_boundaries is not None:
+                            xx, yy, Z, x_min, x_max, y_min, y_max = (
+                                decision_boundaries[q]
+                            )
+                        else:
+                            xx, yy, Z, x_min, x_max, y_min, y_max = (
+                                _compute_decision_boundary(q)
+                            )
 
-                        # Create a mesh plot
-                        x_min, x_max = (
-                            self._X[q][:, 0].min() - 10,
-                            self._X[q][:, 0].max() + 10
-                        )
-                        y_min, y_max =(
-                            self._X[q][:, 1].min() - 10,
-                            self._X[q][:, 1].max() + 10
-                        )
-                        # h = int(min([abs(x_min), abs(y_min)]) * 0.025)
+                        if raw:
+                            ax.contourf(xx, yy, Z, cmap=cmap, alpha=0.15)
+                        else:
+                            cs = ax.contourf(xx, yy, Z, cmap=cmap, alpha=0.15)
+                            self._cs = cs
+                        # grid_resolution = 200
                         # xx, yy = np.meshgrid(
-                        #     np.arange(x_min, x_max, h),
-                        #     np.arange(y_min, y_max, h)
+                        #     np.linspace(x_min, x_max, grid_resolution),
+                        #     np.linspace(y_min, y_max, grid_resolution)
                         # )
 
                         # # Plot the decision boundary by assigning a color to

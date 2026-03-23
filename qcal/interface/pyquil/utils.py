@@ -287,7 +287,7 @@ def prepend_delay_to_program(program: Any, delay: float) -> Any:
     qubits = program.get_qubit_indices()
     # p = Program()
     # p += Delay(*qubits, delay)
-    return program.prepend_instructions([DELAY(*qubits, delay)])
+    return program.prepend_instructions([DELAY(q, delay) for q in qubits])
 
 
 def prepend_measure_to_program(program: Any) -> Any:

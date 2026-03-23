@@ -991,7 +991,7 @@ def ZZRPE(
     Args:
         qpu (QPU): custom QPU object.
         config (Config): qcal Config object.
-        qubit_labels (Iterable[Tuple[int]]): a list specifying sets of system 
+        qubit_labels (Iterable[Tuple[int]]): a list specifying sets of system
             labels on which to perform RPE for the ZZ gate.
         circuit_depths (List[int], optional): a list of positive integers
             specifying the circuit depths. Defaults to ```[1, 2, 4, 8, 16, 32,
