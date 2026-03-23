@@ -11,18 +11,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- IPython version requirement updated to support older versions
-- Faster ReadoutCalibration plotting
-
 ### Deprecated
 
 ### Removed
 
 ### Fixed
 
-- Delay insertion in pyquil programs
-
 ### Security
+
+## [1.0.4] - 2026-03-23
+
+### Changed
+
+- IPython version requirement updated to support older versions
+- Faster ReadoutCalibration plotting
+
+### Fixed
+
+- Delay insertion in pyquil programs
 
 ## [1.0.3] - 2026-03-19
 
@@ -134,7 +140,8 @@ post-processing
 - Single- and two-qubit benchmarking methods
 - Advanced compilation tools
 
-[Unreleased]: https://github.com/akelhashim/qcal/compare/v1.0.3...HEAD
+[Unreleased]: https://github.com/akelhashim/qcal/compare/v1.0.4...HEAD
+[1.0.4]: https://github.com/akelhashim/qcal/releases/tag/v1.0.4
 [1.0.3]: https://github.com/akelhashim/qcal/releases/tag/v1.0.3
 [1.0.2]: https://github.com/akelhashim/qcal/releases/tag/v1.0.2
 [1.0.1]: https://github.com/akelhashim/qcal/releases/tag/v1.0.1
