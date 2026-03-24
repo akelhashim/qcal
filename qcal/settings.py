@@ -7,7 +7,7 @@ class _Settings:
     def __init__(self) -> None:
         """Initialize the settings attributes."""
         self._config_path = ''
-        self._save_data = True
+        self._save_data = False
         self._data_save_path = ''
 
     @property
