@@ -19,6 +19,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Frequency plotting now properly handles empty frequency ranges
+
 ### Security
 
 ## [1.0.4] - 2026-03-23
