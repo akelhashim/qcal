@@ -65,15 +65,18 @@ def plot_freq_spectrum(
     # https://plotly.com/python/builtin-colorscales/
     colors = px.colors.sample_colorscale(
         'Bluered' if len(qubits) <= 2 else 'jet',
-        [n/(len(qubits) - 1) for n in range(len(qubits))]
+        [0.5] if len(qubits) == 1 else [n/(len(qubits) - 1) for n in range(len(qubits))]
     )
 
     n_points = 0
     for qp in config.qubit_pairs:
         n_points += len(config.native_gates['two_qubit'][qp])
-    colors_tq = px.colors.sample_colorscale(
-        'RdBu',
-        [n/(n_points - 1) for n in range(n_points)]
+    colors_tq = (
+        px.colors.sample_colorscale(
+            'RdBu',
+            [0.5] if n_points == 1 else [n/(n_points - 1) for n in range(n_points)]
+        )
+        if n_points > 0 else ['#000000']
     )
 
     x_mins = []
@@ -97,8 +100,9 @@ def plot_freq_spectrum(
             )
             x_mins_ge.append(config[f'single_qubit/{q}/GE/freq'] / GHz)
             x_maxs_ge.append(config[f'single_qubit/{q}/GE/freq'] / GHz)
-        x_mins.append(min(x_mins_ge))
-        x_maxs.append(max(x_maxs_ge))
+        if x_mins_ge and x_maxs_ge:
+            x_mins.append(min(x_mins_ge))
+            x_maxs.append(max(x_maxs_ge))
 
     if plot_EF:
         x_mins_ef = []
@@ -119,8 +123,9 @@ def plot_freq_spectrum(
             )
             x_mins_ef.append(config[f'single_qubit/{q}/EF/freq'] / GHz)
             x_maxs_ef.append(config[f'single_qubit/{q}/EF/freq'] / GHz)
-        x_mins.append(min(x_mins_ef))
-        x_maxs.append(max(x_maxs_ef))
+        if x_mins_ef and x_maxs_ef:
+            x_mins.append(min(x_mins_ef))
+            x_maxs.append(max(x_maxs_ef))
 
     if plot_readout:
         x_mins_ro = []
@@ -141,8 +146,9 @@ def plot_freq_spectrum(
             )
             x_mins_ro.append(config[f'readout/{q}/freq'] / GHz)
             x_maxs_ro.append(config[f'readout/{q}/freq'] / GHz)
-        x_mins.append(min(x_mins_ro))
-        x_maxs.append(max(x_maxs_ro))
+        if x_mins_ro and x_maxs_ro:
+            x_mins.append(min(x_mins_ro))
+            x_maxs.append(max(x_maxs_ro))
 
     if plot_two_qubit:
         i = -1
@@ -166,8 +172,9 @@ def plot_freq_spectrum(
                 )
                 x_mins_tq.append(config[f'two_qubit/{qp}/{gate}/freq'] / GHz)
                 x_maxs_tq.append(config[f'two_qubit/{qp}/{gate}/freq'] / GHz)
-        x_mins.append(min(x_mins_tq))
-        x_maxs.append(max(x_maxs_tq))
+        if x_mins_tq and x_maxs_tq:
+            x_mins.append(min(x_mins_tq))
+            x_maxs.append(max(x_maxs_tq))
 
     fig.add_trace(
         go.Scatter(
