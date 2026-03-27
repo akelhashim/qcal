@@ -19,6 +19,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
+## [1.0.6] - 2026-03-27
+
+### Added
+
+- pyGSTi support for iSWAP gates
+
 ## [1.0.5] - 2026-03-24
 
 ### Changed
@@ -150,7 +156,8 @@ post-processing
 - Single- and two-qubit benchmarking methods
 - Advanced compilation tools
 
-[Unreleased]: https://github.com/akelhashim/qcal/compare/v1.0.5...HEAD
+[Unreleased]: https://github.com/akelhashim/qcal/compare/v1.0.6...HEAD
+[1.0.6]: https://github.com/akelhashim/qcal/releases/tag/v1.0.6
 [1.0.5]: https://github.com/akelhashim/qcal/releases/tag/v1.0.5
 [1.0.4]: https://github.com/akelhashim/qcal/releases/tag/v1.0.4
 [1.0.3]: https://github.com/akelhashim/qcal/releases/tag/v1.0.3
