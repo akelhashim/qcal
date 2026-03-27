@@ -180,7 +180,7 @@ def CRB(
                 if isinstance(ql, (list, tuple)):  # Multi-qubit gates
                     if not native_gates:
                         for i in range(len(ql) - 1):  # E.g., (1, 2, 3)
-                            ql_native_gates.extend(  # Assumes linear connect.
+                            ql_native_gates.extend(   # Assumes linear connect.
                                 config.native_gates['two_qubit'][
                                     (ql[i], ql[i+1])
                                 ]
@@ -822,11 +822,11 @@ def SRB(
             include_rcal:    bool = False,
             **kwargs
         ) -> None:
-            from qcal.interface.trueq.compiler import TrueqCompiler
-            from qcal.interface.trueq.transpiler import TrueqTranspiler
-
             try:
                 import trueq as tq
+
+                from qcal.interface.trueq.compiler import TrueqCompiler
+                from qcal.interface.trueq.transpiler import TrueqTranspiler
                 logger.info(f" True-Q version: {tq.__version__}")
             except ImportError:
                 logger.warning(' Unable to import trueq!')

@@ -16,12 +16,13 @@ logger = logging.getLogger(__name__)
 
 
 GATE_MAPPER = {
-    'X90':  'Gxpi2',
-    'Y90':  'Gypi2',
-    'Z90':  'Gzpi2',
-    'CNOT': 'Gcnot',
-    'CX':   'Gcnot',
-    'CZ':   'Gcphase'
+    'X90':   'Gxpi2',
+    'Y90':   'Gypi2',
+    'Z90':   'Gzpi2',
+    'CNOT':  'Gcnot',
+    'CX':    'Gcnot',
+    'CZ':    'Gcphase',
+    'iSWAP': 'Giswap'
 }
 
 
@@ -29,13 +30,13 @@ __all__ = 'pygsti_pspec'
 
 
 def pygsti_pspec(
-        config: Config,
-        qubits: List[int] | Tuple[int],
-        native_gates: List[str] = ['X90', 'Y90'],  # noqa: B006
-        availability: Dict | None = None,
-        nonstd_gate_unitaries: Dict | None = None,
-        **kwargs
-    ):
+    config: Config,
+    qubits: List[int] | Tuple[int],
+    native_gates: List[str] = ['X90', 'Y90'],  # noqa: B006
+    availability: Dict | None = None,
+    nonstd_gate_unitaries: Dict | None = None,
+    **kwargs
+):
     """Generates a pyGSTi qubit processor spec.
 
     Args:
@@ -61,15 +62,14 @@ def pygsti_pspec(
     qubit_labels = [f'Q{q}' for q in qubits]
     pairings = list(itertools.combinations(qubits, 2))
     gate_names = [
-        GATE_MAPPER[gate] if gate in GATE_MAPPER.keys() else gate 
+        GATE_MAPPER[gate] if gate in GATE_MAPPER.keys() else gate
         for gate in native_gates
     ]
-
     if availability is None:
         availability = {}
-        for gate in native_gates:# This will break if formatted as a pygsti gate
+        for gate in native_gates: # This will break if formatted as a pygsti gate
             if gate in single_qubit_gates:
-                availability[GATE_MAPPER[gate]] = [(f'Q{q}',) for q in qubits]
+                availability[GATE_MAPPER.get(gate)] = [(f'Q{q}',) for q in qubits]
 
             elif gate in two_qubit_gates:
                 qubit_pairs = []
@@ -79,7 +79,7 @@ def pygsti_pspec(
                             qubit_pairs.append(
                                 tuple(f'Q{q}' for q in qubit_pair)
                             )
-                availability[GATE_MAPPER[gate]] = qubit_pairs
+                availability[GATE_MAPPER.get(gate)] = qubit_pairs
 
     pspec = QubitProcessorSpec(
         num_qubits=num_qubits,
