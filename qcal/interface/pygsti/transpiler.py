@@ -10,8 +10,8 @@ from pygsti.baseobjs.label import LabelTupTup
 from pygsti.io import read_circuit_list
 
 from qcal.circuit import Circuit, CircuitSet, Layer
-from qcal.gate.single_qubit import X90, Y90, Idle, single_qubit_gates
-from qcal.gate.two_qubit import two_qubit_gates
+from qcal.gate.single_qubit import SINGLE_QUBIT_GATES, X90, Y90, Idle
+from qcal.gate.two_qubit import TWO_QUBIT_GATES
 from qcal.transpilation.transpiler import Transpiler
 from qcal.transpilation.utils import GateMapper
 from qcal.units import ns
@@ -177,24 +177,24 @@ class PyGSTiTranspiler(Transpiler):
         if gate_mapper is None:
             gate_mapper = GateMapper(
                 {
-                    'Empty':   single_qubit_gates['Id'],
-                    'Gcnot':   two_qubit_gates['CX'],
-                    'Gcphase': two_qubit_gates['CZ'],
-                    'Gi':      single_qubit_gates['Id'],
+                    'Empty':   SINGLE_QUBIT_GATES['Id'],
+                    'Gcnot':   TWO_QUBIT_GATES['CX'],
+                    'Gcphase': TWO_QUBIT_GATES['CZ'],
+                    'Gi':      SINGLE_QUBIT_GATES['Id'],
                     'Gii':     add_global_identity,
                     'Gidle':   add_idle,
-                    'Grz':     single_qubit_gates['Rz'],
-                    'Gxpi2':   single_qubit_gates['X90'],
-                    'Gypi2':   single_qubit_gates['Y90'],
-                    'Gzpi2':   single_qubit_gates['Z90'],
-                    'Gzpi':    single_qubit_gates['Z'],
-                    'Gzr':     single_qubit_gates['Rz'],
-                    'Gzmpi2':  single_qubit_gates['Sdag'],
+                    'Grz':     SINGLE_QUBIT_GATES['Rz'],
+                    'Gxpi2':   SINGLE_QUBIT_GATES['X90'],
+                    'Gypi2':   SINGLE_QUBIT_GATES['Y90'],
+                    'Gzpi2':   SINGLE_QUBIT_GATES['Z90'],
+                    'Gzpi':    SINGLE_QUBIT_GATES['Z'],
+                    'Gzr':     SINGLE_QUBIT_GATES['Rz'],
+                    'Gzmpi2':  SINGLE_QUBIT_GATES['Sdag'],
                     'Gxx':     add_parallel_X90s,
                     'Gxy':     add_parallel_X90_Y90,
                     'Gyx':     add_parallel_Y90_X90,
                     'Gyy':     add_parallel_Y90s,
-                    'Iz':      single_qubit_gates['MCM']
+                    'Iz':      SINGLE_QUBIT_GATES['MCM']
                 }
             )
 

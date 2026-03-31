@@ -2,7 +2,7 @@
 
 """
 from qcal.config import Config
-from qcal.gate.two_qubit import two_qubit_gates
+from qcal.gate.two_qubit import TWO_QUBIT_GATES
 
 import logging
 import numpy as np
@@ -102,10 +102,10 @@ class TrueqCompiler:
 
         factories_2q = ''
         for gate in config.native_gates['set']:
-            if gate in two_qubit_gates.keys():
+            if gate in TWO_QUBIT_GATES.keys():
                 factories_2q += f'\n        - {gate}:'
                 factories_2q += '\n            Matrix:'
-                for row in two_qubit_gates[gate]((0, 1)).matrix:
+                for row in TWO_QUBIT_GATES[gate]((0, 1)).matrix:
                     factories_2q += f'\n            - {list(row)}'
                 factories_2q += '\n            Involving:'
             for qubit_pair in config.native_gates['two_qubit'].keys():

@@ -1,15 +1,14 @@
 """Submodule for transpiler from cirq and qiskit circuits..
 
 """
-from qcal.circuit import Barrier, Cycle, Layer, Circuit, CircuitSet
-from qcal.gate.single_qubit import Meas, Rz, X90, X
-from qcal.gate.two_qubit import CNOT, CX, CZ
-from qcal.transpilation.transpiler import Transpiler
-
 import logging
-
 from collections import defaultdict
 from typing import Dict, List
+
+from qcal.circuit import Barrier, Circuit, CircuitSet, Cycle, Layer
+from qcal.gate.single_qubit import X90, Meas, Rz, X
+from qcal.gate.two_qubit import CNOT, CX, CZ
+from qcal.transpilation.transpiler import Transpiler
 
 logger = logging.getLogger(__name__)
 
@@ -61,7 +60,7 @@ def qiskit_to_qcal(circuit, gate_mapper: defaultdict) -> Circuit:
     for instr in circuit:
         qubits = tuple([circuit.find_bit(q).index for q in instr.qubits])
         gate = instr.operation.name
-        
+
         if any(q in tlayer.qubits for q in qubits):
             tcircuit.append(tlayer)
             tlayer = Layer()
@@ -87,7 +86,7 @@ def transpilation_error(*args):
     """
     raise Exception(
         f'Cannot transpile {str(args)} (non-native gate)!'
-    ) 
+    )
 
 
 class CirqTranspiler(Transpiler):
@@ -133,10 +132,10 @@ class CirqTranspiler(Transpiler):
         tcircuits = []
         for circuit in circuits:
             tcircuits.append(cirq_to_qcal(circuit, self._gate_mapper))
-    
+
         tcircuits = CircuitSet(circuits=tcircuits)
         return tcircuits
-    
+
 
 class QiskitTranspiler(Transpiler):
     """Qiskit Transpiler."""
@@ -183,6 +182,6 @@ class QiskitTranspiler(Transpiler):
         tcircuits = []
         for circuit in circuits:
             tcircuits.append(qiskit_to_qcal(circuit, self._gate_mapper))
-    
+
         tcircuits = CircuitSet(circuits=tcircuits)
         return tcircuits

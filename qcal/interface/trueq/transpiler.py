@@ -8,8 +8,8 @@ from typing import Dict
 import numpy as np
 
 from qcal.circuit import Barrier, Circuit, CircuitSet, Cycle
-from qcal.gate.single_qubit import single_qubit_gates
-from qcal.gate.two_qubit import two_qubit_gates
+from qcal.gate.single_qubit import SINGLE_QUBIT_GATES
+from qcal.gate.two_qubit import TWO_QUBIT_GATES
 from qcal.transpilation.transpiler import Transpiler
 from qcal.transpilation.utils import GateMapper
 
@@ -158,7 +158,7 @@ class TrueqTranspiler(Transpiler):
         """
         if gate_mapper is None:
             gate_mapper = GateMapper(
-                {**single_qubit_gates, **two_qubit_gates}
+                {**SINGLE_QUBIT_GATES, **TWO_QUBIT_GATES}
             )
         super().__init__(gate_mapper=gate_mapper)
         self._cycle_replacement = cycle_replacement
