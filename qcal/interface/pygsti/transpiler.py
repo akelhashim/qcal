@@ -10,8 +10,8 @@ import numpy as np
 from pygsti.baseobjs.label import LabelTupTup
 from pygsti.io import read_circuit_list
 
-from qcal.circuit import Circuit, CircuitSet, Layer
-from qcal.gate.single_qubit import SINGLE_QUBIT_GATES, X90, Y90, Id, Idle, Rz
+from qcal.circuit import Barrier, Circuit, CircuitSet, Layer
+from qcal.gate.single_qubit import SINGLE_QUBIT_GATES, X90, Y90, Idle, Rz
 from qcal.gate.two_qubit import TWO_QUBIT_GATES
 from qcal.transpilation.transpiler import Transpiler
 from qcal.transpilation.utils import GateMapper
@@ -31,7 +31,7 @@ def add_Clifford_C0(qubit: int) -> List:
     Returns:
         List: list of gates corresponding to the Clifford C0 gate.
     """
-    return [Id(qubit)]
+    return [Rz(qubit, theta=0), Rz(qubit, theta=0), Rz(qubit, theta=0)]
 
 
 def add_Clifford_C1(qubit: int) -> List:
@@ -43,7 +43,7 @@ def add_Clifford_C1(qubit: int) -> List:
     Returns:
         List: list of gates corresponding to the Clifford C1 gate.
     """
-    return [X90(qubit), Rz(qubit, theta=np.pi/2)]
+    return [Rz(qubit, theta=0), X90(qubit), Rz(qubit, theta=np.pi/2)]
 
 
 def add_Clifford_C2(qubit: int) -> List:
@@ -67,7 +67,7 @@ def add_Clifford_C3(qubit: int) -> List:
     Returns:
         List: list of gates corresponding to the Clifford C3 gate.
     """
-    return [X90(qubit), X90(qubit)]
+    return [Rz(qubit, theta=0), X90(qubit), X90(qubit)]
 
 
 def add_Clifford_C4(qubit: int) -> List:
@@ -79,7 +79,7 @@ def add_Clifford_C4(qubit: int) -> List:
     Returns:
         List: list of gates corresponding to the Clifford C4 gate.
     """
-    return [Rz(qubit, theta=np.pi), X90(qubit), Rz(qubit, theta=3*np.pi/2)]
+    return [Rz(qubit, theta=np.pi), X90(qubit), Rz(qubit, theta=-np.pi/2)]
 
 
 def add_Clifford_C5(qubit: int) -> List:
@@ -91,7 +91,7 @@ def add_Clifford_C5(qubit: int) -> List:
     Returns:
         List: list of gates corresponding to the Clifford C5 gate.
     """
-    return [Rz(qubit, theta=np.pi/2), X90(qubit)]
+    return [Rz(qubit, theta=np.pi/2), X90(qubit), Rz(qubit, theta=0)]
 
 
 def add_Clifford_C6(qubit: int) -> List:
@@ -115,7 +115,7 @@ def add_Clifford_C7(qubit: int) -> List:
     Returns:
         List: list of gates corresponding to the Clifford C7 gate.
     """
-    return [X90(qubit), Rz(qubit, theta=3*np.pi/2)]
+    return [Rz(qubit, theta=0), X90(qubit), Rz(qubit, theta=-np.pi/2)]
 
 
 def add_Clifford_C8(qubit: int) -> List:
@@ -127,7 +127,7 @@ def add_Clifford_C8(qubit: int) -> List:
     Returns:
         List: list of gates corresponding to the Clifford C8 gate.
     """
-    return [Rz(qubit, theta=3*np.pi/2), X90(qubit)]
+    return [Rz(qubit, theta=-np.pi/2), X90(qubit), Rz(qubit, theta=0)]
 
 
 def add_Clifford_C9(qubit: int) -> List:
@@ -139,7 +139,7 @@ def add_Clifford_C9(qubit: int) -> List:
     Returns:
         List: list of gates corresponding to the Clifford C9 gate.
     """
-    return [Rz(qubit, theta=np.pi)]
+    return [Rz(qubit, theta=np.pi), Rz(qubit, theta=0), Rz(qubit, theta=0)]
 
 
 def add_Clifford_C10(qubit: int) -> List:
@@ -163,7 +163,7 @@ def add_Clifford_C11(qubit: int) -> List:
     Returns:
         List: list of gates corresponding to the Clifford C11 gate.
     """
-    return [Rz(qubit, theta=3*np.pi/2), X90(qubit), X90(qubit), X90(qubit)]
+    return [Rz(qubit, theta=-np.pi/2), X90(qubit), Rz(qubit, theta=np.pi)]
 
 
 def add_Clifford_C12(qubit: int) -> List:
@@ -187,7 +187,7 @@ def add_Clifford_C13(qubit: int) -> List:
     Returns:
         List: list of gates corresponding to the Clifford C13 gate.
     """
-    return [X90(qubit), X90(qubit), X90(qubit)]
+    return [Rz(qubit, theta=np.pi), X90(qubit), Rz(qubit, theta=-np.pi)]
 
 
 def add_Clifford_C14(qubit: int) -> List:
@@ -199,7 +199,7 @@ def add_Clifford_C14(qubit: int) -> List:
     Returns:
         List: list of gates corresponding to the Clifford C14 gate.
     """
-    return [Rz(qubit, theta=np.pi/2)]
+    return [Rz(qubit, theta=np.pi/2), Rz(qubit, theta=0), Rz(qubit, theta=0)]
 
 
 def add_Clifford_C15(qubit: int) -> List:
@@ -211,7 +211,7 @@ def add_Clifford_C15(qubit: int) -> List:
     Returns:
         List: list of gates corresponding to the Clifford C15 gate.
     """
-    return [Rz(qubit, theta=np.pi/2), X90(qubit), Rz(qubit, theta=3*np.pi/2)]
+    return [Rz(qubit, theta=np.pi/2), X90(qubit), Rz(qubit, theta=-np.pi/2)]
 
 
 def add_Clifford_C16(qubit: int) -> List:
@@ -223,7 +223,7 @@ def add_Clifford_C16(qubit: int) -> List:
     Returns:
         List: list of gates corresponding to the Clifford C16 gate.
     """
-    return [X90(qubit)]
+    return [Rz(qubit, theta=0), X90(qubit), Rz(qubit, theta=0)]
 
 
 def add_Clifford_C17(qubit: int) -> List:
@@ -235,7 +235,7 @@ def add_Clifford_C17(qubit: int) -> List:
     Returns:
         List: list of gates corresponding to the Clifford C17 gate.
     """
-    return [Rz(qubit, theta=3*np.pi/2), X90(qubit), X90(qubit)]
+    return [Rz(qubit, theta=-np.pi/2), X90(qubit), X90(qubit)]
 
 
 def add_Clifford_C18(qubit: int) -> List:
@@ -247,7 +247,7 @@ def add_Clifford_C18(qubit: int) -> List:
     Returns:
         List: list of gates corresponding to the Clifford C18 gate.
     """
-    return [Rz(qubit, theta=3*np.pi/2), X90(qubit), Rz(qubit, theta=3*np.pi/2)]
+    return [Rz(qubit, theta=-np.pi/2), X90(qubit), Rz(qubit, theta=-np.pi/2)]
 
 
 def add_Clifford_C19(qubit: int) -> List:
@@ -259,7 +259,7 @@ def add_Clifford_C19(qubit: int) -> List:
     Returns:
         List: list of gates corresponding to the Clifford C19 gate.
     """
-    return [Rz(qubit, theta=np.pi), X90(qubit)]
+    return [Rz(qubit, theta=np.pi), X90(qubit), Rz(qubit, theta=0)]
 
 
 def add_Clifford_C20(qubit: int) -> List:
@@ -283,7 +283,7 @@ def add_Clifford_C21(qubit: int) -> List:
     Returns:
         List: list of gates corresponding to the Clifford C21 gate.
     """
-    return [Rz(qubit, theta=3*np.pi/2), X90(qubit), Rz(qubit, theta=np.pi/2)]
+    return [Rz(qubit, theta=-np.pi/2), X90(qubit), Rz(qubit, theta=np.pi/2)]
 
 
 def add_Clifford_C22(qubit: int) -> List:
@@ -295,7 +295,7 @@ def add_Clifford_C22(qubit: int) -> List:
     Returns:
         List: list of gates corresponding to the Clifford C22 gate.
     """
-    return [X90(qubit), Rz(qubit, theta=np.pi)]
+    return [Rz(qubit, theta=0), X90(qubit), Rz(qubit, theta=np.pi)]
 
 
 def add_Clifford_C23(qubit: int) -> List:
@@ -307,7 +307,7 @@ def add_Clifford_C23(qubit: int) -> List:
     Returns:
         List: list of gates corresponding to the Clifford C23 gate.
     """
-    return [Rz(qubit, theta=3*np.pi/2)]
+    return [Rz(qubit, theta=-np.pi/2), Rz(qubit, theta=0), Rz(qubit, theta=0)]
 
 
 def add_Hadamard(qubit: int) -> List:
@@ -470,6 +470,9 @@ def to_qcal(
                     tcircuit.append(Layer(out))
                 elif isinstance(out, Circuit):
                     tcircuit.extend(out)
+
+            # Add a barrier between each layer to prevent compression via compilation
+            tcircuit.append(Barrier(qubits))
 
         tcircuit.measure(qubits=qubits)
 
