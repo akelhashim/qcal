@@ -41,7 +41,8 @@ def compute_counts(p: PostProcessor) -> None:
 
     for circuit_results in p._circuit_results:
         for result in circuit_results:
-            result['bitstring'] = result[list(p._qubits)].apply(
+            cols = [q for q in p._qubits if q in result.columns]
+            result['bitstring'] = result[cols].apply(
                 lambda row: ''.join(row.values.astype(str)), axis=1
             )
 

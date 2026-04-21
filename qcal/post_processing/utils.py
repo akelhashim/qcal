@@ -19,7 +19,7 @@ def construct_dataframes(
 ) -> List[List[pd.DataFrame]]:
     """Construct all circuit results as a list of a list of DataFrames.
 
-    This method takes the existing results (which is a list of a
+    This function takes the existing results (which is a list of a
     dictionary mapping qubit labels to an array of measurement results) and
     reshapes it to be a list of a list of DataFrames, where each DataFrame
     contains the results on all qubits for a single circuit. The outer list is
@@ -74,7 +74,10 @@ def reshape_results(
         list[dict[int, Array2D]]: reshaped measurement results.
     """
     result = [
-        dict(zip(results.keys(), values, strict=True))
+        {
+            k: v for k, v in zip(results.keys(), values, strict=True)
+            if not np.all(v == None)  # noqa: E711
+        }
         for values in zip(*results.values(), strict=True)
     ]
     return result
