@@ -439,9 +439,6 @@ def to_qcal(
                             (gqubits,) if len(gate.args) == 0 else
                             (gqubits, float(gate.args[0]))
                         )
-                        # tlayer.append(
-                        #     gate_mapper.call(gate.name, *args)
-                        # )
                         out = gate_mapper.call(gate.name, *args)
                         if isinstance(out, set):
                             tlayer.append(out)
@@ -453,7 +450,7 @@ def to_qcal(
                     elif tlayer.n_gates == 0 and tsubcircuit.n_cycles > 0:
                         tcircuit.extend(tsubcircuit)
                     elif tlayer.n_gates > 0 and tsubcircuit.n_cycles > 0:
-                        tsubcircuit.join(tlayer)
+                        tsubcircuit.join(Circuit([tlayer]))
                         tcircuit.extend(tsubcircuit)
 
             # Isolated gate layer
