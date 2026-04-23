@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Just-in-time (JIT) compilation & transpilation in QPU for faster measurements
+
 ### Changed
 
 ### Deprecated
