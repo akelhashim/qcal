@@ -19,9 +19,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- Remove [skip ci] and use the actor check instead
-
 ### Security
+
+## [1.1.1] - 2026-04-24
+
+### Fixed
+
+- Remove [skip ci] and use the actor check instead
 
 ## [1.1.0] - 2026-04-24
 
@@ -166,7 +170,8 @@ post-processing
 - Single- and two-qubit benchmarking methods
 - Advanced compilation tools
 
-[Unreleased]: https://github.com/akelhashim/qcal/compare/v1.1.0...HEAD
+[Unreleased]: https://github.com/akelhashim/qcal/compare/v1.1.1...HEAD
+[1.1.1]: https://github.com/akelhashim/qcal/releases/tag/v1.1.1
 [1.1.0]: https://github.com/akelhashim/qcal/releases/tag/v1.1.0
 [1.0.6]: https://github.com/akelhashim/qcal/releases/tag/v1.0.6
 [1.0.5]: https://github.com/akelhashim/qcal/releases/tag/v1.0.5
