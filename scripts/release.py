@@ -300,21 +300,72 @@ def _bump_version_in_init(init_text: str, new_version: str) -> str:
     return new_text
 
 
-def _bump_patch_version(version: str) -> str:
-    m = re.fullmatch(
-        r"(?P<maj>\d+)\.(?P<min>\d+)\.(?P<pat>\d+)", version.strip()
-    )
+def _parse_version(version: str) -> Tuple[int, int, int]:
+    m = re.fullmatch(r"(?P<maj>\d+)\.(?P<min>\d+)\.(?P<pat>\d+)", version.strip())
     if not m:
         raise ValueError(
-            (
-                f"Version '{version}' is not in expected X.Y.Z format; please "
-                "pass an explicit version"
-            )
+            f"Version '{version}' is not in expected X.Y.Z format"
         )
-    maj = int(m.group("maj"))
-    min_ = int(m.group("min"))
-    pat = int(m.group("pat"))
+    return int(m.group("maj")), int(m.group("min")), int(m.group("pat"))
+
+
+def _bump_patch_version(version: str) -> str:
+    maj, min_, pat = _parse_version(version)
     return f"{maj}.{min_}.{pat + 1}"
+
+
+def _bump_minor_version(version: str) -> str:
+    maj, min_, _ = _parse_version(version)
+    return f"{maj}.{min_ + 1}.0"
+
+
+def _bump_major_version(version: str) -> str:
+    """Bump the major component, with a 0.x guard.
+
+    While in 0.x, breaking changes bump the minor component rather than
+    jumping to 1.0.0. Reaching 1.0.0 must be an explicit decision (pass the
+    version manually). Once on 1.x or later, breaking changes bump the major
+    component normally.
+    """
+    maj, min_, _ = _parse_version(version)
+    if maj == 0:
+        return f"0.{min_ + 1}.0"
+    return f"{maj + 1}.0.0"
+
+
+def _infer_bump_type(changelog_text: str) -> str:
+    """Infer semver bump type from non-empty [Unreleased] subsections.
+
+    Returns 'major', 'minor', or 'patch' according to these rules:
+    - major: ### Removed has content, or any subsection whose title contains
+      'BREAKING', or any bullet line containing 'BREAKING CHANGE'
+    - minor: ### Added, ### Changed, or ### Deprecated has content (introducing
+      a deprecation is an observable behavior change, not a bugfix)
+    - patch: otherwise (### Fixed, ### Security, etc.)
+
+    Note: When the current version is 0.x, ``_bump_major_version`` downgrades
+    a 'major' result into a minor bump so the project stays in 0.x until a
+    1.0.0 is explicitly requested.
+    """
+    lines = changelog_text.splitlines(keepends=True)
+    unreleased_start, unreleased_end = _find_unreleased_block(lines)
+    unreleased_body = lines[unreleased_start + 1 : unreleased_end]
+    _, subsection_content = _split_subsections(unreleased_body)
+
+    for title, content in subsection_content.items():
+        if not _is_subsection_content_nonempty(content):
+            continue
+        if title == "Removed" or "BREAKING" in title.upper():
+            return "major"
+        for line in content:
+            if line.strip() and "BREAKING CHANGE" in line.upper():
+                return "major"
+
+    for title in ("Added", "Changed", "Deprecated"):
+        if _is_subsection_content_nonempty(subsection_content.get(title, [])):
+            return "minor"
+
+    return "patch"
 
 
 def release(
@@ -404,7 +455,8 @@ def main(argv: Optional[List[str]] = None) -> int:
         nargs="?",
         default=None,
         help=(
-            "New version to release (e.g. 0.0.4). If omitted, bumps patch by 1."
+            "New version to release (e.g. 0.0.4). If omitted, infers bump "
+            "type from CHANGELOG [Unreleased] content."
         ),
     )
     parser.add_argument(
@@ -428,6 +480,11 @@ def main(argv: Optional[List[str]] = None) -> int:
         action="store_true",
         help="Print diffs, do not write files",
     )
+    parser.add_argument(
+        "--check",
+        action="store_true",
+        help="Print 'yes' if [Unreleased] has releasable content, 'no' otherwise. Always exits 0.",
+    )
 
     args = parser.parse_args(argv)
 
@@ -435,13 +492,33 @@ def main(argv: Optional[List[str]] = None) -> int:
         changelog_path = pathlib.Path(args.changelog)
         init_path = pathlib.Path(args.init_path)
 
+        if args.check:
+            changelog_text = _read_text(changelog_path)
+            lines = changelog_text.splitlines(keepends=True)
+            unreleased_start, unreleased_end = _find_unreleased_block(lines)
+            unreleased_body = lines[unreleased_start + 1 : unreleased_end]
+            subsection_order, subsection_content = _split_subsections(unreleased_body)
+            release_body = _build_release_body(subsection_order, subsection_content)
+            print("yes" if release_body else "no")
+            return 0
+
         old_changelog = _read_text(changelog_path)
         old_init = _read_text(init_path)
 
         version = args.version
         if version is None:
             current_version = _extract_current_version_from_init(old_init)
-            version = _bump_patch_version(current_version)
+            bump_type = _infer_bump_type(old_changelog)
+            if bump_type == "major":
+                version = _bump_major_version(current_version)
+            elif bump_type == "minor":
+                version = _bump_minor_version(current_version)
+            else:
+                version = _bump_patch_version(current_version)
+        else:
+            # Validate explicit input so typos fail fast instead of producing
+            # e.g. __version__ = "banana" and a "## [banana]" changelog header.
+            _parse_version(version)
 
         new_changelog, new_init = release(
             version=version,

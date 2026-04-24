@@ -1,8 +1,8 @@
 """Quantum Processing Unit (QPU)
 
-This submodule is used to run all experiments on hardware.
+This module is used to run all experiments on hardware.
 
-Basic example useage:
+Basic example usage::
 
     qpu = QPU(config)
     qpu.run(circuit)
@@ -10,26 +10,27 @@ Basic example useage:
 import logging
 import timeit
 from collections.abc import Iterable
+from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Dict, List
 
-import numpy as np
 import pandas as pd
 from IPython.display import clear_output
 from numpy.typing import NDArray
 
 import qcal.settings as settings
 from qcal.circuit import CircuitSet
+from qcal.compilation.compiler import Compiler
 from qcal.config import Config
 from qcal.managers.classification_manager import ClassificationManager
 from qcal.managers.data_manager import DataMananger
+from qcal.transpilation.transpiler import Transpiler
 from qcal.utils import load_from_pickle
 
 logger = logging.getLogger(__name__)
-# logger = logging.getLogger('QPU')
 logging.getLogger().setLevel(logging.INFO)
 
 
-__all__ = ('QPU')
+__all__ = ('QPU',)
 
 
 class QPU:
@@ -50,12 +51,14 @@ class QPU:
         '_config',
         '_data_manager',
         '_exp_circuits',
+        '_jit',
         '_measurements',
         '_n_batches',
         '_n_circs_per_seq',
         '_n_levels',
         '_n_shots',
         '_raster_circuits',
+        '_rcorr_cmat',
         '_runtime',
         '_sequence',
         '_transpiled_circuits',
@@ -65,13 +68,14 @@ class QPU:
     def __init__(
             self,
             config:          Config,
-            compiler:        Any | None = None,
-            transpiler:      Any | None = None,
-            classifier:      ClassificationManager = None,
+            compiler:        Any | Compiler | List[Any] | None = None,
+            transpiler:      Any | Transpiler | List[Any] | None = None,
+            classifier:      ClassificationManager | None = None,
             n_shots:         int = 1024,
             n_batches:       int = 1,
             n_circs_per_seq: int = 1,
             n_levels:        int = 2,
+            jit:             bool = True,
             raster_circuits: bool = False,
             rcorr_cmat:      pd.DataFrame | None = None,
         ) -> None:
@@ -79,12 +83,14 @@ class QPU:
 
         Args:
             config (Config): qcal config object.
-            compiler (Any | Compiler | None, optional): a custom compiler to
-                compile the experimental circuits. Defaults to None.
-            transpiler (Any | None, optional): a custom transpiler to
-                transpile the experimental circuits. Defaults to None.
-            classifier (ClassificationManager, optional): manager used for
-                classifying raw data. Defaults to None.
+            compiler (Any | Compiler | List[Any] | None, optional): a custom
+                (set of) compilers to compile the experimental circuits.
+                Defaults to ``None``.
+            transpiler (Any | Transpiler | List[Any] | None, optional): a custom
+                (set of) transpiler(s) to transpile the experimental circuits.
+                Defaults to ``None``.
+            classifier (ClassificationManager | None, optional): manager used
+                for classifying raw data. Defaults to ``None``.
             n_shots (int, optional): number of measurements per circuit.
                 Defaults to 1024.
             n_batches (int, optional): number of batches of measurements.
@@ -94,14 +100,18 @@ class QPU:
             n_levels (int, optional): number of energy levels to be measured.
                 Defaults to 2. If n_levels = 3, this assumes that the
                 measurement supports qutrit classification.
+            jit (bool, optional): enable just-in-time compilation. Defaults to
+                ``True``. When ``True``, the classical prep (compile, transpile,
+                generate_sequence) for batch i+1 runs concurrently with the
+                hardware acquisition of batch i.
             raster_circuits (bool, optional): whether to raster through all
-                circuits in a batch during measurement. Defaults to False. By
-                default, all circuits in a batch will be measured n_shots times
-                one by one. If True, all circuits in a batch will be measured
-                back-to-back one shot at a time. This can help average out the
-                effects of drift on the timescale of a measurement.
+                circuits in a batch during measurement. Defaults to ``False``.
+                By default, all circuits in a batch will be measured ``n_shots``
+                times one by one. If ``True``, all circuits in a batch will be
+                measured back-to-back one shot at a time. This can help average
+                out the effects of drift on the timescale of a measurement.
             rcorr_cmat (pd.DataFrame | None, optional): confusion matrix for
-                readout correction. Defaults to None. If passed, the readout
+                readout correction. Defaults to ``None``. If passed, the readout
                 correction will be applied to the raw bit strings in
                 post-processing.
         """
@@ -112,6 +122,7 @@ class QPU:
         self._n_shots = n_shots
         self._n_batches = n_batches
         self._n_circs_per_seq = n_circs_per_seq
+        self._jit = jit
         self._raster_circuits = raster_circuits
         self._rcorr_cmat = rcorr_cmat
 
@@ -145,11 +156,11 @@ class QPU:
         self._data_manager = DataMananger()
 
     @property
-    def circuits(self) -> Any:
+    def circuits(self) -> Any | CircuitSet | None:
         """Circuits.
 
         Returns:
-            Any: all loaded circuits.
+            Any | CircuitSet | None: all loaded circuits.
         """
         return self._circuits
 
@@ -163,47 +174,57 @@ class QPU:
         return self._classified_results
 
     @property
-    def classifier(self) -> ClassificationManager:
+    def classifier(self) -> ClassificationManager | None:
         """Classification manager.
 
         Returns:
-            ClassificationManager: current ClassificationManager instance.
+            ClassificationManager | None: current ClassificationManager
+                instance.
         """
         return self._classifier
 
     @property
-    def compiled_circuits(self) -> Any:
+    def compiled_circuits(self) -> Any | CircuitSet | None:
         """Compiled circuits.
 
         Returns:
-            Any: all compiled circuits.
+            Any | CircuitSet | None: all compiled circuits.
         """
         return self._compiled_circuits
 
     @property
-    def exp_circuits(self) -> Any:
+    def exp_circuits(self) -> CircuitSet | None:
         """Experimental circuits.
 
         Returns:
-            Any: experimental circuits of the current batch.
+            CircuitSet | None: experimental circuits of the current batch.
         """
         return self._exp_circuits
 
     @property
-    def compiler(self) -> Any | List[Any]:
-        """Returns the compiler(s) loaded to the QPU.
+    def jit(self) -> bool:
+        """Whether just-in-time compilation is enabled.
 
         Returns:
-            Any | List[Any]: circuit compiler
+            bool: ``True`` if JIT is enabled.
+        """
+        return self._jit
+
+    @property
+    def compiler(self) -> Any | Compiler | List[Any] | None:
+        """Compiler(s) loaded to the QPU.
+
+        Returns:
+            Any | Compiler | List[Any] | None: circuit compiler(s).
         """
         return self._compiler
 
     @property
     def config(self) -> Config:
-        """Returns the config loaded to the QPU.
+        """Config loaded to the QPU.
 
         Returns:
-            Config: experimental config
+            Config: experimental config.
         """
         return self._config
 
@@ -218,7 +239,7 @@ class QPU:
 
     @property
     def measurements(self) -> List[Any]:
-        """Returns the list of measurement objects.
+        """Measurement objects.
 
         Returns:
             List[Any]: measurements.
@@ -236,7 +257,7 @@ class QPU:
 
     @property
     def sequence(self) -> Any:
-        """Returns the current sequence.
+        """Current pulse sequence.
 
         Returns:
             Any: pulse sequence. The format will depend on the hardware backend.
@@ -244,37 +265,37 @@ class QPU:
         return self._sequence
 
     @property
-    def transpiled_circuits(self) -> Any:
+    def transpiled_circuits(self) -> Any | CircuitSet | None:
         """Transpiled circuits.
 
         Returns:
-            Any: all transpiled circuits.
+            Any | CircuitSet | None: all transpiled circuits.
         """
         return self._transpiled_circuits
 
     @property
-    def transpiler(self) -> Any | List[Any]:
-        """Returns the transpiler(s) loaded to the QPU.
+    def transpiler(self) -> Any | Transpiler | List[Any] | None:
+        """Transpiler(s) loaded to the QPU.
 
         Returns:
-            Any | List[Any]: circuit transpiler
+            Any | Transpiler | List[Any] | None: circuit transpiler(s).
         """
         return self._transpiler
 
     def _initialize(
         self,
-        circuits:  Any | List[Any],
+        circuits:  CircuitSet | List[Any],
         n_shots:   int | None = None,
         n_batches: int | None = None
     ) -> None:
         """Initialize the experiment.
 
         Args:
-            circuits (Union[Any, List[Any]]): circuits to measure.
-            n_shots (Union[int, None], optional): number of shots per batch.
-                Defaults to None.
-            n_batches (Union[int, None], optional): number of batches of shots.
-                Defaults to None.
+            circuits (CircuitSet | List[Any]): circuits to measure.
+            n_shots (int | None, optional): number of shots per batch.
+                Defaults to ``None``.
+            n_batches (int | None, optional): number of batches of shots.
+                Defaults to ``None``.
         """
         self._data_manager.generate_exp_id()  # Create a new experimental id
 
@@ -292,7 +313,7 @@ class QPU:
         if n_shots is not None:
             self._n_shots = n_shots
         if n_batches is not None:
-            self._batches = n_batches
+            self._n_batches = n_batches
 
         self._measurements = []
         self._runtime = pd.DataFrame({
@@ -305,6 +326,25 @@ class QPU:
             'Total':      0.0},
           index=['Time (s)']
         )
+
+    def _prepare(self) -> None:
+        """Compile, transpile, and generate sequences (classical CPU tasks)."""
+        if self._compiler is not None:
+            logger.info(' Compiling circuits...')
+            t0 = timeit.default_timer()
+            self.compile()
+            self._runtime['Compile'] += round(timeit.default_timer() - t0, 1)
+
+        if self._transpiler is not None:
+            logger.info(' Transpiling circuits...')
+            t0 = timeit.default_timer()
+            self.transpile()
+            self._runtime['Transpile'] += round(timeit.default_timer() - t0, 1)
+
+        logger.info(' Generating sequences...')
+        t0 = timeit.default_timer()
+        self.generate_sequence()
+        self._runtime['Sequencing'] += round(timeit.default_timer() - t0, 1)
 
     def compile(self) -> None:
         """Compile the circuits using a custom compiler."""
@@ -324,7 +364,7 @@ class QPU:
             self._exp_circuits = self._transpiler.transpile(self._exp_circuits)
         self._transpiled_circuits.append(self._exp_circuits)
 
-    def generate_sequence(self, circuits: Iterable) -> None:
+    def generate_sequence(self) -> None:
         """Generate a sequence from circuits."""
         pass
 
@@ -348,86 +388,106 @@ class QPU:
         pass
 
     def measure(self) -> None:
-        """Measure a set of circuits.
-
-        Args:
-            circuits (Any): circuits to measure.
-        """
-        if self._compiler is not None:
-            logger.info(' Compiling circuits...')
-            t0 = timeit.default_timer()
-            self.compile()
-            self._runtime['Compile'] += round(
-                    timeit.default_timer() - t0, 1
-                )
-
-        if self._transpiler is not None:
-            logger.info(' Transpiling circuits...')
-            t0 = timeit.default_timer()
-            self.transpile()
-            self._runtime['Transpile'] += round(
-                    timeit.default_timer() - t0, 1
-                )
-
-        logger.info(' Generating sequences...')
-        t0 = timeit.default_timer()
-        self.generate_sequence()
-        self._runtime['Sequencing'] += round(
-            timeit.default_timer() - t0, 1
-        )
+        """Measure a set of circuits."""
+        self._prepare()
 
         logger.info(' Writing sequences...')
         t0 = timeit.default_timer()
         self.write()
-        self._runtime['Write'] += round(
-            timeit.default_timer() - t0, 1
-        )
+        self._runtime['Write'] += round(timeit.default_timer() - t0, 1)
 
         logger.info(' Measuring...')
         t0 = timeit.default_timer()
         self.acquire()
-        self._runtime['Measure'] += round(
-                timeit.default_timer() - t0, 1
-            )
+        self._runtime['Measure'] += round(timeit.default_timer() - t0, 1)
 
     def _batch_measurements(self) -> None:
-        """Measurement batcher."""
+        """Measurement batcher with JIT classical/quantum overlap.
+
+        For multi-batch runs, the classical prep (compile, transpile,
+        generate_sequence) for batch i+1 runs on the CPU while the hardware
+        is acquiring batch i, parallelizing the classical and quantum execution
+        time.
+        """
+        def _acquire() -> None:
+            """Helper function to acquire in a background thread."""
+            t0 = timeit.default_timer()
+            self.acquire()
+            self._runtime['Measure'] += round(timeit.default_timer() - t0, 1)
+
         if self._circuits.n_circuits <= self._n_circs_per_seq:
             logger.info(' No batching...')
             self.measure()
 
         else:
-            n_circ_batches = int(
-                    np.ceil(self._circuits.n_circuits / self._n_circs_per_seq)
-                )
+            batches = list(self._circuits.batch(self._n_circs_per_seq))
+            n_circ_batches = len(batches)
             logger.info(
                 f' Dividing {self._circuits.n_circuits} circuits into '
                 f'{n_circ_batches} batches of size {self._n_circs_per_seq}...'
             )
 
-            for i, circuits in enumerate(
-                self._circuits.batch(self._n_circs_per_seq)):
-                self._exp_circuits = circuits
-                if i > 4:
-                    clear_output(wait=True)
+            if self._jit:
+                # Prepare the first batch before entering the pipeline loop.
+                self._exp_circuits = batches[0]
                 logger.info(
-             f' Batch {i+1}/{n_circ_batches}: {circuits.n_circuits} circuit(s)'
+                    f' Batch 1/{n_circ_batches}: {batches[0].n_circuits} circuit(s)'
                 )
-                self.measure()
+                self._prepare()
+
+                with ThreadPoolExecutor(max_workers=1) as pool:
+                    for i in range(n_circ_batches):
+                        if i > 4:
+                            clear_output(wait=True)
+
+                        logger.info(' Writing sequences...')
+                        t0 = timeit.default_timer()
+                        self.write()
+                        self._runtime['Write'] += round(
+                            timeit.default_timer() - t0, 1
+                        )
+
+                        # Acquire in a background thread; self._sequence has
+                        # already been sent to hardware so the main thread can
+                        # safely overwrite it while the hardware runs.
+                        logger.info(' Measuring...')
+                        future = pool.submit(_acquire)
+
+                        # Prepare the next batch concurrently with acquire.
+                        if i + 1 < n_circ_batches:
+                            self._exp_circuits = batches[i + 1]
+                            logger.info(
+                                f' Batch {i+2}/{n_circ_batches}: '
+                                f'{batches[i+1].n_circuits} circuit(s)'
+                            )
+                            self._prepare()
+
+                        future.result()  # re-raises any exception from acquire
+
+            else:
+                for i, circuits in enumerate(
+                    self._circuits.batch(self._n_circs_per_seq)
+                ):
+                    self._exp_circuits = circuits
+                    if i > 4:
+                        clear_output(wait=True)
+                    logger.info(
+                        f' Batch {i+1}/{n_circ_batches}: '
+                        f'{circuits.n_circuits} circuit(s)'
+                    )
+                    self.measure()
 
         logger.info(' Processing...')
         t0 = timeit.default_timer()
         self.process()
-        self._runtime['Process'] += round(
-                timeit.default_timer() - t0, 1
-            )
+        self._runtime['Process'] += round(timeit.default_timer() - t0, 1)
 
     def save(self, create_data_path: bool = True) -> None:
         """Save all circuits and data.
 
         Args:
             create_data_path (bool, optional): whether to create a data save
-                path. Defaults to True.
+                path. Defaults to ``True``.
         """
         if create_data_path:
             self._data_manager.create_data_path()
@@ -477,13 +537,13 @@ class QPU:
         """Run all experimental methods.
 
         Args:
-            circuits (Union[Any, List[Any]]): circuits to measure.
-            n_shots (Union[int, None], optional): number of shots per batch.
-                Defaults to None.
-            n_batches (Union[int, None], optional): number of batches of shots.
-                Defaults to None.
+            circuits (Any | List[Any]): circuits to measure.
+            n_shots (int | None, optional): number of shots per batch.
+                Defaults to ``None``.
+            n_batches (int | None, optional): number of batches of shots.
+                Defaults to ``None``.
             save (bool): whether or not to save data at the end of the run
-                method. Defaults to True. This should be used for determining
+                method. Defaults to ``True``. This should be used for determining
                 when the data is saved for custom QPUs which inherit this
                 class.
         """
