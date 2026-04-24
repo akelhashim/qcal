@@ -19,6 +19,7 @@ jobs:
   release:
     name: Create release
     runs-on: ubuntu-latest
+    if: github.actor != 'github-actions[bot]'
     permissions:
       contents: write
 
@@ -106,7 +107,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add CHANGELOG.md qcal/__init__.py
-          git commit -m "Release v${VERSION} [skip ci]"
+          git commit -m "Release v${VERSION}"
           git tag -a "v${VERSION}" -m "Release v${VERSION}"
           git push --follow-tags
 
