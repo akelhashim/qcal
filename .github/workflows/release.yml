@@ -4,12 +4,21 @@ on:
   push:
     branches:
       - main
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to release (e.g. 1.1.0). Omit to infer bump type from CHANGELOG [Unreleased] content."
+        required: false
+        default: ""
+
+concurrency:
+  group: release
+  cancel-in-progress: false
 
 jobs:
   release:
     name: Create release
     runs-on: ubuntu-latest
-    if: github.actor != 'github-actions[bot]'
     permissions:
       contents: write
 
@@ -27,55 +36,82 @@ jobs:
 
       - name: Check for unreleased changes
         id: check
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
         run: |
-          if python scripts/release.py --dry-run > /dev/null 2>&1; then
-            echo "has_changes=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "has_changes=false" >> "$GITHUB_OUTPUT"
+          # scripts/release.py --check should print "yes" or "no" on stdout
+          # and exit 0. Any nonzero exit is a real error and fails the job.
+          result=$(python scripts/release.py --check)
+          echo "has_changes=$result" >> "$GITHUB_OUTPUT"
+
+          # If someone manually triggered with an explicit version but the
+          # changelog has nothing to release, fail loudly instead of silently
+          # skipping every remaining step.
+          if [ "$result" = "no" ] && [ -n "$INPUT_VERSION" ]; then
+            echo "ERROR: version '$INPUT_VERSION' was requested but CHANGELOG [Unreleased] has no releasable content" >&2
+            exit 1
           fi
 
       - name: Run release script
-        if: steps.check.outputs.has_changes == 'true'
-        run: python scripts/release.py
+        if: steps.check.outputs.has_changes == 'yes'
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          if [ -n "$INPUT_VERSION" ]; then
+            python scripts/release.py "$INPUT_VERSION"
+          else
+            python scripts/release.py
+          fi
 
       - name: Get new version
-        if: steps.check.outputs.has_changes == 'true'
+        if: steps.check.outputs.has_changes == 'yes'
         id: version
         run: |
-          python -c "
-          import re, pathlib
+          python - >> "$GITHUB_OUTPUT" <<'EOF'
+          import re, pathlib, sys
           text = pathlib.Path('qcal/__init__.py').read_text()
-          m = re.search(r'__version__\s*=\s*\"([^\"]+)\"', text)
-          print('version=' + m.group(1))
-          " >> "$GITHUB_OUTPUT"
+          m = re.search(r'__version__\s*=\s*"([^"]+)"', text)
+          if not m:
+              print("ERROR: could not find __version__ in qcal/__init__.py", file=sys.stderr)
+              sys.exit(1)
+          print(f"version={m.group(1)}")
+          EOF
 
       - name: Extract release notes
-        if: steps.check.outputs.has_changes == 'true'
+        if: steps.check.outputs.has_changes == 'yes'
         env:
           VERSION: ${{ steps.version.outputs.version }}
         run: |
           python - <<'EOF'
-          import re, pathlib, os
+          import re, pathlib, os, sys
           version = os.environ["VERSION"]
           changelog = pathlib.Path("CHANGELOG.md").read_text(encoding="utf-8")
           pattern = rf"## \[{re.escape(version)}\][^\n]*\n(.*?)(?=\n## \[|\Z)"
           m = re.search(pattern, changelog, re.DOTALL)
-          notes = m.group(1).strip() if m else ""
+          if not m:
+              print(f"ERROR: no CHANGELOG section for version {version}", file=sys.stderr)
+              sys.exit(1)
+          notes = m.group(1).strip()
+          if not notes:
+              print(f"ERROR: CHANGELOG section for {version} is empty", file=sys.stderr)
+              sys.exit(1)
           pathlib.Path("release_notes.md").write_text(notes, encoding="utf-8")
           EOF
 
       - name: Commit and tag
-        if: steps.check.outputs.has_changes == 'true'
+        if: steps.check.outputs.has_changes == 'yes'
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add CHANGELOG.md qcal/__init__.py
-          git commit -m "Release v${{ steps.version.outputs.version }}"
-          git tag "v${{ steps.version.outputs.version }}"
+          git commit -m "Release v${VERSION} [skip ci]"
+          git tag -a "v${VERSION}" -m "Release v${VERSION}"
           git push --follow-tags
 
       - name: Create GitHub Release
-        if: steps.check.outputs.has_changes == 'true'
+        if: steps.check.outputs.has_changes == 'yes'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ steps.version.outputs.version }}
