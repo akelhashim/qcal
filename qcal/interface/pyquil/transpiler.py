@@ -328,9 +328,10 @@ def RZ_F12(theta, q) -> Any:
     return Gate("RZ_F12", [theta], [q])
 
 
-def to_pyquil(
+def _to_pyquil(
     circuit:              Circuit,
     gate_mapper:          GateMapper,
+    ro_ref:               Any | None = None,
     fence_between_cycles: bool = False,
 ):
     """Transpile a qcal circuit to a pyquil Program.
@@ -338,8 +339,10 @@ def to_pyquil(
     Args:
         circuit (Circuit): qcal circuit.
         gate_mapper (GateMapper): map between qcal to quil gates.
+        ro_ref (pyquil.quilatom.MemoryReference | None, optional): reference to
+            the readout memory. Defaults to ``None``.
         fence_between_cycles (bool, optional): whether to add a fence
-            between every cycle. Defaults to False.
+            between every cycle. Defaults to ``True``.
 
     Returns:
         Program: pyquil Program.
@@ -352,7 +355,8 @@ def to_pyquil(
         return
 
     tprogram = Program()
-    ro = tprogram.declare('ro', 'BIT', circuit.n_qubits)
+    if ro_ref is None:
+        ro_ref = tprogram.declare('ro', 'BIT', circuit.n_qubits)
     for cycle in circuit:
         if fence_between_cycles:
             tprogram += FENCE(*circuit.qubits)
@@ -364,15 +368,90 @@ def to_pyquil(
                 if gate.name in ['Meas', 'MCM']:
                     tprogram += gate_mapper[gate.name](
                         gate.qubits[0],
-                        ro[circuit.qubits.index(gate.qubits[0])]
+                        ro_ref[circuit.qubits.index(gate.qubits[0])]
                     )
                 else:
                     tprogram += gate_mapper[gate.name](
                         *gate.qubits, **{
-                            **{'subspace': gate.properties.get('subspace','GE')},
+                            **{
+                                'subspace': gate.properties.get('subspace','GE')
+                            },
                             **gate.properties.get('params',{})
                         }
                     )
+
+    return tprogram
+
+
+def to_pyquil(
+    circuit:              Circuit,
+    gate_mapper:          GateMapper,
+    fence_between_cycles: bool = False,
+    circuit_for_loop:     bool = True
+):
+    """Transpile a qcal circuit to a pyquil Program.
+
+    Args:
+        circuit (Circuit): qcal circuit.
+        gate_mapper (GateMapper): map between qcal to quil gates.
+        circuit_for_loop (bool, optional): loops over circuit partitions for
+                circuits with repeated structures. Defaults to ``False``.
+        fence_between_cycles (bool, optional): whether to add a fence
+            between every cycle. Defaults to ``True``.
+
+    Returns:
+        Program: pyquil Program.
+    """
+    try:
+        from pyquil import Program
+        from pyquil.gates import MOVE, SUB
+        from pyquil.quilatom import LabelPlaceholder
+        from pyquil.quilbase import JumpTarget, JumpWhen
+    except ImportError:
+        logger.warning(' Unable to import pyquil!')
+        return
+
+    tprogram = Program()
+    ro_ref = tprogram.declare('ro', 'BIT', circuit.n_qubits)
+    if circuit_for_loop:
+        for i, (sub_circuit, n_reps) in enumerate(circuit.partitions):
+            if n_reps == 1:
+                tprogram += _to_pyquil(
+                    Circuit(sub_circuit), gate_mapper, ro_ref=ro_ref,
+                    fence_between_cycles=fence_between_cycles
+                )
+
+            elif n_reps > 1:
+                counter = tprogram.declare(f'counter{i}', 'INTEGER')
+                tsub_program = _to_pyquil(
+                    Circuit(sub_circuit), gate_mapper, ro_ref=ro_ref,
+                    fence_between_cycles=fence_between_cycles
+                )
+
+                # Version 1
+                loop = tsub_program.with_loop(
+                    num_iterations=n_reps,
+                    iteration_count_reference=counter,
+                    start_label=LabelPlaceholder('START'),
+                    end_label=LabelPlaceholder('END'),
+                )
+                tprogram += loop
+
+                # Version 2
+                # tprogram += MOVE(counter, n_reps)
+                # start = LabelPlaceholder("START")
+                # tprogram += JumpTarget(start)
+                # tprogram += tsub_program
+                # tprogram += SUB(counter, 1)
+                # tprogram += JumpWhen(target=start, condition=counter)
+
+        tprogram.resolve_label_placeholders()
+
+    else:
+        tprogram += _to_pyquil(
+            circuit, gate_mapper, ro_ref=ro_ref,
+            fence_between_cycles=fence_between_cycles
+        )
 
     return tprogram
 
@@ -385,13 +464,16 @@ class PyquilTranspiler(Transpiler):
     def __init__(
         self,
         gate_mapper:          Dict | GateMapper | None = None,
-        fence_between_cycles: bool = False,
+        circuit_for_loop:     bool = False,
+        fence_between_cycles: bool = True,
     ) -> None:
         """Initialize with a GateMapper.
 
         Args:
             gate_mapper (Dict | GateMapper | None, optional): dictionary which
                 maps qcal gates to pyquil gates. Defaults to ``None``.
+            circuit_for_loop (bool, optional): loops over circuit partitions for
+                circuits with repeated structures. Defaults to ``False``.
             fence_between_cycles (bool, optional): whether to add a fence
                 between every cycle. Defaults to ``True``.
         """
@@ -428,6 +510,7 @@ class PyquilTranspiler(Transpiler):
             gate_mapper = GateMapper(gate_mapper)
 
         self._fence_between_cycles = fence_between_cycles
+        self._circuit_for_loop = circuit_for_loop
 
         super().__init__(gate_mapper=gate_mapper)
 
@@ -449,7 +532,10 @@ class PyquilTranspiler(Transpiler):
         for circuit in circuits:
             tprograms.append(
                 to_pyquil(
-                    circuit, self._gate_mapper, self._fence_between_cycles
+                    circuit=circuit,
+                    gate_mapper=self._gate_mapper,
+                    fence_between_cycles=self._fence_between_cycles,
+                    circuit_for_loop=self._circuit_for_loop
                 )
             )
 
