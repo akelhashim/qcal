@@ -414,7 +414,7 @@ def to_pyquil(
     tprogram = Program()
     ro_ref = tprogram.declare('ro', 'BIT', circuit.n_qubits)
     if circuit_for_loop:
-        for i, (sub_circuit, n_reps) in enumerate(circuit.partitions):
+        for sub_circuit, n_reps in circuit.partitions:
             if n_reps == 1:
                 tprogram += _to_pyquil(
                     Circuit(sub_circuit), gate_mapper, ro_ref=ro_ref,
@@ -422,28 +422,23 @@ def to_pyquil(
                 )
 
             elif n_reps > 1:
-                counter = tprogram.declare(f'counter{i}', 'INTEGER')
+                counter = tprogram.declare(
+                    f'counter{to_pyquil._counter}', 'INTEGER'
+                )
                 tsub_program = _to_pyquil(
                     Circuit(sub_circuit), gate_mapper, ro_ref=ro_ref,
                     fence_between_cycles=fence_between_cycles
                 )
 
-                # Version 1
                 loop = tsub_program.with_loop(
                     num_iterations=n_reps,
                     iteration_count_reference=counter,
-                    start_label=LabelPlaceholder('START'),
-                    end_label=LabelPlaceholder('END'),
+                    start_label=LabelPlaceholder(f'START{to_pyquil._counter}'),
+                    end_label=LabelPlaceholder(f'END{to_pyquil._counter}'),
                 )
                 tprogram += loop
 
-                # Version 2
-                # tprogram += MOVE(counter, n_reps)
-                # start = LabelPlaceholder("START")
-                # tprogram += JumpTarget(start)
-                # tprogram += tsub_program
-                # tprogram += SUB(counter, 1)
-                # tprogram += JumpWhen(target=start, condition=counter)
+                to_pyquil._counter += 1
 
         tprogram.resolve_label_placeholders()
 
@@ -454,6 +449,9 @@ def to_pyquil(
         )
 
     return tprogram
+
+
+to_pyquil._counter = 0
 
 
 class PyquilTranspiler(Transpiler):
@@ -538,6 +536,9 @@ class PyquilTranspiler(Transpiler):
                     circuit_for_loop=self._circuit_for_loop
                 )
             )
+
+        if self._circuit_for_loop:
+            to_pyquil._counter = 0
 
         tprograms = CircuitSet(circuits=tprograms)
         return tprograms
