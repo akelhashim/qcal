@@ -21,6 +21,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- RPE uncertainty to include uncertainty due to shot noise
+
 ### Security
 
 ## [1.1.1] - 2026-04-24
