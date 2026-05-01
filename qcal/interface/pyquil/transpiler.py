@@ -3,7 +3,7 @@
 """
 import logging
 from collections.abc import Callable, Iterator, Mapping
-from typing import Any, Dict, List
+from typing import Any, Dict, Iterable, List
 
 import numpy as np
 
@@ -331,14 +331,21 @@ def RZ_F12(theta, q) -> Any:
 def _to_pyquil(
     circuit:              Circuit,
     gate_mapper:          GateMapper,
+    qubits:               Iterable[int] | None = None,
     ro_ref:               Any | None = None,
-    fence_between_cycles: bool = False,
+    fence_between_cycles: bool = True,
 ):
     """Transpile a qcal circuit to a pyquil Program.
 
     Args:
         circuit (Circuit): qcal circuit.
         gate_mapper (GateMapper): map between qcal to quil gates.
+        qubits (Iterable[int] | None, optional): qubits to include in the
+            program. Defaults to ``None``, in which case all qubits in the
+            passed circuit are included. Being able to pass the circuit qubits
+            is useful for transpiling circuit partitions into for-loops, in
+            which case the qubits in the partition may be a subset of the qubits
+            in the entire circuit.
         ro_ref (pyquil.quilatom.MemoryReference | None, optional): reference to
             the readout memory. Defaults to ``None``.
         fence_between_cycles (bool, optional): whether to add a fence
@@ -354,12 +361,13 @@ def _to_pyquil(
         logger.warning(' Unable to import pyquil!')
         return
 
+    qubits = circuit.qubits if qubits is None else qubits
     tprogram = Program()
     if ro_ref is None:
         ro_ref = tprogram.declare('ro', 'BIT', circuit.n_qubits)
     for cycle in circuit:
         if fence_between_cycles:
-            tprogram += FENCE(*circuit.qubits)
+            tprogram += FENCE(*qubits)
 
         if isinstance(cycle, Barrier):
             tprogram += FENCE(*cycle.qubits)
@@ -404,9 +412,7 @@ def to_pyquil(
     """
     try:
         from pyquil import Program
-        from pyquil.gates import MOVE, SUB
         from pyquil.quilatom import LabelPlaceholder
-        from pyquil.quilbase import JumpTarget, JumpWhen
     except ImportError:
         logger.warning(' Unable to import pyquil!')
         return
@@ -417,8 +423,8 @@ def to_pyquil(
         for sub_circuit, n_reps in circuit.partitions:
             if n_reps == 1:
                 tprogram += _to_pyquil(
-                    Circuit(sub_circuit), gate_mapper, ro_ref=ro_ref,
-                    fence_between_cycles=fence_between_cycles
+                        Circuit(sub_circuit), gate_mapper, qubits=circuit.qubits,
+                        ro_ref=ro_ref, fence_between_cycles=fence_between_cycles
                 )
 
             elif n_reps > 1:
@@ -426,8 +432,8 @@ def to_pyquil(
                     f'counter{to_pyquil._counter}', 'INTEGER'
                 )
                 tsub_program = _to_pyquil(
-                    Circuit(sub_circuit), gate_mapper, ro_ref=ro_ref,
-                    fence_between_cycles=fence_between_cycles
+                    Circuit(sub_circuit), gate_mapper, qubits=circuit.qubits,
+                    ro_ref=ro_ref, fence_between_cycles=fence_between_cycles
                 )
 
                 loop = tsub_program.with_loop(
