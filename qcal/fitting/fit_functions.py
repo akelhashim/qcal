@@ -2,8 +2,8 @@
 
 """
 import logging
-import numpy as np
 
+import numpy as np
 from numpy.typing import ArrayLike, NDArray
 
 logger = logging.getLogger(__name__)
