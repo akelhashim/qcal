@@ -658,8 +658,9 @@ def Fidelity(
             for q in self._qubits:
                 self._config[self._params[q]] = self._cal_values[q]
 
-            self._config.save()
-            self._config.load()
+            if settings.Settings.save_data:
+                self._config.save()
+                self._config.load()
 
         def run(self) -> None:
             """Run the experiment."""
@@ -899,8 +900,9 @@ def Separation(
             for q in self._qubits:
                 self._config[self._params[q]] = self._cal_values[q]
 
-            self._config.save()
-            self._config.load()
+            if settings.Settings.save_data:
+                self._config.save()
+                self._config.load()
 
         def run(self) -> None:
             """Run the experiment."""
