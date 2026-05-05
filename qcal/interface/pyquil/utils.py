@@ -1,21 +1,113 @@
 """Helper functions for PyQuil interface.
 
+NOTE: we do not use TYPE_CHECKING for PyQuil types because this might fail if
+PyQuil is not installed when building docs.
 """
+from __future__ import annotations
+
 import logging
-from typing import Any
+from collections import Counter
+from dataclasses import dataclass
+from typing import Any, Dict, FrozenSet, Iterable, List, Sequence, Tuple
+
+from .transpiler import add_X90
 
 logger = logging.getLogger(__name__)
 
 
-def _get_template_object(instr: Any) -> Any | None:
+DEFAULT_SYMMETRIC_GATES: FrozenSet[str] = frozenset(
+    {"CZ", "SWAP", "ISWAP", "XX", "YY", "ZZ"}
+)
+
+
+@dataclass(frozen=True)
+class CycleSignature:
+    name: str
+    formal_qubits: Tuple[int, ...]
+    active_multiset: FrozenSet[Tuple[Tuple, int]]
+    idle_qubits: FrozenSet[int]
+
+
+def _classify(
+    instr: AbstractInstruction, symmetric_gates: FrozenSet[str] # type: ignore # noqa: F821
+) -> Tuple[str, object]:
+    """Classify an instruction for parallel-cycle matching.
+
+    Sorts each instruction into one of three roles the matcher cares about:
+
+    - ``"idle"``: an ``I q`` gate, treated as an idle marker rather than an
+      active operation. The payload is the integer qubit index. Idles are
+      collected into a separate set per block and checked against the
+      DefCircuit's idle qubits as a subset constraint, so manual programs
+      can omit them entirely.
+    - ``"active"``: a real gate or a measurement that must appear in any
+      matching block. The payload is a hashable canonical key suitable for
+      use in a ``Counter`` / ``frozenset`` multiset:
+
+      * For ``Gate``: ``("GATE", name, modifiers, params, qubits)``, where
+        ``qubits`` is sorted for gates listed in ``symmetric_gates`` (so
+        ``CZ 12 13`` and ``CZ 13 12`` produce equal keys) and left in order
+        otherwise (preserving control/target distinction for e.g. ``CNOT``).
+        Modifiers (``DAGGER``, ``CONTROLLED``, ``FORKED``) and gate
+        parameters are part of the key, so a ``DAGGER CZ`` won't match a
+        plain ``CZ``.
+      * For ``Measurement``: ``("MEASURE", qubit_index)``. The classical
+        target is intentionally dropped so that ``MEASURE 27 ro[0]`` in a
+        user program matches ``MEASURE q27`` in a DefCircuit body.
+    - ``"boundary"``: anything else (``Pragma``, ``Fence``, ``Delay``,
+      ``Reset``, frame / pulse-level operations, etc.). The payload is
+      ``None``. Boundary instructions terminate the in-progress block and
+      are preserved verbatim in the rewritten program.
+
+    Args:
+        instr (AbstractInstruction): the pyquil instruction to classify.
+        symmetric_gates (FrozenSet[str]): Names of two-qubit gates whose
+            argument order is irrelevant. Qubits in active keys for these gates
+            are sorted before being placed in the key, so that argument order
+            does not affect matching.
+
+    Returns:
+        A ``(kind, payload)`` tuple where ``kind`` is one of ``"idle"``,
+        ``"active"``, or ``"boundary"``, and ``payload`` is a qubit index,
+        a canonical instruction key, or ``None`` respectively.
+    """
+    try:
+        from pyquil.quilbase import Gate, Measurement
+    except ImportError as exc:
+        raise ImportError("Unable to import PyQuil!") from exc
+
+    if _is_identity(instr):
+        return ("idle", _qubit_index(instr.qubits[0]))
+
+    elif isinstance(instr, Gate):
+        qubits = tuple(_qubit_index(q) for q in instr.qubits)
+        if instr.name in symmetric_gates and len(qubits) == 2:
+            qubits = tuple(sorted(qubits))
+        key = (
+            "GATE",
+            instr.name,
+            tuple(instr.modifiers) if instr.modifiers else (),
+            tuple(instr.params),
+            qubits,
+        )
+        return ("active", key)
+
+    elif isinstance(instr, Measurement):
+        return ("active", ("MEASURE", _qubit_index(instr.qubit)))
+
+    else:
+        return ("boundary", None)
+
+
+def _get_template_object(instr: Pulse | Capture) -> Any | None:  # type: ignore  # noqa: F821
     """Return the template object carried by a Pulse or Capture instruction.
 
     For a ``Pulse``, this returns ``instr.waveform``. For a ``Capture``, this
     returns ``instr.kernel``.
 
     Args:
-        instr (Any): A Quil-T instruction that may carry a waveform-like
-            template object.
+        instr (Pulse | Capture): a Quil-T instruction that may carry a
+            waveform-like template object.
 
     Returns:
         Any | None: The waveform-like object attached to the instruction,
@@ -24,30 +116,101 @@ def _get_template_object(instr: Any) -> Any | None:
     try:
         from pyquil.quilbase import Capture, Pulse
     except ImportError as exc:
-        raise ImportError("Unable to import pyquil!") from exc
+        raise ImportError("Unable to import PyQuil!") from exc
 
     if isinstance(instr, Pulse):
         return instr.waveform
-    if isinstance(instr, Capture):
+    elif isinstance(instr, Capture):
         return instr.kernel
-    return None
+    else:
+        return None
 
 
-def _set_template_object(instr: Any, obj: Any) -> None:
-    """Write a template object back to a Pulse or Capture instruction.
+def _is_identity(instr: AbstractInstruction) -> bool:  # type: ignore  # noqa: F821
+    """Check whether an instruction is a plain identity gate (``I q``).
+
+    Identity gates have a special role in the matcher: inside a ``DEFCIRCUIT``
+    body they are treated as *idle markers* — declarations that a qubit
+    participates in the parallel cycle but performs no operation — rather
+    than as ordinary single-qubit gates. The matcher therefore needs to
+    classify them separately from active gates so it can build the
+    signature's ``idle_qubits`` set and apply the looser subset check at
+    match time, instead of demanding that manual programs reproduce every
+    ``I q`` line verbatim.
+
+    The check requires the gate to be exactly ``I`` with no modifiers
+    (e.g. ``DAGGER I q``) and no parameters. A modified or parameterized
+    ``I`` is unusual but not impossible, and treating it as a plain idle
+    would silently drop information; such instructions fall through to be
+    handled as regular active gates instead.
 
     Args:
-        instr (Any): A Quil-T instruction that carries a waveform-like template
-            object.
-        obj (Any): The updated waveform-like object to assign.
+        instr (AbstractInstruction): any PyQuil instruction.
+
+    Returns:
+        ``True`` if ``instr`` is an unmodified, unparameterized ``I`` gate,
+        ``False`` otherwise (including for non-``Gate`` instructions such as
+        ``Measurement``, ``Pragma``, or ``Fence``).
+    """
+    try:
+        from pyquil.quilbase import Gate
+    except ImportError as exc:
+        raise ImportError("Unable to import PyQuil!") from exc
+
+    return (
+        isinstance(instr, Gate)
+        and instr.name == "I"
+        and not instr.modifiers
+        and not instr.params
+    )
+
+
+def _make_invocation(name: str, qubits: Sequence[int]) -> Gate: # type: ignore  # noqa: F821
+    """Construct a DefCircuit invocation as a parameterless ``Gate``.
+
+    A DefCircuit call in Quil is syntactically indistinguishable from a
+    gate application — ``CZ_3 1 2 7 ...`` parses the same way as a
+    multi-qubit gate with no parameters — so pyquil represents it with the
+    same ``Gate`` class. This helper centralizes that fact: when a block
+    matches a signature, the matcher emits one of these in place of the
+    block's instructions.
+
+    Args:
+        name: The DefCircuit name (used as the gate name in the emitted
+            instruction), e.g. ``"CZ_3"`` or ``"MEASURE_ANCILLA"``.
+        qubits: Concrete physical qubit indices, in the order declared by
+            the DefCircuit's formal parameter list. These are wrapped in
+            ``Qubit`` objects to form the gate's qubit arguments.
+
+    Returns:
+        A ``Gate`` whose ``out()`` renders as ``"<name> q0 q1 ..."``,
+        suitable for direct insertion into a ``Program``'s instruction
+        stream.
+    """
+    try:
+        from pyquil.quilatom import Qubit
+        from pyquil.quilbase import Gate
+    except ImportError as exc:
+        raise ImportError("Unable to import PyQuil!") from exc
+
+    return Gate(name=name, params=[], qubits=[Qubit(q) for q in qubits])
+
+
+def _set_template_object(instr: Pulse | Capture, obj: Any) -> None:  # type: ignore  # noqa: F821
+    """Write a template object back to a ``Pulse`` or ``Capture`` instruction.
+
+    Args:
+        instr (Pulse | Capture): a Quil-T instruction that carries a
+            waveform-like template object.
+        obj (Any): the updated waveform-like object to assign.
 
     Raises:
-        TypeError: If ``instr`` is not a supported instruction type.
+        TypeError: if ``instr`` is not a supported instruction type.
     """
     try:
         from pyquil.quilbase import Capture, Pulse
     except ImportError as exc:
-        raise ImportError("Unable to import pyquil!") from exc
+        raise ImportError("Unable to import PyQuil!") from exc
 
     if isinstance(instr, Pulse):
         instr.waveform = obj
@@ -57,8 +220,92 @@ def _set_template_object(instr: Any, obj: Any) -> None:
         raise TypeError(f"Unsupported instruction type: {type(instr)!r}")
 
 
+def _qubit_index(q: Qubit | FormalArgument | int) -> int:  # type: ignore  # noqa: F821
+    """Coerce a PyQuil qubit reference to its integer index.
+
+    Normalizes the several representations a qubit can take in a parsed PyQuil
+    program so the rest of the matcher can compare qubits with ``==`` and use
+    them as dict / set keys. The three accepted inputs are:
+
+    - ``Qubit(n)``: a concrete physical qubit, as it appears in user-written
+      instructions like ``CZ 12 13``. Returns ``n``.
+    - ``FormalArgument("qN")``: a formal parameter from a ``DEFCIRCUIT`` body
+      (e.g. ``CZ q12 q13``). Returns ``N``. This relies on the convention
+      that formal names have the form ``q<int>`` and that the integer denotes
+      the physical qubit the calibration is written for, which holds for
+      every DefCircuit shipped with the calibration files. Formals that don't
+      match this pattern raise ``ValueError``, since a truly parametric
+      template would need a different matching strategy (binding formals to
+      concretes) than this matcher implements.
+    - ``int``: returned unchanged, as a defensive passthrough for callers
+      that have already unwrapped a qubit.
+
+    Without this normalization, ``Qubit(13)`` from the user's program and
+    ``FormalArgument("q13")`` from a DefCircuit body would hash and compare
+    as distinct objects, and the multiset-based block matching would never
+    find a match.
+
+    Args:
+        q (Qubit | FormalArgument | int): a qubit reference of type ``Qubit``,
+            ``FormalArgument``, or ``int``.
+
+    Returns:
+        int: the integer index of the qubit.
+
+    Raises:
+        ValueError: if ``q`` is a ``FormalArgument`` whose name is not of
+            the form ``q<int>``.
+        TypeError: if ``q`` is not one of the three accepted types.
+    """
+    try:
+        from pyquil.quilatom import FormalArgument, Qubit
+    except ImportError as exc:
+        raise ImportError("Unable to import PyQuil!") from exc
+
+    if isinstance(q, Qubit):
+        return q.index
+    elif isinstance(q, FormalArgument):
+        if q.name.startswith("q") and q.name[1:].isdigit():
+            return int(q.name[1:])
+        raise ValueError(
+            f"Formal argument {q.name!r} is not of the form 'qN'; this matcher "
+            "assumes DefCircuit formals correspond to physical qubits by name."
+        )
+    elif isinstance(q, int):
+        return q
+    else:
+        raise TypeError(f"Unrecognized qubit object: {type(q).__name__}")
+
+
+def add_delay_after_measurements(
+        program: Program, delay: float  # type: ignore  # noqa: F821
+) -> Program:  # type: ignore  # noqa: F821
+    """Add a delay after each measurement in a PyQuil program.
+
+    Args:
+        program (Program): the program to update.
+        delay (float): the delay time in seconds.
+
+    Returns:
+        pyquil.Program: the updated program.
+    """
+    try:
+        from pyquil import Program
+        from pyquil.gates import DELAY
+        from pyquil.quilbase import Measurement
+    except ImportError as exc:
+        raise ImportError("Unable to import PyQuil!") from exc
+
+    new_program: Program = program.copy_everything_except_instructions()
+    for instr in program.instructions:
+        new_program += instr
+        if isinstance(instr, Measurement):
+            new_program += DELAY(instr.qubit, delay)
+    return new_program
+
+
 def get_defcal_param(
-    defcal: Any,
+    defcal: DefCalibration | DefMeasureCalibration,  # type: ignore  # noqa: F821
     param: str,
     *,
     instr_idx: int | None = None,
@@ -74,24 +321,24 @@ def get_defcal_param(
         - ``Capture.kernel``
 
     Args:
-        defcal (pyquil.quilbase.DefCalibration): The calibration object to
-            inspect.
-        param (str): The name of the template parameter to retrieve.
-        instr_idx (int | None, optional): Optional specific instruction index
+        defcal (DefCalibration | DefMeasureCalibration): the calibration object
+            to inspect.
+        param (str): the name of the template parameter to retrieve.
+        instr_idx (int | None, optional): optional specific instruction index
             to inspect. If not provided, all instructions are searched in order.
 
     Returns:
-        Any: The retrieved template parameter value.
+        Any: the retrieved template parameter value.
 
     Raises:
-        IndexError: If ``instr_idx`` is out of range.
-        ValueError: If no supported instruction contains the requested
+        IndexError: if ``instr_idx`` is out of range.
+        ValueError: if no supported instruction contains the requested
             parameter.
     """
     try:
         from pyquil.quilbase import Capture, Pulse
     except ImportError as exc:
-        raise ImportError("Unable to import pyquil!") from exc
+        raise ImportError("Unable to import PyQuil!") from exc
 
     instrs = list(defcal.instructions)
     indices = [instr_idx] if instr_idx is not None else range(len(instrs))
@@ -106,7 +353,6 @@ def get_defcal_param(
             continue
 
         try:
-            # return tmpl.get_parameter(param)
             return getattr(tmpl, param)
         except Exception:
             continue
@@ -117,13 +363,235 @@ def get_defcal_param(
     )
 
 
+def prepend_delay_to_program(program: Program, delay: float) -> Program:  # type: ignore  # noqa: F821
+    """Prepend a delay to a PyQuil program.
+
+    Args:
+        program (Program): the program to update.
+        delay (float): the delay time in seconds.
+
+    Returns:
+        Program: the updated program.
+    """
+    try:
+        from pyquil.gates import DELAY
+    except ImportError as exc:
+        raise ImportError("Unable to import PyQuil!") from exc
+
+    qubits = program.get_qubit_indices()
+    # p = Program()
+    # p += Delay(*qubits, delay)
+    return program.prepend_instructions([DELAY(q, delay) for q in qubits])
+
+
+def prepend_esp_to_measure(program: Program) -> Program:  # type: ignore  # noqa: F821
+    """Prepend an EF Pi pulse (ESP) to each measurement in a PyQuil program.
+
+    Args:
+        program (Program): the program to update.
+
+    Returns
+        Program: the updated program.
+    """
+    try:
+        from pyquil import Program
+        from pyquil.quilbase import Measurement
+    except ImportError as exc:
+        raise ImportError("Unable to import PyQuil!") from exc
+
+    new_program: Program = program.copy_everything_except_instructions()
+    for instr in program.instructions:
+        if isinstance(instr, Measurement):
+            new_program += add_X90(instr.qubit, **{'subspace': 'EF'})
+            new_program += add_X90(instr.qubit, **{'subspace': 'EF'})
+        new_program += instr
+
+    return new_program
+
+
+def prepend_measure_to_program(program: Program) -> Program:  # type: ignore  # noqa: F821
+    """Prepend a measure to a PyQuil program.
+
+    Args:
+        program (Program): the program to update.
+
+    Returns:
+        Program: the updated program.
+    """
+    try:
+        from pyquil.gates import MEASURE
+    except ImportError as exc:
+        raise ImportError("Unable to import PyQuil!") from exc
+
+    qubits = program.get_qubit_indices()
+    measure = [MEASURE(q, ('ro', i)) for i, q in enumerate(sorted(qubits))]
+    return program.prepend_instructions(measure)
+
+
+def replace_parallel_cycles(
+    program:     Program, # type: ignore  # noqa: F821
+    defcircuits: Optional[Iterable[DefCircuit]] = None, # type: ignore  # noqa: F821
+    *,
+    symmetric_gates: FrozenSet[str] = DEFAULT_SYMMETRIC_GATES
+) -> Program: # type: ignore  # noqa: F821
+    """Rewrite parallel-cycle blocks in a program as ``DefCircuit`` invocations.
+
+    Walks the program's instruction stream, partitioning it into blocks of
+    consecutive gate-level instructions (``Gate`` and ``Measurement``)
+    separated by boundary instructions (``Fence``, ``Pragma``, ``Delay``,
+    ``Reset``, frame ops, ...). Each block whose contents match a known
+    ``DefCircuit`` signature — the active multiset must equal the
+    ``DefCircuit``'s, and any explicit ``I q`` lines must be on qubits the
+    ``DefCircuit`` also marks idle — is collapsed into a single invocation of
+    that ``DefCircuit``. Boundary instructions and non-matching blocks are
+    preserved verbatim.
+
+    Signatures come from two sources, merged in this order:
+
+    1. Every ``DefCircuit`` already attached to ``program`` (the program is
+       assumed to have been parsed alongside its calibration file, so
+       ``program.circuits`` is already populated).
+    2. Any additional ``DefCircuit`` objects passed via ``defcircuits``.
+
+    When a passed-in ``DefCircuit`` shares a name with one on the program, the
+    passed-in version wins — both for matching and in the returned program.
+    This makes it convenient to swap in a refreshed or locally-modified
+    ``DefCircuit`` without first stripping the old one.
+
+    The returned program preserves all of the original program's metadata
+    (frames, waveforms, ``DefCal``s, measure calibrations, ``DefCircuit``s, ...)
+    and additionally includes every ``DefCircuit`` passed via ``defcircuits``,
+    so the result is self-contained and can be handed straight back to the
+    compiler.
+
+    Args:
+        program (Program): the PyQuil ``Program`` whose instruction stream will
+            be rewritten. Its calibrations, frames, waveforms, and
+            ``DefCircuit``s are carried through to the result.
+        defcircuits (Iterable[DefCircuit], optional): optional extra
+            ``DefCircuit`` objects to consider for matching, in addition to
+            those already on the program. Defaults to ``None``. When ``None``
+            (the default), only the program's own ``DefCircuit``s are used.
+            Names that collide with existing program ``DefCircuit``s override
+            the program's version.
+        symmetric_gates: Names of two-qubit gates whose argument order is
+            irrelevant for matching. Forwarded to
+            :func:`signature_from_defcircuit`. Defaults to
+            :data:`DEFAULT_SYMMETRIC_GATES`.
+
+    Returns:
+        Program: a new ``Program`` with parallel-cycle blocks replaced by
+        ``DefCircuit`` invocations, with all original metadata and any merged-in
+        ``DefCircuit``s attached.
+
+    Raises:
+        ValueError: if two DefCircuits in the merged set share the same
+            active-instruction multiset (the matcher cannot disambiguate
+            them), or if any DefCircuit body is malformed; see
+            :func:`signature_from_defcircuit`.
+    """
+    try:
+        from pyquil.quilbase import AbstractInstruction, DefCircuit
+    except ImportError as exc:
+        raise ImportError("Unable to import PyQuil!") from exc
+
+    def flush() -> None:
+        if not block:
+            return
+        sig = by_active.get(frozenset(Counter(block_active).items()))
+        if sig is not None and set(block_idles).issubset(sig.idle_qubits):
+            new_instructions.append(
+                _make_invocation(sig.name, sig.formal_qubits)
+            )
+        else:
+            new_instructions.extend(block)
+        block.clear()
+        block_active.clear()
+        block_idles.clear()
+
+    # Merge DefCircuits: program's own first, then passed-in (which wins on
+    # collision).
+    program_circuits: Dict[str, DefCircuit] = {
+        instr.name: instr
+        for instr in program.instructions
+        if isinstance(instr, DefCircuit)
+    }
+    extra_circuits: Dict[str, DefCircuit] = {}
+    if defcircuits is not None:
+        for dc in defcircuits:
+            extra_circuits[dc.name] = dc
+    all_circuits = {**program_circuits, **extra_circuits}
+
+    signatures = [
+        signature_from_defcircuit(dc, symmetric_gates=symmetric_gates)
+        for dc in all_circuits.values()
+    ]
+
+    defined_calibrations = {
+        (cal.name, tuple(_qubit_index(q) for q in cal.qubits))
+        for cal in (
+            list(program.calibrations) + list(program.measure_calibrations)
+        )
+    }
+    for sig in signatures:
+        if (sig.name, sig.formal_qubits) not in defined_calibrations:
+            logger.warning(
+                " DefCircuit %r on qubits %s has no matching DefCal in the "
+                "program; the rewritten call will be unresolvable at compile "
+                "time.",
+                sig.name,
+                sig.formal_qubits,
+            )
+
+    by_active: Dict[FrozenSet, CycleSignature] = {}
+    for sig in signatures:
+        if sig.active_multiset in by_active:
+            raise ValueError(
+                f"DefCircuits {sig.name!r} and "
+                f"{by_active[sig.active_multiset].name!r} "
+                "share the same active-instruction multiset; matcher cannot "
+                "disambiguate."
+            )
+        by_active[sig.active_multiset] = sig
+
+    new_instructions: List[AbstractInstruction] = []
+    block: List[AbstractInstruction] = []
+    block_active: List[Tuple] = []
+    block_idles: List[int] = []
+
+    for instr in program.instructions:
+        kind, payload = _classify(instr, symmetric_gates)
+        if kind == "boundary":
+            flush()
+            new_instructions.append(instr)
+        else:
+            block.append(instr)
+            if kind == "active":
+                block_active.append(payload)
+            else:
+                block_idles.append(payload)
+    flush()
+
+    # Preserve all original metadata (frames, waveforms, calibrations, etc.).
+    new_program = program.copy_everything_except_instructions()
+
+    # Apply passed-in DefCircuit overrides on top of what was copied.
+    for dc in extra_circuits.values():
+        new_program.inst(dc)
+
+    for instr in new_instructions:
+        new_program += instr
+
+    return new_program
+
+
 def set_defcal_param(
-    defcal: Any,
+    defcal: DefCalibration | DefMeasureCalibration,  # type: ignore  # noqa: F821
     param:  str,
     value:  Any,
     *,
     instr_idx: int | None = None,
-) -> Any:
+) -> DefCalibration | DefMeasureCalibration:  # type: ignore  # noqa: F821
     """Set a template parameter in a calibration instruction.
 
     This function searches the instructions in a ``DefCalibration`` or
@@ -135,26 +603,26 @@ def set_defcal_param(
         - ``Capture.kernel``
 
     Args:
-        defcal (pyquil.quilbase.DefCalibration): The calibration object to
-            modify.
-        param (str): The name of the template parameter to update.
-        value (Any): The new value to assign to the parameter.
-        instr_idx (int | None, optional): Optional specific instruction
+        defcal (DefCalibration | DefMeasureCalibration): the calibration object
+            to modify.
+        param (str): the name of the template parameter to update.
+        value (Any): the new value to assign to the parameter.
+        instr_idx (int | None, optional): optional specific instruction
             index to inspect. If not provided, all instructions are searched in
             order.
 
     Returns:
-        pyquil.quilbase.DefCalibration: The mutated calibration object.
+        DefCalibration | DefMeasureCalibration: the mutated calibration object.
 
     Raises:
-        IndexError: If ``instr_idx`` is out of range.
-        ValueError: If no supported instruction contains the requested
+        IndexError: if ``instr_idx`` is out of range.
+        ValueError: if no supported instruction contains the requested
             parameter.
     """
     try:
         from pyquil.quilbase import Capture, Pulse
     except ImportError as exc:
-        raise ImportError("Unable to import pyquil!") from exc
+        raise ImportError("Unable to import PyQuil!") from exc
 
     instrs = list(defcal.instructions)
     indices = [instr_idx] if instr_idx is not None else range(len(instrs))
@@ -168,12 +636,10 @@ def set_defcal_param(
         if tmpl is None:
             continue
 
-        try:
-            tmpl.get_parameter(param)
-        except Exception:
+        if not hasattr(tmpl, param):
             continue
 
-        tmpl.set_parameter(param, value)
+        setattr(tmpl, param, value)
         _set_template_object(instr, tmpl)
         instrs[i] = instr
         defcal.instructions = instrs
@@ -186,13 +652,13 @@ def set_defcal_param(
 
 
 def set_defcal_param_in_program(
-    program: Any,
-    defcal:  Any,
+    program: Program,  # type: ignore  # noqa: F821
+    defcal:  DefCalibration | DefMeasureCalibration,  # type: ignore  # noqa: F821
     param:   str,
     value:   Any,
     *,
     instr_idx: int | None = None,
-) -> Any:
+) -> DefCalibration | DefMeasureCalibration:  # type: ignore  # noqa: F821
     """Set a calibration template parameter and write it back to a program.
 
     This function reads a calibration snapshot from ``program.calibrations``,
@@ -200,21 +666,22 @@ def set_defcal_param_in_program(
     program with ``program.inst(...)``.
 
     Args:
-        program (pyquil.quil.Program): The program containing the calibration.
-        defcal (pyquil.quilbase.DefCalibration): The calibration to update.
-        param (str): The name of the template parameter to update.
-        value (Any): The new value to assign to the parameter.
-        instr_idx (int | None, optional): Optional specific instruction
+        program (Program): the program containing the calibration.
+        defcal (DefCalibration | DefMeasureCalibration): the calibration to
+            update.
+        param (str): the name of the template parameter to update.
+        value (Any): the new value to assign to the parameter.
+        instr_idx (int | None, optional): optional specific instruction
             index to inspect. If not provided, all instructions are searched in
             order.
 
     Returns:
-        pyquil.quilbase.DefCalibration: The updated calibration object that
-            was written back to the program.
+        DefCalibration | DefMeasureCalibration: the updated calibration object
+            that was written back to the program.
 
     Raises:
-        IndexError: If ``instr_idx`` is provided and out of range.
-        ValueError: If no supported instruction contains the requested
+        IndexError: if ``instr_idx`` is provided and out of range.
+        ValueError: if no supported instruction contains the requested
             parameter.
     """
     updated_cal = set_defcal_param(
@@ -224,86 +691,124 @@ def set_defcal_param_in_program(
         instr_idx=instr_idx,
     )
     program.inst(updated_cal)
+
     return updated_cal
 
 
-def set_waveform(name: str, array: Any) -> Any:
+def set_waveform(name: str, array: Any) -> DefWaveform:  # type: ignore  # noqa: F821
     """Create a new ``DefWaveform`` from a name and sample array.
 
     Args:
-        name (str): The waveform name.
-        array (Any): The waveform samples.
+        name (str): the waveform name.
+        array (Any): the waveform samples.
 
     Returns:
-        Any: A new ``DefWaveform`` instance.
+        DefWaveform: a new ``DefWaveform`` instance.
     """
     try:
         from pyquil.quilbase import DefWaveform
     except ImportError as exc:
-        raise ImportError("Unable to import pyquil!") from exc
+        raise ImportError("Unable to import PyQuil!") from exc
 
     return DefWaveform(name, [], list(array))
 
 
 def set_waveform_in_program(
-    program: Any,
+    program: Program,  # type: ignore  # noqa: F821
     name:    str,
     array:   Any,
-) -> Any:
-    """Create a ``DefWaveform`` and insert it into a pyQuil program.
+) -> DefWaveform:  # type: ignore  # noqa: F821
+    """Create a ``DefWaveform`` and insert it into a PyQuil program.
 
     This rewrites the waveform definition in the program if a waveform with the
     same name already exists.
 
     Args:
-        program (Any): The program to update.
-        name (str): The waveform name.
-        array (Any): The waveform samples.
+        program (Program): the program to update.
+        name (str): the waveform name.
+        array (Any): the waveform samples.
 
     Returns:
-        Any: The newly created ``DefWaveform`` that was inserted into the
-            program.
+        DefWaveform: the newly created ``DefWaveform`` that was inserted into
+            the program.
     """
-    waveform = set_waveform(name, [], array)
+    waveform = set_waveform(name, array)
     program.inst(waveform)
     return waveform
 
 
-def prepend_delay_to_program(program: Any, delay: float) -> Any:
-    """Prepend a delay to a pyQuil program.
+def signature_from_defcircuit(
+    defcircuit: DefCircuit, # type: ignore  # noqa: F821
+    *,
+    symmetric_gates: FrozenSet[str] = DEFAULT_SYMMETRIC_GATES,
+) -> CycleSignature:
+    """Build a matchable ``CycleSignature`` from a ``DefCircuit``.
+
+    Walks the DefCircuit body once, classifying each instruction with
+    :func:`_classify` and partitioning it into two structures:
+
+    - The active multiset (gates and measurements that a candidate block
+      must reproduce exactly), stored as a ``frozenset`` of
+      ``(key, count)`` pairs so the signature can serve as a dict key for
+      O(1) lookup during matching.
+    - The set of idle qubits declared via ``I q`` lines, against which a
+      candidate block's explicit idles are checked as a subset (manual
+      programs are not required to write these out, but if they do, the
+      qubits must be ones the DefCircuit also marks idle).
+
+    The DefCircuit's formal parameter list is captured in declaration order
+    and used to construct the invocation when a block matches: a DefCircuit
+    declared ``DEFCIRCUIT CZ_3 q1 q2 q7 ...`` produces calls of the form
+    ``CZ_3 1 2 7 ...``. This relies on the formals-as-physical-qubits
+    convention enforced by :func:`_qubit_index`.
 
     Args:
-        program (pyquil.Program): The program to update.
-        delay (float): The delay time in seconds.
+        defcircuit: The ``DefCircuit`` to summarize. Must have no classical
+            parameters (parametric DefCircuits are out of scope for this
+            matcher) and a non-empty body of gate-level instructions.
+        symmetric_gates: Names of two-qubit gates whose argument order is
+            irrelevant when building active keys. Forwarded to
+            :func:`_classify`. Defaults to :data:`DEFAULT_SYMMETRIC_GATES`.
 
     Returns:
-        pyquil.Program: The updated program.
+        A ``CycleSignature`` containing the DefCircuit's name, formal qubit
+        tuple, active-instruction multiset, and idle-qubit set.
+
+    Raises:
+        ValueError: If the DefCircuit declares classical parameters, has an
+            empty active body, or contains a body instruction that is
+            neither a ``Gate`` nor a ``Measurement`` (e.g. a stray
+            ``Pragma`` or frame operation, which would indicate the
+            DefCircuit is doing something the matcher isn't designed for).
     """
-    try:
-        from pyquil.gates import DELAY
-    except ImportError as exc:
-        raise ImportError("Unable to import pyquil!") from exc
+    if getattr(defcircuit, "parameters", None):
+        raise ValueError(
+            f"DefCircuit {defcircuit.name!r} has classical parameters."
+        )
 
-    qubits = program.get_qubit_indices()
-    # p = Program()
-    # p += Delay(*qubits, delay)
-    return program.prepend_instructions([DELAY(q, delay) for q in qubits])
+    formals = tuple(_qubit_index(q) for q in defcircuit.qubit_variables)
+    active_keys: List[Tuple] = []
+    idle_qubits: List[int] = []
+    for body_instr in defcircuit.instructions:
+        kind, payload = _classify(body_instr, symmetric_gates)
+        if kind == "active":
+            active_keys.append(payload)
+        elif kind == "idle":
+            idle_qubits.append(payload)
+        else:
+            raise ValueError(
+                f"DefCircuit {defcircuit.name!r} body contains "
+                f"{type(body_instr).__name__}; only Gate and Measurement allowed."
+            )
 
+    if not active_keys:
+        raise ValueError(
+            f"DefCircuit {defcircuit.name!r} has no active instructions."
+        )
 
-def prepend_measure_to_program(program: Any) -> Any:
-    """Prepend a measure to a pyQuil program.
-
-    Args:
-        program (pyquil.Program): The program to update.
-
-    Returns:
-        pyquil.Program: The updated program.
-    """
-    try:
-        from pyquil.gates import MEASURE
-    except ImportError as exc:
-        raise ImportError("Unable to import pyquil!") from exc
-
-    qubits = program.get_qubit_indices()
-    measure = [MEASURE(q, ('ro', i)) for i, q in enumerate(sorted(qubits))]
-    return program.prepend_instructions(measure)
+    return CycleSignature(
+        name=defcircuit.name,
+        formal_qubits=formals,
+        active_multiset=frozenset(Counter(active_keys).items()),
+        idle_qubits=frozenset(idle_qubits),
+    )
