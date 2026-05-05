@@ -9,11 +9,17 @@ from pygsti.baseobjs import Label as L
 logger = logging.getLogger(__name__)
 
 
-def decompose_X90(phases: Dict[int, List]):
-    """Decompose and X90 gate into ZXZ or ZXZXZ.
+def decompose_X90(
+        phases: Dict[int, List]
+) -> List[List[L | tuple]]:
+    """Decompose an X90 gate into ZXZ or ZXZXZ.
 
     Args:
         phases (Dict[int, List]): local phases for the X90 on each qubit.
+
+    Returns:
+        List[List[Label | tuple]]: circuit layers, alternating between
+            Gzr Label layers and Gxpi2 tuple layers.
     """
     qubits = list(phases.keys())
     n_layers = max(len(phases[q]) for q in qubits)
@@ -36,11 +42,18 @@ def decompose_X90(phases: Dict[int, List]):
     return layers
 
 
-def decompose_CZ(phases: Dict[Tuple, List]):
-    """Decompose and CZ gate into CZ + IZ + ZI.
+def decompose_CZ(
+        phases: Dict[Tuple[int, int], List]
+) -> List[List[L | tuple]]:
+    """Decompose a CZ gate into CZ + IZ + ZI.
 
     Args:
-        phases (Dict[Tuple, List]): local phases for the CZ on each qubit pair.
+        phases (Dict[Tuple[int, int], List]): local phases for the CZ on each
+            qubit pair.
+
+    Returns:
+        List[List[Label | tuple]]: circuit layers — a Gcphase tuple layer
+            followed by a Gzr Label layer.
     """
     qubit_pairs = list(phases.keys())
     layers = [
