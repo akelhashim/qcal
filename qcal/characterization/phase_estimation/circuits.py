@@ -12,6 +12,32 @@ GateLayer = Optional[List[List[tuple]]]
 logger = logging.getLogger(__name__)
 
 
+ZZ_CENTRALIZER = frozenset({
+    'XX', 'YY', 'ZZ', 'XY', 'YX', 'IZ', 'ZI', 'II'
+})
+
+
+def _pauli_to_pygsti_gate(pauli: str, qubit: int) -> PyGSTiCircuit:
+    """Convert a Pauli operator to a pyGSTi gate.
+
+    Args:
+        pauli (str): Pauli operator.
+        qubit (int): qubit label.
+
+    Returns:
+        PyGSTiCircuit: pyGSTi circuit.
+    """
+    match pauli:
+        case 'X':
+            return PyGSTiCircuit([('Gxpi2', qubit)]*2, line_labels=[qubit])
+        case 'Y':
+            return PyGSTiCircuit([('Gypi2', qubit)]*2, line_labels=[qubit])
+        case 'Z':
+            return PyGSTiCircuit([('Gzpi2', qubit)]*2, line_labels=[qubit])
+        case 'I':
+            return PyGSTiCircuit([], line_labels=[qubit])
+
+
 def interleaved_circuit_depths(circuit_depths: Sequence[int]) -> List[int]:
     """Circuit depths for interleaved X90 sequences.
 
