@@ -8,7 +8,7 @@ Relevant pyRPE code: https://gitlab.com/quapack/pyrpe
 """
 import logging
 from collections.abc import Iterable
-from typing import Callable, Dict, List, Tuple
+from typing import Callable, Dict, List, Sequence, Tuple
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -31,6 +31,7 @@ from qcal.characterization.phase_estimation.analysis import (
     analyze_zz,
 )
 from qcal.characterization.phase_estimation.circuits import (
+    GateLayer,
     make_cz_circuits,
     make_idle_circuits,
     make_x90_circuits,
@@ -48,11 +49,11 @@ from qcal.utils import save_init
 logger = logging.getLogger(__name__)
 
 
-def X90(theta):
+def X90(theta: float) -> pygsti.unitary_to_pauligate:
     """Definition of an X gate.
 
     Args:
-        theta (angle): angle of rotation.
+        theta (float): angle of rotation.
 
     Returns:
         pygsti.unitary_to_pauligate: X gate.
@@ -141,10 +142,10 @@ def plot_signal(
 def RPE(
     qpu:            QPU,
     config:         Config,
-    qubit_labels:   Iterable[int],
+    qubit_labels:   Sequence[int],
     gate:           str,
-    circuit_depths: List[int] = [1, 2, 4, 8, 16, 32, 64, 128, 256],  # noqa: B006
-    gate_layer:     List = None,
+    circuit_depths: Sequence[int] = [1, 2, 4, 8, 16, 32, 64, 128, 256],  # noqa: B006
+    gate_layer:     GateLayer = None,
     loss_angle:     str | List[str] | None = None,
     **kwargs
 ) -> Callable:
@@ -156,15 +157,15 @@ def RPE(
     Args:
         qpu (QPU): custom QPU object.
         config (Config): qcal Config object.
-        qubit_labels (Iterable[int]): a list specifying sets of system labels
+        qubit_labels (Sequence[int]): a list specifying sets of system labels
             on which to perform RPE for a given gate.
         gate (str): gate on which to perform RPE. Must be one of 'I', 'X90',
             'CZ', or 'ZZ'.
-        circuit_depths (List[int], optional): a list of positive integers
+        circuit_depths (Sequence[int], optional): a list of positive integers
             specifying the circuit depths. Defaults to ```[1, 2, 4, 8, 16, 32,
             64, 128, 256]```.
-        gate_layer (List, optional): custom gate layer for the gate of interest.
-            Defaults to None.
+        gate_layer (GateLayer, optional): custom gate layer for the gate of
+            interest. Defaults to None.
         loss_angle (str | list[str] | None, optional): a string or list of
             strings specifying which angle to use for calculating the loss from
             RPE. Defaults to None. If None, all angles are used. For example,
@@ -216,9 +217,9 @@ def RPE(
         def __init__(
             self,
             config:         Config,
-            qubit_labels:   Iterable[int],
-            circuit_depths: List[int] = [1, 2, 4, 8, 16, 32, 64, 128, 256],  # noqa: B006
-            gate_layer:     List = None,
+            qubit_labels:   Sequence[int],
+            circuit_depths: Sequence[int] = [1, 2, 4, 8, 16, 32, 64, 128, 256],  # noqa: B006
+            gate_layer:     GateLayer = None,
             loss_angle:     str | None = None,
             **kwargs
         ) -> None:
@@ -279,7 +280,7 @@ def RPE(
             """Datasets for each qubit/qubit pair.
 
             Returns:
-                Dict[int | Tuple[int], DataSet]: datasets.
+                Dict[int | Tuple[int, int], DataSet]: datasets.
             """
             return self._datasets
 
@@ -765,9 +766,9 @@ def RPE(
 def IdleRPE(
     qpu:            QPU,
     config:         Config,
-    qubit_labels:   Iterable[int],
-    circuit_depths: List[int] = [1, 2, 4, 8, 16, 32, 64, 128, 256],  # noqa: B006
-    gate_layer:     List = None,
+    qubit_labels:   Sequence[int],
+    circuit_depths: Sequence[int] = [1, 2, 4, 8, 16, 32, 64, 128, 256],  # noqa: B006
+    gate_layer:     GateLayer = None,
     loss_angle:     str | List[str] | None = None,
     **kwargs
 ) -> Callable:
@@ -776,13 +777,13 @@ def IdleRPE(
     Args:
         qpu (QPU): custom QPU object.
         config (Config): qcal Config object.
-        qubit_labels (Iterable[int]): a list specifying sets of system labels
+        qubit_labels (Sequence[int]): a list specifying sets of system labels
             on which to perform RPE for the idle gate.
-        circuit_depths (List[int], optional): a list of positive integers
+        circuit_depths (Sequence[int], optional): a list of positive integers
             specifying the circuit depths. Defaults to ```[1, 2, 4, 8, 16, 32,
             64, 128, 256]```.
-        gate_layer (List, optional): custom gate layer for the gate of interest.
-            Defaults to None.
+        gate_layer (GateLayer, optional): custom gate layer for the gate of
+            interest. Defaults to None.
         loss_angle (str | list[str] | None, optional): a string or list of
             strings specifying which angle to use for calculating the loss from
             RPE. Defaults to None. If None, all angles are used.
@@ -808,9 +809,9 @@ def IdleRPE(
         def __init__(
             self,
             config:         Config,
-            qubit_labels:   Iterable[int],
-            circuit_depths: List[int] = [1, 2, 4, 8, 16, 32, 64, 128, 256],  # noqa: B006
-            gate_layer:     List = None,
+            qubit_labels:   Sequence[int],
+            circuit_depths: Sequence[int] = [1, 2, 4, 8, 16, 32, 64, 128, 256],  # noqa: B006
+            gate_layer:     GateLayer = None,
             loss_angle:     str | None = None,
             **kwargs
         ) -> None:
@@ -837,9 +838,9 @@ def IdleRPE(
 def X90RPE(
     qpu:            QPU,
     config:         Config,
-    qubit_labels:   Iterable[int],
-    circuit_depths: List[int] = [1, 2, 4, 8, 16, 32, 64, 128, 256],  # noqa: B006
-    gate_layer:     List = None,
+    qubit_labels:   Sequence[int],
+    circuit_depths: Sequence[int] = [1, 2, 4, 8, 16, 32, 64, 128, 256],  # noqa: B006
+    gate_layer:     GateLayer = None,
     loss_angle:     str | List[str] | None = None,
     **kwargs
 ) -> Callable:
@@ -848,13 +849,13 @@ def X90RPE(
     Args:
         qpu (QPU): custom QPU object.
         config (Config): qcal Config object.
-        qubit_labels (Iterable[int]): a list specifying sets of system labels
+        qubit_labels (Sequence[int]): a list specifying sets of system labels
             on which to perform RPE for the X90 gate.
-        circuit_depths (List[int], optional): a list of positive integers
+        circuit_depths (Sequence[int], optional): a list of positive integers
             specifying the circuit depths. Defaults to ```[1, 2, 4, 8, 16, 32,
             64, 128, 256]```.
-        gate_layer (List, optional): custom gate layer for the gate of interest.
-            Defaults to None.
+        gate_layer (GateLayer, optional): custom gate layer for the gate of
+            interest. Defaults to None.
         loss_angle (str | list[str] | None, optional): a string or list of
             strings specifying which angle to use for calculating the loss from
             RPE. Defaults to None. If None, all angles are used. Possible
@@ -881,9 +882,9 @@ def X90RPE(
         def __init__(
             self,
             config:         Config,
-            qubit_labels:   Iterable[int],
-            circuit_depths: List[int] = [1, 2, 4, 8, 16, 32, 64, 128, 256],  # noqa: B006
-            gate_layer:     List = None,
+            qubit_labels:   Sequence[int],
+            circuit_depths: Sequence[int] = [1, 2, 4, 8, 16, 32, 64, 128, 256],  # noqa: B006
+            gate_layer:     GateLayer = None,
             loss_angle:     str | None = None,
             **kwargs
         ) -> None:
@@ -910,9 +911,9 @@ def X90RPE(
 def CZRPE(
     qpu:            QPU,
     config:         Config,
-    qubit_labels:   Iterable[Tuple[int]],
-    circuit_depths: List[int] = [1, 2, 4, 8, 16, 32, 64, 128, 256],  # noqa: B006
-    gate_layer:     List = None,
+    qubit_labels:   Sequence[Tuple[int, int]],
+    circuit_depths: Sequence[int] = [1, 2, 4, 8, 16, 32, 64, 128, 256],  # noqa: B006
+    gate_layer:     GateLayer = None,
     loss_angle:     str | List[str] | None = None,
     **kwargs
 ) -> Callable:
@@ -921,13 +922,13 @@ def CZRPE(
     Args:
         qpu (QPU): custom QPU object.
         config (Config): qcal Config object.
-        qubit_labels (Iterable[Tuple[int]]): a list specifying sets of system labels
-            on which to perform RPE for the CZ gate.
-        circuit_depths (List[int], optional): a list of positive integers
+        qubit_labels (Sequence[Tuple[int, int]]): a list specifying sets of
+            system labels on which to perform RPE for the CZ gate.
+        circuit_depths (Sequence[int], optional): a list of positive integers
             specifying the circuit depths. Defaults to ```[1, 2, 4, 8, 16, 32,
             64, 128, 256]```.
-        gate_layer (List, optional): custom gate layer for the gate of interest.
-            Defaults to None.
+        gate_layer (GateLayer, optional): custom gate layer for the gate of
+            interest. Defaults to None.
         loss_angle (str | list[str] | None, optional): a string or list of
             strings specifying which angle to use for calculating the loss from
             RPE. Defaults to None. If None, all angles are used.
@@ -953,9 +954,9 @@ def CZRPE(
         def __init__(
             self,
             config:         Config,
-            qubit_labels:   Iterable[Tuple[int]],
-            circuit_depths: List[int] = [1, 2, 4, 8, 16, 32, 64, 128, 256],  # noqa: B006
-            gate_layer:     List = None,
+            qubit_labels:   Sequence[Tuple[int, int]],
+            circuit_depths: Sequence[int] = [1, 2, 4, 8, 16, 32, 64, 128, 256],  # noqa: B006
+            gate_layer:     GateLayer = None,
             loss_angle:     str | None = None,
             **kwargs
         ) -> None:
@@ -982,9 +983,9 @@ def CZRPE(
 def ZZRPE(
     qpu:            QPU,
     config:         Config,
-    qubit_labels:   Iterable[Tuple[int]],
-    circuit_depths: List[int] = [1, 2, 4, 8, 16, 32, 64, 128, 256],  # noqa: B006
-    gate_layer:     List = None,
+    qubit_labels:   Sequence[Tuple[int, int]],
+    circuit_depths: Sequence[int] = [1, 2, 4, 8, 16, 32, 64, 128, 256],  # noqa: B006
+    gate_layer:     GateLayer = None,
     loss_angle:     str | List[str] | None = None,
     **kwargs
 ) -> Callable:
@@ -993,13 +994,13 @@ def ZZRPE(
     Args:
         qpu (QPU): custom QPU object.
         config (Config): qcal Config object.
-        qubit_labels (Iterable[Tuple[int]]): a list specifying sets of system
+        qubit_labels (Sequence[Tuple[int, int]]): a list specifying sets of system
             labels on which to perform RPE for the ZZ gate.
-        circuit_depths (List[int], optional): a list of positive integers
+        circuit_depths (Sequence[int], optional): a list of positive integers
             specifying the circuit depths. Defaults to ```[1, 2, 4, 8, 16, 32,
             64, 128, 256]```.
-        gate_layer (List, optional): custom gate layer for the gate of interest.
-            Defaults to None.
+        gate_layer (GateLayer, optional): custom gate layer for the gate of
+            interest. Defaults to None.
         loss_angle (str | list[str] | None, optional): a string or list of
             strings specifying which angle to use for calculating the loss from
             RPE. Defaults to None. If None, all angles are used.
@@ -1025,9 +1026,9 @@ def ZZRPE(
         def __init__(
             self,
             config:         Config,
-            qubit_labels:   Iterable[Tuple[int]],
-            circuit_depths: List[int] = [1, 2, 4, 8, 16, 32, 64, 128, 256],  # noqa: B006
-            gate_layer:     List = None,
+            qubit_labels:   Sequence[Tuple[int, int]],
+            circuit_depths: Sequence[int] = [1, 2, 4, 8, 16, 32, 64, 128, 256],  # noqa: B006
+            gate_layer:     GateLayer = None,
             loss_angle:     str | None = None,
             **kwargs
         ) -> None:
