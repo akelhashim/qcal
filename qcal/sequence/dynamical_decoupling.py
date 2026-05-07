@@ -1,31 +1,29 @@
 """Submodule for handling dynamical decoupling sequences.
 
 """
-from qcal.calibration.utils import find_pulse_index
-from qcal.circuit import Barrier, Circuit, Cycle
-from qcal.config import Config
-from qcal.gate.single_qubit import Idle, X90, Y90, Rz
-
 import logging
-
 from collections import defaultdict
-from collections.abc import Iterable
+from collections.abc import Callable, Mapping, Sequence
+
+from qcal.circuit import Circuit, Cycle
+from qcal.gate.single_qubit import X90, Y90, Idle, Rz
+
 # from typing import Any, List
 
 logger = logging.getLogger(__name__)
 
 
-__all__ = ('XY', 'dd_sequences')
+__all__ = ('XY', 'DD_SEQUENCES')
 
 
 def XY(
-        config:   Config, 
-        qubits:   Iterable[int], 
-        time:     float, 
-        n_pulses: int | None = None,
-        phase:    float | None = None,
-        subspace: str = 'GE',
-    ) -> Circuit:
+    qubits:     Sequence[int],
+    total_time: float,
+    gate_time:  float,
+    n_pulses:   int | None = None,
+    phase:      float | None = None,
+    subspace:   str = 'GE',
+) -> Circuit:
     """Subcircuit for performing an XY-type dynamical decoupling (DD) sequence.
 
     See:
@@ -33,35 +31,31 @@ def XY(
     dynamical-decoupling-using-pulse-control-on-amazon-braket/
 
     Args:
-        config (Config): qcal Config object.
-        qubits (Iterable[int]): qubit labels.
-        time (float): time of time over which to perform the DD.
-        n_pulses (int | None, optional): number of pulses. Defaults to 4. For 
-            example, for n_pulses = 4, this performs an XY4 DD sequence.
+        qubits (Sequence[int]): qubit labels.
+        total_time (float): total time over which to perform the DD.
+        gate_time (float): time of the native X90 gate.
+        n_pulses (int | None, optional): number of pulses. Defaults to None. For
+            example, for n_pulses = 4, this performs an XY4 DD sequence. If
+            None, the number of pulses is set to the maximum number of pulses
+            that can fit within the specified time, with a minimum of 4.
         phase (float | None, optional): optional (virtual) phase to add to the
             sequence for each XY4 duration.
-        subspace (str, optional): qubits subsace for the DD sequence. Defaults 
+        subspace (str, optional): qubits subspace for the DD sequence. Defaults
             'GE'. 'EF' is also supported.
 
     Returns:
         Circuit: qcal Circuit.
     """
-    idx = find_pulse_index(
-        config, f'single_qubit/{qubits[0]}/{subspace}/X90/pulse'
-    )
-    gate_time = config[
-        f'single_qubit/{qubits[0]}/{subspace}/X90/pulse/{idx}/time'
-    ]
-
     if n_pulses is None:
-        n_pulses = max(4, int(time / (gate_time * 8)) * 4)
+        n_pulses = max(4, int(total_time / (gate_time * 8)) * 4)
+    else:
+        if n_pulses % 4 != 0:
+            raise ValueError("'n_pulses' must be a multiple of 4!")
 
-    assert n_pulses % 4 == 0, "'n_pulses' must be a multiple of 4!"
-    
-    tau = time / (2 * n_pulses)  # Base interval
+    tau = total_time / (2 * n_pulses)  # Base interval
     idle_time = tau - gate_time
     idle_time = idle_time if idle_time > 0 else 0.
-    
+
     if phase:
         DD_sequence = Circuit([
             # Idle + phase
@@ -112,7 +106,7 @@ def XY(
             Cycle({Idle(q, duration=idle_time) for q in qubits}),
             # Barrier((q for q in qubits))
         ])
-    
+
     else:
         DD_sequence = Circuit([
             # Idle
@@ -139,7 +133,7 @@ def XY(
             Cycle({Idle(q, duration=idle_time) for q in qubits}),
             # Barrier((q for q in qubits))
         ])
-    
+
     DD_circuit = Circuit()
     for _ in range(int(n_pulses / 4)):
         DD_circuit.extend(DD_sequence.copy())
@@ -147,6 +141,8 @@ def XY(
     return DD_circuit
 
 
-dd_sequences = defaultdict(lambda: 'DD sequence not currently supported!', {
-    'XY': XY,
-})
+DD_SEQUENCES: Mapping[str, Callable] = defaultdict(
+    lambda: 'DD sequence not currently supported!', {
+        'XY': XY,
+    }
+)
