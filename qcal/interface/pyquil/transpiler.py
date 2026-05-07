@@ -460,8 +460,8 @@ def to_pyquil(
 to_pyquil._counter = 0
 
 
-class PyquilTranspiler(Transpiler):
-    """qcal to Pyquil Transpiler."""
+class PyQuilTranspiler(Transpiler):
+    """qcal to PyQuil Transpiler."""
 
     # __slots__ = ('_gate_mapper',)
 
