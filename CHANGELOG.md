@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Circuit for-loops for pyquil
 - Automatic leakage analysis for CRB
+- plot_mock_sequence for psuedo-visualization of pulse sequence of circuits
 
 ### Changed
 
