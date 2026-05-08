@@ -16,14 +16,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Circuit for-loops for pyquil
 - Automatic leakage analysis for CRB
 - plot_mock_sequence for psuedo-visualization of pulse sequence of circuits
+- Fit for decaying cosine with exponential baseline
 
 ### Changed
 
 - uncertainty_of_product to account for correlations using the covariance
+- T2* EF fit to decaying cosine with exponential baseline
 
 ### Deprecated
 
 ### Removed
+
+- Artificial detuning for T2echo and T2XY experiments
 
 ### Fixed
 
