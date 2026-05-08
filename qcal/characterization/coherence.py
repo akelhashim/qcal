@@ -46,8 +46,8 @@ def T1(qpu:        QPU,
     Basic example useage:
     ```
     exp = T1(
-        CustomQPU, 
-        config, 
+        CustomQPU,
+        config,
         qubits=[0, 1, 2],
         t_max=5e-4)
     exp.run()
@@ -58,7 +58,7 @@ def T1(qpu:        QPU,
         config (Config): qcal Config object.
         qubits (List[int] | Tuple[int]): qubits to measure.
         t_max (float, option): maximum wait time. Defaults to 500 us.
-        gate (str, optional): native gate used for state preparation. Defaults 
+        gate (str, optional): native gate used for state preparation. Defaults
             to 'X90'.
         subspace (str, optional): qubit subspace for T1 measurement.
             Defaults to 'GE'.
@@ -279,8 +279,8 @@ def T2(qpu:        QPU,
 
     ```
     exp = T2(
-        CustomQPU, 
-        config, 
+        CustomQPU,
+        config,
         qubits=[0, 1, 2],
         t_max=250e-4,
         detuning=0.05e6,
@@ -295,7 +295,7 @@ def T2(qpu:        QPU,
         t_max (float, optional): maximum wait time. Defaults to 250 us.
         detuning (float, optional): artificial detuning from the actual qubit
             frequency. Defaults to 0.05 MHz.
-        echo (bool, optional): whether to echo the qubit in the middle. 
+        echo (bool, optional): whether to echo the qubit in the middle.
             Defaults to False.
         subspace (str, optional): qubit subspace for T2 measurement.
             Defaults to 'GE'.
