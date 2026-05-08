@@ -13,10 +13,10 @@ from qcal.gate.single_qubit import X90, Y90, Idle, Rz
 logger = logging.getLogger(__name__)
 
 
-__all__ = ('XY', 'DD_SEQUENCES')
+__all__ = ('XY_N', 'DD_SEQUENCES')
 
 
-def XY(
+def XY_N(
     qubits:     Sequence[int],
     total_time: float,
     gate_time:  float,
@@ -143,6 +143,6 @@ def XY(
 
 DD_SEQUENCES: Mapping[str, Callable] = defaultdict(
     lambda: 'DD sequence not currently supported!', {
-        'XY': XY,
+        'XY_N': XY_N,
     }
 )

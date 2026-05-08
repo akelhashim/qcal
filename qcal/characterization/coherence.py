@@ -11,7 +11,7 @@ from qcal.gate.single_qubit import Idle, Rz, VirtualZ, X90, X, Z
 from qcal.math.utils import (
     uncertainty_of_sum, reciprocal_uncertainty, round_to_order_error
 )
-from qcal.sequence.dynamical_decoupling import XY
+from qcal.sequence.dynamical_decoupling import XY_N
 from qcal.qpu.qpu import QPU
 from qcal.units import MHz, us
 
@@ -655,7 +655,7 @@ def T2XY(
                     ])
 
                 # Add the XY DD sequence
-                DD_sequence = XY(
+                DD_sequence = XY_N(
                     config=self._config, 
                     qubits=self._qubits, 
                     time=t, 

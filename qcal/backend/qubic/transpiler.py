@@ -3,7 +3,7 @@
 References:
 https://ieeexplore.ieee.org/document/9552516
 """
-import copy
+import copy  # noqa: I001
 import logging
 import operator
 from collections import defaultdict
@@ -18,7 +18,9 @@ from qcal.calibration.utils import find_pulse_index
 from qcal.circuit import Circuit, CircuitSet, Cycle
 from qcal.config import Config
 from qcal.gate.gate import Gate
-from qcal.gate.single_qubit import MCM, X90, Id, Idle, Meas, Reset, Rz, VirtualZ, X, Z
+from qcal.gate.single_qubit import (
+    MCM, X90, Id, Idle, Meas, Reset, Rz, VirtualZ, X, Z
+)
 from qcal.sequence.dynamical_decoupling import DD_SEQUENCES
 from qcal.sequence.utils import clip_amplitude
 from qcal.transpilation.utils import GateMapper
