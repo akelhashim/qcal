@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Breaking
 
+- Change dynamical decoupling XY name to XY_N
+
 ### Added
 
 - Circuit for-loops for pyquil
