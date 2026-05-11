@@ -74,7 +74,7 @@ from qcal.gate.single_qubit import X90, Y90, Idle
 logger = logging.getLogger(__name__)
 
 
-__all__ = ('XY_N', 'DD_SEQUENCES')
+__all__ = ('XY_N', 'XX_N', 'DD_SEQUENCES')
 
 
 def XY_N(
@@ -350,8 +350,182 @@ def XY_N(
     return DD_circuit
 
 
+def XX_N(
+    qubits:     Sequence[int],
+    total_time: float,
+    gate_time:  float,
+    n_pulses:   int | None = None,
+    subspace:   str = 'GE',
+) -> Circuit:
+    """Subcircuit for performing an XX-type dynamical decoupling (DD) sequence.
+
+    This circuit implements a syncopated XX-type DD sequence for more than one
+    qubit, but assumes even and odd qubits are nearest neighbors.
+
+    Args:
+        qubits (Sequence[int]): qubit labels.
+        total_time (float): total time over which to perform the DD.
+        gate_time (float): time of the native X90 gate.
+        n_pulses (int | None, optional): number of pulses. Defaults to None. For
+            example, for n_pulses = 2, this performs an XX2 DD sequence. If
+            None, the number of pulses is set to the maximum number of pulses
+            that can fit within the specified time, with a minimum of 2.
+        subspace (str, optional): qubit subspace for the DD sequence. Defaults
+            to 'GE'. 'EF' is also supported.
+
+    Returns:
+        Circuit: qcal Circuit.
+    """
+    if n_pulses is None:
+        n_pulses = max(2, int(total_time / (gate_time * 4)) * 2)
+    else:
+        if n_pulses % 2 != 0:
+            raise ValueError("'n_pulses' must be a multiple of 2!")
+
+    qubits_even = [q for i, q in enumerate(qubits) if i % 2 == 0]
+    qubits_odd = [q for i, q in enumerate(qubits) if i % 2 == 1]
+    syncopated = bool(qubits_even and qubits_odd)
+
+    tau = (
+        total_time - gate_time if syncopated else total_time
+    ) / (2 * n_pulses)
+
+    min_tau = 2 * gate_time if syncopated else gate_time
+    if tau < min_tau:
+        min_total_time = (
+            2 * n_pulses * 2 * gate_time if syncopated
+            else 2 * n_pulses * gate_time
+        )
+        if syncopated:
+            logger.warning(
+                ' Syncopated XX%d DD sequence will exceed total_time=%.3g: '
+                'the fixed gate_time=%.3g idles in the interleaved cycles '
+                'cannot be reduced, requiring a minimum total_time of %.3g.',
+                n_pulses, total_time, gate_time, min_total_time
+            )
+        else:
+            logger.warning(
+                ' XX%d DD sequence will exceed total_time=%.3g: '
+                'requires a minimum total_time of %.3g for gate_time=%.3g.',
+                n_pulses, total_time, min_total_time, gate_time
+            )
+
+    idle_time = max(0.0, tau - 2 * gate_time)
+    first_idle_time = max(0.0, tau - gate_time)
+
+    if syncopated:
+        DD_sequence = Circuit([
+            # Idle
+            Cycle({Idle(q, duration=first_idle_time) for q in qubits}),
+
+            # X (even)
+            Cycle(
+                {
+                    X90(q, subspace=subspace) for q in qubits_even
+                } | {
+                    Idle(q, duration=gate_time) for q in qubits_odd
+                }
+            ),
+            # NOTE: time = tau
+            Cycle(
+                {
+                    X90(q, subspace=subspace) for q in qubits_even
+                } | {
+                    Idle(q, duration=gate_time) for q in qubits_odd
+                }
+            ),
+
+            # Idle
+            Cycle({Idle(q, duration=idle_time) for q in qubits}),
+
+            # X (odd)
+            Cycle(
+                {
+                    X90(q, subspace=subspace) for q in qubits_odd
+                } | {
+                    Idle(q, duration=gate_time) for q in qubits_even
+                }
+            ),
+            # NOTE: time = 2*tau
+            Cycle(
+                {
+                    X90(q, subspace=subspace) for q in qubits_odd
+                } | {
+                    Idle(q, duration=gate_time) for q in qubits_even
+                }
+            ),
+
+            # Idle
+            Cycle({Idle(q, duration=idle_time) for q in qubits}),
+
+            # X (even)
+            Cycle(
+                {
+                    X90(q, subspace=subspace) for q in qubits_even
+                } | {
+                    Idle(q, duration=gate_time) for q in qubits_odd
+                }
+            ),
+            # NOTE: time = 3*tau
+            Cycle(
+                {
+                    X90(q, subspace=subspace) for q in qubits_even
+                } | {
+                    Idle(q, duration=gate_time) for q in qubits_odd
+                }
+            ),
+
+            # Idle
+            Cycle({Idle(q, duration=idle_time) for q in qubits}),
+
+            # X (odd)
+            Cycle(
+                {
+                    X90(q, subspace=subspace) for q in qubits_odd
+                } | {
+                    Idle(q, duration=gate_time) for q in qubits_even
+                }
+            ),
+            # NOTE: time = 4*tau
+            Cycle(
+                {
+                    X90(q, subspace=subspace) for q in qubits_odd
+                } | {
+                    Idle(q, duration=gate_time) for q in qubits_even
+                }
+            ),
+
+            Barrier((q for q in qubits))
+        ])
+
+    else:
+        inter_idle = max(0.0, 2 * tau - 2 * gate_time)
+        DD_sequence = Circuit([
+            # Idle
+            Cycle({Idle(q, duration=first_idle_time) for q in qubits}),
+            # X
+            Cycle({X90(q, subspace=subspace) for q in qubits}),
+            Cycle({X90(q, subspace=subspace) for q in qubits}),
+            # Idle
+            Cycle({Idle(q, duration=inter_idle) for q in qubits}),
+            # X
+            Cycle({X90(q, subspace=subspace) for q in qubits}),
+            Cycle({X90(q, subspace=subspace) for q in qubits}),
+            # Idle
+            Cycle({Idle(q, duration=first_idle_time) for q in qubits}),
+            Barrier((q for q in qubits))
+        ])
+
+    DD_circuit = Circuit()
+    for _ in range(int(n_pulses / 2)):
+        DD_circuit.extend(DD_sequence.copy())
+
+    return DD_circuit
+
+
 DD_SEQUENCES: Mapping[str, Callable] = defaultdict(
     lambda: 'DD sequence not currently supported!', {
+        'XX_N': XX_N,
         'XY_N': XY_N,
     }
 )
