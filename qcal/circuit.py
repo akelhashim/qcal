@@ -29,6 +29,7 @@ import plotly.io as pio
 
 from qcal.gate.gate import Gate
 from qcal.gate.single_qubit import Meas, basis_rotation
+from qcal.plotting.sequence import plot_mock_sequence
 from qcal.results import Results
 
 pio.renderers.default = 'colab'  # TODO: replace with settings
@@ -760,6 +761,19 @@ class Circuit:
             )
             # self.append(Barrier(self.qubits))
             self.append(meas_cycle)
+
+    def plot_mock_sequence(self, **kwargs):
+        """Plot a mock sequence of the circuit.
+
+        Args:
+            single_qubit_gate_time (float, optional): duration of a
+                single-qubit gate in seconds. Defaults to 20 ns.
+            two_qubit_gate_time (float, optional): duration of a two-qubit
+                gate in seconds. Defaults to 100 ns.
+            measurement_time (float, optional): duration of a measurement in
+                seconds. Defaults to 1 us.
+        """
+        plot_mock_sequence(self, **kwargs)
 
     def pop(self) -> None:
         """Removes the last cycle/layer to the end of the circuit."""

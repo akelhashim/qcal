@@ -1,8 +1,10 @@
 """Submodule for plotting pulses and sequences.
 
 """
+from __future__ import annotations
+
 import logging
-from typing import List
+from typing import TYPE_CHECKING, List
 
 import numpy as np
 import plotly.graph_objects as go
@@ -10,7 +12,9 @@ import plotly.io as pio
 from numpy.typing import NDArray
 from plotly.subplots import make_subplots
 
-from qcal.circuit import Circuit
+if TYPE_CHECKING:
+    from qcal.circuit import Circuit
+
 from qcal.config import Config
 from qcal.sequence.pulse_envelopes import cosine_square, gaussian, square
 from qcal.units import ns, us
@@ -207,7 +211,7 @@ def plot_mock_sequence(
         circuit:                Circuit,
         single_qubit_gate_time: float = 20 * ns,
         two_qubit_gate_time:    float = 100 * ns,
-        readout_time:           float = 1 * us,
+        measurement_time:       float = 1 * us,
     ) -> None:
     """Plot a mock pulse sequence for a qcal Circuit.
 
@@ -223,7 +227,7 @@ def plot_mock_sequence(
             seconds. Defaults to 20 ns.
         two_qubit_gate_time (float): duration of a two-qubit gate in seconds.
             Defaults to 100 ns.
-        readout_time (float): duration of a measurement in seconds. Defaults
+        measurement_time (float): duration of a measurement in seconds. Defaults
             to 1 us.
     """
     pio.templates.default = 'plotly'
@@ -262,7 +266,7 @@ def plot_mock_sequence(
             gate_qubits = gate.qubits
 
             if gate.is_measurement:
-                duration = readout_time
+                duration = measurement_time
                 envelope_fn = square
                 amp = 1.0
             elif gate.is_multi_qubit:
