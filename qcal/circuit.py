@@ -492,9 +492,10 @@ class Circuit:
         circuit_partitions = pd.DataFrame(columns=['Partitions', 'Size'])
         n = max([1, int(np.log2(self.n_cycles / 4))])
         blocks = [2**i for i in range(n + 1)]
-        add = [3, 5, 6, 7, 9, 10, 11, 12, 15, 20, 21, 24]
-        blocks += list(np.array(add)[np.array(add) < 2**(n + 1)])
-        for block_size in sorted(blocks):
+        # Cover important non-power-of-2 block sizes
+        add = [3, 5, 6, 7, 9, 10, 11, 12, 13, 14, 15, 20, 21, 24]
+        blocks += sorted(np.array(add)[np.array(add) < 2**(n + 1)])
+        for block_size in blocks:
             partitions = partition_circuit(self, block_size=block_size)
             circuit_partitions.loc[block_size] = {
                 'Partitions': partitions, 'Size': len(partitions)
