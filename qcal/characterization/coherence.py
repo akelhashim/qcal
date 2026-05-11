@@ -29,13 +29,13 @@ from qcal.math.utils import (
     uncertainty_of_sum,
 )
 from qcal.qpu.qpu import QPU
-from qcal.sequence.dynamical_decoupling import XY_N
+from qcal.sequence.dynamical_decoupling import DD_SEQUENCES
 from qcal.units import kHz, us
 
 logger = logging.getLogger(__name__)
 
 
-__all__ = ['T1', 'T2', 'T2XY', 'ParityOscillations']
+__all__ = ['T1', 'T2', 'T2DD', 'ParityOscillations']
 
 
 def T1(
@@ -114,7 +114,11 @@ def T1(
             self._subspace = subspace
 
             self._times = {
-                q: np.linspace(0., t_max, n_elements) for q in qubits
+                q: np.concatenate([
+                    [0.], np.geomspace(
+                        t_max/n_elements/2, t_max, n_elements - 1
+                    )
+                ]) for q in qubits
             }
             self._param_sweep = self._times
 
@@ -351,8 +355,14 @@ def T2(
                 )
             self._subspace = subspace
 
+            if echo:
+                t_start = t_max / n_elements / 2
+            else:
+                t_start = 1 / (8 * detuning)
             self._times = {
-                q: np.linspace(0., t_max, n_elements) for q in qubits
+                q: np.concatenate([
+                    [0.], np.geomspace(t_start, t_max, n_elements - 1)
+                ]) for q in qubits
             }
             self._param_sweep = self._times
 
@@ -565,22 +575,23 @@ def T2(
     )
 
 
-def T2XY(
+def T2DD(
     qpu:        QPU,
     config:     Config,
     qubits:     Sequence[int],
     t_max:      float = 250*us,
     gate_time:  float | None = None,
     subspace:   str = 'GE',
+    dd_method:  str = 'XY_N',
     n_elements: int = 50,
     n_pulses:   int | None = None,
     **kwargs
 ) -> Callable:
-    """T2 XY coherence characterization.
+    """T2 dynamical decoupling coherence characterization.
 
     Basic example useage:
     ```
-    exp = T2XY(
+    exp = T2DD(
         CustomQPU,
         config,
         qubits=[0, 1, 2]
@@ -598,6 +609,7 @@ def T2XY(
             Defaults to None.
         subspace (str, optional): qubit subspace for T2 measurement.
             Defaults to 'GE'.
+        dd_method (str, optional): the DD method to use. Defaults to 'XY_N'.
         n_elements (int, optional): number of delays starting from 0 to t_max.
             Defaults to 50.
         n_pulses (int | None, optional): number of pulses. Defaults to None.
@@ -606,13 +618,13 @@ def T2XY(
             time.
 
     Returns:
-        Callable: T2XY class.
+        Callable: T2DD class.
     """
 
-    class T2XY(qpu, Characterize):
-        """T2XY characterization class.
+    class T2DD(qpu, Characterize):
+        """T2DD characterization class.
 
-        This class inherits a custom QPU from the T2XY characterization
+        This class inherits a custom QPU from the T2DD characterization
         function.
         """
 
@@ -624,6 +636,7 @@ def T2XY(
             gate_time:  float | None = None,
             echo:       bool = False,
             subspace:   str = 'GE',
+            dd_method:  str = 'XY_N',
             n_elements: int = 50,
             n_pulses:   int | None = None,
             **kwargs
@@ -645,8 +658,14 @@ def T2XY(
                 )
             self._subspace = subspace
 
+            self._dd_method = dd_method
+
             self._times = {
-                q: np.linspace(0., t_max, n_elements) for q in qubits
+                q: np.concatenate([
+                    [0.], np.geomspace(
+                        t_max/n_elements/2, t_max, n_elements - 1
+                    )
+                ]) for q in qubits
             }
             self._param_sweep = self._times
 
@@ -696,7 +715,7 @@ def T2XY(
                     ])
 
                 # Add the XY DD sequence
-                DD_sequence = XY_N(
+                DD_sequence = DD_SEQUENCES[self._dd_method](
                     qubits=self._qubits,
                     total_time=t,
                     gate_time=gate_time,
@@ -763,15 +782,15 @@ def T2XY(
             """Save all circuits and data."""
             clear_output(wait=True)
             self._data_manager._exp_id += (
-                f'_T2XY_{"".join("Q"+str(q) for q in self._qubits)}'
+                f'_T2DD_{"".join("Q"+str(q) for q in self._qubits)}'
             )
             if settings.Settings.save_data:
                 qpu.save(self)
                 self._data_manager.save_to_csv(
-                    pd.DataFrame([self._char_values]), 'T2XY_values'
+                    pd.DataFrame([self._char_values]), 'T2DD_values'
                 )
                 self._data_manager.save_to_csv(
-                    pd.DataFrame([self._errors]), 'T2XY_errors'
+                    pd.DataFrame([self._errors]), 'T2DD_errors'
                 )
 
         def plot(self):
@@ -782,7 +801,7 @@ def T2XY(
                     r'$|2\rangle$ Population' if self._subspace == 'EF' else
                     r'$|1\rangle$ Population'
                 ),
-                flabel=r'$T_{2XY}$',
+                flabel=r'$T_{2DD}$',
                 save_path=self._data_manager._save_path
             )
 
@@ -800,12 +819,13 @@ def T2XY(
             self.plot()
             self.final()
 
-    return T2XY(
+    return T2DD(
         config=config,
         qubits=qubits,
         t_max=t_max,
         gate_time=gate_time,
         subspace=subspace,
+        dd_method=dd_method,
         n_elements=n_elements,
         n_pulses=n_pulses,
         **kwargs

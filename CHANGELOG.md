@@ -22,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - uncertainty_of_product to account for correlations using the covariance
 - T2* EF fit to decaying cosine with exponential baseline
+- Default time spacing for coherence measurements to exponential
 
 ### Deprecated
 
