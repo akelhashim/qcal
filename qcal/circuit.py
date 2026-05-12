@@ -178,6 +178,29 @@ class Cycle:
         """Draw the cycle/layer as a string."""
         return self.to_str()
 
+    def __eq__(self, other: object) -> bool:
+        """Check equality between two cycles.
+
+        Two cycles are equal if they contain the same set of gates.
+
+        Args:
+            other (object): object to compare against.
+
+        Returns:
+            bool: True if the cycles are equal, False otherwise.
+        """
+        if not isinstance(other, Cycle):
+            return NotImplemented
+        return self._gates == other._gates
+
+    def __hash__(self) -> int:
+        """Hash the cycle by its frozen set of gates.
+
+        Returns:
+            int: hash of the cycle.
+        """
+        return hash(frozenset(self._gates))
+
     def _repr_html_(self):
         """Draw the circuit as an html string."""
         df = pd.DataFrame([
@@ -381,7 +404,31 @@ class Circuit:
     def __len__(self) -> int:
         return len(self._cycles)
 
-    def _repr_html_(self) -> str:  # TODO: sometimes causes notebook to crash
+    def __eq__(self, other: object) -> bool:
+        """Check equality between two circuits.
+
+        Two circuits are equal if they contain the same cycles in the same
+        order.
+
+        Args:
+            other (object): object to compare against.
+
+        Returns:
+            bool: True if the circuits are equal, False otherwise.
+        """
+        if not isinstance(other, Circuit):
+            return NotImplemented
+        return self._cycles == other._cycles
+
+    def __hash__(self) -> int:
+        """Hash the circuit by its sequence of cycles.
+
+        Returns:
+            int: hash of the circuit.
+        """
+        return hash(tuple(self._cycles))
+
+    def _repr_html_(self) -> str:
         """Draw the html formatted circuit."""
         from qcal.plotting.graphs import draw_circuit
         fig = draw_circuit(self, show=False)
@@ -940,8 +987,8 @@ class CircuitSet:
             self._df = self._df.set_index(pd.Index(index))
 
     def __getitem__(
-            self, idx_or_label: int | str | slice
-        ) -> Circuit | pd.Series | CircuitSet:
+        self, idx_or_label: int | str | slice
+    ) -> Circuit | pd.Series | CircuitSet:
         """Index the CircuitSet dataframe.
 
         Args:
@@ -982,6 +1029,29 @@ class CircuitSet:
 
     def __iter__(self):
         return iter(self._df.circuit)
+
+    def __eq__(self, other: object) -> bool:
+        """Check equality between two CircuitSets.
+
+        Two CircuitSets are equal if their underlying DataFrames are equal.
+
+        Args:
+            other (object): object to compare against.
+
+        Returns:
+            bool: True if the CircuitSets are equal, False otherwise.
+        """
+        if not isinstance(other, CircuitSet):
+            return NotImplemented
+        return self._df.equals(other._df)
+
+    def __hash__(self) -> int:
+        """Hash the CircuitSet by its sequence of circuits.
+
+        Returns:
+            int: hash of the CircuitSet.
+        """
+        return hash(tuple(self._df.circuit))
 
     def __repr__(self) -> str:
         return repr(self._df)
