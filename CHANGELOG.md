@@ -34,6 +34,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - RPE uncertainty to include uncertainty due to shot noise
+- Circuit get_index, remove, replace methods
+- CircuitSet subset and sum_results methods
 
 ### Security
 
