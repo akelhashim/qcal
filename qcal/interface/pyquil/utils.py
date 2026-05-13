@@ -10,7 +10,9 @@ from collections import Counter
 from dataclasses import dataclass
 from typing import Any, Dict, FrozenSet, Iterable, List, Sequence, Tuple
 
-from .transpiler import add_X90
+from qcal.sequence.dynamical_decoupling import DD_SEQUENCES
+
+from .transpiler import PyQuilTranspiler, add_X90
 
 logger = logging.getLogger(__name__)
 
@@ -275,6 +277,139 @@ def _qubit_index(q: Qubit | FormalArgument | int) -> int:  # type: ignore  # noq
         return q
     else:
         raise TypeError(f"Unrecognized qubit object: {type(q).__name__}")
+
+
+def add_dd_sequence_during_operation(
+    program:    Program,  # type: ignore  # noqa: F821
+    operation:  Gate | Measurement,  # type: ignore  # noqa: F821
+    dd_qubits:  Sequence[int],
+    total_time: float,
+    gate_time:  float,
+    n_pulses:   int | None = None,
+    dd_method:  str = 'XX_N',
+    subspace:   str = 'GE',
+) -> Program:  # type: ignore  # noqa: F821
+    """Add a dynamical decoupling sequence concurrent with a matching operation.
+
+    Walks the program's instruction stream and, alongside every instruction
+    that matches ``operation``, inserts a dynamical decoupling (DD) sequence on
+    ``dd_qubits``. Because this function assumes the program uses fences to
+    delimit parallel cycles, the DD instructions are placed in the same fenced
+    block as the matched operation and therefore execute concurrently with it.
+
+    Matching rules:
+
+    - ``Gate``: name and qubit indices must both match, in order.
+    - ``Measurement``: qubit index must match (classical register is ignored).
+
+    Basic example usage:
+
+    ```python
+    from pyquil import Program
+    from pyquil.gates import CZ, H
+
+    from qcal.interface.pyquil.utils import add_dd_sequence_during_operation
+    from qcal.units import ns
+
+    # Program with a CZ on qubits 0 and 1; qubit 2 is idle during the CZ.
+    p = Program()
+    p += FENCE(0, 1, 2)
+    p += CZ(0, 1)
+    p += FENCE(0, 1, 2)
+    p += H(2)
+
+    # Apply an XX_N DD sequence on qubit 2 while CZ(0, 1) executes.
+    p = add_dd_sequence_during_operation(
+        program=p,
+        operation=CZ(0, 1),
+        dd_qubits=[2],
+        total_time=100 * ns,
+        gate_time=20 * ns,
+        dd_method='XX_N',
+    )
+    print(p)
+    # DECLARE ro BIT[1]
+    # FENCE 0 1 2
+    # CZ 0 1
+    # DELAY 2 4e-9
+    # RX(1.5707963267948966) 2
+    # RX(1.5707963267948966) 2
+    # DELAY 2 1.2000000000000002e-8
+    # RX(1.5707963267948966) 2
+    # RX(1.5707963267948966) 2
+    # DELAY 2 4e-9
+    # FENCE 2
+    # FENCE 0 1 2
+    # H 2
+    ```
+
+    Args:
+        program (Program): the program to update.
+        operation (Gate | Measurement): the PyQuil instruction to match against.
+        dd_qubits (Sequence[int]): qubit indices on which the DD sequence
+            should be applied concurrently with ``operation``.
+        total_time (float): total time over which to perform the DD.
+        gate_time (float): time of the native X90 gate.
+        n_pulses (int | None, optional): number of pulses. Defaults to ``None``.
+            If ``None``, the number of pulses is set to the maximum number of
+            pulses that can fit within the total time, with a minimum that
+            depends on the DD method.
+        dd_method (str, optional): the DD method to use. Defaults to 'XX_N'.
+        subspace (str, optional): qubits subspace for the DD sequence. Defaults
+            'GE'.
+
+    Returns:
+        Program: a new program with DD sequences inserted alongside each
+            matching instruction.
+    """
+    try:
+        from pyquil import Program
+        from pyquil.quilbase import Gate, Measurement
+    except ImportError as exc:
+        raise ImportError("Unable to import PyQuil!") from exc
+
+    transpiler = PyQuilTranspiler(fence_between_cycles=False)
+
+    if isinstance(operation, Gate):
+        target_qubits = tuple(_qubit_index(q) for q in operation.qubits)
+
+        def _matches(instr: object) -> bool:
+            return (
+                isinstance(instr, Gate)
+                and instr.name == operation.name
+                and tuple(
+                    _qubit_index(q) for q in instr.qubits
+                ) == target_qubits
+            )
+    elif isinstance(operation, Measurement):
+        target_qubit = _qubit_index(operation.qubit)
+
+        def _matches(instr: object) -> bool:
+            return (
+                isinstance(instr, Measurement)
+                and _qubit_index(instr.qubit) == target_qubit
+            )
+    else:
+        raise TypeError(
+            f"operation must be a Gate or Measurement, got {type(operation)!r}"
+        )
+
+    new_program: Program = program.copy_everything_except_instructions()
+    for instr in program.instructions:
+        new_program += instr
+
+        if _matches(instr):
+            dd_circuit = DD_SEQUENCES[dd_method](
+                qubits=dd_qubits,
+                total_time=total_time,
+                gate_time=gate_time,
+                n_pulses=n_pulses,
+                subspace=subspace
+            )
+            dd_program = transpiler.transpile(dd_circuit)[0]
+            new_program += dd_program
+
+    return new_program
 
 
 def add_delay_after_measurements(

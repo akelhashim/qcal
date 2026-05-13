@@ -280,7 +280,7 @@ class MCM(Gate):
             basis:       str = 'Z',
             apply:       Dict = {},  # noqa: B006
             dd_qubits:   List | Tuple = [],  # noqa: B006
-            dd_method:   str = 'XY',
+            dd_method:   str = 'XY_N',
             n_dd_pulses: int = 8,
     ) -> None:
         """Initialize using the meas matrix.
@@ -332,7 +332,7 @@ class Reset(Gate):
         measure_first: bool = True,
         method:        List[str] = ['active'],  # noqa: B006
         dd_qubits:     List | Tuple = [],  # noqa: B006
-        dd_method:     str = 'XY',
+        dd_method:     str = 'XY_N',
         n_dd_pulses:   int = 8,
     ) -> None:
         """Initialize using the meas matrix.

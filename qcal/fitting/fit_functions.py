@@ -14,6 +14,7 @@ __all__ = (
     'base_exponential',
     'cosine',
     'decaying_cosine',
+    'decaying_cosine_exponential',
     'exponential',
     'linear',
     'parabola'
@@ -92,6 +93,31 @@ def decaying_cosine(
         NDArray: decaying cosine curve.
     """
     return a * np.exp(-b * x) * np.cos(2 * np.pi * c * x + d) + e
+
+
+def decaying_cosine_exponential(
+        x: ArrayLike, a: float, b: float, c: float, d: float, e: float,
+        f: float, g: float
+    ) -> NDArray:
+    """Decaying cosine function with an exponential baseline.
+
+    Args:
+        x (ArrayLike): data.
+        a (float): amplitude.
+        b (float): exponential constant.
+        c (float): cosine frequency.
+        d (float): cosine phase.
+        e (float): baseline y-offset.
+        f (float): baseline exponential constant.
+        g (float): constant y-offset.
+
+    Returns:
+        NDArray: decaying cosine curve.
+    """
+    return (
+        a * np.exp(-b * x) * np.cos(2 * np.pi * c * x + d)
+        + e * np.exp(-f * x) + g
+    )
 
 
 def exponential(x: ArrayLike, a: float, b: float, c: float) -> NDArray:
