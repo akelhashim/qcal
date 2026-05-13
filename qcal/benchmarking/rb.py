@@ -7,7 +7,6 @@ For SRB, see:
 https://trueq.quantumbenchmark.com/guides/error_diagnostics/srb.html
 """
 import logging
-import multiprocessing as mp
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Callable, List, Tuple
 
@@ -88,7 +87,7 @@ def CRB(
     circuit_depths: List[int] | Tuple[int],
     n_circuits:     int = 30,
     native_gates:   List[str] | None = None,
-    pspec:          Any | None = None,
+    pspec:          QubitProcessorSpec | None = None,
     randomizeout:   bool = True,
     citerations:    int = 5,
     **kwargs
@@ -145,7 +144,7 @@ def CRB(
             circuit_depths: List[int] | Tuple[int],
             n_circuits:     int = 30,
             native_gates:   List[str] | None = None,
-            pspec:          Any | None = None,
+            pspec:          QubitProcessorSpec | None = None,
             randomizeout:   bool = True,
             citerations:    int = 5,
             **kwargs
@@ -306,9 +305,7 @@ def CRB(
                     )
 
             elif self._sim_RB:
-                max_workers = min(
-                    len(self._qubit_labels), max(1, mp.cpu_count() - 1)
-                )
+                max_workers = len(self._qubit_labels)
                 with ThreadPoolExecutor(
                     max_workers=max_workers
                 ) as ex:

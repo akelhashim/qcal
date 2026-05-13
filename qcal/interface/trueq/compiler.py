@@ -1,14 +1,19 @@
 """Submodule for True-Q compiler based on qcal config and the basis gates.
 
+NOTE: we do not use TYPE_CHECKING for trueq types because this might fail if
+trueq is not installed when building docs.
 """
-from qcal.config import Config
-from qcal.gate.two_qubit import two_qubit_gates
+from __future__ import annotations
 
 import logging
-import numpy as np
+from collections.abc import Sequence
+from typing import Dict, List
 
+import numpy as np
 from scipy.linalg import block_diag
-from typing import Dict, List, Tuple
+
+from qcal.config import Config
+from qcal.gate.two_qubit import TWO_QUBIT_GATES
 
 logger = logging.getLogger(__name__)
 
@@ -19,27 +24,26 @@ class TrueqCompiler:
     The compiler can be created from a True-Q config file, or automatically
     from a qcal Config object.
     """
-    try:
-        import trueq as tq
-    except ImportError:
-        logger.warning(' Unable to import trueq!')
-
     __slots__ = ('_config', '_tq_config', '_compiler')
 
     def __init__(
-            self, 
-            config: Config | tq.Config | str, 
-            passes: tq.Compiler.passes = None
+            self,
+            config: Config | trueq.Config | str,  # noqa: F821 # type: ignore
+            passes: trueq.Compiler.passes = None  # noqa: F821 # type: ignore
         ) -> None:
         """Initialize a True-Q compiler.
 
         Args:
-            config (Config | tq.Config | str): qcal Config object or True-Q yaml.
-            passes (tq.Compiler.passes, optional): True-Q compiler passes. 
+            config (Config | trueq.Config | str): qcal Config object or True-Q
+                yaml.
+            passes (trueq.Compiler.passes, optional): True-Q compiler passes.
                 Defaults to None. If None, this will default to the
                 HARDWARE_PASSES.
         """
-        import trueq as tq
+        try:
+            import trueq as tq
+        except ImportError:
+            logger.warning(' Unable to import trueq!')
 
         passes = (
             passes if passes is not None else tq.Compiler.HARDWARE_PASSES
@@ -54,17 +58,17 @@ class TrueqCompiler:
         elif isinstance(config, str):
             self._config = None
             self._tq_config = tq.Config.from_yaml(config)
-        
+
         self._compiler = tq.Compiler.from_config(
             self._tq_config, passes=passes
         )
 
     @property
-    def compiler(self) -> tq.Compiler:
+    def compiler(self) -> trueq.Compiler:  # noqa: F821 # type: ignore
         """True-Q compiler.
 
         Returns:
-            tq.Compiler: True-Q Compiler object.
+            trueq.Compiler: True-Q Compiler object.
         """
         return self._compiler
 
@@ -76,13 +80,13 @@ class TrueqCompiler:
             Config: qcal Config object.
         """
         return self._config
-    
+
     @property
-    def tq_config(self) -> tq.Config:
+    def tq_config(self) -> trueq.Config:  # noqa: F821 # type: ignore
         """True-Q config.
 
         Returns:
-            tq.Config: True-Q Config object.
+            trueq.Config: True-Q Config object.
         """
         return self._tq_config
 
@@ -94,7 +98,7 @@ class TrueqCompiler:
             config (Config): qcal Config object.
 
         Returns:
-            tq.Config: True-Q Config object.
+            trueq.Config: True-Q Config object.
         """
         import trueq as tq
 
@@ -102,10 +106,10 @@ class TrueqCompiler:
 
         factories_2q = ''
         for gate in config.native_gates['set']:
-            if gate in two_qubit_gates.keys():
+            if gate in TWO_QUBIT_GATES.keys():
                 factories_2q += f'\n        - {gate}:'
                 factories_2q += '\n            Matrix:'
-                for row in two_qubit_gates[gate]((0, 1)).matrix:
+                for row in TWO_QUBIT_GATES[gate]((0, 1)).matrix:
                     factories_2q += f'\n            - {list(row)}'
                 factories_2q += '\n            Involving:'
             for qubit_pair in config.native_gates['two_qubit'].keys():
@@ -128,10 +132,10 @@ class TrueqCompiler:
         _config += factories_2q
 
         return tq.Config.from_yaml(_config)
-    
+
     @staticmethod
     def from_generators(generators: Dict[int, Dict]):
-        """Generates a compiler which decomposes single-qubit gates based on the 
+        """Generates a compiler which decomposes single-qubit gates based on the
         true native gate.
 
         See: trueq.Gate.from_generators
@@ -140,7 +144,7 @@ class TrueqCompiler:
             generators (dict): Dictionary of gate generators for each qubit.
 
         Returns:
-            tq.Compiler: True-Q compiler object
+            trueq.Compiler: True-Q compiler object
         """
         try:
             import trueq as tq
@@ -161,7 +165,6 @@ class TrueqCompiler:
                 return tq.backend.local.decompose_sq_gates(
                     cycle, self._natives, True
                 )
-        
 
         native_gate_cycle = tq.Cycle({
             q: tq.Gate.from_generators(
@@ -172,9 +175,9 @@ class TrueqCompiler:
 
         factories = [
             tq.config.GateFactory(
-                f"X90", 
+                "X90",
                 layers=[tq.math.FixedRotation(g),],
-                involving = {label: tuple()}
+                involving = {label: ()}
             ) for label, g in native_gate_cycle.gates.items()
         ]
         factories.append(
@@ -195,23 +198,23 @@ class TrueqCompiler:
         ])
 
         return compiler
-    
+
     def compile(
-            self, circuits: tq.Circuit | tq.CircuitCollection
-        ) -> tq.Circuit | tq.CircuitCollection:
+            self, circuits: trueq.Circuit | trueq.CircuitCollection  # noqa: F821 # type: ignore
+        ) -> trueq.Circuit | trueq.CircuitCollection:  # noqa: F821 # type: ignore
         """Compile circuits using the compiler.
 
         Args:
-            circuits (tq.Circuit | tq.CircuitCollection): True-Q circuit or
-                CircuitCollection.
+            circuits (trueq.Circuit | trueq.CircuitCollection): True-Q circuit
+                or CircuitCollection.
 
         Returns:
-            tq.Circuit | tq.CircuitCollection: compiled True-Q circuit or
+            trueq.Circuit | trueq.CircuitCollection: compiled True-Q circuit or
                 CircuitCollection.
         """
         return self._compiler.compile(circuits)
 
-        
+
 class QuditCompiler:
     """True-Q qudit compiler."""
     try:
@@ -238,13 +241,13 @@ class QuditCompiler:
                 "EFRz", [[1,0,0], [0,1,0], [0,0,"exp(1j * phi * pi/180)"]]
             ),
             # tq.config.GateFactory(
-            #     "Rz", 
-            #     [tq.math.Rotation(np.pi / 360 * np.diag([1, -1, 0]), "phi")], 
+            #     "Rz",
+            #     [tq.math.Rotation(np.pi / 360 * np.diag([1, -1, 0]), "phi")],
             #     sys_dim=3
             # ),
             # tq.config.GateFactory(
-            #     "EFRz", 
-            #     [tq.math.Rotation(np.pi / 360 * np.diag([0, 1, -1]), "phi")], 
+            #     "EFRz",
+            #     [tq.math.Rotation(np.pi / 360 * np.diag([0, 1, -1]), "phi")],
             #     sys_dim=3
             # ),
         ]
@@ -255,28 +258,27 @@ class QuditCompiler:
         ])
 
     def compile(
-            self, circuits: tq.Circuit | tq.CircuitCollection
-        ) -> tq.Circuit | tq.CircuitCollection:
+            self, circuits: trueq.Circuit | trueq.CircuitCollection  # noqa: F821 # type: ignore
+        ) -> trueq.Circuit | trueq.CircuitCollection:  # noqa: F821 # type: ignore
         """Compile circuits using the compiler.
 
         Args:
-            circuits (tq.Circuit | tq.CircuitCollection): True-Q circuit or
-                CircuitCollection.
+            circuits (trueq.Circuit | trueq.CircuitCollection): True-Q circuit
+                or CircuitCollection.
 
         Returns:
-            tq.Circuit | tq.CircuitCollection: compiled True-Q circuit or
+            trueq.Circuit | trueq.CircuitCollection: compiled True-Q circuit or
                 CircuitCollection.
         """
         return self._compiler.compile(circuits)
 
     class DecompEFZ(tq.compilation.base.OperationReplacement):
         r"""
-        Decomposes diagonal qutrit unitaries. Assumes that one of the factories 
-        produces gates of the form diag(e^{-i phi}, 1, 1) and that another 
-        produces gates of the form diag(1, 1, e^{-i phi}). phi _must_ be in 
+        Decomposes diagonal qutrit unitaries. Assumes that one of the factories
+        produces gates of the form diag(e^{-i phi}, 1, 1) and that another
+        produces gates of the form diag(1, 1, e^{-i phi}). phi _must_ be in
         radians.
         """
-        import trueq as tq
 
         def __init__(self, factories):
             """_summary_
@@ -286,12 +288,15 @@ class QuditCompiler:
             """
             import trueq as tq
 
-            _IS_Z = lambda x: tq.math.proc_infidelity(
-                x, np.diag(np.exp([-1j*np.pi/180,0,0]))
-            ) < 1e-10
-            _IS_EFZ = lambda x: tq.math.proc_infidelity(
-                x, np.diag(np.exp([0,0,1j*np.pi/180]))
-            ) < 1e-10
+            def _IS_Z(x):
+                return tq.math.proc_infidelity(
+                            x, np.diag(np.exp([-1j*np.pi/180,0,0]))
+                        ) < 1e-10
+
+            def _IS_EFZ(x):
+                return tq.math.proc_infidelity(
+                            x, np.diag(np.exp([0,0,1j*np.pi/180]))
+                        ) < 1e-10
 
             self.z = None
             self.efz = None
@@ -305,11 +310,11 @@ class QuditCompiler:
             assert self.z is not None and self.efz is not None
 
         @staticmethod
-        def is_diag(gate: tq.Gate) -> bool:
+        def is_diag(gate: trueq.Gate) -> bool:  # noqa: F821 # type: ignore
             """Determine whether the given gate is unitary.
 
             Args:
-                gate (tq.Gate): True-Q gate
+                gate (trueq.Gate): True-Q gate
 
             Returns:
                 bool: unitary or not.
@@ -319,29 +324,26 @@ class QuditCompiler:
             )
 
         def apply(
-                self, labels: List[int] | Tuple[int], operation: tq.Gate
+                self, labels: Sequence[int], operation: trueq.Gate  # noqa: F821 # type: ignore
             ) -> List:
             """Apply an operation to a given set of qudit labels.
 
             Args:
-                labels (List[int] | Tuple[int]): qudit labels.
-                operation (tq.Gate): True-Q gate.
-
-            Raises:
-                RuntimeError: incompatible operation.
+                labels (Sequence[int]): qudit labels.
+                operation (trueq.Gate): True-Q gate.
 
             Returns:
                 List: list of cycles.
             """
             import trueq as tq
 
-            if (len(labels) != 1 or not isinstance(operation, tq.Gate) or 
+            if (len(labels) != 1 or not isinstance(operation, tq.Gate) or
                 not self.is_diag(operation)
                 ):
                 return [{labels: operation}]
 
             diag = operation.mat[1,1].conj() * np.diag(operation.mat)
             return [
-                {labels: self.z(-180 / np.pi * np.angle(diag[0]))}, 
+                {labels: self.z(-180 / np.pi * np.angle(diag[0]))},
                 {labels: self.efz(180 / np.pi * np.angle(diag[2]))}
             ]

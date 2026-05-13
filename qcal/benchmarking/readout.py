@@ -3,17 +3,17 @@
 """
 from __future__ import annotations
 
-import qcal.settings as settings
-from qcal.circuit import Barrier, Cycle, Circuit, CircuitSet
-from qcal.config import Config
-from qcal.gate.single_qubit import Id, Meas, X90, X
-from qcal.qpu.qpu import QPU
-
 import logging
-import pandas as pd
-
-from IPython.display import clear_output
 from typing import Callable, List, Tuple
+
+import pandas as pd
+from IPython.display import clear_output
+
+import qcal.settings as settings
+from qcal.circuit import Barrier, Circuit, CircuitSet, Cycle
+from qcal.config import Config
+from qcal.gate.single_qubit import X90, Id, Meas, X
+from qcal.qpu.qpu import QPU
 
 logger = logging.getLogger(__name__)
 
@@ -48,11 +48,11 @@ def ReadoutFidelity(
 
     class ReadoutFidelity(qpu):
         """ReadoutFidelity class.
-        
+
         This class inherits a custom QPU from the ReadoutFidelity function.
         """
 
-        def __init__(self, 
+        def __init__(self,
                 config: Config,
                 qubits: List | Tuple,
                 gate:   str = 'X90',
@@ -62,7 +62,7 @@ def ReadoutFidelity(
 
             """
             qpu.__init__(self,
-                config=config, 
+                config=config,
                 **kwargs
             )
             self._qubits = sorted(qubits)
@@ -97,7 +97,7 @@ def ReadoutFidelity(
                     Cycle([Meas(q) for q in self._qubits])
                 ])
             ]
-            
+
             level = {1: 'GE', 2: 'EF'}
             for m in range(1, self._n_levels):
                 circuit = Circuit()
@@ -127,7 +127,7 @@ def ReadoutFidelity(
                 circuits.append(circuit)
 
             self._circuits = CircuitSet(circuits)
-            self._circuits['prep state'] = [n for n in range(self._n_levels)]
+            self._circuits['prep state'] = list(range(self._n_levels))
 
         def analyze(self):
             """Analyze the data and generate confusion matrices."""
@@ -135,13 +135,13 @@ def ReadoutFidelity(
 
             index = [
                 ['Prep State'] * self._n_levels,
-                [n for n in range(self._n_levels)]
+                list(range(self._n_levels))
             ]
             columns = [[], [], []]
             for q in self._qubits:
                 columns[0].extend([f'Q{q}'] * self._n_levels)
                 columns[1].extend(['Meas State'] * self._n_levels)
-                columns[2].extend([n for n in range(self._n_levels)])
+                columns[2].extend(list(range(self._n_levels)))
 
             self._cmat = pd.DataFrame(
                 columns=columns, index=index

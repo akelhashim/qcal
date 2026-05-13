@@ -2,8 +2,9 @@
 
 """
 import logging
-from collections.abc import Iterable
+from collections.abc import Iterable, Iterator
 
+from qcal.circuit import Circuit, Cycle
 from qcal.gate.gate import Gate
 
 logger = logging.getLogger(__name__)
@@ -58,8 +59,12 @@ class GateMapper(dict):
         result = self[key](*args, **kwargs)
         if isinstance(result, Gate):
             return {result}
-        elif isinstance(result, Iterable):
+        elif isinstance(result, Iterator):
             return set(result)
+        elif isinstance(result, Iterable):
+            return Circuit([
+                Cycle({gate}) for gate in result
+            ])
         else:
             raise TypeError(
                 f"Gate function for {key} returned an unsupported type."

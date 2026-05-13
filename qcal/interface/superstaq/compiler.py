@@ -1,20 +1,17 @@
 """Submodule for SuperstaQ compiler.
 
 """
+import logging
+from typing import Any, Dict, List
+
 from qcal.circuit import CircuitSet
 from qcal.config import Config
-from qcal.gate.two_qubit import two_qubit_gates
-
-import logging
-import numpy as np
-
-from scipy.linalg import block_diag
-from typing import Any, Dict, List, Tuple
+from qcal.gate.two_qubit import TWO_QUBIT_GATES
 
 logger = logging.getLogger(__name__)
 
 
-# __all__ = ('CirqCompiler', 'QiskitCompiler')
+__all__ = ('CirqCompiler', 'QiskitCompiler')
 
 
 def gateset_from_config(config: Config) -> Dict:
@@ -32,20 +29,20 @@ def gateset_from_config(config: Config) -> Dict:
         ]
     }
     for gate in config.native_gates['set']:
-        if gate in two_qubit_gates:
+        if gate in TWO_QUBIT_GATES:
             gateset[gate] = [
                 list(qp) for qp in config.native_gates['two_qubit'] if gate in
                 config.native_gates['two_qubit'][qp]
             ]
-    
+
     return gateset
 
 
 class CirqCompiler:
     """Superstaq Cirq compiler."""
     try:
-        import cirq_superstaq as css
         import cirq
+        import cirq_superstaq as css
     except ImportError:
         logger.warning(' Unable to import cirq_superstaq!')
 
@@ -53,12 +50,13 @@ class CirqCompiler:
         '_service', '_config', '_gateset', '_gate_defs', '_compiler_output'
     )
 
-    def __init__(self, 
-            api_key: str, 
-            config: Config, 
-            gateset: Dict = None, 
-            gate_defs: Dict = None     
-        ) -> None:
+    def __init__(
+        self,
+        api_key:   str,
+        config:    Config,
+        gateset:   Dict = None,
+        gate_defs: Dict = None
+    ) -> None:
         """Initialize a Cirq Superstaq compiler.
 
         Args:
@@ -89,7 +87,7 @@ class CirqCompiler:
             css.Service: service object.
         """
         return self.service
-    
+
     @property
     def compiler_output(self) -> Any:
         """Output of compiler.
@@ -98,7 +96,7 @@ class CirqCompiler:
             Any: compiler output.
         """
         return self._compiler_output
-    
+
     @property
     def config(self) -> Config:
         """qcal config.
@@ -107,7 +105,7 @@ class CirqCompiler:
             Config: qcal Config object.
         """
         return self._config
-    
+
     @property
     def gateset(self) -> Dict:
         """Gateset for compiler.
@@ -116,7 +114,7 @@ class CirqCompiler:
             Dict: gateset.
         """
         return self._gateset
-    
+
     @property
     def gate_defs(self) -> Dict:
         """Custom gate definitions.
@@ -125,7 +123,7 @@ class CirqCompiler:
             Dict: gate definitions.
         """
         return self._gate_defs
-    
+
     @property
     def service(self) -> css.Service:
         """Cirq Superstaq Service.
@@ -134,7 +132,7 @@ class CirqCompiler:
             css.Service: service object.
         """
         return self._service
-    
+
     def compile(
             self, circuits: cirq.Circuit | List[cirq.Circuit] | CircuitSet,
         ) -> CircuitSet:
@@ -161,7 +159,7 @@ class CirqCompiler:
         )
 
         return CircuitSet(circuits=self._compiler_output.circuits)
-    
+
 
 class QiskitCompiler:
     """Superstaq Qiskit compiler."""
@@ -172,15 +170,15 @@ class QiskitCompiler:
         logger.warning(' Unable to import qiskit_superstaq!')
 
     __slots__ = (
-        '_provider', '_backend', '_config', '_gateset', '_gate_defs', 
+        '_provider', '_backend', '_config', '_gateset', '_gate_defs',
         '_compiler_output'
     )
 
-    def __init__(self, 
-            api_key: str, 
-            config: Config, 
-            gateset: Dict = None, 
-            gate_defs: Dict = None     
+    def __init__(self,
+            api_key: str,
+            config: Config,
+            gateset: Dict = None,
+            gate_defs: Dict = None
         ) -> None:
         """Initialize a Qiskit Superstaq compiler.
 
@@ -213,7 +211,7 @@ class QiskitCompiler:
             qss.SuperstaqBackend: backend object.
         """
         return self._backend
-    
+
     @property
     def compiler_output(self) -> Any:
         """Output of compiler.
@@ -222,7 +220,7 @@ class QiskitCompiler:
             Any: compiler output.
         """
         return self._compiler_output
-    
+
     @property
     def config(self) -> Config:
         """qcal config.
@@ -231,7 +229,7 @@ class QiskitCompiler:
             Config: qcal Config object.
         """
         return self._config
-    
+
     @property
     def gateset(self) -> Dict:
         """Gateset for compiler.
@@ -240,7 +238,7 @@ class QiskitCompiler:
             Dict: gateset.
         """
         return self._gateset
-    
+
     @property
     def gate_defs(self) -> Dict:
         """Custom gate definitions.
@@ -249,7 +247,7 @@ class QiskitCompiler:
             Dict: gate definitions.
         """
         return self._gate_defs
-    
+
     @property
     def provider(self) -> qss.SuperstaqProvider:
         """Qiskit Superstaq Provider.
@@ -258,8 +256,8 @@ class QiskitCompiler:
             qss.SuperstaqProvider: provider object.
         """
         return self._provider
-    
-    def compile(self, 
+
+    def compile(self,
             circuits: QuantumCircuit | List[QuantumCircuit] | CircuitSet,
         ) -> CircuitSet:
         """Compile circuits using the compiler.

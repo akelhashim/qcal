@@ -9,8 +9,8 @@ import logging
 from typing import Dict, List, Tuple
 
 from qcal.config import Config
-from qcal.gate.single_qubit import single_qubit_gates
-from qcal.gate.two_qubit import two_qubit_gates
+from qcal.gate.single_qubit import SINGLE_QUBIT_GATES
+from qcal.gate.two_qubit import TWO_QUBIT_GATES
 
 logger = logging.getLogger(__name__)
 
@@ -67,11 +67,13 @@ def pygsti_pspec(
     ]
     if availability is None:
         availability = {}
-        for gate in native_gates: # This will break if formatted as a pygsti gate
-            if gate in single_qubit_gates:
-                availability[GATE_MAPPER.get(gate)] = [(f'Q{q}',) for q in qubits]
+        for gate in native_gates:
+            if gate in SINGLE_QUBIT_GATES:
+                availability[GATE_MAPPER.get(gate)] = [
+                    (f'Q{q}',) for q in qubits
+                ]
 
-            elif gate in two_qubit_gates:
+            elif gate in TWO_QUBIT_GATES:
                 qubit_pairs = []
                 for qubit_pair in config.native_gates['two_qubit'].keys():
                     if qubit_pair in pairings:

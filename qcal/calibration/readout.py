@@ -3,7 +3,6 @@
 """
 import inspect
 import logging
-import multiprocessing as mp
 import os
 from concurrent.futures import ThreadPoolExecutor
 from typing import Callable, Dict, List, Tuple
@@ -265,10 +264,7 @@ def ReadoutCalibration(
             ]
             cmap = ListedColormap(colors[:self._n_levels])
 
-            n_jobs = min(
-                len(self._qubits),
-                max(1, mp.cpu_count() - 1)
-            )
+            n_jobs = len(self._qubits)
             grid_resolution = 200
 
             def _compute_decision_boundary(q):
@@ -899,8 +895,9 @@ def Separation(
             for q in self._qubits:
                 self._config[self._params[q]] = self._cal_values[q]
 
-            self._config.save()
-            self._config.load()
+            if settings.Settings.save_data:
+                self._config.save()
+                self._config.load()
 
         def run(self) -> None:
             """Run the experiment."""

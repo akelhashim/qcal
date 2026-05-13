@@ -19,8 +19,8 @@ import pandas as pd
 import yaml
 
 import qcal.settings as settings
-from qcal.gate.single_qubit import single_qubit_gates
-from qcal.gate.two_qubit import two_qubit_gates
+from qcal.gate.single_qubit import SINGLE_QUBIT_GATES
+from qcal.gate.two_qubit import TWO_QUBIT_GATES
 from qcal.math.utils import round_sig_figures
 
 logger = logging.getLogger(__name__)
@@ -263,7 +263,7 @@ class Config:
             for sbsp in self.parameters['single_qubit'][q].keys():
                 gates = []
                 for k, v in self.parameters['single_qubit'][q][sbsp].items():
-                    if isinstance(v, dict) and k in single_qubit_gates:
+                    if isinstance(v, dict) and k in SINGLE_QUBIT_GATES:
                         gates.append(k)
                         native_set.add(k)
                 subspace[sbsp] = gates
@@ -274,7 +274,7 @@ class Config:
         for p in self.qubit_pairs:
             gates = []
             for k, v in self.parameters['two_qubit'][str(p)].items():
-                if isinstance(v, dict) and k in two_qubit_gates:
+                if isinstance(v, dict) and k in TWO_QUBIT_GATES:
                     gates.append(k)
                     native_set.add(k)
             two_qubit[p] = gates
