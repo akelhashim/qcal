@@ -19,6 +19,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fit for decaying cosine with exponential baseline
 - __eq__ for Gate, Cycle, Circuit, and CircuitSet
 - PyQuil cycles_to_defcircuits kwarg in transpilation
+- XX-type (CPMG) dynamical decoupling sequencies
+- Make simultaneous DD sequences syncopated for canceling ZZ
+- PyQuil helper function for adding DD sequences during targeted operations
 
 ### Changed
 

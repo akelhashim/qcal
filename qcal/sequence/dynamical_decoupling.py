@@ -107,15 +107,17 @@ def XY_N(
     Returns:
         Circuit: qcal Circuit.
     """
-    if n_pulses is None:
-        n_pulses = max(4, int(total_time / (gate_time * 8)) * 4)
-    else:
-        if n_pulses % 4 != 0:
-            raise ValueError("'n_pulses' must be a multiple of 4!")
-
-    qubits_even = [q for i, q in enumerate(qubits) if i % 2 == 0]
-    qubits_odd = [q for i, q in enumerate(qubits) if i % 2 == 1]
+    qubits_even = [q for q in qubits if q % 2 == 0]
+    qubits_odd = [q for q in qubits if q % 2 == 1]
     syncopated = bool(qubits_even and qubits_odd)
+
+    if n_pulses is None and syncopated:
+        n_pulses = max(4, int((total_time - gate_time) / (gate_time * 16)) * 4)
+    elif n_pulses is None and not syncopated:
+        n_pulses = max(4, int(total_time / (gate_time * 8)) * 4)
+
+    if n_pulses % 4 != 0:
+        raise ValueError("'n_pulses' must be a multiple of 4!")
 
     # Account for the duration of the X90 gates, which are assumed to be
     # centered on either side of the interval given by tau
@@ -126,7 +128,7 @@ def XY_N(
     min_tau = 2 * gate_time if syncopated else gate_time
     if tau < min_tau:
         min_total_time = (
-            2 * n_pulses * 2 * gate_time if syncopated
+            2 * n_pulses * 2 * gate_time + gate_time if syncopated
             else 2 * n_pulses * gate_time
         )
         if syncopated:
@@ -376,15 +378,17 @@ def XX_N(
     Returns:
         Circuit: qcal Circuit.
     """
-    if n_pulses is None:
+    qubits_even = [q for i, q in enumerate(qubits) if i % 2 == 0]
+    qubits_odd = [q for i, q in enumerate(qubits) if i % 2 == 1]
+    syncopated = bool(qubits_even and qubits_odd)
+
+    if n_pulses is None and syncopated:
+        n_pulses = max(2, int((total_time - gate_time) / (gate_time * 8)) * 2)
+    elif n_pulses is None:
         n_pulses = max(2, int(total_time / (gate_time * 4)) * 2)
     else:
         if n_pulses % 2 != 0:
             raise ValueError("'n_pulses' must be a multiple of 2!")
-
-    qubits_even = [q for i, q in enumerate(qubits) if i % 2 == 0]
-    qubits_odd = [q for i, q in enumerate(qubits) if i % 2 == 1]
-    syncopated = bool(qubits_even and qubits_odd)
 
     tau = (
         total_time - gate_time if syncopated else total_time
@@ -393,7 +397,7 @@ def XX_N(
     min_tau = 2 * gate_time if syncopated else gate_time
     if tau < min_tau:
         min_total_time = (
-            2 * n_pulses * 2 * gate_time if syncopated
+            2 * n_pulses * 2 * gate_time + gate_time if syncopated
             else 2 * n_pulses * gate_time
         )
         if syncopated:
