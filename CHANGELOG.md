@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - plot_mock_sequence for psuedo-visualization of pulse sequence of circuits
 - Fit for decaying cosine with exponential baseline
 - __eq__ for Gate, Cycle, Circuit, and CircuitSet
+- PyQuil cycles_to_defcircuits kwarg in transpilation
 
 ### Changed
 
