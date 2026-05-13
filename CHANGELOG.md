@@ -11,11 +11,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Expand pyGSTi transpilers to support single-qubit Cliffords
-- pyGSTi Pauli generation and measurement grouping utilities
-- pyGSTi Pauli randomization for Clifford circuits
-- Mirror circuit benchmarking
-
 ### Changed
 
 ### Deprecated
@@ -24,9 +19,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- Post-processing results for different depth circs
-
 ### Security
+
+## [1.2.0] - 2026-05-13
+
+### Added
+
+- Expand pyGSTi transpilers to support single-qubit Cliffords
+- pyGSTi Pauli generation and measurement grouping utilities
+- pyGSTi Pauli randomization for Clifford circuits
+- Mirror circuit benchmarking
+
+### Fixed
+
+- Post-processing results for different depth circs
 
 ## [1.1.1] - 2026-04-24
 
@@ -177,7 +183,8 @@ post-processing
 - Single- and two-qubit benchmarking methods
 - Advanced compilation tools
 
-[Unreleased]: https://github.com/akelhashim/qcal/compare/v1.1.1...HEAD
+[Unreleased]: https://github.com/akelhashim/qcal/compare/v1.2.0...HEAD
+[1.2.0]: https://github.com/akelhashim/qcal/releases/tag/v1.2.0
 [1.1.1]: https://github.com/akelhashim/qcal/releases/tag/v1.1.1
 [1.1.0]: https://github.com/akelhashim/qcal/releases/tag/v1.1.0
 [1.0.6]: https://github.com/akelhashim/qcal/releases/tag/v1.0.6
