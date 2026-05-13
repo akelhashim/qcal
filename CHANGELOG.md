@@ -11,6 +11,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Expand pyGSTi transpilers to support single-qubit Cliffords
+- pyGSTi Pauli generation and measurement grouping utilities
+- pyGSTi Pauli randomization for Clifford circuits
+- Mirror circuit benchmarking
+
 ### Changed
 
 ### Deprecated
@@ -18,6 +23,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Removed
 
 ### Fixed
+
+- Post-processing results for different depth circs
 
 ### Security
 

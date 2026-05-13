@@ -4,55 +4,37 @@ See:
 https://www.nature.com/articles/s41467-019-13068-7
 https://trueq.quantumbenchmark.com/guides/error_diagnostics/cb.html
 https://trueq.quantumbenchmark.com/api/protocols.html#trueq.make_cb
-
-For MCMs:
-https://journals.aps.org/prl/abstract/10.1103/PhysRevLett.134.020602
-https://journals.aps.org/prxquantum/abstract/10.1103/PRXQuantum.6.010310
-
 """
+from __future__ import annotations
+
 import logging
-from collections.abc import Iterable, Sequence
-from typing import Any, Callable
+from collections.abc import Iterable
+from typing import Callable
 
 import matplotlib.pyplot as plt
 import numpy as np
-import pygsti
-import pygsti.algorithms.randomcircuit as random_circuit
 from IPython.display import clear_output
-from pygsti.baseobjs.label import Label
-from pygsti.processors import QubitProcessorSpec
-from pygsti.processors.compilationrules import CliffordCompilationRules as CCR
 
-# from scipy.optimize import curve_fit
 from qcal.analysis.leakage import analyze_leakage
-from qcal.circuit import CircuitSet
 from qcal.config import Config
-from qcal.gate.two_qubit import TWO_QUBIT_GATES
-from qcal.interface.pygsti.compiler import pauli_randomize_clifford_circuit
-from qcal.interface.pygsti.processor_spec import pygsti_pspec
-from qcal.interface.pygsti.transpiler import PyGSTiTranspiler
 from qcal.math.utils import round_to_order_error
 from qcal.qpu.qpu import QPU
 from qcal.settings import Settings
 
-from .utils import (
-    generate_n_qubit_pauli_measurement_map,
-    generate_n_qubit_paulis,
-    generate_random_n_qubit_paulis,
-)
-
 logger = logging.getLogger(__name__)
 
 
-__all__ = ['CB', 'CBMCM', 'SC']
+__all__ = ['CB', 'SC']
 
 
-def compute_cycle_infidelity(circs_D: Any, circs_ref: Any) -> tuple:
+def compute_cycle_infidelity(
+        circs_D: trueq.CircuitCollection, circs_ref: trueq.CircuitCollection  # noqa: F821 # type: ignore
+) -> tuple:
     """Compute the infidelity of the interleaved Cycle.
 
     Args:
-        circs_D (tq.CircuitCollection): dressed circuits
-        circs_ref (tq.CircuitCollection): reference circuits
+        circs_D (trueq.CircuitCollection): dressed circuits
+        circs_ref (trueq.CircuitCollection): reference circuits
 
     Returns:
         tuple: (cycle infidelity, error)
@@ -80,13 +62,13 @@ def compute_cycle_infidelity(circs_D: Any, circs_ref: Any) -> tuple:
 def CB(
     qpu:                  QPU,
     config:               Config,
-    cycle:                dict,
+    cycle:                dict | trueq.Cycle,  # noqa: F821 # type: ignore
     circuit_depths:       Iterable[int],
-    tq_config:            str | Any = None,
+    tq_config:            str | trueq.Config = None,  # noqa: F821 # type: ignore
     n_circuits:           int = 30,
     n_decays:             int = 20,
-    targeted_errors:      Iterable[str] | None = None,
-    twirl:                str = "P",
+    targeted_errors:      Iterable[str] | trueq.math.Weyls | None = None,  # noqa: F821 # type: ignore
+    twirl:                str | trueq.Twirl = "P",  # noqa: F821 # type: ignore
     propogate_correction: bool = False,
     compiled_pauli:       bool = True,
     include_ref_cycle:    bool = False,
@@ -100,12 +82,12 @@ def CB(
     Args:
         qpu (QPU): custom QPU object.
         config (Config): qcal Config object.
-        cycle (dict, tq.Cycle): cycle (or subcircuit) to benchmark.
+        cycle (dict, trueq.Cycle): cycle (or subcircuit) to benchmark.
         circuit_depths (Iterable[int]): a list of positive integers specifying
             how many interleaved cycles of the target cycle and
             random Pauli operators to generate, for example, [4, 16, 64].
-        tq_config (str | Any, optional): True-Q config yaml file or config
-            object. Defaults to None.
+        tq_config (str | trueq.Config, optional): True-Q config yaml file or
+            config object. Defaults to None.
         n_circuits (int, optional): the number of circuits for each circuit
             depth. Defaults to 30.
         n_decays (int, optional): an integer specifying the total number of
@@ -115,14 +97,14 @@ def CB(
             may result in a biased estimate of the process fidelity, and
             setting this value lower than min(40, 4 ** n_qubits - 1) may result
             in a biased estimate of the probability for non-identity errors.
-        targeted_errors (tq.math.Weyls, Iterable[str], None, optional): A True-Q
-            Weyls instance, where each row specifies an error to measure.
+        targeted_errors (Iterable[str] | trueq.math.Weyls | None, optional): A
+            True-Q Weyls instance, where each row specifies an error to measure.
             Defaults to None. The identity Pauli will always be added to the
             list of errors (or be the sole target if None is the argument),
             which corresponds to measuring the process fidelity of the cycle.
             For convenience, a list of strings can be given, e.g. ["XII",
             "ZZY"], which will be used to instantiate a Weyls object.
-        twirl (tq.Twirl, str, optional): The Twirl to use in this protocol.
+        twirl (str | trueq.Twirl, optional): The Twirl to use in this protocol.
             Defaults to 'P'. You can also specify a twirling group that will be
             used to automatically instantiate a twirl based on the labels in
             the given cycles.
@@ -154,13 +136,13 @@ def CB(
         def __init__(
             self,
             config:               Config,
-            cycle:                dict,
+            cycle:                dict | trueq.Cycle,  # noqa: F821 # type: ignore
             circuit_depths:       Iterable[int],
-            tq_config:            str | Any = None,
+            tq_config:            str | trueq.Config = None,  # noqa: F821 # type: ignore
             n_circuits:           int = 30,
             n_decays:             int = 20,
-            targeted_errors:      Iterable[str] | None = None,
-            twirl:                str = "P",
+            targeted_errors:      Iterable[str] | trueq.math.Weyls | None = None,  # noqa: F821 # type: ignore
+            twirl:                str | trueq.Twirl = "P",  # noqa: F821 # type: ignore
             propogate_correction: bool = False,
             compiled_pauli:       bool = True,
             include_ref_cycle:    bool = False,
@@ -375,243 +357,15 @@ def CB(
     )
 
 
-def CBMCM(
-    qpu:            QPU,
-    config:         Config,
-    # cycle:          Circuit,
-    mcm_qubits:     Sequence[int],
-    idle_qubits:    Sequence[int],
-    circuit_depths: Iterable[int],
-    n_circuits:     int = 30,
-    n_decays:       int | None = None,
-    pspec:          QubitProcessorSpec | None = None,
-    **kwargs
-) -> Callable:
-    """Circuit Benchmarking of Mid-Circuit Measurements.
-
-    This is a pyGSTi protocol.
-
-    Relevant paper:
-    https://journals.aps.org/prl/abstract/10.1103/PhysRevLett.134.020602
-
-    Args:
-        qpu (QPU): custom QPU object.
-        config (Config): qcal Config object.
-        # cycle (Circuit): MCM cycle to be benchmarked.
-        mcm_qubits (Sequence[int]): qubits measured in the MCM cycle.
-        idle_qubits (Sequence[int]): qubits that are idle in the MCM cycle
-            (i.e., have no gates applied).
-        circuit_depths (Iterable[int]):  a list of integers >= 0 specifying
-            the CB circuit depths.
-        n_circuits (int, optional): The number of different CB circuits sampled
-            at each depth. Defaults to 30.
-        n_decays (int | None, optional): an integer specifying the total number
-            of randomly  chosen Pauli decay strings used to measure the process
-            infidelity. Defaults to None.
-        pspec (QubitProcessorSpec | None, optional): pyGSTi qubit processor
-            spec. Defaults to None. If None, a processor spec will be
-            automatically generated based on the native_gates and the qubit
-            labels.
-
-    Returns:
-        Callable: CBMCM class instance.
-    """
-
-    class CBMCM(qpu):
-        """pyGSTi CB of MCM protocol."""
-
-        def __init__(
-            self,
-            config:         Config,
-            # cycle:          Circuit,
-            mcm_qubits:     Sequence[int],
-            idle_qubits:    Sequence[int],
-            circuit_depths: Iterable[int],
-            n_circuits:     int = 30,
-            n_decays:       int | None = None,
-            pspec:          QubitProcessorSpec | None = None,
-            **kwargs
-        ) -> None:
-            logger.info(f" pyGSTi version: {pygsti.__version__}\n")
-
-            self._qubits = sorted(set(mcm_qubits) | set(idle_qubits))
-            self._mcm_qubits = mcm_qubits
-            self._idle_qubits = idle_qubits
-
-            cycle_gates = []
-            for q in mcm_qubits:
-                cycle_gates.append([Label('Iz', f'Q{q}')])
-            for q in idle_qubits:
-                cycle_gates.append([Label('Gc0', f'Q{q}')])
-            self._cycle = pygsti.circuits.Circuit(cycle_gates) # TODO [cycle_gates]
-            self._qubit_labels = self._cycle.line_labels
-
-            self._circuit_depths = circuit_depths
-            self._n_circuits = n_circuits
-            self._n_decays = (
-                n_decays if n_decays is not None else min(
-                    20, 4 ** len(self._qubits)
-                )
-            )
-
-            gate_set = [f'Gc{i}' for i in range(24)]
-            for gate in config.native_gates['set']:
-                if gate in TWO_QUBIT_GATES:
-                    gate_set.append(gate)
-            self._pspec = pspec if pspec is not None else pygsti_pspec(
-                config, self._qubits, gate_set
-            )
-
-            self._compilations = {
-                'absolute': CCR.create_standard(
-                    self._pspec, 'absolute',
-                    ('paulis', '1Qcliffords'),
-                    verbosity=0
-                ),
-                'paulieq': CCR.create_standard(
-                    self._pspec, 'paulieq',
-                    ('1Qcliffords', 'allcnots'),
-                    verbosity=0
-                )
-            }
-
-            transpiler = kwargs.get('transpiler', PyGSTiTranspiler())
-            kwargs.pop('transpiler', None)
-            qpu.__init__(self, config=config, transpiler=transpiler, **kwargs)
-
-            self._pauli_groups = None
-            self._edesign = None
-            self._data = None
-            self._dataset = None
-            self._results = None
-
-            self._error_rates = {}
-            self._fit_params = {}
-            self._success_probabilities = {}
-            self._uncertainties = {}
-
-        @property
-        def pspec(self):
-            """pyGSTi processor spec."""
-            return self._pspec
-
-        @property
-        def edesign(self):
-            """pyGSTi edesign."""
-            return self._edesign
-
-        @property
-        def data(self):
-            """pyGSTi data object."""
-            return self._data
-
-        @property
-        def dataset(self):
-            """pyGSTi dataset."""
-            return self._dataset
-
-        # @property
-        # def fit_params(self):
-        #     """CRB fit parameters."""
-        #     return self._fit_params
-
-        # @property
-        # def process_infidelity(self):
-        #     """CRB process infidelity."""
-        #     process_infidelity = {}
-        #     for ql, error_rate in self._error_rates.items():
-        #         process_infidelity[ql] = {
-        #             'val': error_rate,
-        #             'err': self._uncertainties[ql]
-        #         }
-        #     return process_infidelity
-
-        # @property
-        # def success_probabilities(self):
-        #     """Success probabilities."""
-        #     return self._success_probabilities
-
-        @property
-        def results(self):
-            """pyGSTi results object."""
-            return self._results
-
-        def generate_circuits(self):
-            """Generate all pyGSTi circuits."""
-            logger.info(' Generating circuits from pyGSTi...')
-
-            if len(self._qubits) <= 2:
-                paulis = generate_n_qubit_paulis(
-                    qubits=self._qubits,
-                    measured_qubits=self._mcm_qubits
-                )
-            else:
-                paulis = generate_random_n_qubit_paulis(
-                    qubits=self._qubits,
-                    measured_qubits=self._mcm_qubits,
-                    n_random_paulis=self._n_decays
-                )
-
-            # Remove the all-identity Pauli if it is included
-            while tuple(['I'] * len(self._qubits)) in paulis:
-                paulis.remove(tuple(['I'] * len(self._qubits)))
-
-            self._pauli_groups = generate_n_qubit_pauli_measurement_map(paulis)
-            cs_by_pauli, signs_by_pauli, tbs_by_pauli = _generate_rc_circuits(
-                cycle=self._cycle,
-                circuit_depths=self._circuit_depths,
-                pauli_measurements=self._pauli_groups.keys(),
-                compilations=self._compilations,
-                n_randomizations=self._n_circuits,
-            )
-
-            edesigns = {}
-            for pauli, clists in cs_by_pauli.items():
-                print(pauli)
-                edesigns[pauli] = pygsti.protocols.ByDepthDesign(
-                    self._circuit_depths, clists
-                )
-            self._edesign = pygsti.protocols.CombinedExperimentDesign(edesigns)
-
-            self._circuits = CircuitSet(self._edesign.all_circuits_needing_data)
-            self._circuits['pygsti_circuit'] = [
-                circ.str for circ in self._edesign.all_circuits_needing_data
-            ]
-
-            self._data_manager._exp_id += (
-                f'_CBMCM_{"".join("Q"+str(q) for q in self._qubits)}'
-            )
-            if Settings.save_data:
-                self._data_manager.create_data_path()
-                pygsti.io.write_empty_protocol_data(
-                    self._data_manager._save_path,
-                    self._edesign,
-                    sparse=True,
-                    clobber_ok=True
-                )
-
-    return CBMCM(
-        config=config,
-        # cycle=cycle,
-        mcm_qubits=mcm_qubits,
-        idle_qubits=idle_qubits,
-        circuit_depths=circuit_depths,
-        n_circuits=n_circuits,
-        n_decays=n_decays,
-        pspec=pspec,
-        **kwargs
-    )
-
-
 def SC(
     qpu:                  QPU,
     config:               Config,
-    cycle:                dict,
+    cycle:                dict | trueq.Cycle,  # noqa: F821 # type: ignore
     circuit_depths:       Iterable[int],
-    tq_config:            str | Any = None,
+    tq_config:            str | trueq.Config = None,  # noqa: F821 # type: ignore
     n_circuits:           int = 30,
-    pauli_decays:         Iterable[str] | None = None,
-    twirl:                str = "P",
+    pauli_decays:         Iterable[str] | trueq.math.Weyls | None = None,  # noqa: F821 # type: ignore
+    twirl:                str | trueq.Twirl = "P",  # noqa: F821 # type: ignore
     propogate_correction: bool = False,
     compiled_pauli:       bool = True,
     include_rcal:         bool = False,
@@ -631,22 +385,22 @@ def SC(
     Args:
         qpu (QPU): custom QPU object.
         config (Config): qcal Config object.
-        cycle (dict, tq.Cycle): cycle (or subcircuit) to benchmark.
+        cycle (dict, trueq.Cycle): cycle (or subcircuit) to benchmark.
         circuit_depths (Iterable[int]): iterable of positive integers
             specifying how many interleaved cycles of the target cycle and
             random Pauli operators to generate, for example, [4, 16, 64].
-        tq_config (str | Any, optional): True-Q config yaml file or config
-            object. Defaults to None.
+        tq_config (str | trueq.Config, optional): True-Q config yaml file or
+            config object. Defaults to None.
         n_circuits (int, optional): the number of circuits for each circuit
             depth. Defaults to 30.
-        pauli_decays (tq.math.Weyls, Iterable[str], None, optional): A True-Q
-            Weyls instance, where the rows specify which elements of the
+        pauli_decays (Iterable[str] | trueq.math.Weyls | None, optional): A
+            True-Q Weyls instance, where the rows specify which elements of the
             diagonalized error channel should be estimated. These should be
             chosen to anticommute with the Hamiltonian terms of a known noise
             source to be optimized. As a convenience, a list of strings can be
             given, e.g. ["XII", "ZZY"], which will be used to instantiate a
             Weyls object.
-        twirl (tq.Twirl, str, optional): The Twirl to use in this protocol.
+        twirl (str | trueq.Twirl, optional): The Twirl to use in this protocol.
             Defaults to 'P'. You can also specify a twirling group that will be
             used to automatically instantiate a twirl based on the labels in
             the given cycles.
@@ -671,14 +425,13 @@ def SC(
 
         def __init__(
             self,
-            qpu:                  QPU,
             config:               Config,
-            cycle:                dict,
+            cycle:                dict | trueq.Cycle,  # noqa: F821 # type: ignore
             circuit_depths:       Iterable[int],
-            tq_config:            str | Any = None,
+            tq_config:            str | trueq.Config = None,  # noqa: F821 # type: ignore
             n_circuits:           int = 30,
-            pauli_decays:         Iterable[str] | None = None,
-            twirl:                str = "P",
+            pauli_decays:         Iterable[str] | trueq.math.Weyls | None = None,  # noqa: F821 # type: ignore
+            twirl:                str | trueq.Twirl = "P",  # noqa: F821 # type: ignore
             propogate_correction: bool = False,
             compiled_pauli:       bool = True,
             include_rcal:         bool = False,
@@ -850,71 +603,3 @@ def SC(
         include_rcal=include_rcal,
         **kwargs,
     )
-
-
-def _generate_rc_circuits(
-    cycle:              pygsti.circuits.Circuit,
-    circuit_depths:     Iterable[int],
-    pauli_measurements: Iterable[tuple[str]],
-    compilations:       dict[str, CCR],
-    n_randomizations:   int = 30,
-) -> tuple:
-    """Generate randomly compiled circuits.
-
-    Args:
-        cycle (pygsti.circuits.Circuit): the base cycle to repeat.
-        circuit_depths (Iterable[int]): iterable of cycle depths to test.
-        pauli_measurements (Iterable[tuple[str]]): iterable of Pauli strings to
-            sample.
-        compilations (dict[str, CCR]): compilation rules.
-        n_randomizations (int): number of randomizations per depth. Defaults
-            to 30.
-
-    Returns:
-        tuple: dictionaries containing circuits, signs, and twirl bit-string
-            by Pauli.
-    """
-    cs_by_pauli = {}
-    signs_by_pauli = {}
-    tbs_by_pauli = {}
-    for pauli in pauli_measurements:
-        clist = []
-        signlist = []
-        tbslist = []
-        for d in circuit_depths:
-            cs = []
-            signs = []
-            tbss = []
-            for _ in range(n_randomizations):
-                if not all(i == 'I' for i in pauli):
-                    sign = np.random.choice([-1, 1])
-                else:
-                    sign = 1
-
-                _, _, _, _, prep_layer = random_circuit._sample_stabilizer(
-                    pauli, sign, compilations['absolute'], cycle.line_labels
-                )
-                _, _, meas_layer = random_circuit._stabilizer_to_all_zs(
-                    pauli, cycle.line_labels, compilations['absolute']
-                )
-
-                circuit = prep_layer.serialize().copy(editable=True)
-                circuit.append_circuit_inplace(cycle.repeat(d))
-                circuit.append_circuit_inplace(meas_layer.serialize())
-                circuit.delete_idle_layers_inplace()
-                circuit.done_editing()
-                circuit, tbs, _ = pauli_randomize_clifford_circuit(circuit)
-
-                cs.append(circuit)
-                tbss.append(tbs)
-                signs.append(sign)
-
-            clist.append(cs)
-            signlist.append(signs)
-            tbslist.append(tbss)
-
-        cs_by_pauli[pauli] = clist
-        signs_by_pauli[pauli] = signlist
-        tbs_by_pauli[pauli] = tbslist
-
-    return cs_by_pauli, signs_by_pauli, tbs_by_pauli

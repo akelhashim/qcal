@@ -1,8 +1,10 @@
 """Submodule for handling transpilation from True-Q to qcal circuits.
 
+NOTE: we do not use TYPE_CHECKING for trueq types because this might fail if
+trueq is not installed when building docs.
 """
 import logging
-from collections import defaultdict, deque
+from collections import deque
 from typing import Dict
 
 import numpy as np
@@ -16,15 +18,15 @@ from qcal.transpilation.utils import GateMapper
 logger = logging.getLogger(__name__)
 
 
-def transpile_cycle(cycle, gate_mapper: defaultdict) -> deque:
+def transpile_cycle(cycle: trueq.Cycle, gate_mapper: GateMapper) -> Cycle:  # type: ignore # noqa: F821
     """Transpile a True-Q cycle to qcal Cycle.
 
     Args:
         cycle (trueq.Cycle): True-Q cycle to transpile.
-        gate_mapper (defaultdict): map between True-Q to qcal gates.
+        gate_mapper (GateMapper): map between True-Q to qcal gates.
 
     Returns:
-        deque: transpiled cycle.
+        Cycle: transpiled cycle.
     """
     try:
         import trueq as tq
@@ -61,7 +63,7 @@ def transpile_cycle(cycle, gate_mapper: defaultdict) -> deque:
 
 def to_qcal(
         circuit,
-        gate_mapper:         defaultdict,
+        gate_mapper:         GateMapper,
         cycle_replacement:   Cycle | Circuit | Dict | None = None,
         barrier_between_all: bool = False
     ) -> Circuit:
@@ -69,7 +71,7 @@ def to_qcal(
 
     Args:
         circuit (trueq.Circuit): True-Q circuit.
-        gate_mapper (defaultdict): map between True-Q to qcal gates.
+        gate_mapper (GateMapper): map between True-Q to qcal gates.
         cycle_replacement (Cycle | Circuit | Dict | None, optional): dictionary
             which specifies how a marked cycle should be transpiled.
             Defaults to None. For example, ```cycle_replacement = {'marker':
@@ -129,10 +131,6 @@ def to_qcal(
 
 class TrueqTranspiler(Transpiler):
     """True-Q to qcal Transpiler."""
-    try:
-        import trueq as tq
-    except ImportError:
-        logger.warning(' Unable to import trueq!')
 
     # __slots__ = ('_gate_mapper', '_barrier_between_all', '_cycle_replacement')
 
@@ -165,12 +163,12 @@ class TrueqTranspiler(Transpiler):
         self._barrier_between_all = barrier_between_all
 
     def transpile(
-            self, circuits: tq.Circuit | tq.CircuitCollection
+            self, circuits: trueq.Circuit | trueq.CircuitCollection  # noqa: F821 # type: ignore
         ) -> CircuitSet:
         """Transpile all circuits.
 
         Args:
-            circuits (tq.Circuit | tq.CircuitCollection): circuits to
+            circuits (trueq.Circuit | trueq.CircuitCollection): circuits to
                 transpile.
 
         Returns:
