@@ -53,7 +53,7 @@ class PostProcessor:
         self._circuit_results = None
         self._mcm_results = None # Mid-circuit measurement results
         self._tm_results = None  # Terminating measurement results
-        self._qubits = sorted(set(self.results[0].keys()))
+        self._qubits = sorted({q for r in self.results for q in r.keys()})
         self._herald_idx = find_herald_idx(self.config)
 
     @property

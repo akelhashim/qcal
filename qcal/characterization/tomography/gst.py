@@ -8,7 +8,6 @@ Relevant code repos:
 - https://github.com/sandialabs/pyGSTi
 """
 import logging
-import multiprocessing as mp
 from collections.abc import Iterable
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any, Callable, Dict, List, Tuple
@@ -1109,9 +1108,7 @@ def SimultaneousGST(
             """Generate all GST circuits."""
             transpiler = PyGSTiTranspiler()
 
-            max_workers = min(
-                len(self._qubit_labels), max(1, mp.cpu_count() - 1)
-            )
+            max_workers = len(self._qubit_labels)
 
             def _generate_one(ql):
                 self._gst[ql].generate_circuits()
@@ -1173,9 +1170,7 @@ def SimultaneousGST(
                 self._gst[ql].save()
                 return ql
 
-            max_workers = min(
-                len(self._qubit_labels), max(1, mp.cpu_count() - 1)
-            )
+            max_workers = len(self._qubit_labels)
             with ThreadPoolExecutor(max_workers=max_workers) as executor:
                 futures = [
                     executor.submit(_save_one, ql) for ql in self._qubit_labels
@@ -1190,9 +1185,7 @@ def SimultaneousGST(
                 self._gst[ql].analyze()
                 return ql
 
-            max_workers = min(
-                len(self._qubit_labels), max(1, mp.cpu_count() - 1)
-            )
+            max_workers = len(self._qubit_labels)
             with ThreadPoolExecutor(max_workers=max_workers) as executor:
                 futures = [
                     executor.submit(_analyze_one, ql)
@@ -1954,9 +1947,7 @@ def QuantumInstrumentGST(
                     ]
                     _run_post_processing(gst_obj, filtered_results)
 
-                max_workers = min(
-                    len(self._qubit_labels), max(1, mp.cpu_count() - 1)
-                )
+                max_workers = len(self._qubit_labels)
                 with ThreadPoolExecutor(max_workers=max_workers) as executor:
                     futures = {
                         executor.submit(_process_qubit_label, ql): ql

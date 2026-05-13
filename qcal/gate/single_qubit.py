@@ -849,7 +849,7 @@ class Z90(Gate):
         self._properties['subspace'] = subspace
 
 
-single_qubit_gates: Mapping[str, Callable] = defaultdict(
+SINGLE_QUBIT_GATES: Mapping[str, Callable] = defaultdict(
     lambda: 'Gate not currently supported!', {
         'C':        C,
         'H':        H,

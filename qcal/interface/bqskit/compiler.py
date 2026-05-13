@@ -3,7 +3,6 @@
 See: https://github.com/BQSKit/bqskit
 """
 import logging  # noqa: I001
-import multiprocessing as mp
 from typing import Any, Dict
 
 import bqskit
@@ -207,7 +206,7 @@ class BQSKitCompiler:
 
         ccircuits = []
         if len(circuits) > 1 and self._compiler is None:
-            num_workers = min(len(circuits), max(1, mp.cpu_count() - 1))
+            num_workers = len(circuits)
             self._compiler = Compiler(num_workers=num_workers)
 
         ccircuits = [_compile_one(circuit) for circuit in circuits]

@@ -4,20 +4,20 @@ All results are stored in a Results object.
 """
 from __future__ import annotations
 
-from qcal.math.entropy import shannon_entropy
-from qcal.math.probability import total_variation_distance
-
 import copy
 import itertools
 import logging
-import numpy as np
-import pandas as pd
-import plotly.graph_objects as go
-
 from collections import defaultdict
 from functools import reduce
 from typing import Dict, Tuple
+
+import numpy as np
+import pandas as pd
+import plotly.graph_objects as go
 from pandas import DataFrame
+
+from qcal.math.entropy import shannon_entropy
+from qcal.math.probability import total_variation_distance
 
 logger = logging.getLogger(__name__)
 
@@ -66,7 +66,7 @@ __all__ = ('readout_correction', 'Results')
 #         cmats_inv = [np.linalg.inv(cmat) for cmat in cmats]
 #         btstrs = [
 #             ''.join(i) for i in itertools.product(
-#                 [str(j) for j in results.levels], 
+#                 [str(j) for j in results.levels],
 #                 repeat=len(results.states[0])
 #             )
 #         ]
@@ -91,7 +91,7 @@ __all__ = ('readout_correction', 'Results')
 #                 corrected_value += coeff * results[btstr].counts
 
 #             corrected_results[obsrv] = max(0, int(corrected_value))
-            
+
 #         return corrected_results
 
 
@@ -130,27 +130,27 @@ def readout_correction(results: Results, confusion_matrix: DataFrame) -> Dict:
             ' performed!'
         )
         return results
-    
+
     else:
         # Tensor product of confusion matricies
         cmat_inv = reduce(np.kron,
             [np.linalg.inv(cmat) for cmat in cmats]
         ).astype(float)
-        
+
         # Generate all possible dit strings
         dtstrs = [
             ''.join(i) for i in itertools.product(
-                [str(j) for j in results.levels], 
+                [str(j) for j in results.levels],
                 repeat=len(results.states[0])
             )
         ]
 
         # Probability distribution over all possible dit strings
         probs = {
-            **{bt: 0. for bt in dtstrs}, 
+            **dict.fromkeys(dtstrs, 0.0),
             **dict(results.probabilities.astype(float))
         }
-        probs = np.array([prob for prob in probs.values()])#.reshape(-1, 1)
+        probs = np.array(list(probs.values()))#.reshape(-1, 1)
 
         # Perform the readout correction
         corr_probs = np.array(
@@ -158,7 +158,7 @@ def readout_correction(results: Results, confusion_matrix: DataFrame) -> Dict:
             probs @ cmat_inv * results.n_shots
         ).astype(int)
 
-        corrected_results = dict(zip(dtstrs, corr_probs))
+        corrected_results = dict(zip(dtstrs, corr_probs, strict=False))
 
         # corr_probs = []
         # # Apply readout correction independently for each qubit
@@ -173,7 +173,7 @@ def readout_correction(results: Results, confusion_matrix: DataFrame) -> Dict:
 
         #     # Perform the readout correction
         #     corr_probs.append(probs @ np.linalg.inv(cmats[i]))
-        
+
         # # Combined probability distribution
         # comb_probs = reduce(np.kron, corr_probs)
         # counts = np.array(
@@ -183,13 +183,13 @@ def readout_correction(results: Results, confusion_matrix: DataFrame) -> Dict:
         # # All possible ditstrings
         # dtstrs = [
         #     ''.join(i) for i in itertools.product(
-        #         [str(j) for j in results.levels], 
+        #         [str(j) for j in results.levels],
         #         repeat=len(results.states[0])
         #     )
         # ]
 
         # corrected_results = dict(zip(dtstrs, counts))
-        
+
     return corrected_results
 
 
@@ -198,13 +198,13 @@ class Results:
     """Results class.
 
     This class should be passed a dictionary which maps bitstrings to counts.
-    
+
     Basic example useage:
     ```results = Results({'000': 200, '010': 10, '100': 12, '111': 200})```
     """
 
     def __init__(self,
-            results: Dict | None = None, 
+            results: Dict | None = None,
             confusion_matrix: DataFrame | None = None
         ) -> None:
         """Initialize a Results object.
@@ -212,14 +212,14 @@ class Results:
         Args:
             results (Dict | None, optional): dictionary of bitstring results.
                 Defaults to None.
-            confusion_matrix (DataFrame | None, optional): confusion matrix 
+            confusion_matrix (DataFrame | None, optional): confusion matrix
                 used for readout correction. Defaults to None.
         """
         if results is not None:
             results = dict(sorted(results.items()))
         else:
-            results = dict()
-        
+            results = {}
+
         self._results = results
         self.__raw_results = copy.deepcopy(results)
         self._confusion_matrix = None
@@ -247,9 +247,9 @@ class Results:
         # assert item in self._results.keys(), f'{item} is not a valid bitstring!'
         if item not in self._results.keys():
             return pd.Series(
-                data=[0, 0.], 
-                index=['counts', 'probabilities'], 
-                name=item, 
+                data=[0, 0.],
+                index=['counts', 'probabilities'],
+                name=item,
                 dtype='object'
             )
         else:
@@ -308,7 +308,7 @@ class Results:
             float: entropy.
         """
         return shannon_entropy(self)
-    
+
     @property
     def ev(self) -> float:
         """Expectation value of the measured observable.
@@ -387,7 +387,7 @@ class Results:
             Tuple: unique bitstrings.
         """
         return tuple(sorted(self._results.keys()))
-    
+
     def apply_readout_correction(self, confusion_matrix: DataFrame) -> None:
         """Apply local readout correction using a measured confusion matrix.
 
@@ -433,7 +433,7 @@ class Results:
             marg_states.add(marg_state)
         marg_states = tuple(sorted(marg_states))
 
-        marg_results = {state: 0 for state in marg_states}
+        marg_results = dict.fromkeys(marg_states, 0)
         for btstr, counts in self._results.items():
             marg_state = ''
             for i in idx:
@@ -446,7 +446,7 @@ class Results:
         """Plot the results in a histogram.
 
         Args:
-            normalize (bool, optional): whether to plot the normalized counts. 
+            normalize (bool, optional): whether to plot the normalized counts.
                 Defaults to False.
         """
         fig = go.Figure()
@@ -462,18 +462,18 @@ class Results:
             autosize=False,
             width=150 * len(self.states),
             height=400,
-            xaxis=dict(
-                tickvals=[i for i in range(len(self.states))],
-                ticktext=self.states,
-                title='Bit String',
-                titlefont_size=20,
-                tickfont_size=15
-            ),
-            yaxis=dict(
-                title=title,
-                titlefont_size=20,
-                tickfont_size=15
-            )
+            xaxis={
+                'tickvals': list(range(len(self.states))),
+                'ticktext': self.states,
+                'title': 'Bit String',
+                'titlefont_size': 20,
+                'tickfont_size': 15
+            },
+            yaxis={
+                'title': title,
+                'titlefont_size': 20,
+                'tickfont_size': 15
+            }
         )
         if len(self.states[0]) > 5:
             fig.update_xaxes(tickangle=-45)
@@ -500,4 +500,3 @@ class Results:
             float: tvd.
         """
         return total_variation_distance(self, results)
-                
