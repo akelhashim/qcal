@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Breaking
 
+- Changed calculate_cz_frequency to calculate_parametric_cz_frequency
+
 ### Added
 
 ### Changed
