@@ -2,19 +2,21 @@
 
 """
 import logging
-from typing import Callable, Dict, List, Tuple
+from typing import Callable, Dict, List, Sequence, Tuple
 
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from IPython.display import clear_output
 from lmfit import Parameters
+from numpy.typing import NDArray
 
 import qcal.settings as settings
 from qcal.characterization.characterize import Characterize
 from qcal.circuit import Barrier, Circuit, CircuitSet, Cycle
 from qcal.config import Config
 from qcal.fitting.fit import FitDecayingCosine
+from qcal.fitting.utils import est_freq_fft
 from qcal.gate.gate import Gate
 from qcal.gate.single_qubit import X90, Idle, Rz
 from qcal.math.utils import round_to_order_error, uncertainty_of_sum
@@ -270,13 +272,14 @@ def make_JAZZ_circuits(
 def JAZZ(
         qpu:               QPU,
         config:            Config,
-        qubit_pairs:       List[Tuple],
-        t_max:             float = 5*us,
-        detuning:          float = 1*MHz,
+        qubit_pairs:       List[Tuple[int, int]],
+        t_max:             float = 5 * us,
+        detuning:          float = 1 * MHz,
         conditional_phase: str = '11',
         n_elements:        int = 50,
         mq_gate:           Gate | None = None,
-        params:            Dict | None = None,
+        mq_gate_params:    Dict[Tuple[int, int], str] | str | None = None,
+        params:            Dict[Tuple[int, int], str] | str | None = None,
         **kwargs
     ) -> Callable:
     """Joint Amplification of ZZ (JAZZ).
@@ -309,8 +312,8 @@ def JAZZ(
     Args:
         qpu (QPU): custom QPU object.
         config (Config): qcal Config object.
-        qubit_pairs (List[Tuple]): pairs of qubit labels for the two-qubit gate
-            calibration.
+        qubit_pairs (List[Tuple[int, int]]): pairs of qubit labels for the
+            ZZ characterization (e.g. [(0, 1), (2, 3)]).
         t_max (float): maximum free-evolution time. Defaults to 5 µs.
         detuning (float): virtual detuning frequency. Defaults to 1 MHz.
         conditional_phase (str): which ZZ coupling to measure. Must be one of
@@ -319,7 +322,12 @@ def JAZZ(
         mq_gate (Callable | None): uninstantiated two-qubit gate class (e.g.
             ``CZ``) to use in place of the BIRD echo. Instantiated as
             ``mq_gate(qp)`` per qubit pair. Defaults to None.
-        params (Dict | None): config parameter paths to write results to.
+        mq_gate_params (Dict[Tuple[int, int], str] | str | None): if using
+            ``mq_gate``, the config parameter paths for the two-qubit gate time.
+            Defaults to None.
+        params (Dict[Tuple[int, int], str] | str | None): config parameter paths
+            to write the ZZ results to. Defaults to None, which uses
+            'two_qubit/{qp}/ZZ{conditional_phase}'.
 
     Returns:
         Callable: JAZZ characterization class.
@@ -336,13 +344,14 @@ def JAZZ(
         def __init__(
             self,
             config:            Config,
-            qubit_pairs:       List[Tuple],
-            t_max:             float = 5*us,
-            detuning:          float = 1*MHz,
+            qubit_pairs:       List[Tuple[int, int]],
+            t_max:             float = 5 * us,
+            detuning:          float = 1 * MHz,
             conditional_phase: str = '11',
             n_elements:        int = 50,
-            mq_gate:           Callable | None = None,
-            params:            Dict | None = None,
+            mq_gate:           Gate | None = None,
+            mq_gate_params:    Dict[Tuple[int, int], str] | str | None = None,
+            params:            Dict[Tuple[int, int], str] | str | None = None,
             **kwargs
         ) -> None:
             """Initialize the JAZZ class within the function."""
@@ -376,6 +385,17 @@ def JAZZ(
                     for qp in qubit_pairs
                 }
 
+            if mq_gate and mq_gate_params:
+                self._mq_gate_params = mq_gate_params
+            elif mq_gate and not mq_gate_params:
+                self._mq_gate_params = {
+                    qp: [
+                        f'two_qubit/{qp}/pulse/0/time',
+                        f'two_qubit/{qp}/pulse/1/time'
+                    ]
+                    for qp in qubit_pairs
+                }
+
             self._fit = {
                 qp: {
                     self._seq_low: FitDecayingCosine(),
@@ -388,28 +408,37 @@ def JAZZ(
             self._circuits = None
 
         @property
-        def qubit_pairs(self) -> List[Tuple]:
-            """Qubit pair labels.
-
-            Returns:
-                List[Tuple]: qubit pairs.
-            """
-            return self._qubits
-
-        @property
-        def loss(self) -> Dict:
+        def loss(self) -> Dict[Tuple[int, int], float]:
             """Loss for each qubit pair.
 
             This property can be used for parameter optimization.
 
             Returns:
-                Dict: loss for each qubit pair.
+                Dict[Tuple[int, int], float]: loss for each qubit pair.
             """
             return {
                 qp: [self._char_values[qp]['val']]
                 for qp in self._qubits
                 if self._char_values[qp]
             }
+
+        @property
+        def qubit_pairs(self) -> Sequence[Tuple[int, int]]:
+            """Qubit pair labels.
+
+            Returns:
+                Sequence[Tuple[int, int]]: qubit pairs.
+            """
+            return self._qubits
+
+        @property
+        def times(self) -> Dict[Tuple[int, int], NDArray]:
+            """Time arrays for each qubit pair.
+
+            Returns:
+                Dict[Tuple[int, int], NDArray]: time arrays keyed by qubit pair.
+            """
+            return self._times
 
         def generate_circuits(self) -> None:
             """Generate all JAZZ circuits."""
@@ -422,16 +451,24 @@ def JAZZ(
                 mq_gate=self._mq_gate,
             )
 
-        def _fit_pair(self, times, prob_low):
-            """Build initial Parameters from prob_low for a decaying-cosine fit.
+            if self._mq_gate and self._mq_gate_params:
+                for qp in self._qubits:
+                    for param in self._mq_gate_params[qp]:
+                        self._circuits[f'param: {param}'] = np.repeat(
+                            self._times[qp], 2
+                        ) / 2 # divide by 2 since there are 2 gates per circuit
+
+        def _fit_pair(self, times: NDArray, prob: List[float]) -> Parameters:
+            """Build initial Parameters from prob for a decaying-cosine fit.
             """
-            e = np.array(prob_low).min()
-            a = np.array(prob_low).max() - e
-            b = np.mean(np.diff(prob_low) / np.diff(times)) / (a if a else 1.)
+            est_freq = est_freq_fft(times, prob)
+            e = np.array(prob).min()
+            a = np.array(prob).max() - e
+            b = np.mean(np.diff(prob) / np.diff(times)) / (a if a else 1.)
             params = Parameters()
             params.add('a', value=a)
             params.add('b', value=b)
-            params.add('c', value=self._detuning)
+            params.add('c', value=est_freq)
             params.add('d', value=0.)
             params.add('e', value=e)
             return params
@@ -448,13 +485,11 @@ def JAZZ(
 
                 prob_low = [
                     c.results.marginalize(t_idx).populations['0']
-                    for c in self._circuits[
-                        self._circuits['sequence'] == seq_low].circuit
+                    for c in self._circuits.subset(sequence=seq_low).circuit
                 ]
                 prob_high = [
                     c.results.marginalize(t_idx).populations['0']
-                    for c in self._circuits[
-                        self._circuits['sequence'] == seq_high].circuit
+                    for c in self._circuits.subset(sequence=seq_high).circuit
                 ]
 
                 self._results[qp] = {seq_low: prob_low, seq_high: prob_high}
@@ -463,6 +498,7 @@ def JAZZ(
                 self._fit[qp][seq_low].fit(
                     self._times[qp], prob_low, params=params
                 )
+                params = self._fit_pair(self._times[qp], prob_high)
                 self._fit[qp][seq_high].fit(
                     self._times[qp], prob_high, params=params
                 )
@@ -500,6 +536,47 @@ def JAZZ(
                     pd.DataFrame([self._char_values]), 'characterized_values'
                 )
 
+        def _draw_ax(self, ax, qp) -> None:
+            """Draw a single axes panel."""
+            seq_low, seq_high = self._seq_low, self._seq_high
+            ax.set_xlabel(r'Time ($\mu$s)', fontsize=15)
+            ax.set_ylabel(r'$|0\rangle$ Population', fontsize=15)
+            ax.tick_params(axis='both', which='major', labelsize=12)
+            ax.grid(True)
+
+            state_label_low = seq_low.replace('C', '|') + '⟩'
+            state_label_high = seq_high.replace('C', '|') + '⟩'
+            ax.plot(
+                self._times[qp] / us, self._results[qp][seq_low],
+                'o', c='blue', label=rf'Q{qp[0]} {state_label_low}'
+            )
+            ax.plot(
+                self._times[qp] / us, self._results[qp][seq_high],
+                'o', c='red', label=rf'Q{qp[0]} {state_label_high}'
+            )
+
+            for seq, color in ((seq_low, 'b'), (seq_high, 'r')):
+                if self._fit[qp][seq].fit_success:
+                    freq = self._fit[qp][seq].fit_params['c'].value
+                    x = np.linspace(
+                        self._times[qp][0], self._times[qp][-1], 100
+                    )
+                    unit, unit_str = (MHz, 'MHz') if self._mq_gate else (
+                        kHz, 'kHz'
+                    )
+                    ax.plot(
+                        x / us, self._fit[qp][seq].predict(x),
+                        f'{color}-', label=f'{freq / unit:.3f} {unit_str}'
+                    )
+
+            title = f'{qp} ZZ{self._conditional_phase}'
+            if self._char_values[qp]:
+                val = self._char_values[qp]['val']
+                err = self._char_values[qp]['err']
+                title += f': {val / unit:.3f} ({err / unit:.3f}) {unit_str}'
+            ax.set_title(title)
+            ax.legend(loc=0, fontsize=12)
+
         def plot(self) -> None:
             """Plot the frequency sweep and fit results."""
             nrows, ncols = calculate_nrows_ncols(len(self._qubits))
@@ -526,54 +603,12 @@ def JAZZ(
                         ax.axis('off')
 
             fig.set_tight_layout(True)
-            self._save_fig(fig, 'ZZ_characterization')
-            plt.show()
-
-        def _draw_ax(self, ax, qp) -> None:
-            """Draw a single axes panel."""
-            seq_low, seq_high = self._seq_low, self._seq_high
-            ax.set_xlabel(r'Time ($\mu$s)', fontsize=15)
-            ax.set_ylabel(r'$|0\rangle$ Population', fontsize=15)
-            ax.tick_params(axis='both', which='major', labelsize=12)
-            ax.grid(True)
-
-            state_label_low = seq_low.replace('C', '|') + '⟩'
-            state_label_high = seq_high.replace('C', '|') + '⟩'
-            ax.plot(
-                self._times[qp] / us, self._results[qp][seq_low],
-                'o', c='blue', label=rf'Q{qp[0]} {state_label_low}'
-            )
-            ax.plot(
-                self._times[qp] / us, self._results[qp][seq_high],
-                'o', c='red', label=rf'Q{qp[0]} {state_label_high}'
-            )
-
-            for seq, color in ((seq_low, 'b'), (seq_high, 'r')):
-                if self._fit[qp][seq].fit_success:
-                    freq = self._fit[qp][seq].fit_params['c'].value
-                    x = np.linspace(
-                        self._times[qp][0], self._times[qp][-1], 100
-                    )
-                    ax.plot(
-                        x / us, self._fit[qp][seq].predict(x),
-                        f'{color}-', label=f'{freq / kHz:.3f} kHz'
-                    )
-
-            title = f'{qp} ZZ{self._conditional_phase}'
-            if self._char_values[qp]:
-                val = self._char_values[qp]['val']
-                err = self._char_values[qp]['err']
-                title += f': {val / kHz:.3f} ({err / kHz:.3f}) kHz'
-            ax.set_title(title)
-            ax.legend(loc=0, fontsize=12)
-
-        def _save_fig(self, fig, stem: str) -> None:
-            """Save figure in png/pdf/svg if save_data is enabled."""
             if settings.Settings.save_data:
-                base = self._data_manager._save_path + stem
+                base = self._data_manager._save_path + 'ZZ_characterization'
                 fig.savefig(base + '.png', dpi=300)
                 fig.savefig(base + '.pdf')
                 fig.savefig(base + '.svg')
+            plt.show()
 
         def final(self) -> None:
             """Final calibration method."""
@@ -582,10 +617,13 @@ def JAZZ(
                     self.set_param(
                         self._params[qp], self._char_values[qp]['val']
                     )
+                    unit, unit_str = (MHz, 'MHz') if self._mq_gate else (
+                        kHz, 'kHz'
+                    )
                     print(
                         f"{qp} ZZ{self._conditional_phase}: ZZ = "
-                        f"{self._char_values[qp]['val'] / kHz:.3f} "
-                        f"({self._char_values[qp]['err'] / kHz:.3f}) kHz"
+                        f"{self._char_values[qp]['val']/unit:.3f} "
+                        f"({self._char_values[qp]['err']/unit:.3f}) {unit_str}"
                     )
 
             if settings.Settings.save_data:
@@ -610,6 +648,7 @@ def JAZZ(
         conditional_phase=conditional_phase,
         n_elements=n_elements,
         mq_gate=mq_gate,
+        mq_gate_params=mq_gate_params,
         params=params,
         **kwargs
     )
