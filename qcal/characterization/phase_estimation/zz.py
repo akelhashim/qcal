@@ -18,7 +18,7 @@ from qcal.config import Config
 from qcal.fitting.fit import FitDecayingCosine
 from qcal.fitting.utils import est_freq_fft
 from qcal.gate.gate import Gate
-from qcal.gate.single_qubit import X90, Idle, Rz
+from qcal.gate.single_qubit import X90, Y90, Idle, Rz
 from qcal.math.utils import round_to_order_error, uncertainty_of_sum
 from qcal.plotting.utils import calculate_nrows_ncols
 from qcal.qpu.qpu import QPU
@@ -117,18 +117,32 @@ def make_JAZZ_circuits(
         ],
     }[target_subspace]
 
-    # Measurement preparation (closes the Ramsey)
-    target_meas = {
-        'GE': [  # GE pi/2 → maps back to computational basis
+    # Measurement preparation (closes the Ramsey).
+    # X90 closing pulse → in-phase (I); Y90 closing pulse → out-of-phase (Q).
+    target_meas_x = {
+        'GE': [
             Cycle({X90(p[1], subspace='GE') for p in qubit_pairs}),
         ],
-        'GF': [  # EF pi then GE pi/2 → maps back to computational basis
+        'GF': [
             Cycle({X90(p[1], subspace='EF') for p in qubit_pairs}),
             Cycle({X90(p[1], subspace='EF') for p in qubit_pairs}),
             Cycle({X90(p[1], subspace='GE') for p in qubit_pairs}),
         ],
         'EF': [
             Cycle({X90(p[1], subspace='EF') for p in qubit_pairs}),
+        ],
+    }[target_subspace]
+    target_meas_y = {
+        'GE': [
+            Cycle({Y90(p[1], subspace='GE') for p in qubit_pairs}),
+        ],
+        'GF': [
+            Cycle({X90(p[1], subspace='EF') for p in qubit_pairs}),
+            Cycle({X90(p[1], subspace='EF') for p in qubit_pairs}),
+            Cycle({Y90(p[1], subspace='GE') for p in qubit_pairs}),
+        ],
+        'EF': [
+            Cycle({Y90(p[1], subspace='EF') for p in qubit_pairs}),
         ],
     }[target_subspace]
 
@@ -219,50 +233,53 @@ def make_JAZZ_circuits(
         for ctrl_cycles, seq_label in (
             (ctrl_low, seq_low), (ctrl_high, seq_high)
         ):
-            circuit = Circuit()
+            for tmeas, quad_suffix in (
+                (target_meas_x, ' X90'), (target_meas_y, ' Y90')
+            ):
+                circuit = Circuit()
 
-            if ctrl_cycles:
-                circuit.extend(ctrl_cycles)
-                # circuit.append(Barrier(all_qubits))
-                circuit.join(Circuit(target_prep))
-            else:
-                circuit.extend(target_prep)
-            circuit.append(Barrier(all_qubits))
+                if ctrl_cycles:
+                    circuit.extend(ctrl_cycles)
+                    # circuit.append(Barrier(all_qubits))
+                    circuit.join(Circuit(target_prep))
+                else:
+                    circuit.extend(target_prep)
+                circuit.append(Barrier(all_qubits))
 
-            circuit.extend([
-                Cycle({Idle(q, duration=t/2) for q in all_qubits}),
-                Barrier(all_qubits),
-            ])
-
-            if mq_gate is not None:
                 circuit.extend([
-                    Cycle({mq_gate(qp) for qp in qubit_pairs}),
+                    Cycle({Idle(q, duration=t/2) for q in all_qubits}),
                     Barrier(all_qubits),
                 ])
 
-            circuit.extend(echo)
-            circuit.append(Barrier(all_qubits))
+                if mq_gate is not None:
+                    circuit.extend([
+                        Cycle({mq_gate(qp) for qp in qubit_pairs}),
+                        Barrier(all_qubits),
+                    ])
 
-            if mq_gate is not None:
+                circuit.extend(echo)
+                circuit.append(Barrier(all_qubits))
+
+                if mq_gate is not None:
+                    circuit.extend([
+                        Cycle({mq_gate(qp) for qp in qubit_pairs}),
+                        Barrier(all_qubits),
+                    ])
+
                 circuit.extend([
-                    Cycle({mq_gate(qp) for qp in qubit_pairs}),
+                    Cycle({Idle(q, duration=t/2) for q in all_qubits}),
+                    Cycle({
+                        Rz(p[1], phase, subspace=rz_subspace)
+                        for p in qubit_pairs
+                    }),
                     Barrier(all_qubits),
                 ])
+                circuit.extend(tmeas)
+                circuit.measure()
 
-            circuit.extend([
-                Cycle({Idle(q, duration=t/2) for q in all_qubits}),
-                Cycle({
-                    Rz(p[1], phase, subspace=rz_subspace)
-                    for p in qubit_pairs
-                }),
-                Barrier(all_qubits),
-            ])
-            circuit.extend(target_meas)
-            circuit.measure()
-
-            sequence.append(seq_label)
-            phases.append(phase)
-            circuits.append(circuit)
+                sequence.append(f'{seq_label}{quad_suffix}')
+                phases.append(phase)
+                circuits.append(circuit)
 
     circuits['sequence'] = sequence
     circuits['phase'] = phases
@@ -371,6 +388,10 @@ def JAZZ(
 
             self._cs, self._ts = _PHASE_TO_SUBSPACES[conditional_phase]
             self._seq_low, self._seq_high = _SEQ_LABELS[self._cs]
+            self._seq_low_x  = f'{self._seq_low} X90'
+            self._seq_low_y  = f'{self._seq_low} Y90'
+            self._seq_high_x = f'{self._seq_high} X90'
+            self._seq_high_y = f'{self._seq_high} Y90'
 
             self._times = {
                 q: np.linspace(0., t_max, n_elements) for q in qubit_pairs
@@ -398,8 +419,8 @@ def JAZZ(
 
             self._fit = {
                 qp: {
-                    self._seq_low: FitDecayingCosine(),
-                    self._seq_high: FitDecayingCosine(),
+                    self._seq_low_x: FitDecayingCosine(),
+                    self._seq_high_x: FitDecayingCosine(),
                 } for qp in qubit_pairs
             }
             self._freq_low = dict.fromkeys(qubit_pairs, False)
@@ -455,13 +476,20 @@ def JAZZ(
                 for qp in self._qubits:
                     for param in self._mq_gate_params[qp]:
                         self._circuits[f'param: {param}'] = np.repeat(
-                            self._times[qp], 2
+                            self._times[qp], 4
                         ) / 2 # divide by 2 since there are 2 gates per circuit
 
-        def _fit_pair(self, times: NDArray, prob: List[float]) -> Parameters:
-            """Build initial Parameters from prob for a decaying-cosine fit.
-            """
-            est_freq = est_freq_fft(times, prob)
+        def _fit_pair(
+            self,
+            times: NDArray,
+            prob: List[float],
+            freq_hint: float | None = None,
+        ) -> Parameters:
+            """Build initial Parameters from prob for a decaying-cosine fit."""
+            est_freq = (
+                freq_hint if freq_hint is not None
+                else est_freq_fft(times, prob)
+            )
             e = np.array(prob).min()
             a = np.array(prob).max() - e
             b = np.mean(np.diff(prob) / np.diff(times)) / (a if a else 1.)
@@ -478,45 +506,77 @@ def JAZZ(
             logger.info(' Analyzing the data...')
 
             qubits = sorted(flatten(self._qubits))
-            seq_low, seq_high = self._seq_low, self._seq_high
+            seq_low_x,  seq_low_y  = self._seq_low_x,  self._seq_low_y
+            seq_high_x, seq_high_y = self._seq_high_x, self._seq_high_y
 
             for qp in self._qubits:
                 t_idx = qubits.index(qp[1])
 
-                prob_low = [
+                I_low = [
                     c.results.marginalize(t_idx).populations['0']
-                    for c in self._circuits.subset(sequence=seq_low).circuit
+                    for c in self._circuits.subset(sequence=seq_low_x).circuit
                 ]
-                prob_high = [
+                Q_low = [
                     c.results.marginalize(t_idx).populations['0']
-                    for c in self._circuits.subset(sequence=seq_high).circuit
+                    for c in self._circuits.subset(sequence=seq_low_y).circuit
+                ]
+                I_high = [
+                    c.results.marginalize(t_idx).populations['0']
+                    for c in self._circuits.subset(sequence=seq_high_x).circuit
+                ]
+                Q_high = [
+                    c.results.marginalize(t_idx).populations['0']
+                    for c in self._circuits.subset(sequence=seq_high_y).circuit
                 ]
 
-                self._results[qp] = {seq_low: prob_low, seq_high: prob_high}
+                self._results[qp] = {
+                    seq_low_x:  I_low,  seq_low_y:  Q_low,
+                    seq_high_x: I_high, seq_high_y: Q_high,
+                }
 
-                params = self._fit_pair(self._times[qp], prob_low)
-                self._fit[qp][seq_low].fit(
-                    self._times[qp], prob_low, params=params
+                # Use complex quadrature signal to resolve frequency sign.
+                z_low  = np.array(I_low)  - 1j * np.array(Q_low)
+                z_high = np.array(I_high) - 1j * np.array(Q_high)
+                signed_freq_low  = est_freq_fft(self._times[qp], z_low)
+                signed_freq_high = est_freq_fft(self._times[qp], z_high)
+
+                params_low = self._fit_pair(
+                    self._times[qp], I_low, freq_hint=signed_freq_low
                 )
-                params = self._fit_pair(self._times[qp], prob_high)
-                self._fit[qp][seq_high].fit(
-                    self._times[qp], prob_high, params=params
+                self._fit[qp][seq_low_x].fit(
+                    self._times[qp], I_low, params=params_low
+                )
+                params_high = self._fit_pair(
+                    self._times[qp], I_high, freq_hint=signed_freq_high
+                )
+                self._fit[qp][seq_high_x].fit(
+                    self._times[qp], I_high, params=params_high
                 )
 
-                if self._fit[qp][seq_low].fit_success:
+                if self._fit[qp][seq_low_x].fit_success:
+                    fit_freq = self._fit[qp][seq_low_x].fit_params['c'].value
                     self._freq_low[qp] = (
-                        self._fit[qp][seq_low].fit_params['c'].value
+                        np.sign(signed_freq_low) * abs(fit_freq)
                     )
-                if self._fit[qp][seq_high].fit_success:
-                    self._freq_high[qp] = (
-                        self._fit[qp][seq_high].fit_params['c'].value
-                    )
+                else:
+                    self._freq_low[qp] = signed_freq_low
 
-                if self._freq_low[qp] and self._freq_high[qp]:
-                    val = abs(self._freq_low[qp] - self._freq_high[qp])
+                if self._fit[qp][seq_high_x].fit_success:
+                    fit_freq = self._fit[qp][seq_high_x].fit_params['c'].value
+                    self._freq_high[qp] = (
+                        np.sign(signed_freq_high) * abs(fit_freq)
+                    )
+                else:
+                    self._freq_high[qp] = signed_freq_high
+
+                if (
+                    self._freq_low[qp] is not False
+                    and self._freq_high[qp] is not False
+                ):
+                    val = self._freq_high[qp] - self._freq_low[qp]
                     err = uncertainty_of_sum([
-                        self._fit[qp][seq_low].error,
-                        self._fit[qp][seq_high].error,
+                        self._fit[qp][seq_low_x].error,
+                        self._fit[qp][seq_high_x].error,
                     ])
                     val, err = round_to_order_error(val, err)
                     self._char_values[qp] = {'val': val, 'err': err}
@@ -538,31 +598,30 @@ def JAZZ(
 
         def _draw_ax(self, ax, qp) -> None:
             """Draw a single axes panel."""
-            seq_low, seq_high = self._seq_low, self._seq_high
+            seq_low_x, seq_high_x = self._seq_low_x, self._seq_high_x
+            unit, unit_str = (MHz, 'MHz') if self._mq_gate else (kHz, 'kHz')
+
             ax.set_xlabel(r'Time ($\mu$s)', fontsize=15)
             ax.set_ylabel(r'$|0\rangle$ Population', fontsize=15)
             ax.tick_params(axis='both', which='major', labelsize=12)
             ax.grid(True)
 
-            state_label_low = seq_low.replace('C', '|') + '⟩'
-            state_label_high = seq_high.replace('C', '|') + '⟩'
+            state_label_low  = self._seq_low.replace('C', '|')  + '⟩'
+            state_label_high = self._seq_high.replace('C', '|') + '⟩'
             ax.plot(
-                self._times[qp] / us, self._results[qp][seq_low],
-                'o', c='blue', label=rf'Q{qp[0]} {state_label_low}'
+                self._times[qp] / us, self._results[qp][seq_low_x],
+                'o', c='blue', label=rf'Q{qp[0]} {state_label_low} (I)'
             )
             ax.plot(
-                self._times[qp] / us, self._results[qp][seq_high],
-                'o', c='red', label=rf'Q{qp[0]} {state_label_high}'
+                self._times[qp] / us, self._results[qp][seq_high_x],
+                'o', c='red', label=rf'Q{qp[0]} {state_label_high} (I)'
             )
 
-            for seq, color in ((seq_low, 'b'), (seq_high, 'r')):
+            for seq, color in ((seq_low_x, 'b'), (seq_high_x, 'r')):
                 if self._fit[qp][seq].fit_success:
                     freq = self._fit[qp][seq].fit_params['c'].value
                     x = np.linspace(
                         self._times[qp][0], self._times[qp][-1], 100
-                    )
-                    unit, unit_str = (MHz, 'MHz') if self._mq_gate else (
-                        kHz, 'kHz'
                     )
                     ax.plot(
                         x / us, self._fit[qp][seq].predict(x),
