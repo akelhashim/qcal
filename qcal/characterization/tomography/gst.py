@@ -1405,9 +1405,9 @@ def SingleQubitGST(
                 if target_model is None:
                     target_model = create_explicit_model(
                         pspec,
-                        # ideal_gate_type='full TP',
-                        # ideal_spam_type='full TP',
-                        # basis='pp',
+                        ideal_gate_type='full TP',
+                        ideal_spam_type='full TP',
+                        basis='pp',
                     )
 
                 if prep_fiducials is None and meas_fiducials is None:
