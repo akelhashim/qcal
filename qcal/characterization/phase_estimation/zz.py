@@ -7,9 +7,11 @@ from typing import Callable, Dict, List, Sequence, Tuple
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import plotly.graph_objects as go
 from IPython.display import clear_output
 from lmfit import Parameters
 from numpy.typing import NDArray
+from plotly.subplots import make_subplots
 
 import qcal.settings as settings
 from qcal.characterization.characterize import Characterize
@@ -639,35 +641,159 @@ def JAZZ(
         def plot(self) -> None:
             """Plot the frequency sweep and fit results."""
             nrows, ncols = calculate_nrows_ncols(len(self._qubits))
-            figsize = (5 * ncols, 4 * nrows)
-            fig, axes = plt.subplots(
-                nrows, ncols, figsize=figsize, layout='constrained'
+            unit, unit_str = (MHz, 'MHz') if self._mq_gate else (kHz, 'kHz')
+
+            seq_low_x, seq_high_x = self._seq_low_x, self._seq_high_x
+            state_label_low  = self._seq_low.replace('C', '|') + '⟩'
+            state_label_high = self._seq_high.replace('C', '|') + '⟩'
+
+            # --- subplot titles ---
+            subplot_titles = []
+            for qp in self._qubits:
+                title = f'{qp} ZZ{self._conditional_phase}'
+                if self._char_values[qp]:
+                    val = self._char_values[qp]['val']
+                    err = self._char_values[qp]['err']
+                    title += f'<br>{val/unit:.3f} ({err/unit:.3f}) {unit_str}'
+                subplot_titles.append(title)
+
+            pfig_height = 350 * nrows
+            pfig_width  = 350 * ncols + 50
+            pfig_gap_px = 80
+            vertical_spacing = (
+                0.0 if nrows <= 1
+                else min(0.25, pfig_gap_px / pfig_height)
+            )
+            horizontal_spacing = (
+                0.0 if ncols <= 1
+                else min(0.2, pfig_gap_px / pfig_width)
             )
 
-            k = -1
-            for i in range(nrows):
-                for j in range(ncols):
-                    k += 1
+            pfig = make_subplots(
+                rows=nrows, cols=ncols,
+                subplot_titles=subplot_titles,
+                vertical_spacing=vertical_spacing,
+                horizontal_spacing=horizontal_spacing,
+            )
+            pfig.update_annotations(font_size=12)
 
-                    if len(self._qubits) == 1:
-                        ax = axes
-                    elif axes.ndim == 1:
-                        ax = axes[j]
-                    else:
-                        ax = axes[i, j]
+            blue, red = '#1f77b4', '#d62728'
 
-                    if k < len(self._qubits):
-                        self._draw_ax(ax, self._qubits[k])
-                    else:
-                        ax.axis('off')
+            for k, qp in enumerate(self._qubits):
+                row = (k // ncols) + 1
+                col = (k % ncols) + 1
+                times_us = self._times[qp] / us
 
-            fig.set_tight_layout(True)
+                pfig.add_trace(
+                    go.Scatter(
+                        x=times_us,
+                        y=self._results[qp][seq_low_x],
+                        mode='markers',
+                        marker={'size': 6, 'color': blue},
+                        name=f'Q{qp[0]} {state_label_low} (I)',
+                        showlegend=(k == 0),
+                    ),
+                    row=row, col=col,
+                )
+                pfig.add_trace(
+                    go.Scatter(
+                        x=times_us,
+                        y=self._results[qp][seq_high_x],
+                        mode='markers',
+                        marker={'size': 6, 'color': red},
+                        name=f'Q{qp[0]} {state_label_high} (I)',
+                        showlegend=(k == 0),
+                    ),
+                    row=row, col=col,
+                )
+
+                x_fit = np.linspace(
+                    self._times[qp][0], self._times[qp][-1], 200
+                )
+                x_fit_us = x_fit / us
+
+                for seq, color in ((seq_low_x, blue), (seq_high_x, red)):
+                    if self._fit[qp][seq].fit_success:
+                        freq = self._fit[qp][seq].fit_params['c'].value
+                        pfig.add_trace(
+                            go.Scatter(
+                                x=x_fit_us,
+                                y=self._fit[qp][seq].predict(x_fit),
+                                mode='lines',
+                                line={'color': color, 'width': 2},
+                                name=f'{freq / unit:.3f} {unit_str}',
+                                showlegend=(k == 0),
+                            ),
+                            row=row, col=col,
+                        )
+
+                pfig.update_xaxes(
+                    title_text='Time (µs)' if row == nrows else '',
+                    automargin=True, showgrid=True,
+                    row=row, col=col,
+                )
+                pfig.update_yaxes(
+                    title_text='|0⟩ Population' if col == 1 else '',
+                    automargin=True, showgrid=True,
+                    row=row, col=col,
+                )
+
+            pfig.update_layout(
+                height=pfig_height,
+                width=pfig_width,
+                margin={'t': 60, 'b': 50, 'l': 60, 'r': 30},
+                legend={
+                    'orientation': 'v',
+                    'xanchor': 'right', 'x': 0.99,
+                    'yanchor': 'top',   'y': 0.99,
+                    'bgcolor': 'rgba(255,255,255,0.85)',
+                    'bordercolor': '#c7c7c7',
+                    'borderwidth': 1,
+                },
+                template='plotly_white',
+                paper_bgcolor='white',
+                plot_bgcolor='#fbfbfd',
+            )
+            pfig.update_xaxes(
+                automargin=True, showline=True, mirror=True,
+                linecolor='#c7c7c7', linewidth=1,
+                gridcolor='#e5e7eb', zeroline=False, ticks='outside',
+            )
+            pfig.update_yaxes(
+                automargin=True, showline=True, mirror=True,
+                linecolor='#c7c7c7', linewidth=1,
+                gridcolor='#e5e7eb', zeroline=False, ticks='outside',
+            )
+            pfig.show(config={
+                'toImageButtonOptions': {
+                    'format': 'png', 'filename': 'JAZZ', 'scale': 10,
+                }
+            })
+
             if settings.Settings.save_data:
+                figsize = (5 * ncols, 4 * nrows)
+                fig, axes = plt.subplots(
+                    nrows, ncols, figsize=figsize, layout='constrained'
+                )
+                k = -1
+                for i in range(nrows):
+                    for j in range(ncols):
+                        k += 1
+                        if len(self._qubits) == 1:
+                            ax = axes
+                        elif axes.ndim == 1:
+                            ax = axes[j]
+                        else:
+                            ax = axes[i, j]
+                        if k < len(self._qubits):
+                            self._draw_ax(ax, self._qubits[k])
+                        else:
+                            ax.axis('off')
                 base = self._data_manager._save_path + 'ZZ_characterization'
                 fig.savefig(base + '.png', dpi=300)
                 fig.savefig(base + '.pdf')
                 fig.savefig(base + '.svg')
-            plt.show()
+                plt.close(fig)
 
         def final(self) -> None:
             """Final calibration method."""
