@@ -658,7 +658,7 @@ def RPE(
             )
             save_properties = {
                 'toImageButtonOptions': {
-                    'format': 'svg', # one of png, svg, jpeg, webp
+                    'format': 'png', # one of png, svg, jpeg, webp
                     'filename': 'RPE',
                     # 'height': 500,
                     # 'width': 1000,

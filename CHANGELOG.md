@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - JAZZ can measure static and driven ZZs in full qutrit space
+- Default ploly save option to png
 
 ### Deprecated
 

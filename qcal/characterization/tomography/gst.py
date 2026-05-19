@@ -818,7 +818,7 @@ def GST(
                 )
                 save_properties = {
                     'toImageButtonOptions': {
-                        'format': 'svg', # one of png, svg, jpeg, webp
+                        'format': 'png', # one of png, svg, jpeg, webp
                         'filename': 'qpu_layout',
                         # 'height': 500,
                         # 'width': 1000,
