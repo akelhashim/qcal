@@ -237,7 +237,12 @@ def T1(
                 params.add('a', value=a)
                 params.add('b', value=b)
                 params.add('c', value=c)
-                self._fit[q].fit(self._times[q], prob1, params=params)
+                weights = np.full(
+                    len(self._times[q]), 1.0 / np.sqrt(self._n_shots),
+                )
+                self._fit[q].fit(
+                    self._times[q], prob1, params=params, weights=weights
+                )
 
                 # If the fit was successful, write to the config
                 if self._fit[q].fit_success:
@@ -563,7 +568,12 @@ def T2(
                         params.add('f', value=b)
                         params.add('g', value=g)
 
-                self._fit[q].fit(self._times[q], prob0, params=params)
+                weights = np.full(
+                    len(self._times[q]), 1.0 / np.sqrt(self._n_shots),
+                )
+                self._fit[q].fit(
+                    self._times[q], prob0, params=params, weights=weights
+                )
 
                 # If the fit was successful, write to the config
                 if self._fit[q].fit_success:
@@ -845,7 +855,12 @@ def T2DD(
                 params.add('a', value=-a)
                 params.add('b', value=b)
                 params.add('c', value=c)
-                self._fit[q].fit(self._times[q], prob0, params=params)
+                weights = np.full(
+                    len(self._times[q]), 1.0 / np.sqrt(self._n_shots),
+                )
+                self._fit[q].fit(
+                    self._times[q], prob0, params=params, weights=weights
+                )
 
                 # If the fit was successful, write to the config
                 if self._fit[q].fit_success:
