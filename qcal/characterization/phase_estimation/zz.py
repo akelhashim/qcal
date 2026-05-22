@@ -542,17 +542,21 @@ def JAZZ(
                 signed_freq_low  = est_freq_fft(self._times[qp], z_low)
                 signed_freq_high = est_freq_fft(self._times[qp], z_high)
 
+                weights = np.full(
+                    len(self._times[qp]),
+                    1.0 / np.sqrt(self._n_shots),
+                )
                 params_low = self._fit_pair(
                     self._times[qp], I_low, freq_hint=signed_freq_low
                 )
                 self._fit[qp][seq_low_x].fit(
-                    self._times[qp], I_low, params=params_low
+                    self._times[qp], I_low, params=params_low, weights=weights
                 )
                 params_high = self._fit_pair(
                     self._times[qp], I_high, freq_hint=signed_freq_high
                 )
                 self._fit[qp][seq_high_x].fit(
-                    self._times[qp], I_high, params=params_high
+                    self._times[qp], I_high, params=params_high, weights=weights
                 )
 
                 if self._fit[qp][seq_low_x].fit_success:
@@ -577,8 +581,8 @@ def JAZZ(
                 ):
                     val = self._freq_high[qp] - self._freq_low[qp]
                     err = uncertainty_of_sum([
-                        self._fit[qp][seq_low_x].error,
-                        self._fit[qp][seq_high_x].error,
+                        self._fit[qp][seq_low_x].fit_params['c'].stderr or 0.,
+                        self._fit[qp][seq_high_x].fit_params['c'].stderr or 0.,
                     ])
                     val, err = round_to_order_error(val, err)
                     self._char_values[qp] = {'val': val, 'err': err}
@@ -627,14 +631,14 @@ def JAZZ(
                     )
                     ax.plot(
                         x / us, self._fit[qp][seq].predict(x),
-                        f'{color}-', label=f'{freq / unit:.3f} {unit_str}'
+                        f'{color}-', label=f'{freq / unit:.1f} {unit_str}'
                     )
 
             title = f'{qp} ZZ{self._conditional_phase}'
             if self._char_values[qp]:
                 val = self._char_values[qp]['val']
                 err = self._char_values[qp]['err']
-                title += f': {val / unit:.3f} ({err / unit:.3f}) {unit_str}'
+                title += f': {val / unit:.1f} ({err / unit:.1f}) {unit_str}'
             ax.set_title(title)
             ax.legend(loc=0, fontsize=12)
 
@@ -654,15 +658,16 @@ def JAZZ(
                 if self._char_values[qp]:
                     val = self._char_values[qp]['val']
                     err = self._char_values[qp]['err']
-                    title += f'<br>{val/unit:.3f} ({err/unit:.3f}) {unit_str}'
+                    title += f'<br>{val/unit:.1f} ({err/unit:.1f}) {unit_str}'
                 subplot_titles.append(title)
 
             pfig_height = 350 * nrows
             pfig_width  = 350 * ncols + 50
             pfig_gap_px = 80
+            pfig_margin = {'t': 60, 'b': 60, 'l': 60, 'r': 30}
             vertical_spacing = (
                 0.0 if nrows <= 1
-                else min(0.25, pfig_gap_px / pfig_height)
+                else min(0.2, pfig_gap_px / pfig_height)
             )
             horizontal_spacing = (
                 0.0 if ncols <= 1
@@ -675,7 +680,10 @@ def JAZZ(
                 vertical_spacing=vertical_spacing,
                 horizontal_spacing=horizontal_spacing,
             )
-            pfig.update_annotations(font_size=12)
+            pfig.update_annotations(font_size=12, yshift=10)
+
+            _leg_x = pfig.layout.xaxis.domain[0] + 0.01
+            _leg_y = pfig.layout.yaxis.domain[1] - 0.01
 
             blue, red = '#1f77b4', '#d62728'
 
@@ -721,7 +729,7 @@ def JAZZ(
                                 y=self._fit[qp][seq].predict(x_fit),
                                 mode='lines',
                                 line={'color': color, 'width': 2},
-                                name=f'{freq / unit:.3f} {unit_str}',
+                                name=f'{freq / unit:.1f} {unit_str}',
                                 showlegend=(k == 0),
                             ),
                             row=row, col=col,
@@ -730,22 +738,24 @@ def JAZZ(
                 pfig.update_xaxes(
                     title_text='Time (µs)' if row == nrows else '',
                     automargin=True, showgrid=True,
+                    title_standoff=10,
                     row=row, col=col,
                 )
                 pfig.update_yaxes(
                     title_text='|0⟩ Population' if col == 1 else '',
                     automargin=True, showgrid=True,
+                    title_standoff=10,
                     row=row, col=col,
                 )
 
             pfig.update_layout(
                 height=pfig_height,
                 width=pfig_width,
-                margin={'t': 60, 'b': 50, 'l': 60, 'r': 30},
+                margin=pfig_margin,
                 legend={
                     'orientation': 'v',
-                    'xanchor': 'right', 'x': 0.99,
-                    'yanchor': 'top',   'y': 0.99,
+                    'xanchor': 'left', 'x': _leg_x,
+                    'yanchor': 'top',   'y': _leg_y,
                     'bgcolor': 'rgba(255,255,255,0.85)',
                     'bordercolor': '#c7c7c7',
                     'borderwidth': 1,
@@ -755,14 +765,16 @@ def JAZZ(
                 plot_bgcolor='#fbfbfd',
             )
             pfig.update_xaxes(
-                automargin=True, showline=True, mirror=True,
+                showline=True, mirror=True,
                 linecolor='#c7c7c7', linewidth=1,
                 gridcolor='#e5e7eb', zeroline=False, ticks='outside',
+                side='bottom', title_standoff=10,
             )
             pfig.update_yaxes(
-                automargin=True, showline=True, mirror=True,
+                showline=True, mirror=True,
                 linecolor='#c7c7c7', linewidth=1,
                 gridcolor='#e5e7eb', zeroline=False, ticks='outside',
+                side='left', title_standoff=10,
             )
             pfig.show(config={
                 'toImageButtonOptions': {
