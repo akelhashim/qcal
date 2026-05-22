@@ -35,6 +35,41 @@ ZZ_CENTRALIZER = frozenset({
 _ZZ_CENTRALIZER_SORTED = sorted(ZZ_CENTRALIZER)
 _N_CENTRALIZERS: int = len(ZZ_CENTRALIZER)  # 8
 _PAULI_GATE = {'X': 'Gxpi2', 'Y': 'Gypi2', 'Z': 'Gzpi2', 'I': 'Gi'}
+# Single-qubit Pauli multiplication, modulo global phase (phases cancel in RPE).
+_PAULI_PRODUCT = {
+    ('I', 'I'): 'I', ('I', 'X'): 'X', ('I', 'Y'): 'Y', ('I', 'Z'): 'Z',
+    ('X', 'I'): 'X', ('X', 'X'): 'I', ('X', 'Y'): 'Z', ('X', 'Z'): 'Y',
+    ('Y', 'I'): 'Y', ('Y', 'X'): 'Z', ('Y', 'Y'): 'I', ('Y', 'Z'): 'X',
+    ('Z', 'I'): 'Z', ('Z', 'X'): 'Y', ('Z', 'Y'): 'X', ('Z', 'Z'): 'I',
+}
+
+
+def _pauli_product_layer(
+    paulis_a: List[str],
+    paulis_b: List[str],
+    qubit_pairs: Sequence[Tuple[int, int]],
+) -> Optional[List[tuple]]:
+    """Gate layer for the element-wise Pauli product P_a · P_b.
+
+    Args:
+        paulis_a (List[str]): Pauli strings for the first operand, one per
+            qubit pair (e.g. ``['XX', 'YZ']``).
+        paulis_b (List[str]): Pauli strings for the second operand, one per
+            qubit pair.
+        qubit_pairs (Sequence[Tuple[int, int]]): qubit pair labels; must
+            have the same length as ``paulis_a`` and ``paulis_b``.
+
+    Returns:
+        Optional[List[tuple]]: a flat gate layer of ``(gate_name, qubit)``
+            tuples representing P_a · P_b, or ``None`` if the product is
+            the identity on every qubit.
+    """
+    result = [
+        (_PAULI_GATE[_PAULI_PRODUCT[(a[qi], b[qi])]], qp[qi])
+        for a, b, qp in zip(paulis_a, paulis_b, qubit_pairs, strict=True)
+        for qi in (0, 1)
+    ]
+    return None if all(g == 'Gi' for g, _ in result) else result
 
 
 def interleaved_circuit_depths(circuit_depths: Sequence[int]) -> List[int]:
@@ -562,6 +597,7 @@ def make_twirled_zz_subcircuit(
         List: raw circuit layers for use as a gate_layer argument.
     """
     sub_circuit = []
+    paulis_prev = None
     for j in range(depth):
         paulis = [
             permutations[i][(offset + j) % _N_CENTRALIZERS]
@@ -572,12 +608,22 @@ def make_twirled_zz_subcircuit(
             for pauli, qp in zip(paulis, qubit_pairs, strict=True)
             for qi in (0, 1)
         ]
-        merged_layers = [layer, layer]
-        sub_circuit.extend(merged_layers)
+        if j == 0:
+            sub_circuit.extend([layer, layer])
+        else:
+            # Merge the trailing P_{j-1} with the leading P_j into one Pauli.
+            combined = _pauli_product_layer(paulis_prev, paulis, qubit_pairs)
+            if combined is not None:
+                sub_circuit.extend([combined, combined])
+
         sub_circuit.extend(
             gate_layer if gate_layer
             else [[('Gidle', q) for q in flatten(qubit_pairs)]]
         )
-        sub_circuit.extend(merged_layers)
+
+        if j == depth - 1:
+            sub_circuit.extend([layer, layer])
+
+        paulis_prev = paulis
 
     return sub_circuit

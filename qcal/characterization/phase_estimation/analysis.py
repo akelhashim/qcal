@@ -459,7 +459,7 @@ def analyze_zz(
 
     # Turn lin. comb. estimates into direct phase estimates
     # Wrap angles to [-π/2, π/2] using arcsin(sin(x))
-    zz_estimates = np.arcsin(np.sin(
+    zz_estimates = -1 * np.arcsin(np.sin(
         0.5 * (
             np.array(analyses[(0, 1)].angle_estimates_rectified) -
             np.array(analyses[(2, 3)].angle_estimates_rectified)
