@@ -35,6 +35,7 @@ from qcal.characterization.phase_estimation.circuits import (
     make_cz_circuits,
     make_idle_circuits,
     make_x90_circuits,
+    make_zz_circuits
 )
 from qcal.config import Config
 from qcal.interface.pygsti.circuits import load_circuits
@@ -144,7 +145,7 @@ def RPE(
     config:         Config,
     qubit_labels:   Sequence[int],
     gate:           str,
-    circuit_depths: Sequence[int] = [1, 2, 4, 8, 16, 32, 64, 128, 256],  # noqa: B006
+    circuit_depths: Sequence[int] = (1, 2, 4, 8, 16, 32, 64, 128, 256),
     gate_layer:     GateLayer = None,
     loss_angle:     str | List[str] | None = None,
     **kwargs
@@ -162,8 +163,8 @@ def RPE(
         gate (str): gate on which to perform RPE. Must be one of 'I', 'X90',
             'CZ', or 'ZZ'.
         circuit_depths (Sequence[int], optional): a list of positive integers
-            specifying the circuit depths. Defaults to ```[1, 2, 4, 8, 16, 32,
-            64, 128, 256]```.
+            specifying the circuit depths. Defaults to ```(1, 2, 4, 8, 16, 32,
+            64, 128, 256)```.
         gate_layer (GateLayer, optional): custom gate layer for the gate of
             interest. Defaults to None.
         loss_angle (str | list[str] | None, optional): a string or list of
@@ -195,7 +196,7 @@ def RPE(
         'I':   make_idle_circuits,
         'X90': make_x90_circuits,
         'CZ':  make_cz_circuits,
-        'ZZ':  make_cz_circuits
+        'ZZ':  make_zz_circuits
     }
     analyze_results_map = {
         'I':   analyze_idle,
@@ -218,7 +219,7 @@ def RPE(
             self,
             config:         Config,
             qubit_labels:   Sequence[int],
-            circuit_depths: Sequence[int] = [1, 2, 4, 8, 16, 32, 64, 128, 256],  # noqa: B006
+            circuit_depths: Sequence[int] = (1, 2, 4, 8, 16, 32, 64, 128, 256),
             gate_layer:     GateLayer = None,
             loss_angle:     str | None = None,
             **kwargs
@@ -433,9 +434,14 @@ def RPE(
 
         def analyze(self):
             """Analyze the RPE results."""
+            clear_output(wait=True)
             logger.info(' Analyzing the results...')
 
-            clear_output(wait=True)
+             # x8 for ZZ because we combine 8 twirled sequences
+            shot_noise = (
+                8 * np.sqrt(self._n_shots) if self._gate == 'ZZ'
+                else np.sqrt(self._n_shots)
+            )
             for ql in self._qubit_labels:
                 results = self._analyze_results_func(
                     self._datasets[ql],
@@ -451,7 +457,7 @@ def RPE(
 
                 for angle, estimates in self._angle_estimates[ql].items():
                     est = estimates[self._last_good_idx[ql]]
-                    unc = np.pi / (2 * 2**self._last_good_idx[ql])
+                    unc = np.pi / (2 * 2**self._last_good_idx[ql] * shot_noise)
                     est, unc = round_to_order_error(est, unc)
                     self._trusted_angle_est[ql][angle] = {
                         'val': est, 'err': unc
@@ -468,7 +474,7 @@ def RPE(
                     error = errors[self._last_good_idx[ql]]
                     self._loss[ql][angle] = error
                     unc = np.pi / (
-                        2 * 2**self._last_good_idx[ql] * np.sqrt(self._n_shots)
+                        2 * 2**self._last_good_idx[ql] * shot_noise
                     )
                     error, unc = round_to_order_error(error, unc)
                     error_deg, unc_deg = round_to_order_error(
@@ -486,18 +492,12 @@ def RPE(
             """Plot the RPE results."""
             nrows, ncols = calculate_nrows_ncols(len(self._qubit_labels))
 
-            mpl_colors = ['tab:blue', 'tab:orange', 'tab:green']
             plotly_colors = ['#1f77b4', '#ff7f0e', '#2ca02c']
-
-            figsize = (5 * ncols, 4 * nrows)
-            fig, axes = plt.subplots(
-                nrows, ncols, figsize=figsize, layout='constrained'
-            )
 
             pfig_height = 350 * nrows
             pfig_width = 350 * ncols + 50
-            pfig_margin = {'t': 50, 'b': 50, 'l': 50, 'r': 50}
-            pfig_gap_px = 60
+            pfig_margin = {'t': 60, 'b': 60, 'l': 60, 'r': 30}
+            pfig_gap_px = 80
             vertical_spacing = (
                 0.0 if nrows <= 1 else min(0.2, pfig_gap_px / pfig_height)
             )
@@ -511,19 +511,30 @@ def RPE(
                 vertical_spacing=vertical_spacing,
                 horizontal_spacing=horizontal_spacing,
             )
-            pfig.update_annotations(font_size=12)
+            pfig.update_annotations(font_size=12, yshift=5)
+
+            _leg_x = pfig.layout.xaxis.domain[0] + 0.01
+            _leg_y = pfig.layout.yaxis.domain[1] - 0.01
+
+            if Settings.save_data:
+                mpl_colors = ['tab:blue', 'tab:orange', 'tab:green']
+                figsize = (5 * ncols, 4 * nrows)
+                fig, axes = plt.subplots(
+                    nrows, ncols, figsize=figsize, layout='constrained'
+                )
 
             k = -1
             for i in range(nrows):
                 for j in range(ncols):
                     k += 1
 
-                    if len(self._qubit_labels) == 1:
-                        ax = axes
-                    elif axes.ndim == 1:
-                        ax = axes[j]
-                    elif axes.ndim == 2:
-                        ax = axes[i,j]
+                    if Settings.save_data:
+                        if len(self._qubit_labels) == 1:
+                            ax = axes
+                        elif axes.ndim == 1:
+                            ax = axes[j]
+                        elif axes.ndim == 2:
+                            ax = axes[i,j]
 
                     if k < len(self._qubit_labels):
                         ql = self._qubit_labels[k]
@@ -533,22 +544,23 @@ def RPE(
                             errors = self._angle_errors[ql][angle]
                             depths = self._circuit_depths[:len(errors)]
                             yerr = np.pi / (2 * np.array(depths))
-                            mpl_color = mpl_colors[idx % len(mpl_colors)]
                             plotly_color = plotly_colors[
                                 idx % len(plotly_colors)
                             ]
 
-                            ax.errorbar(
-                                depths,
-                                errors,
-                                yerr=yerr,
-                                fmt='o-',
-                                elinewidth=0.75,
-                                capsize=7,
-                                color=mpl_color,
-                                ecolor=mpl_color,
-                                label=angle
-                            )
+                            if Settings.save_data:
+                                mpl_color = mpl_colors[idx % len(mpl_colors)]
+                                ax.errorbar(
+                                    depths,
+                                    errors,
+                                    yerr=yerr,
+                                    fmt='o-',
+                                    elinewidth=0.75,
+                                    capsize=7,
+                                    color=mpl_color,
+                                    ecolor=mpl_color,
+                                    label=angle
+                                )
                             pfig.add_trace(
                                 go.Scatter(
                                     x=depths,
@@ -570,14 +582,14 @@ def RPE(
                                 col=j + 1,
                             )
 
-                        # Add vertical line for last good depth
                         last_good_depth = 2**self._last_good_idx[ql]
-                        ax.axvline(
-                            last_good_depth,
-                            ls='--',
-                            c='k',
-                            label='Last good depth',
-                        )
+                        if Settings.save_data:
+                            ax.axvline(
+                                last_good_depth,
+                                ls='--',
+                                c='k',
+                                label='Last good depth',
+                            )
                         pfig.add_vline(
                             x=last_good_depth,
                             line_dash='dash',
@@ -591,38 +603,44 @@ def RPE(
                         maxval = np.nanmax(np.abs(np.concatenate(
                             list(self._angle_errors[ql].values())
                         )))
-                        ax.set_ylim((-1.1 * maxval, 1.1 * maxval))
-                        ax.set_title(f'Q{ql}', fontsize=20)
-                        ax.set_xlabel('Circuit Depth', fontsize=15)
-                        ax.set_ylabel('Angle Error (rad.)', fontsize=15)
-                        ax.tick_params(
-                            axis='both', which='major', labelsize=12
-                        )
-                        ax.set_xscale('log')
-                        ax.legend(prop={'size': 12})
-                        ax.grid(True)
+                        if Settings.save_data:
+                            ax.set_ylim((-1.1 * maxval, 1.1 * maxval))
+                            ax.set_title(f'Q{ql}', fontsize=20)
+                            ax.set_xlabel('Circuit Depth', fontsize=15)
+                            ax.set_ylabel('Angle Error (rad.)', fontsize=15)
+                            ax.tick_params(
+                                axis='both', which='major', labelsize=12
+                            )
+                            ax.set_xscale('log')
+                            ax.legend(prop={'size': 12})
+                            ax.grid(True)
 
                         pfig.update_xaxes(
+                            side='bottom',
                             type='log',
                             title_text='Circuit Depth' if i == nrows-1 else '',
                             title_standoff=10,
                             automargin=True,
                             showgrid=True,
+                            showticklabels=True,
                             row=i + 1,
                             col=j + 1,
                         )
                         pfig.update_yaxes(
+                            side='left',
                             title_text='Angle Error (rad.)' if j == 0 else '',
                             title_standoff=10,
                             automargin=True,
                             showgrid=True,
+                            showticklabels=True,
                             range=[-1.1 * maxval, 1.1 * maxval],
                             row=i + 1,
                             col=j + 1,
                         )
 
                     else:
-                        ax.axis('off')
+                        if Settings.save_data:
+                            ax.axis('off')
                         pfig.update_xaxes(visible=False, row=i + 1, col=j + 1)
                         pfig.update_yaxes(visible=False, row=i + 1, col=j + 1)
 
@@ -630,14 +648,21 @@ def RPE(
                 height=pfig_height,
                 width=pfig_width,
                 margin=pfig_margin,
-                legend={'orientation': 'h', 'yanchor': 'bottom', 'y': 1.02},
+                legend={
+                    'orientation': 'v',
+                    'xanchor': 'left', 'x': _leg_x,
+                    'yanchor': 'top',   'y': _leg_y,
+                    'bgcolor': 'rgba(255,255,255,0.85)',
+                    'bordercolor': '#c7c7c7',
+                    'borderwidth': 1,
+                },
                 template='plotly_white',
                 paper_bgcolor='white',
                 plot_bgcolor='#fbfbfd',
             )
 
             pfig.update_xaxes(
-                automargin=True,
+                side='bottom',
                 showline=True,
                 mirror=True,
                 linecolor='#c7c7c7',
@@ -645,9 +670,10 @@ def RPE(
                 gridcolor='#e5e7eb',
                 zeroline=False,
                 ticks='outside',
+                title_standoff=10,
             )
             pfig.update_yaxes(
-                automargin=True,
+                side='left',
                 showline=True,
                 mirror=True,
                 linecolor='#c7c7c7',
@@ -655,20 +681,19 @@ def RPE(
                 gridcolor='#e5e7eb',
                 zeroline=False,
                 ticks='outside',
+                title_standoff=10,
             )
             save_properties = {
                 'toImageButtonOptions': {
                     'format': 'png', # one of png, svg, jpeg, webp
                     'filename': 'RPE',
-                    # 'height': 500,
-                    # 'width': 1000,
                     'scale': 10
                 }
             }
             pfig.show(config=save_properties)
 
-            fig.set_tight_layout(True)
             if Settings.save_data:
+                fig.set_tight_layout(True)
                 fig.savefig(
                     self._data_manager._save_path + 'RPE.png',
                     dpi=300
@@ -679,7 +704,7 @@ def RPE(
                 fig.savefig(
                     self._data_manager._save_path + 'RPE.svg'
                 )
-            plt.close(fig)
+                plt.close(fig)
 
         def plot_signal(self) -> None:
             """Plot signal decay."""
@@ -767,7 +792,7 @@ def IdleRPE(
     qpu:            QPU,
     config:         Config,
     qubit_labels:   Sequence[int],
-    circuit_depths: Sequence[int] = [1, 2, 4, 8, 16, 32, 64, 128, 256],  # noqa: B006
+    circuit_depths: Sequence[int] = (1, 2, 4, 8, 16, 32, 64, 128, 256),
     gate_layer:     GateLayer = None,
     loss_angle:     str | List[str] | None = None,
     **kwargs
@@ -780,8 +805,8 @@ def IdleRPE(
         qubit_labels (Sequence[int]): a list specifying sets of system labels
             on which to perform RPE for the idle gate.
         circuit_depths (Sequence[int], optional): a list of positive integers
-            specifying the circuit depths. Defaults to ```[1, 2, 4, 8, 16, 32,
-            64, 128, 256]```.
+            specifying the circuit depths. Defaults to ```(1, 2, 4, 8, 16, 32,
+            64, 128, 256)```.
         gate_layer (GateLayer, optional): custom gate layer for the gate of
             interest. Defaults to None.
         loss_angle (str | list[str] | None, optional): a string or list of
@@ -810,7 +835,7 @@ def IdleRPE(
             self,
             config:         Config,
             qubit_labels:   Sequence[int],
-            circuit_depths: Sequence[int] = [1, 2, 4, 8, 16, 32, 64, 128, 256],  # noqa: B006
+            circuit_depths: Sequence[int] = (1, 2, 4, 8, 16, 32, 64, 128, 256),
             gate_layer:     GateLayer = None,
             loss_angle:     str | None = None,
             **kwargs
@@ -839,7 +864,7 @@ def X90RPE(
     qpu:            QPU,
     config:         Config,
     qubit_labels:   Sequence[int],
-    circuit_depths: Sequence[int] = [1, 2, 4, 8, 16, 32, 64, 128, 256],  # noqa: B006
+    circuit_depths: Sequence[int] = (1, 2, 4, 8, 16, 32, 64, 128, 256),
     gate_layer:     GateLayer = None,
     loss_angle:     str | List[str] | None = None,
     **kwargs
@@ -852,8 +877,8 @@ def X90RPE(
         qubit_labels (Sequence[int]): a list specifying sets of system labels
             on which to perform RPE for the X90 gate.
         circuit_depths (Sequence[int], optional): a list of positive integers
-            specifying the circuit depths. Defaults to ```[1, 2, 4, 8, 16, 32,
-            64, 128, 256]```.
+            specifying the circuit depths. Defaults to ```(1, 2, 4, 8, 16, 32,
+            64, 128, 256)```.
         gate_layer (GateLayer, optional): custom gate layer for the gate of
             interest. Defaults to None.
         loss_angle (str | list[str] | None, optional): a string or list of
@@ -883,7 +908,7 @@ def X90RPE(
             self,
             config:         Config,
             qubit_labels:   Sequence[int],
-            circuit_depths: Sequence[int] = [1, 2, 4, 8, 16, 32, 64, 128, 256],  # noqa: B006
+            circuit_depths: Sequence[int] = (1, 2, 4, 8, 16, 32, 64, 128, 256),
             gate_layer:     GateLayer = None,
             loss_angle:     str | None = None,
             **kwargs
@@ -912,7 +937,7 @@ def CZRPE(
     qpu:            QPU,
     config:         Config,
     qubit_labels:   Sequence[Tuple[int, int]],
-    circuit_depths: Sequence[int] = [1, 2, 4, 8, 16, 32, 64, 128, 256],  # noqa: B006
+    circuit_depths: Sequence[int] = (1, 2, 4, 8, 16, 32, 64, 128, 256),
     gate_layer:     GateLayer = None,
     loss_angle:     str | List[str] | None = None,
     **kwargs
@@ -925,8 +950,8 @@ def CZRPE(
         qubit_labels (Sequence[Tuple[int, int]]): a list specifying sets of
             system labels on which to perform RPE for the CZ gate.
         circuit_depths (Sequence[int], optional): a list of positive integers
-            specifying the circuit depths. Defaults to ```[1, 2, 4, 8, 16, 32,
-            64, 128, 256]```.
+            specifying the circuit depths. Defaults to ```(1, 2, 4, 8, 16, 32,
+            64, 128, 256)```.
         gate_layer (GateLayer, optional): custom gate layer for the gate of
             interest. Defaults to None.
         loss_angle (str | list[str] | None, optional): a string or list of
@@ -955,7 +980,7 @@ def CZRPE(
             self,
             config:         Config,
             qubit_labels:   Sequence[Tuple[int, int]],
-            circuit_depths: Sequence[int] = [1, 2, 4, 8, 16, 32, 64, 128, 256],  # noqa: B006
+            circuit_depths: Sequence[int] = (1, 2, 4, 8, 16, 32, 64, 128, 256),
             gate_layer:     GateLayer = None,
             loss_angle:     str | None = None,
             **kwargs
@@ -984,7 +1009,7 @@ def ZZRPE(
     qpu:            QPU,
     config:         Config,
     qubit_labels:   Sequence[Tuple[int, int]],
-    circuit_depths: Sequence[int] = [1, 2, 4, 8, 16, 32, 64, 128, 256],  # noqa: B006
+    circuit_depths: Sequence[int] = (1, 2, 4, 8, 16, 32, 64, 128, 256),
     gate_layer:     GateLayer = None,
     loss_angle:     str | List[str] | None = None,
     **kwargs
@@ -997,8 +1022,8 @@ def ZZRPE(
         qubit_labels (Sequence[Tuple[int, int]]): a list specifying sets of system
             labels on which to perform RPE for the ZZ gate.
         circuit_depths (Sequence[int], optional): a list of positive integers
-            specifying the circuit depths. Defaults to ```[1, 2, 4, 8, 16, 32,
-            64, 128, 256]```.
+            specifying the circuit depths. Defaults to ```(1, 2, 4, 8, 16, 32,
+            64, 128, 256)```.
         gate_layer (GateLayer, optional): custom gate layer for the gate of
             interest. Defaults to None.
         loss_angle (str | list[str] | None, optional): a string or list of
@@ -1027,7 +1052,7 @@ def ZZRPE(
             self,
             config:         Config,
             qubit_labels:   Sequence[Tuple[int, int]],
-            circuit_depths: Sequence[int] = [1, 2, 4, 8, 16, 32, 64, 128, 256],  # noqa: B006
+            circuit_depths: Sequence[int] = (1, 2, 4, 8, 16, 32, 64, 128, 256),
             gate_layer:     GateLayer = None,
             loss_angle:     str | None = None,
             **kwargs

@@ -4,38 +4,37 @@
 import logging
 from typing import List, Optional, Sequence, Tuple
 
+import numpy as np
 from pygsti import remove_duplicates
 from pygsti.circuits import Circuit as PyGSTiCircuit
+
+from qcal.gate import gate
+from qcal.utils import flatten
 
 GateLayer = Optional[List[List[tuple]]]
 
 logger = logging.getLogger(__name__)
 
 
+# Centralizer of ZZ in the 2-qubit Pauli group: all P⊗Q that commute with Z⊗Z.
+# Commutation holds when both qubits commute with Z, or both anticommute with Z:
+#
+#   Operator | Qubit 0 vs Z | Qubit 1 vs Z
+#   ---------+--------------+--------------
+#   II       | commutes     | commutes
+#   IZ       | commutes     | commutes
+#   ZI       | commutes     | commutes
+#   ZZ       | commutes     | commutes
+#   XX       | anticommutes | anticommutes
+#   XY       | anticommutes | anticommutes
+#   YX       | anticommutes | anticommutes
+#   YY       | anticommutes | anticommutes
 ZZ_CENTRALIZER = frozenset({
     'XX', 'YY', 'ZZ', 'XY', 'YX', 'IZ', 'ZI', 'II'
 })
-
-
-def _pauli_to_pygsti_gate(pauli: str, qubit: int) -> PyGSTiCircuit:
-    """Convert a Pauli operator to a pyGSTi gate.
-
-    Args:
-        pauli (str): Pauli operator.
-        qubit (int): qubit label.
-
-    Returns:
-        PyGSTiCircuit: pyGSTi circuit.
-    """
-    match pauli:
-        case 'X':
-            return PyGSTiCircuit([('Gxpi2', qubit)]*2, line_labels=[qubit])
-        case 'Y':
-            return PyGSTiCircuit([('Gypi2', qubit)]*2, line_labels=[qubit])
-        case 'Z':
-            return PyGSTiCircuit([('Gzpi2', qubit)]*2, line_labels=[qubit])
-        case 'I':
-            return PyGSTiCircuit([], line_labels=[qubit])
+_ZZ_CENTRALIZER_SORTED = sorted(ZZ_CENTRALIZER)
+_N_CENTRALIZERS: int = len(ZZ_CENTRALIZER)  # 8
+_PAULI_GATE = {'X': 'Gxpi2', 'Y': 'Gypi2', 'Z': 'Gzpi2', 'I': 'Gi'}
 
 
 def interleaved_circuit_depths(circuit_depths: Sequence[int]) -> List[int]:
@@ -77,12 +76,12 @@ def make_idle_circuits(
 
 
 def make_idle_cos_circ(
-    d: int, qubits: Sequence[int], gate_layer: GateLayer = None,
+    depth: int, qubits: Sequence[int], gate_layer: GateLayer = None,
 ) -> PyGSTiCircuit:
     """Make the cosine circuit for idle RPE.
 
     Args:
-        d (int): circuit depth.
+        depth (int): circuit depth.
         qubits (Sequence[int]): qubit labels.
         gate_layer (GateLayer, optional): custom gate layer for the gate of
             interest. Defaults to None.
@@ -96,7 +95,7 @@ def make_idle_cos_circ(
     Gi_germ = PyGSTiCircuit(
         gate_layer if gate_layer else [[('Gidle', q) for q in qubits]],
         line_labels=qubits
-    ) * d
+    ) * depth
     Gi_meas = PyGSTiCircuit(
         [[('Gypi2', q) for q in qubits]], line_labels=qubits
     ) * 3
@@ -105,12 +104,12 @@ def make_idle_cos_circ(
 
 
 def make_idle_sin_circ(
-    d: int, qubits: Sequence[int], gate_layer: GateLayer = None,
+    depth: int, qubits: Sequence[int], gate_layer: GateLayer = None,
 ) -> PyGSTiCircuit:
     """Make the sine circuit for idle RPE.
 
     Args:
-        d (int): circuit depth.
+        depth (int): circuit depth.
         qubits (Sequence[int]): qubit labels.
         gate_layer (GateLayer, optional): custom gate layer for the gate of
             interest. Defaults to None.
@@ -124,7 +123,7 @@ def make_idle_sin_circ(
     Gi_germ = PyGSTiCircuit(
         gate_layer if gate_layer else [[('Gidle', q) for q in qubits]],
         line_labels=qubits
-    ) * d
+    ) * depth
     Gi_meas = PyGSTiCircuit(
         [[('Gypi2', q) for q in qubits]], line_labels=qubits
     ) * 3
@@ -159,12 +158,12 @@ def make_x90_circuits(
 
 
 def make_x90_cos_circ(
-    d: int, qubits: Sequence[int], gate_layer: GateLayer = None,
+    depth: int, qubits: Sequence[int], gate_layer: GateLayer = None,
 ) -> PyGSTiCircuit:
     """Make the cosine circuit for X90 RPE.
 
     Args:
-        d (int): circuit depth.
+        depth (int): circuit depth.
         qubits (Sequence[int]): qubit labels.
         gate_layer (GateLayer, optional): custom gate layer for the gate of
             interest. Defaults to None.
@@ -175,16 +174,16 @@ def make_x90_cos_circ(
     return PyGSTiCircuit(
             gate_layer if gate_layer else [[('Gxpi2', q) for q in qubits]],
             line_labels=qubits
-        ) * d
+        ) * depth
 
 
 def make_x90_sin_circ(
-    d: int, qubits: Sequence[int], gate_layer: GateLayer = None,
+    depth: int, qubits: Sequence[int], gate_layer: GateLayer = None,
 ) -> PyGSTiCircuit:
     """Make the sine circuit for X90 RPE.
 
     Args:
-        d (int): circuit depth.
+        depth (int): circuit depth.
         qubits (Sequence[int]): qubit labels.
         gate_layer (GateLayer, optional): custom gate layer for the gate of
             interest. Defaults to None.
@@ -195,16 +194,16 @@ def make_x90_sin_circ(
     return PyGSTiCircuit(
             gate_layer if gate_layer else [[('Gxpi2', q) for q in qubits]],
             line_labels=qubits
-        ) * (d + 1)
+        ) * (depth + 1)
 
 
 def make_X90_icos_circ(
-    d: int, qubits: Sequence[int], gate_layer: GateLayer = None,
+    depth: int, qubits: Sequence[int], gate_layer: GateLayer = None,
 ) -> PyGSTiCircuit:
     """Make the interleaved cosine circuit for X90 axis error RPE.
 
     Args:
-        d (int): circuit depth.
+        depth (int): circuit depth.
         qubits (Sequence[int]): qubit labels.
         gate_layer (GateLayer, optional): custom gate layer for the gate of
             interest. Defaults to None.
@@ -223,16 +222,16 @@ def make_X90_icos_circ(
     return (
         Gz_layer + Gx_layer + Gx_layer + Gz_layer + Gz_layer + Gx_layer +
         Gx_layer + Gz_layer
-    ) * d
+    ) * depth
 
 
 def make_X90_isin_circ(
-    d: int, qubits: Sequence[int], gate_layer: GateLayer = None,
+    depth: int, qubits: Sequence[int], gate_layer: GateLayer = None,
 ) -> PyGSTiCircuit:
     """Make the interleaved sine circuit for X90 axis error RPE.
 
     Args:
-        d (int): circuit depth.
+        depth (int): circuit depth.
         qubits (Sequence[int]): qubit labels.
         gate_layer (GateLayer, optional): custom gate layer for the gate of
             interest. Defaults to None.
@@ -251,7 +250,7 @@ def make_X90_isin_circ(
     return (
         Gz_layer + Gx_layer + Gx_layer + Gz_layer + Gz_layer + Gx_layer +
         Gx_layer + Gz_layer
-    ) * d + Gx_layer
+    ) * depth + Gx_layer
 
 
 def make_cz_circuits(
@@ -274,16 +273,16 @@ def make_cz_circuits(
     state_pairs = [(0, 1), (2, 3), (3, 1)]
     sin_dict = {
         state_pair: {
-            i: make_cz_sin_circ(
-                i, state_pair, qubit_pairs, gate_layer
-            ) for i in circuit_depths
+            d: make_cz_sin_circ(
+                d, state_pair, qubit_pairs, gate_layer
+            ) for d in circuit_depths
         } for state_pair in state_pairs
     }
     cos_dict = {
         state_pair: {
-            i: make_cz_cos_circ(
-                i, state_pair, qubit_pairs, gate_layer
-            ) for i in circuit_depths
+            d: make_cz_cos_circ(
+                d, state_pair, qubit_pairs, gate_layer
+            ) for d in circuit_depths
         } for state_pair in state_pairs
     }
 
@@ -292,11 +291,11 @@ def make_cz_circuits(
         for state_pair in state_pairs:
             circuits += list(trig_dict[state_pair].values())
 
-    return remove_duplicates(circuits)
+    return circuits
 
 
 def make_cz_cos_circ(
-    d:           int,
+    depth:       int,
     state_pair:  Tuple[int, int],
     qubit_pairs: Sequence[Tuple[int, int]],
     gate_layer:  GateLayer = None,
@@ -304,7 +303,7 @@ def make_cz_cos_circ(
     """Make the cosine circuit for CZ RPE.
 
     Args:
-        d (int): circuit depth.
+        depth (int): circuit depth.
         state_pair (Tuple[int, int]): state pair.
         qubit_pairs (Sequence[Tuple[int, int]]): pairs of qubits for two-qubit
             gates.
@@ -330,7 +329,7 @@ def make_cz_cos_circ(
                gate_layer if gate_layer else [
                    [('Gcphase', qp[0], qp[1]) for qp in qubit_pairs]
                ]
-           ) * d +
+           ) * depth +
            PyGSTiCircuit(
                [[('Gypi2', qp[1]) for qp in qubit_pairs]]
            )
@@ -340,20 +339,21 @@ def make_cz_cos_circ(
     elif state_pair in [(2, 3), (3, 2)]:
         circ = (
             PyGSTiCircuit(
-                [[('Gxpi2', qp[0]) for qp in qubit_pairs]],
+                [[
+                    gate for qp in qubit_pairs for gate in [
+                        ('Gxpi2', qp[0]), ('Gypi2', qp[1])
+                    ]
+                ]],
                 line_labels=line_labels
             ) +
             PyGSTiCircuit(
                 [[('Gxpi2', qp[0]) for qp in qubit_pairs]]
             ) +
             PyGSTiCircuit(
-                [[('Gypi2', qp[1]) for qp in qubit_pairs]]
-            ) +
-            PyGSTiCircuit(
                 gate_layer if gate_layer else [
                    [('Gcphase', qp[0], qp[1]) for qp in qubit_pairs]
                ]
-            ) * d +
+            ) * depth +
             PyGSTiCircuit(
                 [[('Gypi2', qp[1]) for qp in qubit_pairs]]
             )
@@ -363,20 +363,21 @@ def make_cz_cos_circ(
     elif state_pair in [(1, 3), (3, 1)]:
         circ = (
             PyGSTiCircuit(
-                [[('Gxpi2', qp[1]) for qp in qubit_pairs]],
+                [[
+                    gate for qp in qubit_pairs for gate in [
+                        ('Gypi2', qp[0]), ('Gxpi2', qp[1])
+                    ]
+                ]],
                 line_labels=line_labels
             ) +
             PyGSTiCircuit(
                 [[('Gxpi2', qp[1]) for qp in qubit_pairs]]
             ) +
             PyGSTiCircuit(
-                [[('Gypi2', qp[0]) for qp in qubit_pairs]]
-            ) +
-            PyGSTiCircuit(
                 gate_layer if gate_layer else [
                    [('Gcphase', qp[0], qp[1]) for qp in qubit_pairs]
                ]
-            ) * d +
+            ) * depth +
             PyGSTiCircuit(
                 [[('Gypi2', qp[0]) for qp in qubit_pairs]]
             )
@@ -391,7 +392,7 @@ def make_cz_cos_circ(
 
 
 def make_cz_sin_circ(
-    d:           int,
+    depth:       int,
     state_pair:  Tuple[int, int],
     qubit_pairs: Sequence[Tuple[int, int]],
     gate_layer:  GateLayer = None,
@@ -399,7 +400,7 @@ def make_cz_sin_circ(
     """Make the sine circuit for CZ RPE.
 
     Args:
-        d (int): circuit depth.
+        depth (int): circuit depth.
         state_pair (Tuple[int, int]): state pair.
         qubit_pairs (Sequence[Tuple[int, int]]): pairs of qubits for two-qubit
             gates.
@@ -424,7 +425,7 @@ def make_cz_sin_circ(
                 gate_layer if gate_layer else [
                    [('Gcphase', qp[0], qp[1]) for qp in qubit_pairs]
                ]
-            ) * d +
+            ) * depth +
             PyGSTiCircuit(
                 [[('Gxpi2', qp[1]) for qp in qubit_pairs]]
             )
@@ -434,20 +435,21 @@ def make_cz_sin_circ(
     elif state_pair in [(2, 3),(3, 2)]:
         circ = (
             PyGSTiCircuit(
-                [[('Gxpi2', qp[0]) for qp in qubit_pairs]],
+                [[
+                    gate for qp in qubit_pairs for gate in [
+                        ('Gxpi2', qp[0]), ('Gypi2', qp[1])
+                    ]
+                ]],
                 line_labels=line_labels
             ) +
             PyGSTiCircuit(
                 [[('Gxpi2', qp[0]) for qp in qubit_pairs]]
             ) +
             PyGSTiCircuit(
-                [[('Gypi2', qp[1]) for qp in qubit_pairs]]
-            ) +
-            PyGSTiCircuit(
                 gate_layer if gate_layer else [
                    [('Gcphase', qp[0], qp[1]) for qp in qubit_pairs]
                ]
-            ) * d +
+            ) * depth +
             PyGSTiCircuit(
                 [[('Gxpi2', qp[1]) for qp in qubit_pairs]]
             )
@@ -457,20 +459,21 @@ def make_cz_sin_circ(
     elif state_pair in [(1, 3), (3, 1)]:
         circ = (
             PyGSTiCircuit(
-                [[('Gxpi2', qp[1]) for qp in qubit_pairs]],
+                [[
+                    gate for qp in qubit_pairs for gate in [
+                        ('Gypi2', qp[0]), ('Gxpi2', qp[1]),
+                    ]
+                ]],
                 line_labels=line_labels
             ) +
             PyGSTiCircuit(
                 [[('Gxpi2', qp[1]) for qp in qubit_pairs]]
             ) +
             PyGSTiCircuit(
-                [[('Gypi2', qp[0]) for qp in qubit_pairs]]
-            ) +
-            PyGSTiCircuit(
                 gate_layer if gate_layer else [
                    [('Gcphase', qp[0], qp[1]) for qp in qubit_pairs]
                ]
-            ) * d +
+            ) * depth +
             PyGSTiCircuit(
                 [[('Gxpi2', qp[0]) for qp in qubit_pairs]]
             )
@@ -480,3 +483,101 @@ def make_cz_sin_circ(
             "state_pair must be in [(0,1), (1,0), (2,3), (3,2), (1,3), (3,1)]"
         )
     return circ
+
+
+def make_zz_circuits(
+    circuit_depths: Sequence[int],
+    qubit_pairs:    Sequence[Tuple[int, int]],
+    gate_layer:     GateLayer = None,
+) -> List[PyGSTiCircuit]:
+    """Make the circuits for ZZ RPE.
+
+    Each circuit depth produces exactly 8 randomized variants — one for each
+    element of the ZZ centralizer. Each qubit pair gets an independent random
+    permutation of the 8 centralizer elements, so no element is repeated across
+    the 8 randomizations.
+
+    Args:
+        circuit_depths (Sequence[int]): circuit depths.
+        qubit_pairs (Sequence[Tuple[int, int]]): pairs of qubits for two-qubit
+            gates.
+        gate_layer (GateLayer, optional): custom gate layer for the gate of
+            interest. Defaults to None.
+
+    Returns:
+        List[PyGSTiCircuit]: pyGSTi circuits for ZZ RPE.
+    """
+    circuits = []
+    for d in circuit_depths:
+        # Fresh independent shuffle per qubit pair at each depth, so the Pauli
+        # sequences are uncorrelated across circuit depths.
+        permutations = [
+            list(np.random.permutation(_ZZ_CENTRALIZER_SORTED))
+            for _ in qubit_pairs
+        ]
+        for r in range(_N_CENTRALIZERS):
+            circuits.extend(
+                make_cz_circuits(
+                    circuit_depths=[1],
+                    qubit_pairs=qubit_pairs,
+                    gate_layer=make_twirled_zz_subcircuit(
+                        depth=d,
+                        qubit_pairs=qubit_pairs,
+                        permutations=permutations,
+                        offset=r,
+                        gate_layer=gate_layer,
+                    )
+                )
+            )
+    return circuits
+
+
+def make_twirled_zz_subcircuit(
+    depth:        int,
+    qubit_pairs:  Sequence[tuple[int, int]],
+    permutations: List[List[str]],
+    offset:       int,
+    gate_layer:   GateLayer = None,
+) -> List:
+    """Make a twirled ZZ subcircuit for RPE.
+
+    At each gate repetition j, applies the Pauli frame P·gate·P where P is
+    drawn from the pre-shuffled permutation at index (offset + j) % 8. This
+    ensures two properties simultaneously:
+      - Within a circuit: each depth step uses a different centralizer element.
+      - Across 8 randomizations (offsets 0-7): every centralizer element
+        appears exactly once at each depth position.
+
+    Args:
+        depth (int): number of gate repetitions.
+        qubit_pairs (Sequence[tuple[int, int]]): qubit pairs.
+        permutations (List[List[str]]): one shuffled list of the 8 ZZ
+            centralizer elements per qubit pair.
+        offset (int): starting index into each permutation (0-7), equal to the
+            randomization index from the outer loop.
+        gate_layer (GateLayer, optional): custom gate layer for the gate of
+            interest. Defaults to None.
+
+    Returns:
+        List: raw circuit layers for use as a gate_layer argument.
+    """
+    sub_circuit = []
+    for j in range(depth):
+        paulis = [
+            permutations[i][(offset + j) % _N_CENTRALIZERS]
+            for i in range(len(qubit_pairs))
+        ]
+        layer = [
+            (_PAULI_GATE[pauli[qi]], qp[qi])
+            for pauli, qp in zip(paulis, qubit_pairs, strict=True)
+            for qi in (0, 1)
+        ]
+        merged_layers = [layer, layer]
+        sub_circuit.extend(merged_layers)
+        sub_circuit.extend(
+            gate_layer if gate_layer
+            else [[('Gidle', q) for q in flatten(qubit_pairs)]]
+        )
+        sub_circuit.extend(merged_layers)
+
+    return sub_circuit

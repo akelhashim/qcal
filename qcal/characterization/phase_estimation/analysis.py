@@ -2,7 +2,7 @@
 
 """
 import logging
-from typing import List, Tuple
+from typing import Sequence, Tuple
 
 import numpy as np
 import pygsti
@@ -10,6 +10,7 @@ import pygsti
 from qcal._vendor.pyrpe.classical import RobustPhaseEstimation
 from qcal._vendor.pyrpe.quantum import Q
 from qcal.characterization.phase_estimation.circuits import (
+    GateLayer,
     make_cz_cos_circ,
     make_cz_sin_circ,
     make_idle_cos_circ,
@@ -18,6 +19,7 @@ from qcal.characterization.phase_estimation.circuits import (
     make_X90_icos_circ,
     make_X90_isin_circ,
     make_x90_sin_circ,
+    make_zz_circuits
 )
 
 logger = logging.getLogger(__name__)
@@ -25,18 +27,18 @@ logger = logging.getLogger(__name__)
 
 def analyze_idle(
     dataset:        pygsti.data.dataset,
-    qubits:         List[int],
-    circuit_depths: List[int],
-    gate_layer:     List = None,
+    qubits:         Sequence[int],
+    circuit_depths: Sequence[int],
+    gate_layer:     GateLayer = None,
 ) -> Tuple:
     """Analyze idle RPE dataset.
 
     Args:
         dataset (pygsti.data.dataset): pyGSTi dataset.
-        qubits (List[int]): qubit labels.
-        circuit_depths (List[int]): circuit depths.
-        gate_layer (List, optional): custom gate layer for the gate of interest.
-            Defaults to None.
+        qubits (Sequence[int]): qubit labels.
+        circuit_depths (Sequence[int]): circuit depths.
+        gate_layer (GateLayer, optional): custom gate layer for the gate of
+            interest. Defaults to None.
 
     Returns:
         Tuple: angle estimates, angle errors, and index of last good depth
@@ -83,19 +85,19 @@ def analyze_idle(
 
 def analyze_x90(
     dataset:        pygsti.data.dataset,
-    qubits:         List[int],
-    circuit_depths: List[int],
-    gate_layer:     List = None,
+    qubits:         Sequence[int],
+    circuit_depths: Sequence[int],
+    gate_layer:     GateLayer = None,
     estimator_type: str = 'linearized',
 ) -> Tuple:
     """Analyze RPE dataset for the X90 gate.
 
     Args:
         dataset (pygsti.data.dataset): pyGSTi dataset.
-        qubits (List[int]): qubit labels.
-        circuit_depths (List[int]): circuit depths.
-        gate_layer (List, optional): custom gate layer for the gate of interest.
-            Defaults to None.
+        qubits (Sequence[int]): qubit labels.
+        circuit_depths (Sequence[int]): circuit depths.
+        gate_layer (GateLayer, optional): custom gate layer for the gate of
+            interest. Defaults to None.
         estimator_type (str): type of estimator. Defaults to 'linearized'.
 
     Returns:
@@ -219,18 +221,18 @@ def analyze_x90(
 
 def analyze_cz(
     dataset:        pygsti.data.dataset,
-    qubit_pairs:    List[Tuple[int]],
-    circuit_depths: List[int],
-    gate_layer:     List = None,
+    qubit_pairs:    Sequence[Tuple[int, int]],
+    circuit_depths: Sequence[int],
+    gate_layer:     GateLayer = None,
 ) -> Tuple:
     """Analyze RPE dataset for the CZ gate.
 
     Args:
         dataset (pygsti.data.dataset): pyGSTi dataset.
-        qubit_pairs (List[Tuple[int]]): qubit labels.
-        circuit_depths (List[int]): circuit depths.
-        gate_layer (List, optional): custom gate layer for the gate of interest.
-            Defaults to None.
+        qubit_pairs (Sequence[Tuple[int, int]]): qubit pairs.
+        circuit_depths (Sequence[int]): circuit depths.
+        gate_layer (GateLayer, optional): custom gate layer for the gate of
+            interest. Defaults to None.
 
     Returns:
         Tuple: angle estimates, angle errors, and index of last good depth
@@ -351,18 +353,18 @@ def analyze_cz(
 
 def analyze_zz(
     dataset:        pygsti.data.dataset,
-    qubit_pairs:    List[Tuple[int]],
-    circuit_depths: List[int],
-    gate_layer:     List = None,
+    qubit_pairs:    Sequence[Tuple[int, int]],
+    circuit_depths: Sequence[int],
+    gate_layer:     GateLayer = None,
 ) -> Tuple:
     """Analyze RPE dataset for ZZ.
 
     Args:
         dataset (pygsti.data.dataset): pyGSTi dataset.
-        qubit_pairs (List[Tuple[int]]): qubit labels.
-        circuit_depths (List[int]): circuit depths.
-        gate_layer (List, optional): custom gate layer for the gate of interest.
-            Defaults to None.
+        qubit_pairs (Sequence[Tuple[int, int]]): qubit pairs.
+        circuit_depths (Sequence[int]): circuit depths.
+        gate_layer (GateLayer, optional): custom gate layer for the gate of
+            interest. Defaults to None.
 
     Returns:
         Tuple: angle estimates, angle errors, and index of last good depth
@@ -385,19 +387,40 @@ def analyze_zz(
             ('sin', '+'): '01', ('sin', '-'): '11'
         }
     }
-    sin_dict = {
+
+    # Circuits are ordered: for each depth, for each randomization, 6 types —
+    # [sin(0,1), sin(2,3), sin(3,1), cos(0,1), cos(2,3), cos(3,1)] —
+    # matching the make_cz_circuits ordering. Index by position rather than
+    # by circuit object since the twirled circuits can't be reconstructed.
+    dataset_rows = list(dataset.values())
+    n_rand = len(dataset_rows) // (len(circuit_depths) * 6)
+
+    def _aggregate_counts(d_idx: int, c: int) -> dict:
+        total: dict = {}
+        for r in range(n_rand):
+            row = dataset_rows[d_idx * 6 * n_rand + r * 6 + c]
+            for bitstring, count in row.counts.items():
+                bs = (
+                    ''.join(bitstring) if isinstance(bitstring, tuple)
+                    else bitstring
+                )
+                total[bs] = total.get(bs, 0) + int(count)
+        return total
+
+    # c ∈ [0, 1, 2] → sin for state_pairs; c ∈ [3, 4, 5] → cos for state_pairs
+    sin_counts = {
         state_pair: {
-            d: make_cz_sin_circ(
-                d, state_pair, qubit_pairs, gate_layer
-            ) for d in circuit_depths
-        } for state_pair in state_pairs
+            d: _aggregate_counts(d_idx, sp_idx)
+            for d_idx, d in enumerate(circuit_depths)
+        }
+        for sp_idx, state_pair in enumerate(state_pairs)
     }
-    cos_dict = {
+    cos_counts = {
         state_pair: {
-            d: make_cz_cos_circ(
-                d, state_pair, qubit_pairs, gate_layer
-            ) for d in circuit_depths
-        } for state_pair in state_pairs
+            d: _aggregate_counts(d_idx, 3 + sp_idx)
+            for d_idx, d in enumerate(circuit_depths)
+        }
+        for sp_idx, state_pair in enumerate(state_pairs)
     }
 
     signal = {state_pair: [] for state_pair in state_pairs}
@@ -411,24 +434,14 @@ def analyze_zz(
         sin_plus = state_pair_lookup[state_pair]['sin','+']
         sin_minus = state_pair_lookup[state_pair]['sin','-']
         for d in circuit_depths:
-            experiments[state_pair].process_cos(d,
-                (int(dataset[cos_dict[state_pair][d]][cos_plus]),
-                 int(dataset[cos_dict[state_pair][d]][cos_minus])
-                )
-            )
-            experiments[state_pair].process_sin(d,
-                (int(dataset[sin_dict[state_pair][d]][sin_plus]),
-                 int(dataset[sin_dict[state_pair][d]][sin_minus])
-                )
-            )
-            p_I = int(dataset[cos_dict[state_pair][d]][cos_plus]) / (
-                int(dataset[cos_dict[state_pair][d]][cos_plus]) +
-                int(dataset[cos_dict[state_pair][d]][cos_minus]) + eps
-            )
-            p_Q = int(dataset[sin_dict[state_pair][d]][sin_plus]) / (
-                int(dataset[sin_dict[state_pair][d]][sin_plus]) +
-                int(dataset[sin_dict[state_pair][d]][sin_minus]) + eps
-            )
+            c_plus  = cos_counts[state_pair][d].get(cos_plus, 0)
+            c_minus = cos_counts[state_pair][d].get(cos_minus, 0)
+            s_plus  = sin_counts[state_pair][d].get(sin_plus, 0)
+            s_minus = sin_counts[state_pair][d].get(sin_minus, 0)
+            experiments[state_pair].process_cos(d, (c_plus, c_minus))
+            experiments[state_pair].process_sin(d, (s_plus, s_minus))
+            p_I = c_plus / (c_plus + c_minus + eps)
+            p_Q = s_plus / (s_plus + s_minus + eps)
             signal[state_pair].append(1 - 2 * p_I + 1j - 2j * p_Q)
 
     analyses = {}
@@ -452,19 +465,19 @@ def analyze_zz(
             np.array(analyses[(2, 3)].angle_estimates_rectified)
         )
     ))
-    iz_estimates = np.arcsin(np.sin(
-        0.5 * (
-            np.array(analyses[(0, 1)].angle_estimates_rectified) +
-            np.array(analyses[(2, 3)].angle_estimates_rectified)
-        )
-    ))
-    zi_estimates = np.arcsin(np.sin(
-        np.array(analyses[(3, 1)].angle_estimates_rectified) + zz_estimates
-    ))
+    # iz_estimates = np.arcsin(np.sin(
+    #     0.5 * (
+    #         np.array(analyses[(0, 1)].angle_estimates_rectified) +
+    #         np.array(analyses[(2, 3)].angle_estimates_rectified)
+    #     )
+    # ))
+    # zi_estimates = np.arcsin(np.sin(
+    #     np.array(analyses[(3, 1)].angle_estimates_rectified) + zz_estimates
+    # ))
     angle_estimates = {
         'ZZ': zz_estimates,
-        'IZ': iz_estimates,
-        'ZI': zi_estimates
+        # 'IZ': iz_estimates,
+        # 'ZI': zi_estimates
     }
 
     # Extract the last "trusted" RPE angle estimate
@@ -478,8 +491,8 @@ def analyze_zz(
 
     angle_errors = {
         'ZZ': zz_estimates - target_zz,
-        'IZ': iz_estimates - target_iz,
-        'ZI': zi_estimates - target_zi,
+        # 'IZ': iz_estimates - target_iz,
+        # 'ZI': zi_estimates - target_zi,
     }
 
     return (angle_estimates, angle_errors, last_good_idx, signal)
