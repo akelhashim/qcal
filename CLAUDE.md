@@ -9,7 +9,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Code Style
 
 - Limit code lines to **79 characters** and docstring/comment lines to
-  **72 characters**, per PEP 8.
+  **79 characters**, per PEP 8.
 
 ## Commands
 
