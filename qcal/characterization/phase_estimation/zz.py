@@ -658,7 +658,7 @@ def JAZZ(
                 if self._char_values[qp]:
                     val = self._char_values[qp]['val']
                     err = self._char_values[qp]['err']
-                    title += f'<br>{val/unit:.1f} ({err/unit:.1f}) {unit_str}'
+                    title += f' = {val/unit:.1f} ({err/unit:.1f}) {unit_str}'
                 subplot_titles.append(title)
 
             pfig_height = 350 * nrows
@@ -680,7 +680,7 @@ def JAZZ(
                 vertical_spacing=vertical_spacing,
                 horizontal_spacing=horizontal_spacing,
             )
-            pfig.update_annotations(font_size=12, yshift=10)
+            pfig.update_annotations(font_size=12, yshift=5)
 
             _leg_x = pfig.layout.xaxis.domain[0] + 0.01
             _leg_y = pfig.layout.yaxis.domain[1] - 0.01
@@ -738,13 +738,13 @@ def JAZZ(
                 pfig.update_xaxes(
                     title_text='Time (µs)' if row == nrows else '',
                     automargin=True, showgrid=True,
-                    title_standoff=10,
+                    title_standoff=10, showticklabels=True,
                     row=row, col=col,
                 )
                 pfig.update_yaxes(
                     title_text='|0⟩ Population' if col == 1 else '',
                     automargin=True, showgrid=True,
-                    title_standoff=10,
+                    title_standoff=10, showticklabels=True,
                     row=row, col=col,
                 )
 
