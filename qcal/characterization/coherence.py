@@ -1,52 +1,60 @@
 """"Submodule for qubit coherence experiments.
 
 """
-import qcal.settings as settings
-
-from qcal.characterization.characterize import Characterize
-from qcal.circuit import Barrier, Cycle, Circuit, CircuitSet
-from qcal.config import Config
-from qcal.fitting.fit import FitCosine, FitDecayingCosine, FitExponential
-from qcal.gate.single_qubit import Idle, Rz, VirtualZ, X90, X, Z
-from qcal.math.utils import (
-    uncertainty_of_sum, reciprocal_uncertainty, round_to_order_error
-)
-from qcal.sequence.dynamical_decoupling import XY
-from qcal.qpu.qpu import QPU
-from qcal.units import MHz, us
-
 import logging
+from typing import Callable, Dict, List, Sequence
+
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-
 from IPython.display import clear_output
 from lmfit import Parameters
 from numpy.typing import NDArray
-from typing import Callable, Dict, List, Tuple
+
+import qcal.settings as settings
+from qcal.calibration.utils import find_pulse_index
+from qcal.characterization.characterize import Characterize
+from qcal.circuit import Barrier, Circuit, CircuitSet, Cycle
+from qcal.config import Config
+from qcal.fitting.fit import (
+    FitCosine,
+    FitDecayingCosine,
+    FitDecayingCosineExponential,
+    FitExponential,
+)
+from qcal.gate.single_qubit import X90, Idle, Rz, X, Z
+from qcal.math.utils import (
+    reciprocal_uncertainty,
+    round_to_order_error,
+    uncertainty_of_sum,
+)
+from qcal.qpu.qpu import QPU
+from qcal.sequence.dynamical_decoupling import DD_SEQUENCES
+from qcal.units import kHz, us
 
 logger = logging.getLogger(__name__)
 
 
-__all__ = ['T1', 'T2', 'T2XY', 'ParityOscillations']
+__all__ = ['T1', 'T2', 'T2DD', 'ParityOscillations']
 
 
-def T1(qpu:        QPU,
-       config:     Config,
-       qubits:     List[int] | Tuple[int],
-       t_max:      float = 500*us,
-       gate:       str = 'X90',
-       subspace:   str = 'GE',
-       n_elements: int = 50,
-       **kwargs
-    ) -> Callable:
+def T1(
+    qpu:        QPU,
+    config:     Config,
+    qubits:     Sequence[int],
+    t_max:      float = 500*us,
+    gate:       str = 'X90',
+    subspace:   str = 'GE',
+    n_elements: int = 50,
+    **kwargs
+) -> Callable:
     """T1 coherence characterization.
 
     Basic example useage:
     ```
     exp = T1(
-        CustomQPU, 
-        config, 
+        CustomQPU,
+        config,
         qubits=[0, 1, 2],
         t_max=5e-4)
     exp.run()
@@ -55,9 +63,9 @@ def T1(qpu:        QPU,
     Args:
         qpu (QPU): custom QPU object.
         config (Config): qcal Config object.
-        qubits (List[int] | Tuple[int]): qubits to measure.
+        qubits (Sequence[int]): qubits to measure.
         t_max (float, option): maximum wait time. Defaults to 500 us.
-        gate (str, optional): native gate used for state preparation. Defaults 
+        gate (str, optional): native gate used for state preparation. Defaults
             to 'X90'.
         subspace (str, optional): qubit subspace for T1 measurement.
             Defaults to 'GE'.
@@ -70,20 +78,21 @@ def T1(qpu:        QPU,
 
     class T1(qpu, Characterize):
         """T1 characterization class.
-        
+
         This class inherits a custom QPU from the T1 characterization
         function.
         """
 
-        def __init__(self, 
-                config:     Config,
-                qubits:     List | Tuple,
-                t_max:      float = 500*us,
-                gate:       str = 'X90',
-                subspace:   str = 'GE',
-                n_elements: int = 50,
-                **kwargs
-            ) -> None:
+        def __init__(
+            self,
+            config:     Config,
+            qubits:     Sequence[int],
+            t_max:      float = 500*us,
+            gate:       str = 'X90',
+            subspace:   str = 'GE',
+            n_elements: int = 50,
+            **kwargs
+        ) -> None:
             """Initialize the T1 experiment class within the function."""
 
             n_levels = 3 if subspace == 'EF' else 2
@@ -91,19 +100,25 @@ def T1(qpu:        QPU,
             Characterize.__init__(self, config)
 
             self._qubits = qubits
-            
-            assert gate in ('X90', 'X'), (
-                "'gate' must be one of 'X90' or 'X'!"
-            )
+
+            if gate not in ('X90', 'X'):
+                raise ValueError(
+                    f"'gate' must be one of 'X90' or 'X', not {gate}!"
+                )
             self._gate = gate
 
-            assert subspace in ('GE', 'EF'), (
-                "'subspace' must be one of 'GE' or 'EF'!"
-            )
+            if subspace not in ('GE', 'EF'):
+                raise ValueError(
+                    f"'subspace' must be one of 'GE' or 'EF', not {subspace}!"
+                )
             self._subspace = subspace
 
             self._times = {
-                q: np.linspace(0., t_max, n_elements) for q in qubits
+                q: np.concatenate([
+                    [0.], np.geomspace(
+                        t_max/n_elements/2, t_max, n_elements - 1
+                    )
+                ]) for q in qubits
             }
             self._param_sweep = self._times
 
@@ -140,10 +155,10 @@ def T1(qpu:        QPU,
 
                     if self._subspace == 'EF':
                         circuit.extend([
-                            Cycle({X90(q, subspace='EF') 
+                            Cycle({X90(q, subspace='EF')
                                    for q in self._qubits}),
                             Barrier(self._qubits),
-                            Cycle({X90(q, subspace='EF') 
+                            Cycle({X90(q, subspace='EF')
                                    for q in self._qubits}),
                             Barrier(self._qubits)
                         ])
@@ -167,16 +182,16 @@ def T1(qpu:        QPU,
                 circuit.measure()
 
                 circuits.append(circuit)
-            
+
             self._circuits = CircuitSet(circuits=circuits)
             self._circuits['time'] = self._times[self._qubits[0]]
-                
+
         def analyze(self) -> None:
             """Analyze the data."""
             logger.info(' Analyzing the data...')
 
             pop = {'GE': '1', 'EF': '2'}
-            # Fit the probability of being in 1 from the time sweep to an 
+            # Fit the probability of being in 1 from the time sweep to an
             # exponential
             for i, q in enumerate(self._qubits):
                 prob1 = []
@@ -187,14 +202,14 @@ def T1(qpu:        QPU,
                         ]
                     )
                 self._results[q] = prob1
-                self._circuits[f'Q{q}: Prob(1)'] = prob1
+                self._circuits[f'Q{q}: Prob({pop[self._subspace]})'] = prob1
 
                 # Add initial guesses to fit
                 c = np.array(prob1).min()
                 a = np.array(prob1).max() - c
                 b = -np.mean( np.diff(prob1) / np.diff(self._times[q]) ) / a
                 params = Parameters()
-                params.add('a', value=a)  
+                params.add('a', value=a)
                 params.add('b', value=b)
                 params.add('c', value=c)
                 self._fit[q].fit(self._times[q], prob1, params=params)
@@ -203,7 +218,7 @@ def T1(qpu:        QPU,
                 if self._fit[q].fit_success:
                     val, err = round_to_order_error(
                         *reciprocal_uncertainty(
-                            self._fit[q].fit_params['b'].value, 
+                            self._fit[q].fit_params['b'].value,
                             self._fit[q].fit_params['b'].stderr
                         )
                     )
@@ -252,34 +267,35 @@ def T1(qpu:        QPU,
             self.final()
 
     return T1(
-        config,
-        qubits,
-        t_max,
-        gate,
-        subspace,
-        n_elements, 
+        config=config,
+        qubits=qubits,
+        t_max=t_max,
+        gate=gate,
+        subspace=subspace,
+        n_elements=n_elements,
         **kwargs
     )
 
 
-def T2(qpu:        QPU,
-       config:     Config,
-       qubits:     List | Tuple,
-       t_max:      float = 250*us,
-       detuning:   float = 0.05 * MHz,
-       echo:       bool = False,
-       subspace:   str = 'GE',
-       n_elements: int = 50,
-       **kwargs
-    ) -> Callable:
+def T2(
+    qpu:        QPU,
+    config:     Config,
+    qubits:     Sequence[int],
+    t_max:      float = 250*us,
+    detuning:   float = 100 * kHz,
+    echo:       bool = False,
+    subspace:   str = 'GE',
+    n_elements: int = 50,
+    **kwargs
+) -> Callable:
     """T2 coherence characterization.
 
     Basic example useage:
 
     ```
     exp = T2(
-        CustomQPU, 
-        config, 
+        CustomQPU,
+        config,
         qubits=[0, 1, 2],
         t_max=250e-4,
         detuning=0.05e6,
@@ -290,11 +306,11 @@ def T2(qpu:        QPU,
     Args:
         qpu (QPU): custom QPU object.
         config (Config): qcal Config object.
-        qubits (List | Tuple): qubits to measure.
+        qubits (Sequence[int]): qubits to measure.
         t_max (float, optional): maximum wait time. Defaults to 250 us.
         detuning (float, optional): artificial detuning from the actual qubit
-            frequency. Defaults to 0.05 MHz.
-        echo (bool, optional): whether to echo the qubit in the middle. 
+            frequency. Defaults to 100 * kHz.
+        echo (bool, optional): whether to echo the qubit in the middle.
             Defaults to False.
         subspace (str, optional): qubit subspace for T2 measurement.
             Defaults to 'GE'.
@@ -307,21 +323,22 @@ def T2(qpu:        QPU,
 
     class T2(qpu, Characterize):
         """T2 characterization class.
-        
+
         This class inherits a custom QPU from the T2 characterization
         function.
         """
 
-        def __init__(self, 
-                config:     Config,
-                qubits:     List | Tuple,
-                t_max:      float = 250*us,
-                detuning:   float = 0.05 * MHz,
-                echo:       bool = False,
-                subspace:   str = 'GE',
-                n_elements: int = 50,
-                **kwargs
-            ) -> None:
+        def __init__(
+            self,
+            config:     Config,
+            qubits:     Sequence[int],
+            t_max:      float = 250*us,
+            detuning:   float = 100 * kHz,
+            echo:       bool = False,
+            subspace:   str = 'GE',
+            n_elements: int = 50,
+            **kwargs
+        ) -> None:
             """Initialize the T2 experiment class within the function."""
 
             n_levels = 3 if subspace == 'EF' else 2
@@ -332,13 +349,20 @@ def T2(qpu:        QPU,
             self._echo = echo
             self._detuning = detuning
 
-            assert subspace in ('GE', 'EF'), (
-                "'subspace' must be one of 'GE' or 'EF'!"
-            )
+            if subspace not in ('GE', 'EF'):
+                raise ValueError(
+                    f"'subspace' must be one of 'GE' or 'EF', not {subspace}!"
+                )
             self._subspace = subspace
 
+            if echo:
+                t_start = t_max / n_elements / 2
+            else:
+                t_start = 1 / (8 * detuning)
             self._times = {
-                q: np.linspace(0., t_max, n_elements) for q in qubits
+                q: np.concatenate([
+                    [0.], np.geomspace(t_start, t_max, n_elements - 1)
+                ]) for q in qubits
             }
             self._param_sweep = self._times
 
@@ -346,13 +370,19 @@ def T2(qpu:        QPU,
                 self._params = {
                     q: f'single_qubit/{q}/{subspace}/T2*' for q in qubits
                 }
-                self._fit = {q: FitDecayingCosine() for q in qubits}
+                self._fit = {
+                    q: (
+                        FitDecayingCosineExponential()
+                        if subspace == 'EF' else FitDecayingCosine()
+                    )
+                    for q in qubits
+                }
             elif echo:
                 self._params = {
                     q: f'single_qubit/{q}/{subspace}/T2e' for q in qubits
                 }
                 self._fit = {q: FitExponential() for q in qubits}
-            
+
         @property
         def times(self) -> Dict:
             """Time sweep for each qubit.
@@ -365,7 +395,7 @@ def T2(qpu:        QPU,
         def generate_circuits(self):
             """Generate all amplitude calibration circuits."""
             logger.info(' Generating circuits...')
-            
+
             circuits = []
             for t in self._times[self._qubits[0]]:
                 phase = 2. * np.pi * self._detuning * t  # theta = 2pi*freq*t
@@ -389,7 +419,7 @@ def T2(qpu:        QPU,
                     circuit.extend([
                         Cycle({Idle(q, duration=t) for q in self._qubits}),
                         Barrier(self._qubits),
-                        Cycle({VirtualZ(q, phase, subspace=self._subspace) 
+                        Cycle({Rz(q, phase, subspace=self._subspace)
                                for q in self._qubits}),
                         Barrier(self._qubits),
                     ])
@@ -397,45 +427,37 @@ def T2(qpu:        QPU,
                     circuit.extend([
                         Cycle({Idle(q, duration=t/2) for q in self._qubits}),
                         Barrier(self._qubits),
-                        Cycle({VirtualZ(q, phase/2, subspace=self._subspace) 
+                        Cycle({X90(q, subspace=self._subspace)
                                for q in self._qubits}),
-                        Barrier(self._qubits),
-                        # Cycle({X(q, subspace=self._subspace) 
-                        #        for q in self._qubits}),
-                        Cycle({X90(q, subspace=self._subspace) 
-                               for q in self._qubits}),
-                        Barrier(self._qubits),
-                        Cycle({X90(q, subspace=self._subspace) 
+                        Cycle({X90(q, subspace=self._subspace)
                                for q in self._qubits}),
                         Barrier(self._qubits),
                         Cycle({Idle(q, duration=t/2) for q in self._qubits}),
                         Barrier(self._qubits),
-                        Cycle({VirtualZ(q, phase/2, subspace=self._subspace) 
-                               for q in self._qubits}),
-                        Barrier(self._qubits),
                     ])
-                
+
                 # Basis preparation
                 circuit.append(
-                    Cycle({X90(q, subspace=self._subspace) 
+                    Cycle({X90(q, subspace=self._subspace)
                            for q in self._qubits})
                 )
-                
+
                 circuit.measure()
                 circuits.append(circuit)
-            
+
             self._circuits = CircuitSet(circuits=circuits)
             self._circuits['time'] = self._times[self._qubits[0]]
-            self._circuits['phase'] = (
-                2. * np.pi * self._detuning * self._times[self._qubits[0]]
-            )
-                
+            if not self._echo:
+                self._circuits['phase'] = (
+                    2. * np.pi * self._detuning * self._times[self._qubits[0]]
+                )
+
         def analyze(self) -> None:
             """Analyze the data."""
             logger.info(' Analyzing the data...')
 
             pop = {'GE': '0', 'EF': '1'}
-            # Fit the probability of being in 1 from the time sweep to an 
+            # Fit the probability of being in 1 from the time sweep to an
             # exponential
             for i, q in enumerate(self._qubits):
                 prob0 = []
@@ -446,7 +468,7 @@ def T2(qpu:        QPU,
                         ]
                     )
                 self._results[q] = prob0
-                self._circuits[f'Q{q}: Prob(0)'] = prob0
+                self._circuits[f'Q{q}: Prob({pop[self._subspace]})'] = prob0
 
                 # Add initial guesses to fit
                 if self._echo:  # a * np.exp(-b * x) + c
@@ -454,27 +476,46 @@ def T2(qpu:        QPU,
                     a = np.array(prob0).max() - c
                     b = -np.mean( np.diff(prob0) / np.diff(self._times[q]) ) / a
                     params = Parameters()
-                    params.add('a', value=a)  
+                    params.add('a', value=a)
                     params.add('b', value=b)
                     params.add('c', value=c)
                 else:  # a * np.exp(-b * x) * np.cos(2 * np.pi * c * x + d) + e
-                    e = np.array(prob0).min()
-                    a = np.array(prob0).max() - e
-                    b = np.mean( np.diff(prob0) / np.diff(self._times[q]) ) / a
-                    params = Parameters()
-                    params.add('a', value=a)  
-                    params.add('b', value=b)
-                    params.add('c', value=self._detuning)
-                    params.add('d', value=0.)
-                    params.add('e', value=e)
-                
+                    if self._subspace == 'GE':
+                        e = np.array(prob0).min()
+                        a = np.array(prob0).max() - e
+                        b = np.mean(
+                            np.diff(prob0) / np.diff(self._times[q])
+                        ) / a
+                        params = Parameters()
+                        params.add('a', value=a)
+                        params.add('b', value=b)
+                        params.add('c', value=self._detuning)
+                        params.add('d', value=0.)
+                        params.add('e', value=e)
+                    elif self._subspace == 'EF':
+                        # a*exp(-b*x)*cos(2pi*c*x+d) + e*exp(-f*x) + g
+                        g = np.array(prob0).min()
+                        a = (np.array(prob0).max() - g) / 2
+                        b = np.mean(
+                            np.diff(prob0) / np.diff(self._times[q])
+                        ) / a
+                        e = np.array(prob0).max() - a - g
+                        params = Parameters()
+                        params.add('a', value=a)
+                        params.add('b', value=b)
+                        params.add('c', value=self._detuning)
+                        params.add('d', value=0.)
+                        params.add('e', value=e)
+                        params.add('f', value=b)
+                        params.add('g', value=g)
+
                 self._fit[q].fit(self._times[q], prob0, params=params)
 
                 # If the fit was successful, write to the config
                 if self._fit[q].fit_success:
                     val, err = round_to_order_error(
                         *reciprocal_uncertainty(
-                            self._fit[q].fit_params['b'].value, 
+                            self._fit[q].fit_params['b'].value,
                             self._fit[q].fit_params['b'].stderr
                         )
                     )
@@ -523,38 +564,37 @@ def T2(qpu:        QPU,
             self.final()
 
     return T2(
-        config,
-        qubits,
-        t_max,
-        detuning,
-        echo,
-        subspace,
-        n_elements, 
+        config=config,
+        qubits=qubits,
+        t_max=t_max,
+        detuning=detuning,
+        echo=echo,
+        subspace=subspace,
+        n_elements=n_elements,
         **kwargs
     )
 
 
-def T2XY(
-        qpu:        QPU,
-        config:     Config,
-        qubits:     List | Tuple,
-        t_max:      float = 250*us,
-        detuning:   float = 0.05 * MHz,
-        subspace:   str = 'GE',
-        n_elements: int = 50,
-        n_pulses:   int | None = None,
-        **kwargs
-    ) -> Callable:
-    """T2 XY coherence characterization.
+def T2DD(
+    qpu:        QPU,
+    config:     Config,
+    qubits:     Sequence[int],
+    t_max:      float = 250*us,
+    gate_time:  float | None = None,
+    subspace:   str = 'GE',
+    dd_method:  str = 'XY_N',
+    n_elements: int = 50,
+    n_pulses:   int | None = None,
+    **kwargs
+) -> Callable:
+    """T2 dynamical decoupling coherence characterization.
 
     Basic example useage:
     ```
-    exp = T2XY(
-        CustomQPU, 
-        config, 
-        qubits=[0, 1, 2],
-        t_max=250e-4,
-        detuning=0.05e6
+    exp = T2DD(
+        CustomQPU,
+        config,
+        qubits=[0, 1, 2]
     )
     exp.run()
     ```
@@ -562,41 +602,45 @@ def T2XY(
     Args:
         qpu (QPU): custom QPU object.
         config (Config): qcal Config object.
-        qubits (List | Tuple): qubits to measure.
+        qubits (Sequence[int]): qubits to measure.
         t_max (float, optional): maximum wait time. Defaults to 250 us.
-        detuning (float, optional): artificial detuning from the actual qubit
-            frequency. Defaults to 0.05 MHz.
+        gate_time (float | None, optional): X90 gate time used to compute DD
+            idle intervals. If None, the value is looked up from the config.
+            Defaults to None.
         subspace (str, optional): qubit subspace for T2 measurement.
             Defaults to 'GE'.
+        dd_method (str, optional): the DD method to use. Defaults to 'XY_N'.
         n_elements (int, optional): number of delays starting from 0 to t_max.
             Defaults to 50.
-        n_pulses (int | None, optional): number of pulses. Defaults to None. 
+        n_pulses (int | None, optional): number of pulses. Defaults to None.
             For example, for n_pulses = 4, this performs an XY4 DD sequence. If
             None, the number of pulses will be determined by the total idle
             time.
 
     Returns:
-        Callable: T2XY class.
+        Callable: T2DD class.
     """
 
-    class T2XY(qpu, Characterize):
-        """T2XY characterization class.
-        
-        This class inherits a custom QPU from the T2XY characterization
+    class T2DD(qpu, Characterize):
+        """T2DD characterization class.
+
+        This class inherits a custom QPU from the T2DD characterization
         function.
         """
 
-        def __init__(self, 
-                config:     Config,
-                qubits:     List | Tuple,
-                t_max:      float = 250*us,
-                detuning:   float = 0.05 * MHz,
-                echo:       bool = False,
-                subspace:   str = 'GE',
-                n_elements: int = 50,
-                n_pulses:   int | None = None,
-                **kwargs
-            ) -> None:
+        def __init__(
+            self,
+            config:     Config,
+            qubits:     Sequence[int],
+            t_max:      float = 250*us,
+            gate_time:  float | None = None,
+            echo:       bool = False,
+            subspace:   str = 'GE',
+            dd_method:  str = 'XY_N',
+            n_elements: int = 50,
+            n_pulses:   int | None = None,
+            **kwargs
+        ) -> None:
             """Initialize the T2 XY experiment class within the function."""
 
             n_levels = 3 if subspace == 'EF' else 2
@@ -605,16 +649,23 @@ def T2XY(
 
             self._qubits = qubits
             self._echo = echo
-            self._detuning = detuning
             self._n_pulses = n_pulses
+            self._gate_time = gate_time
 
-            assert subspace in ('GE', 'EF'), (
-                "'subspace' must be one of 'GE' or 'EF'!"
-            )
+            if subspace not in ('GE', 'EF'):
+                raise ValueError(
+                    f"'subspace' must be one of 'GE' or 'EF', not {subspace}!"
+                )
             self._subspace = subspace
 
+            self._dd_method = dd_method
+
             self._times = {
-                q: np.linspace(0., t_max, n_elements) for q in qubits
+                q: np.concatenate([
+                    [0.], np.geomspace(
+                        t_max/n_elements/2, t_max, n_elements - 1
+                    )
+                ]) for q in qubits
             }
             self._param_sweep = self._times
 
@@ -622,7 +673,7 @@ def T2XY(
                 q: f'single_qubit/{q}/{subspace}/T2DD' for q in qubits
             }
             self._fit = {q: FitExponential() for q in qubits}
-            
+
         @property
         def times(self) -> Dict:
             """Time sweep for each qubit.
@@ -635,10 +686,19 @@ def T2XY(
         def generate_circuits(self):
             """Generate all amplitude calibration circuits."""
             logger.info(' Generating circuits...')
-            
+
+            if self._gate_time is not None:
+                gate_time = self._gate_time
+            else:
+                def _gate_time(q):
+                    prefix = f'single_qubit/{q}/{self._subspace}/X90/pulse'
+                    idx = find_pulse_index(self._config, prefix)
+                    return self._config[f'{prefix}/{idx}/time']
+
+                gate_time = max(_gate_time(q) for q in self._qubits)
+
             circuits = []
             for t in self._times[self._qubits[0]]:
-                phase = 2. * np.pi * self._detuning * t  # theta = 2pi*freq*t
                 circuit = Circuit()
 
                 # State prepration
@@ -655,37 +715,15 @@ def T2XY(
                     ])
 
                 # Add the XY DD sequence
-                DD_sequence = XY(
-                    config=self._config, 
-                    qubits=self._qubits, 
-                    time=t, 
-                    n_pulses=self._n_pulses, 
-                    phase=phase,
-                    subspace=self._subspace
+                DD_sequence = DD_SEQUENCES[self._dd_method](
+                    qubits=self._qubits,
+                    total_time=t,
+                    gate_time=gate_time,
+                    n_pulses=self._n_pulses,
+                    subspace=self._subspace,
                 )
                 circuit.extend(DD_sequence)
 
-                # if self._n_pulses is None:
-                #     n_pulses = int(DD_sequence.circuit_depth / 13) * 4
-                # else:
-                #     n_pulses = self._n_pulses
-
-                # # Add in the virtual Z gates
-                # # Pre-pulse + first idle
-                # i = 3 if self._subspace == 'GE' else 5  # depth incrementer
-                # for n in range(2 * n_pulses):
-                #     circuit.insert(
-                #         Cycle({
-                #             VirtualZ(
-                #                 q, 
-                #                 phase/(2*n_pulses), 
-                #                 subspace=self._subspace
-                #             ) for q in self._qubits
-                #         }),
-                #         idx=i+n
-                #     )
-                #     i = (i + 2) if (n % 2 == 0) else i + 1
-                
                 # Basis preparation
                 circuit.extend([
                     Cycle({
@@ -695,22 +733,19 @@ def T2XY(
                         X90(q, subspace=self._subspace) for q in self._qubits
                     })
                 ])
-                
+
                 circuit.measure()
                 circuits.append(circuit)
-            
+
             self._circuits = CircuitSet(circuits=circuits)
             self._circuits['time'] = self._times[self._qubits[0]]
-            self._circuits['phase'] = (
-                2. * np.pi * self._detuning * self._times[self._qubits[0]]
-            )
-                
+
         def analyze(self) -> None:
             """Analyze the data."""
             logger.info(' Analyzing the data...')
 
             pop = {'GE': '0', 'EF': '1'}
-            # Fit the probability of being in 0 from the time sweep to an 
+            # Fit the probability of being in 0 from the time sweep to an
             # exponential
             for i, q in enumerate(self._qubits):
                 prob0 = []
@@ -721,13 +756,13 @@ def T2XY(
                         ]
                     )
                 self._results[q] = prob0
-                self._circuits[f'Q{q}: Prob(0)'] = prob0
+                self._circuits[f'Q{q}: Prob({pop[self._subspace]})'] = prob0
 
                 c = np.array(prob0).min()
                 a = np.array(prob0).max() - c
                 b = -np.mean( np.diff(prob0) / np.diff(self._times[q]) ) / a
                 params = Parameters()
-                params.add('a', value=-a)  
+                params.add('a', value=-a)
                 params.add('b', value=b)
                 params.add('c', value=c)
                 self._fit[q].fit(self._times[q], prob0, params=params)
@@ -736,7 +771,7 @@ def T2XY(
                 if self._fit[q].fit_success:
                     val, err = round_to_order_error(
                         *reciprocal_uncertainty(
-                            self._fit[q].fit_params['b'].value, 
+                            self._fit[q].fit_params['b'].value,
                             self._fit[q].fit_params['b'].stderr
                         )
                     )
@@ -747,15 +782,15 @@ def T2XY(
             """Save all circuits and data."""
             clear_output(wait=True)
             self._data_manager._exp_id += (
-                f'_T2XY_{"".join("Q"+str(q) for q in self._qubits)}'
+                f'_T2DD_{"".join("Q"+str(q) for q in self._qubits)}'
             )
             if settings.Settings.save_data:
                 qpu.save(self)
                 self._data_manager.save_to_csv(
-                    pd.DataFrame([self._char_values]), 'T2XY_values'
+                    pd.DataFrame([self._char_values]), 'T2DD_values'
                 )
                 self._data_manager.save_to_csv(
-                    pd.DataFrame([self._errors]), 'T2XY_errors'
+                    pd.DataFrame([self._errors]), 'T2DD_errors'
                 )
 
         def plot(self):
@@ -763,10 +798,10 @@ def T2XY(
             Characterize.plot(self,
                 xlabel=r'Time ($\mu$s)',
                 ylabel=(
-                r'$|2\rangle$ Population' if self._subspace == 'EF' else
-                r'$|1\rangle$ Population'
+                    r'$|2\rangle$ Population' if self._subspace == 'EF' else
+                    r'$|1\rangle$ Population'
                 ),
-                flabel=r'$T_{2XY}$',
+                flabel=r'$T_{2DD}$',
                 save_path=self._data_manager._save_path
             )
 
@@ -784,26 +819,27 @@ def T2XY(
             self.plot()
             self.final()
 
-    return T2XY(
+    return T2DD(
         config=config,
         qubits=qubits,
         t_max=t_max,
-        detuning=detuning,
+        gate_time=gate_time,
         subspace=subspace,
-        n_elements=n_elements, 
+        dd_method=dd_method,
+        n_elements=n_elements,
         n_pulses=n_pulses,
         **kwargs
     )
 
 
 def ParityOscillations(
-        qpu:        QPU,
-        config:     Config,
-        circuit:    Circuit,
-        qubits:     List[int] | Tuple[int] = None,
-        n_elements: int = 31,
-        **kwargs
-    ) -> Callable:
+    qpu:        QPU,
+    config:     Config,
+    circuit:    Circuit,
+    qubits:     Sequence[int] | None = None,
+    n_elements: int = 31,
+    **kwargs
+) -> Callable:
     """Parity oscillations coherence characterization.
 
     See: https://arxiv.org/abs/2112.14589
@@ -812,7 +848,7 @@ def ParityOscillations(
         qpu (QPU): custom QPU object.
         config (Config): qcal Config object.
         cicuit (Circuit): qcal Circuit.
-        qubits (List[int] | Tuple[int]): qubits to measure. Defaults to None.
+        qubits (Sequence[int] | None): qubits to measure. Defaults to None.
         n_elements (int, optional): number of phases between 0 and pi.
             Defaults to 31.
 
@@ -822,18 +858,19 @@ def ParityOscillations(
 
     class ParityOscillations(qpu, Characterize):
         """Parity oscillations characterization class.
-        
-        This class inherits a custom QPU from the ParityOscillations 
+
+        This class inherits a custom QPU from the ParityOscillations
         characterization function.
         """
 
-        def __init__(self, 
-                config:     Config,
-                circuit:    Circuit,
-                qubits:     List[int] | Tuple[int] = None,
-                n_elements: int = 31,
-                **kwargs
-            ) -> None:
+        def __init__(
+            self,
+            config:     Config,
+            circuit:    Circuit,
+            qubits:     Sequence[int] | None = None,
+            n_elements: int = 31,
+            **kwargs
+        ) -> None:
             """Initialize the ParityOscillations class within the function."""
 
             qpu.__init__(self, config=config, **kwargs)
@@ -856,16 +893,16 @@ def ParityOscillations(
                 List: expectation values.
             """
             return self._evs
-        
+
         @property
         def fidelity(self) -> Dict:
             """Fidelity of the state.
 
-            The fidelity is determined from the populations of the |0^n> and 
+            The fidelity is determined from the populations of the |0^n> and
             |1^n> states, as well as the coherence of the state, which is
             determined from the amplitude of the parity oscillations. The error
             in the fidelity is determined from the shot noise for the
-            populations and the error in the amplitude fit for the parity 
+            populations and the error in the amplitude fit for the parity
             oscillations.
 
             Returns:
@@ -881,7 +918,7 @@ def ParityOscillations(
                 NDArray: phases.
             """
             return self._phases
-            
+
         def generate_circuits(self):
             """Generate all amplitude calibration circuits."""
             logger.info(' Generating circuits...')
@@ -890,7 +927,7 @@ def ParityOscillations(
             circuit = self._circuit.copy()
             circuit.measure(self._qubits)
             self._circuits.append(circuit)
-            
+
             # Parity oscillations
             for phase in self._phases:
                 circuit = self._circuit.copy()
@@ -902,7 +939,7 @@ def ParityOscillations(
                 self._circuits.append(circuit)
 
             self._circuits['phase'] = [np.nan] + list(self._phases)
-                
+
         def analyze(self) -> None:
             """Analyze the data."""
             logger.info(' Analyzing the data...')
@@ -930,8 +967,8 @@ def ParityOscillations(
                 self._evs.append(results.ev)
 
             self._fit.fit(
-                self._phases, 
-                self._evs, 
+                self._phases,
+                self._evs,
                 p0=(max(self._evs), 1.0/((len(self._qubits)-1) * np.pi), 0, 0)
             )
             assert self._fit.fit_success, 'Cosine fit was unsuccessful!'
@@ -972,7 +1009,7 @@ def ParityOscillations(
                 [0, 1, 2, 3],
                 list(
                    self._circuits[0].results.marginalize(q_index).probabilities
-                ), 
+                ),
                 color='blue'
             )
             ax[0].set_xticks([0, 1, 2, 3])
@@ -1000,14 +1037,14 @@ def ParityOscillations(
             fig.set_tight_layout(True)
             if settings.Settings.save_data:
                 fig.savefig(
-                    self._data_manager._save_path + 'parity_oscillations.png', 
+                    self._data_manager._save_path + 'parity_oscillations.png',
                     dpi=300
                 )
                 fig.savefig(
-                    self._data_manager._save_path + 'parity_oscillations.pdf', 
+                    self._data_manager._save_path + 'parity_oscillations.pdf',
                 )
                 fig.savefig(
-                    self._data_manager._save_path + 'parity_oscillations.svg', 
+                    self._data_manager._save_path + 'parity_oscillations.svg',
                 )
             plt.show()
 
@@ -1028,9 +1065,9 @@ def ParityOscillations(
             self.final()
 
     return ParityOscillations(
-        config,
-        circuit,
-        qubits,
-        n_elements,
+        config=config,
+        circuit=circuit,
+        qubits=qubits,
+        n_elements=n_elements,
         **kwargs
     )

@@ -3,7 +3,7 @@
 References:
 https://ieeexplore.ieee.org/document/9552516
 """
-import copy
+import copy  # noqa: I001
 import logging
 import operator
 from collections import defaultdict
@@ -18,8 +18,10 @@ from qcal.calibration.utils import find_pulse_index
 from qcal.circuit import Circuit, CircuitSet, Cycle
 from qcal.config import Config
 from qcal.gate.gate import Gate
-from qcal.gate.single_qubit import MCM, X90, Id, Idle, Meas, Reset, Rz, VirtualZ, X, Z
-from qcal.sequence.dynamical_decoupling import dd_sequences
+from qcal.gate.single_qubit import (
+    MCM, X90, Id, Idle, Meas, Reset, Rz, VirtualZ, X, Z
+)
+from qcal.sequence.dynamical_decoupling import DD_SEQUENCES
 from qcal.sequence.utils import clip_amplitude
 from qcal.transpilation.utils import GateMapper
 
@@ -415,9 +417,10 @@ def add_dynamical_decoupling(
         config:      Config,
         dd_method:   str,
         qubit:       int,
-        time:        float,
+        total_time:  float,
         n_dd_pulses: int,
-        pulse: List
+        pulse:       List,
+        subspace:    str = 'GE',
     ) -> None:
     """Add dynamical decoupling pulses to a sequence.
 
@@ -425,11 +428,25 @@ def add_dynamical_decoupling(
         config (Config): qcal Config object.
         dd_method (str): dynamical decoupling method.
         qubit (int): qubit label.
-        time (float): time of time over which to perform the DD.
+        total_time (float): total time over which to perform the DD.
         n_dd_pulses (int): number of dynamical decoupling pulses.
         pulse (List): qubic pulse.
+        subspace (str, optional): qubits subspace for the DD sequence. Defaults
+            'GE'.
     """
-    dd_circuit = dd_sequences[dd_method](config, qubit, time, n_dd_pulses)
+    idx = find_pulse_index(
+        config, f'single_qubit/{qubit}/{subspace}/X90/pulse'
+    )
+    gate_time = config[
+        f'single_qubit/{qubit}/{subspace}/X90/pulse/{idx}/time'
+    ]
+    dd_circuit = DD_SEQUENCES[dd_method](
+        qubits=[qubit],
+        total_time=total_time,
+        gate_time=gate_time,
+        n_pulses=n_dd_pulses,
+        subspace=subspace
+    )
     for cycle in dd_circuit:
         if cycle.is_barrier:
             pulse.append({'name': 'barrier', 'qubit': [f'Q{qubit}']})

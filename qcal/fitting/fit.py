@@ -13,6 +13,7 @@ from qcal.fitting.fit_functions import (
     base_exponential,
     cosine,
     decaying_cosine,
+    decaying_cosine_exponential,
     exponential,
     linear,
     parabola,
@@ -157,6 +158,18 @@ class FitDecayingCosine(Fit):
     def __init__(self, fit_function: Callable = decaying_cosine) -> None:
         """Initialize a decaying cosine fitter using the decaying cosine
         function.
+        """
+        super().__init__(fit_function)
+
+
+class FitDecayingCosineExponential(Fit):
+    """Decaying cosine with exponential baseline fit class."""
+
+    def __init__(
+            self, fit_function: Callable = decaying_cosine_exponential
+    ) -> None:
+        """Initialize a decaying cosine with exponential baseline fitter using
+        the decaying cosine with exponential baseline function.
         """
         super().__init__(fit_function)
 

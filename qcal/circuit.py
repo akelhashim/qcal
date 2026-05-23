@@ -18,8 +18,8 @@ cs = CircuitSet([list of circuits])
 from __future__ import annotations
 
 import copy
-from collections import deque
-from collections.abc import Iterable
+from collections import Counter, deque
+from collections.abc import Iterable, Sequence
 from itertools import groupby, zip_longest
 from typing import Any, Dict, List, Set, Tuple
 
@@ -29,6 +29,7 @@ import plotly.io as pio
 
 from qcal.gate.gate import Gate
 from qcal.gate.single_qubit import Meas, basis_rotation
+from qcal.plotting.sequence import plot_mock_sequence
 from qcal.results import Results
 
 pio.renderers.default = 'colab'  # TODO: replace with settings
@@ -50,25 +51,14 @@ def partition_circuit(circuit: Circuit, block_size: int = 1) -> List:
     Returns:
         List: (circuit_partitions, counts)
     """
-    added_cycles = set()
-    cycle_map = {
-        str(cycle): cycle for cycle in circuit.cycles
-        if cycle not in added_cycles and not added_cycles.add(cycle)
-    }
-    cycles = [str(cycle) for cycle in circuit.cycles]
-
-    # Create a list of tuples representing blocks of size `block_size`
+    cycles = circuit.cycles
     blocks = [
-        list(cycles[i:i+block_size]) for i in range(0, len(cycles), block_size)
+        cycles[i:i+block_size] for i in range(0, len(cycles), block_size)
     ]
-
-    # Use groupby to count consecutive occurrences of the same block
-    partitions = [
-        ([cycle_map[key] for key in keys], len(list(group)))
-        for keys, group in groupby(blocks)
+    return [
+        (block, len(list(group)))
+        for block, group in groupby(blocks)
     ]
-
-    return partitions
 
 
 class Barrier:
@@ -76,7 +66,7 @@ class Barrier:
 
     __slots__ = '_qubits'
 
-    def __init__(self, qubits: Tuple[int] = ()) -> None:
+    def __init__(self, qubits: Iterable[int] = ()) -> None:
         """Initialize the Barrier class.
 
         Barrier takes an option qubits kwarg. If qubits does not include every
@@ -84,8 +74,8 @@ class Barrier:
         implemented.
 
         Args:
-            qubits (Tuple[int], optional): qubits to enforce a barrier between.
-                Defaults to tuple().
+            qubits (Iterable[int], optional): qubits to enforce a barrier
+                between. Defaults to tuple().
         """
         self._qubits = tuple(qubits)
 
@@ -163,7 +153,7 @@ class Cycle:
     def __call__(self) -> Set:
         return self._gates
 
-    def __copy__(self) -> List:
+    def __copy__(self) -> Cycle:
         return Cycle({copy.deepcopy(gate) for gate in self.gates})
 
     def __iter__(self):
@@ -176,6 +166,29 @@ class Cycle:
     def __str__(self) -> str:
         """Draw the cycle/layer as a string."""
         return self.to_str()
+
+    def __eq__(self, other: object) -> bool:
+        """Check equality between two cycles.
+
+        Two cycles are equal if they contain the same set of gates.
+
+        Args:
+            other (object): object to compare against.
+
+        Returns:
+            bool: True if the cycles are equal, False otherwise.
+        """
+        if not isinstance(other, Cycle):
+            return NotImplemented
+        return self._gates == other._gates
+
+    def __hash__(self) -> int:
+        """Hash the cycle by its frozen set of gates.
+
+        Returns:
+            int: hash of the cycle.
+        """
+        return hash(frozenset(self._gates))
 
     def _repr_html_(self):
         """Draw the circuit as an html string."""
@@ -337,19 +350,21 @@ class Circuit:
     __slots__ = ('_cycles', '_qubits', '_results', '_mcm_results')
 
     def __init__(self,
-            cycles_or_layers: List[Cycle | Layer] | deque[Cycle | Layer] = []  # noqa: B006
+            cycles_or_layers: Iterable[Cycle | Layer | Barrier] = None
         ) -> None:
         """qcal Circuit.
 
         Args:
-            cycles_or_layers (List[Cycle | Layer] | deque[Cycle | Layer],
-                optional): list of qcal cycles or layers. Defaults to [].
+            cycles_or_layers (Iterable[Cycle | Layer | Barrier], optional):
+                iterable of qcal cycles, layers, or barriers. Defaults to None.
         """
         if cycles_or_layers:
             cycles_or_layers = [
-                cycle if isinstance(cycle, (Cycle, Layer, Barrier)) else
+                cycle if isinstance(cycle, (Cycle, Barrier)) else
                 Cycle(cycle) for cycle in cycles_or_layers
             ]
+        else:
+            cycles_or_layers = []
         self._cycles = deque(cycles_or_layers)
 
         self._qubits = set()
@@ -380,7 +395,31 @@ class Circuit:
     def __len__(self) -> int:
         return len(self._cycles)
 
-    def _repr_html_(self) -> str:  # TODO: sometimes causes notebook to crash
+    def __eq__(self, other: object) -> bool:
+        """Check equality between two circuits.
+
+        Two circuits are equal if they contain the same cycles in the same
+        order.
+
+        Args:
+            other (object): object to compare against.
+
+        Returns:
+            bool: True if the circuits are equal, False otherwise.
+        """
+        if not isinstance(other, Circuit):
+            return NotImplemented
+        return self._cycles == other._cycles
+
+    def __hash__(self) -> int:
+        """Hash the circuit by its sequence of cycles.
+
+        Returns:
+            int: hash of the circuit.
+        """
+        return hash(tuple(self._cycles))
+
+    def _repr_html_(self) -> str:
         """Draw the html formatted circuit."""
         from qcal.plotting.graphs import draw_circuit
         fig = draw_circuit(self, show=False)
@@ -491,9 +530,10 @@ class Circuit:
         circuit_partitions = pd.DataFrame(columns=['Partitions', 'Size'])
         n = max([1, int(np.log2(self.n_cycles / 4))])
         blocks = [2**i for i in range(n + 1)]
-        add = [3, 5, 6, 7, 9, 10, 11, 12, 15, 20, 21, 24]
-        blocks += list(np.array(add)[np.array(add) < 2**(n + 1)])
-        for block_size in sorted(blocks):
+        # Cover important non-power-of-2 block sizes
+        add = [3, 5, 6, 7, 9, 10, 11, 12, 13, 14, 15, 20, 21, 24]
+        blocks += sorted(np.array(add)[np.array(add) < 2**(n + 1)])
+        for block_size in blocks:
             partitions = partition_circuit(self, block_size=block_size)
             circuit_partitions.loc[block_size] = {
                 'Partitions': partitions, 'Size': len(partitions)
@@ -558,20 +598,22 @@ class Circuit:
         self._results = Results(results)
 
     def append(
-            self, cycle_or_layer: Barrier | Cycle | Layer | List
-        ) -> None:
+        self, cycle_or_layer: Barrier | Cycle | Layer | Iterable
+    ) -> None:
         """Appends a cycle/layer to the end of the circuit.
 
         Args:
-            cycle_or_layer (Barrier, Cycle, Layer, List): cycle/layer to
+            cycle_or_layer (Barrier, Cycle, Layer, Iterable): cycle/layer to
                 append.
         """
-        if isinstance(cycle_or_layer, List):
+        if isinstance(cycle_or_layer, Iterable) and not isinstance(
+            cycle_or_layer, (Barrier, Cycle, Layer)
+        ):
             cycle_or_layer = Cycle(cycle_or_layer)
-        else:
-            assert isinstance(cycle_or_layer, (Barrier, Cycle, Layer)), (
+        elif not isinstance(cycle_or_layer, (Barrier, Cycle, Layer)):
+            raise TypeError(
                 "Expected Barrier, Cycle, or Layer, got "
-                f"{type(cycle_or_layer).__name__}"
+                f"{type(cycle_or_layer).__name__}."
             )
         self._cycles.append(cycle_or_layer)
         self._qubits.update(cycle_or_layer.qubits)
@@ -584,19 +626,21 @@ class Circuit:
         """
         return self.__copy__()
 
-    def extend(self, circuit: Circuit | List[Barrier | Cycle | Layer]) -> None:
+    def extend(
+            self, circuit: Circuit | Iterable[Barrier | Cycle | Layer]
+    ) -> None:
         """Appends another circuit to the end of the current circuit.
 
         Args:
-            circuit (Circuit | List[Barrier | Cycle | Layer]): circuit to
+            circuit (Circuit | Iterable[Barrier | Cycle | Layer]): circuit to
                 append.
         """
-        if isinstance(circuit, List):
+        if isinstance(circuit, Iterable) and not isinstance(circuit, Circuit):
             circuit = Circuit(circuit)
-        else:
-            assert (
-                isinstance(circuit, Circuit)
-            ), "circuit must be a Circuit object!"
+        elif not isinstance(circuit, Circuit):
+            raise TypeError(
+                f"Expected Circuit, got {type(circuit).__name__}."
+            )
         self._cycles.extend(circuit._cycles)
         self._qubits.update(circuit.qubits)
 
@@ -605,48 +649,59 @@ class Circuit:
         from qcal.plotting.graphs import draw_circuit
         draw_circuit(self)
 
-    # TODO
     def get_index(self,
-            cycle_or_layer: Barrier | Cycle | Layer | List, beg=0, end=-1
-        ) -> int:
+        cycle_or_layer: Barrier | Cycle | Layer | Iterable,
+        beg: int = 0,
+        end: int | None = None
+    ) -> int:
         """Returns the first index of the cycle_or_layer in the circuit.
 
         The search is performed starting from the `beg` index and ending with
         the `end` index.
 
         Args:
-            cycle_or_layer (Barrier, Cycle, Layer, List): cycle/layer to index.
+            cycle_or_layer (Barrier, Cycle, Layer, Iterable): cycle/layer to
+                index.
             beg (int, optional): beginning index. Defaults to 0.
-            end (int, optional): ending index. Defaults to -1.
+            end (int | None, optional): ending index (exclusive). Defaults to
+                None, which searches to the end of the circuit.
 
         Returns:
             int: first index where cycle_or_layer is found.
         """
-        if isinstance(cycle_or_layer, List):
+        if isinstance(cycle_or_layer, Iterable) and not isinstance(
+            cycle_or_layer, (Barrier, Cycle, Layer)
+        ):
             cycle_or_layer = Cycle(cycle_or_layer)
-        else:
-            assert isinstance(cycle_or_layer, (Barrier, Cycle, Layer)), (
+        elif not isinstance(cycle_or_layer, (Barrier, Cycle, Layer)):
+            raise TypeError(
                 "Expected Barrier, Cycle, or Layer, got "
-                f"{type(cycle_or_layer).__name__}"
+                f"{type(cycle_or_layer).__name__}."
             )
+
+        if end is None:
+            return self._cycles.index(cycle_or_layer, beg)
         return self._cycles.index(cycle_or_layer, beg, end)
 
-    def insert(self,
-            cycle_or_layer: Barrier | Cycle | Layer | List, idx: int
-        ) -> None:
+    def insert(
+        self,
+        cycle_or_layer: Barrier | Cycle | Layer | Iterable, idx: int
+    ) -> None:
         """Inserts a cycle/layer at index `idx`.
 
         Args:
-            cycle_or_layer (Barrier, Cycle, Layer, List): cycle/layer to
+            cycle_or_layer (Barrier, Cycle, Layer, Iterable): cycle/layer to
                 insert.
             idx (int): index at which the cycle/layer is inserted.
         """
-        if isinstance(cycle_or_layer, List):
+        if isinstance(cycle_or_layer, Iterable) and not isinstance(
+            cycle_or_layer, (Barrier, Cycle, Layer)
+        ):
             cycle_or_layer = Cycle(cycle_or_layer)
-        else:
-            assert isinstance(cycle_or_layer, (Barrier, Cycle, Layer)), (
+        elif not isinstance(cycle_or_layer, (Barrier, Cycle, Layer)):
+            raise TypeError(
                 "Expected Barrier, Cycle, or Layer, got "
-                f"{type(cycle_or_layer).__name__}"
+                f"{type(cycle_or_layer).__name__}."
             )
         self._cycles.insert(idx, cycle_or_layer)
         self._qubits.update(cycle_or_layer.qubits)
@@ -728,16 +783,17 @@ class Circuit:
         self._cycles = deque(new_cycles)
         self._update_qubits()
 
-    def measure(self,
-            qubits: List | Tuple = None,
-            basis:  List | Tuple = None,
-        ) -> None:
+    def measure(
+        self,
+        qubits: Sequence[int] | None = None,
+        basis:  Sequence[str] | None = None,
+    ) -> None:
         """Appends a measurement cycle to the end of the circuit.
 
         Args:
-            qubits (Union[List, Tuple], optional): qubits to measure. Defaults
-                to None.
-            basis (Union[List, Typle], optional):  measurement basis for each
+            qubits (Sequence[int] | None, optional): qubits to measure.
+                Defaults to None.
+            basis (Sequence[str] | None, optional): measurement basis for each
                 qubit. Defaults to None.
         """
         if qubits is None:
@@ -761,6 +817,19 @@ class Circuit:
             # self.append(Barrier(self.qubits))
             self.append(meas_cycle)
 
+    def plot_mock_sequence(self, **kwargs):
+        """Plot a mock sequence of the circuit.
+
+        Args:
+            single_qubit_gate_time (float, optional): duration of a
+                single-qubit gate in seconds. Defaults to 20 ns.
+            two_qubit_gate_time (float, optional): duration of a two-qubit
+                gate in seconds. Defaults to 100 ns.
+            measurement_time (float, optional): duration of a measurement in
+                seconds. Defaults to 1 us.
+        """
+        plot_mock_sequence(self, **kwargs)
+
     def pop(self) -> None:
         """Removes the last cycle/layer to the end of the circuit."""
         self._cycles.pop()
@@ -771,39 +840,43 @@ class Circuit:
         self._cycles.popleft()
         self._update_qubits()
 
-    def prepend(self, cycle_or_layer: Barrier | Cycle | Layer | List) -> None:
+    def prepend(
+            self, cycle_or_layer: Barrier | Cycle | Layer | Iterable
+    ) -> None:
         """Prepends a cycle/layer to the front of the circuit.
 
         Args:
-            cycle_or_layer (Barrier, Cycle, Layer, List): cycle/layer to
+            cycle_or_layer (Barrier, Cycle, Layer, Iterable): cycle/layer to
                 prepend.
         """
-        if isinstance(cycle_or_layer, List):
+        if isinstance(cycle_or_layer, Iterable) and not isinstance(
+            cycle_or_layer, (Barrier, Cycle, Layer)
+        ):
             cycle_or_layer = Cycle(cycle_or_layer)
-        else:
-            assert (
-                isinstance(cycle_or_layer, Barrier) or
-                isinstance(cycle_or_layer, Cycle) or
-                isinstance(cycle_or_layer, Layer)
-            ), "cycle_or_layer must be a Cycle, Layer or Barrier object!"
+        elif not isinstance(cycle_or_layer, (Barrier, Cycle, Layer)):
+            raise TypeError(
+                "Expected Barrier, Cycle, or Layer, got "
+                f"{type(cycle_or_layer).__name__}."
+            )
         self._cycles.appendleft(cycle_or_layer)
         self._qubits.update(cycle_or_layer.qubits)
 
     def prepend_circuit(
-            self, circuit: Circuit | List[Barrier | Cycle | Layer]
-        ) -> None:
+        self, circuit: Circuit | Iterable[Barrier | Cycle | Layer]
+    ) -> None:
         """Prepends another circuit to the beginning of the current circuit.
 
         Args:
-            circuit (Circuit | List[Barrier | Cycle | Layer]): circuit to
+            circuit (Circuit | Iterable[Barrier | Cycle | Layer]): circuit to
                 prepend.
         """
         if isinstance(circuit, List):
             circuit = Circuit(circuit)
         else:
-            assert (
-                isinstance(circuit, Circuit)
-            ), "circuit must be a Circuit object!"
+            if not isinstance(circuit, Circuit):
+                raise TypeError(
+                    f"Expected Circuit, got {type(circuit).__name__}."
+                )
         self._cycles.extendleft(circuit._cycles)
         self._qubits.update(circuit.qubits)
 
@@ -824,59 +897,63 @@ class Circuit:
                 cycle._update_qubits()
         self._update_qubits()
 
-    # TODO
-    def remove(self, cycle_or_layer: Barrier | Cycle | Layer | List) -> None:
+    def remove(
+        self, cycle_or_layer: Barrier | Cycle | Layer | Iterable
+    ) -> None:
         """Removes the first instance of the cycle/layer found in the circuit.
 
         Args:
-            cycle_or_layer (Barrier, Cycle, Layer, List): cycle/layer to
+            cycle_or_layer (Barrier, Cycle, Layer, Iterable): cycle/layer to
                 remove.
         """
-        if isinstance(cycle_or_layer, List):
+        if isinstance(cycle_or_layer, Iterable) and not isinstance(
+            cycle_or_layer, (Barrier, Cycle, Layer)
+        ):
             cycle_or_layer = Cycle(cycle_or_layer)
-        else:
-            assert isinstance(cycle_or_layer, (Barrier, Cycle, Layer)), (
+        elif not isinstance(cycle_or_layer, (Barrier, Cycle, Layer)):
+            raise TypeError(
                 "Expected Barrier, Cycle, or Layer, got "
-                f"{type(cycle_or_layer).__name__}"
+                f"{type(cycle_or_layer).__name__}."
             )
         self._cycles.remove(cycle_or_layer)
         self._update_qubits()
 
-    # TODO
     def replace(self,
-            old_cycle_or_layer: Barrier | Cycle | Layer | List,
-            new_cycle_or_layer: Barrier | Cycle | Layer | List
-        ) -> None:
+        old_cycle_or_layer: Barrier | Cycle | Layer | Iterable,
+        new_cycle_or_layer: Barrier | Cycle | Layer | Iterable
+    ) -> None:
         """Replaces an old cycle/layer with a new one in the circuit.
 
         Args:
-            old_cycle_or_layer (Barrier, Cycle, Layer, List): cycle/layer to
-                replace.
-            new_cycle_or_layer (Barrier, Cycle, Layer, List): new cycle/layer.
+            old_cycle_or_layer (Barrier, Cycle, Layer, Iterable): cycle/layer
+                to replace.
+            new_cycle_or_layer (Barrier, Cycle, Layer, Iterable): new
+                cycle/layer.
         """
-        if isinstance(old_cycle_or_layer, List):
+        if isinstance(old_cycle_or_layer, Iterable) and not isinstance(
+            old_cycle_or_layer, (Barrier, Cycle, Layer)
+        ):
             old_cycle_or_layer = Cycle(old_cycle_or_layer)
-        else:
-            assert (
-                isinstance(old_cycle_or_layer, Barrier) or
-                isinstance(old_cycle_or_layer, Cycle) or
-                isinstance(old_cycle_or_layer, Layer)
-            ), "old_cycle_or_layer must be a Barrier, Cycle, or Layer object!"
+        elif not isinstance(old_cycle_or_layer, (Barrier, Cycle, Layer)):
+            raise TypeError(
+                "Expected Barrier, Cycle, or Layer for old_cycle_or_layer, "
+                f"got {type(old_cycle_or_layer).__name__}."
+            )
 
-        if isinstance(new_cycle_or_layer, List):
+        if isinstance(new_cycle_or_layer, Iterable) and not isinstance(
+            new_cycle_or_layer, (Barrier, Cycle, Layer)
+        ):
             new_cycle_or_layer = Cycle(new_cycle_or_layer)
-        else:
-            assert (
-                isinstance(new_cycle_or_layer, Barrier) or
-                isinstance(new_cycle_or_layer, Cycle) or
-                isinstance(new_cycle_or_layer, Layer)
-            ), "new_cycle_or_layer must be a Barrier, Cycle, or Layer object!"
+        elif not isinstance(new_cycle_or_layer, (Barrier, Cycle, Layer)):
+            raise TypeError(
+                "Expected Barrier, Cycle, or Layer for new_cycle_or_layer, "
+                f"got {type(new_cycle_or_layer).__name__}."
+            )
 
-        for i, cycle in enumerate(self._cycles):
-            if cycle == old_cycle_or_layer:
-                self.remove(old_cycle_or_layer)
-                self.insert(new_cycle_or_layer, i)
-
+        self._cycles = deque(
+            new_cycle_or_layer if cycle == old_cycle_or_layer else cycle
+            for cycle in self._cycles
+        )
         self._update_qubits()
 
     def reverse(self) -> None:
@@ -897,15 +974,16 @@ class CircuitSet:
 
     __slots__ = '_df'
 
-    def __init__(self,
-            circuits: List[Any] | deque[Any] | None = None,
-            index: List[int] | None = None
-        ) -> None:
+    def __init__(
+        self,
+        circuits: Iterable[Any] | None = None,
+        index: List[int] | None = None
+    ) -> None:
         """Initialize a CircuitSet.
 
         Args:
-            circuits (List[Any] | deque[Any] | None, optional): circuits to
-                store in a CircuitSet. Defaults to None.
+            circuits (Iterable[Any] | None, optional): circuits to store in a
+                CircuitSet. Defaults to None.
             index (List[int] | None, optional): Indices for the circuits in the
                 DataFrame. Defaults to None.
         """
@@ -925,8 +1003,8 @@ class CircuitSet:
             self._df = self._df.set_index(pd.Index(index))
 
     def __getitem__(
-            self, idx_or_label: int | str | slice
-        ) -> Circuit | pd.Series | CircuitSet:
+        self, idx_or_label: int | str | slice
+    ) -> Circuit | pd.Series | CircuitSet:
         """Index the CircuitSet dataframe.
 
         Args:
@@ -967,6 +1045,29 @@ class CircuitSet:
 
     def __iter__(self):
         return iter(self._df.circuit)
+
+    def __eq__(self, other: object) -> bool:
+        """Check equality between two CircuitSets.
+
+        Two CircuitSets are equal if their underlying DataFrames are equal.
+
+        Args:
+            other (object): object to compare against.
+
+        Returns:
+            bool: True if the CircuitSets are equal, False otherwise.
+        """
+        if not isinstance(other, CircuitSet):
+            return NotImplemented
+        return self._df.equals(other._df)
+
+    def __hash__(self) -> int:
+        """Hash the CircuitSet by its sequence of circuits.
+
+        Returns:
+            int: hash of the CircuitSet.
+        """
+        return hash(tuple(self._df.circuit))
 
     def __repr__(self) -> str:
         return repr(self._df)
@@ -1057,12 +1158,20 @@ class CircuitSet:
         # If a single value is provided, assign it to all circuits
         self._df['results'] = [values] * len(self._df)
 
-    def append(self, circuits, index=None):
-        """Appends circuit(s) to the circuit collection."""
-        if not isinstance(circuits, CircuitSet):
-            circuits = CircuitSet(circuits, index)
-        self._df = pd.concat([self._df, circuits._df],
-                             ignore_index=True if index is None else False)
+    def append(self, circuits: CircuitSet | Iterable, index=None):
+        """Appends circuit(s) to the CircuitSet."""
+        if isinstance(circuits, Iterable) and not isinstance(
+            circuits, CircuitSet
+        ):
+            circuits = CircuitSet(circuits, index=index)
+        elif not isinstance(circuits, CircuitSet):
+            raise TypeError(
+                f"Expected CircuitSet, got {type(circuits).__name__}."
+            )
+        self._df = pd.concat(
+            [self._df, circuits._df],
+            ignore_index=True if index is None else False
+        )
         return self._df
 
     def batch(self, batch_size: int):
@@ -1117,37 +1226,38 @@ class CircuitSet:
         """
         return self._df.tail(n)
 
-    # def subset(self, **kwargs) -> pd.DataFrame:
-    #     """Subset of the full CircuitSet.
+    def subset(self, **kwargs) -> CircuitSet:
+        """Return a subset of the CircuitSet filtered by column values.
 
-    #     Returns a subset of the full CircuitSet given by the keyword argument.
+        Args:
+            **kwargs: column name / value pairs to filter by.
 
-    #     Returns:
-    #         pd.DataFrame: subset of the full CircuitSet
-    #     """
-    #     df = self._df.copy()  # TODO: deep copy here?
-    #     for key in kwargs:
-    #         assert key in self._df.columns, f'{key} is not a valid column name.'
-    #         df = df.loc[self._df[key] == kwargs[key]]
-    #     return df
+        Returns:
+            CircuitSet: filtered CircuitSet.
+        """
+        df = self._df.copy()
+        for key, value in kwargs.items():
+            if key not in df.columns:
+                raise KeyError(f'{key} is not a valid column name.')
+            df = df.loc[df[key] == value]
 
-    # def combine_results(self, idx: int = None) -> Dict:
-    #     """Combine all of the results.
+        cs = CircuitSet(df['circuit'].to_list(), index=df.index.to_list())
+        for col in df.columns:
+            if col != 'circuit':
+                cs[col] = df[col].to_list()
 
-    #     This can take in an optional index, for which the results will only
-    #     be unioned for columns of matching indices.
+        return cs
 
-    #     Args:
-    #         idx (int, optional): index over which to union the results.
-    #             Defaults to None.
+    def sum_results(self) -> Results:
+        """Sum all results by counts across circuits.
 
-    #     Returns:
-    #         Dict: unioned bit string results.
-    #     """
-    #     if idx is None:
-    #         results_list = self._df['results'].to_list()
-
-    #     # TODO: finish
+        Returns:
+            Results: combined Results object.
+        """
+        combined = Counter()
+        for result in self._df['results']:
+            combined += Counter(result)
+        return Results(dict(combined))
 
     @staticmethod
     def load(path: str) -> pd.DataFrame:

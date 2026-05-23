@@ -25,76 +25,6 @@ logger = logging.getLogger(__name__)
 __all__ = ('readout_correction', 'Results')
 
 
-# def readout_correction(results: Results, confusion_matrix: DataFrame) -> Dict:
-    # """Perform readout correction using a measured confusion matrix.
-
-    # This readout correction is performed individually on each qubit.
-    # Therefore, it is scalable, but will not correct correlated readout
-    # errors.
-
-    # Args:
-    #     results (Results): Results object.
-    #     confusion_matrix (DataFrame): confusion matrix measured using the
-    #         ```qcal.benchmarking.fidelity.ReadoutFidelity``` module.
-
-    # Returns:
-    #     Dict: corrected results dictionary.
-    # """
-#     if confusion_matrix.columns[0][0] == 'Meas State':
-#         cmats = [confusion_matrix.to_numpy().astype(float).T]
-#     else:
-#         cmats = []
-#         qubits = set()
-#         for col in confusion_matrix:
-#             qubits.add(col[0])
-#         qubits = tuple(sorted(qubits))
-#         for q in qubits:
-#             cmats.append(
-#                 confusion_matrix[q].to_numpy().astype(float).T
-#             )
-
-#     if len(cmats) != len(tuple(results._results.keys())[0]):
-#         logger.warning(
-#             ' The number of confusion matrices does not match the length'
-#             ' of the provided bitstrings. No readout correction will be'
-#             ' performed!'
-#         )
-#         return results
-
-#     else:
-#         corrected_results = {}
-#         cmats_inv = [np.linalg.inv(cmat) for cmat in cmats]
-#         btstrs = [
-#             ''.join(i) for i in itertools.product(
-#                 [str(j) for j in results.levels],
-#                 repeat=len(results.states[0])
-#             )
-#         ]
-#         # Observable, i.e. measured bitstrings (e.g. '00', '10', etc.)
-#         for obsrv in results.states:
-
-#             ideal_dists = []  # List of ideal distributions
-#             for o in obsrv:
-#                 # print(o)
-#                 dist = np.zeros(results.dim)
-#                 # print(dist)
-#                 dist[int(o)] = 1.
-#                 ideal_dists.append(dist)
-
-#             corrected_value = 0.
-#             for btstr in btstrs:  # 00, 01, 10, 11
-#                 coeff = 1.  # Coefficient for capturing readout errors
-#                 for q in range(len(results.states[0])):  # Qubit index
-#                     coeff *= np.dot(
-#                         ideal_dists[q], cmats_inv[q][:, int(btstr[q])]
-#                     )
-#                 corrected_value += coeff * results[btstr].counts
-
-#             corrected_results[obsrv] = max(0, int(corrected_value))
-
-#         return corrected_results
-
-
 def readout_correction(results: Results, confusion_matrix: DataFrame) -> Dict:
     """Perform readout correction using a measured confusion matrix.
 
@@ -160,36 +90,6 @@ def readout_correction(results: Results, confusion_matrix: DataFrame) -> Dict:
 
         corrected_results = dict(zip(dtstrs, corr_probs, strict=False))
 
-        # corr_probs = []
-        # # Apply readout correction independently for each qubit
-        # # Then compute the combined probability distribution
-        # for i in range(len(results.states[0])):
-        #     mresults = results.marginalize(i)
-        #     pdist = {
-        #         **{str(level): 0. for level in results.levels},
-        #         **dict(mresults.probabilities.astype(float))
-        #     }
-        #     probs = np.array([prob for prob in pdist.values()])
-
-        #     # Perform the readout correction
-        #     corr_probs.append(probs @ np.linalg.inv(cmats[i]))
-
-        # # Combined probability distribution
-        # comb_probs = reduce(np.kron, corr_probs)
-        # counts = np.array(
-        #     results.n_shots * comb_probs
-        # ).astype(int)
-
-        # # All possible ditstrings
-        # dtstrs = [
-        #     ''.join(i) for i in itertools.product(
-        #         [str(j) for j in results.levels],
-        #         repeat=len(results.states[0])
-        #     )
-        # ]
-
-        # corrected_results = dict(zip(dtstrs, counts))
-
     return corrected_results
 
 
@@ -204,9 +104,9 @@ class Results:
     """
 
     def __init__(self,
-            results: Dict | None = None,
-            confusion_matrix: DataFrame | None = None
-        ) -> None:
+        results: Dict | None = None,
+        confusion_matrix: DataFrame | None = None
+    ) -> None:
         """Initialize a Results object.
 
         Args:
@@ -244,7 +144,6 @@ class Results:
             pd.Series: dataseries of counts and probabilities for a given
                 bistring.
         """
-        # assert item in self._results.keys(), f'{item} is not a valid bitstring!'
         if item not in self._results.keys():
             return pd.Series(
                 data=[0, 0.],

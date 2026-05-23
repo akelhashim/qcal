@@ -109,6 +109,8 @@ def draw_circuit(circuit: Circuit, show: bool = True):
                     name = gate.name
                     if 'phase' in gate.properties['params'].keys():
                         name += str(gate.properties['params']['phase'])
+                    elif name == 'Idle':
+                        name += str(gate.properties['params']['duration'])
                     text = qnode_text[
                         f'{name}{gate.subspace}:{gate.qubits}'
                     ]

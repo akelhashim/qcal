@@ -466,7 +466,9 @@ def RPE(
                 for angle, errors in self._angle_errors[ql].items():
                     error = errors[self._last_good_idx[ql]]
                     self._loss[ql][angle] = error
-                    unc = np.pi / (2 * 2**self._last_good_idx[ql])
+                    unc = np.pi / (
+                        2 * 2**self._last_good_idx[ql] * np.sqrt(self._n_shots)
+                    )
                     error, unc = round_to_order_error(error, unc)
                     error_deg, unc_deg = round_to_order_error(
                         error * 180 / np.pi, unc * 180 / np.pi
