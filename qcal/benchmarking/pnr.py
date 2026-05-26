@@ -3,6 +3,8 @@
 NOTE: we do not use TYPE_CHECKING for trueq types because this might fail if
 trueq is not installed when building docs.
 """
+from __future__ import annotations
+
 import logging
 from collections.abc import Iterable
 from typing import Callable
