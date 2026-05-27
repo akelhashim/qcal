@@ -98,6 +98,11 @@ def _build_crb_edesign_for_qubit_label(
             logger.info(f" Loading pre-generated circuits from {path}/...")
             protocol_data = pygsti.io.read_data_from_dir(path)
             edesign = protocol_data.edesign
+            if randomizeout:
+                defaultfit = 'A-fixed'
+            else:
+                defaultfit = 'full'
+            edesign.add_default_protocol(RB(name='RB', defaultfit=defaultfit))
         except Exception as e:
             logger.warning(
                 f" Failed to load pre-generated circuits from "
@@ -221,7 +226,7 @@ def CRB(
             self._qtups = []
             for ql in self._qubit_labels:
                 if isinstance(ql, Iterable):
-                    qtup = (f'Q{q}' for q in ql)
+                    qtup = tuple(f'Q{q}' for q in ql)
                 else:
                     qtup = (f'Q{ql}',)
                 self._qtups.append(qtup)
@@ -525,9 +530,9 @@ def CRB(
                 fit_success = False
                 try:
                     self._results = self._protocol.run(self._data)
-                    fit_success = True
                     for qtup in self._qtups:
                         results[qtup] = self._results[qtup].for_protocol['RB']
+                    fit_success = True
                 except Exception:
                     logger.warning(' Unable to fit the data simultaneously!')
 
@@ -656,7 +661,7 @@ def CRB(
                     pfig_gap_px = 60
                     vertical_spacing = (
                         0.0 if nrows <= 1 else min(
-                            0.2, pfig_gap_px / pfig_height
+                            0.25, pfig_gap_px / pfig_height
                         )
                     )
                     horizontal_spacing = (
@@ -671,11 +676,6 @@ def CRB(
                             ql_str = "".join([f"Q{q}" for q in ql])
                         else:
                             ql_str = f"Q{ql}"
-
-                        er = self._error_rates.get(ql, None)
-                        un = self._uncertainties.get(ql, None)
-                        if er is not None and un is not None:
-                            ql_str = f"{ql_str}<br>r={er:1.2e} ({un:1.2e})"
                         subplot_titles.append(ql_str)
 
                     pfig = make_subplots(
@@ -688,6 +688,7 @@ def CRB(
                     pfig.update_annotations(font_size=12)
 
                     plotly_blue = '#1f77b4'
+                    legend_settings = {}
 
                     for k, ql in enumerate(qubit_labels_to_plot):
                         row = (k // ncols) + 1
@@ -757,6 +758,10 @@ def CRB(
                             col=col,
                         )
 
+                        legend_key = 'legend' if k == 0 else f'legend{k + 1}'
+                        er = self._error_rates.get(ql, None)
+                        un = self._uncertainties.get(ql, None)
+
                         if ql in self._fit_params and np.any(finite_mask):
                             max_depth = float(np.max(depths_arr[finite_mask]))
                             xfit = np.linspace(
@@ -768,18 +773,38 @@ def CRB(
                                 xfit,
                                 **self._fit_params[ql],
                             )
+                            fit_label = (
+                                f'r={er:1.2e} ({un:1.2e})'
+                                if er is not None and un is not None
+                                else 'Fit'
+                            )
                             pfig.add_trace(
                                 go.Scatter(
                                     x=xfit,
                                     y=yfit,
                                     mode='lines',
                                     line={'color': plotly_blue, 'width': 2},
-                                    name='Fit',
-                                    showlegend=(k == 0),
+                                    name=fit_label,
+                                    legend=legend_key,
+                                    showlegend=True,
                                 ),
                                 row=row,
                                 col=col,
                             )
+                            xaxis_key = 'xaxis' if k == 0 else f'xaxis{k + 1}'
+                            yaxis_key = 'yaxis' if k == 0 else f'yaxis{k + 1}'
+                            x_domain = pfig.layout[xaxis_key].domain
+                            y_domain = pfig.layout[yaxis_key].domain
+                            legend_settings[legend_key] = {
+                                'x': x_domain[1],
+                                'y': y_domain[1],
+                                'xanchor': 'right',
+                                'yanchor': 'top',
+                                'bgcolor': 'rgba(255,255,255,0.8)',
+                                'bordercolor': '#c7c7c7',
+                                'borderwidth': 1,
+                                'font': {'size': 10},
+                            }
 
                         pfig.update_xaxes(
                             title_text='Circuit Depth' if row == nrows else '',
@@ -800,12 +825,10 @@ def CRB(
                         height=pfig_height,
                         width=pfig_width,
                         margin=pfig_margin,
-                        legend={
-                            'orientation': 'h', 'yanchor': 'bottom', 'y': 1.02
-                        },
                         template='plotly_white',
                         paper_bgcolor='white',
                         plot_bgcolor='#fbfbfd',
+                        **legend_settings,
                     )
 
                     pfig.update_xaxes(
