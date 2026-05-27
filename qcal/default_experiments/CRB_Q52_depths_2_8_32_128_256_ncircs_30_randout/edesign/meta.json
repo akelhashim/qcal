@@ -1,0 +1,53 @@
+{
+    "type": "pygsti.protocols.rb.CliffordRBDesign",
+    "auxfile_types": {
+        "all_circuits_needing_data": "text-circuit-list",
+        "alt_actual_circuits_executed": "text-circuit-list",
+        "default_protocols": "dict:dir-serialized-object",
+        "_dirs": "none",
+        "_vals": "none",
+        "_loaded_from": "none",
+        "circuit_lists": "list:text-circuit-list",
+        "idealout_lists": "json",
+        "native_gate_count_lists": "json",
+        "interleaved_circuit": "circuit-str-json"
+    },
+    "seed": 749743,
+    "paired_with_circuit_attrs": [
+        "idealout_lists",
+        "native_gate_count_lists"
+    ],
+    "nested": false,
+    "tags": {},
+    "_nameddict_attributes": [
+        [
+            "qubit_labels",
+            "Qubits",
+            "category"
+        ]
+    ],
+    "qubit_labels": [
+        "Q52"
+    ],
+    "depths": [
+        2,
+        8,
+        32,
+        128,
+        256
+    ],
+    "circuits_per_depth": 30,
+    "randomizeout": true,
+    "citerations": 20,
+    "compilerargs": [],
+    "descriptor": "A Clifford RB experiment",
+    "exact_compilation_key": null,
+    "default_protocols": {},
+    "circuit_lists": [
+        null,
+        null,
+        null,
+        null,
+        null
+    ]
+}

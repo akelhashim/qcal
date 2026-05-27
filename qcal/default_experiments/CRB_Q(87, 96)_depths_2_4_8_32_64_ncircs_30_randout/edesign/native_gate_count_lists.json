@@ -1,0 +1,762 @@
+[
+    [
+        {
+            "native_gate_count": 139,
+            "native_2q_gate_count": 11,
+            "native_size": 150
+        },
+        {
+            "native_gate_count": 118,
+            "native_2q_gate_count": 8,
+            "native_size": 126
+        },
+        {
+            "native_gate_count": 76,
+            "native_2q_gate_count": 4,
+            "native_size": 80
+        },
+        {
+            "native_gate_count": 92,
+            "native_2q_gate_count": 6,
+            "native_size": 98
+        },
+        {
+            "native_gate_count": 74,
+            "native_2q_gate_count": 5,
+            "native_size": 79
+        },
+        {
+            "native_gate_count": 75,
+            "native_2q_gate_count": 5,
+            "native_size": 80
+        },
+        {
+            "native_gate_count": 106,
+            "native_2q_gate_count": 8,
+            "native_size": 114
+        },
+        {
+            "native_gate_count": 60,
+            "native_2q_gate_count": 3,
+            "native_size": 63
+        },
+        {
+            "native_gate_count": 98,
+            "native_2q_gate_count": 7,
+            "native_size": 105
+        },
+        {
+            "native_gate_count": 122,
+            "native_2q_gate_count": 9,
+            "native_size": 131
+        },
+        {
+            "native_gate_count": 53,
+            "native_2q_gate_count": 3,
+            "native_size": 56
+        },
+        {
+            "native_gate_count": 98,
+            "native_2q_gate_count": 7,
+            "native_size": 105
+        },
+        {
+            "native_gate_count": 144,
+            "native_2q_gate_count": 11,
+            "native_size": 155
+        },
+        {
+            "native_gate_count": 34,
+            "native_2q_gate_count": 1,
+            "native_size": 35
+        },
+        {
+            "native_gate_count": 115,
+            "native_2q_gate_count": 9,
+            "native_size": 124
+        },
+        {
+            "native_gate_count": 99,
+            "native_2q_gate_count": 7,
+            "native_size": 106
+        },
+        {
+            "native_gate_count": 91,
+            "native_2q_gate_count": 6,
+            "native_size": 97
+        },
+        {
+            "native_gate_count": 115,
+            "native_2q_gate_count": 8,
+            "native_size": 123
+        },
+        {
+            "native_gate_count": 109,
+            "native_2q_gate_count": 8,
+            "native_size": 117
+        },
+        {
+            "native_gate_count": 48,
+            "native_2q_gate_count": 3,
+            "native_size": 51
+        },
+        {
+            "native_gate_count": 96,
+            "native_2q_gate_count": 7,
+            "native_size": 103
+        },
+        {
+            "native_gate_count": 59,
+            "native_2q_gate_count": 3,
+            "native_size": 62
+        },
+        {
+            "native_gate_count": 107,
+            "native_2q_gate_count": 8,
+            "native_size": 115
+        },
+        {
+            "native_gate_count": 64,
+            "native_2q_gate_count": 3,
+            "native_size": 67
+        },
+        {
+            "native_gate_count": 73,
+            "native_2q_gate_count": 5,
+            "native_size": 78
+        },
+        {
+            "native_gate_count": 84,
+            "native_2q_gate_count": 5,
+            "native_size": 89
+        },
+        {
+            "native_gate_count": 117,
+            "native_2q_gate_count": 8,
+            "native_size": 125
+        },
+        {
+            "native_gate_count": 96,
+            "native_2q_gate_count": 6,
+            "native_size": 102
+        },
+        {
+            "native_gate_count": 107,
+            "native_2q_gate_count": 8,
+            "native_size": 115
+        },
+        {
+            "native_gate_count": 82,
+            "native_2q_gate_count": 5,
+            "native_size": 87
+        }
+    ],
+    [
+        {
+            "native_gate_count": 147,
+            "native_2q_gate_count": 9,
+            "native_size": 156
+        },
+        {
+            "native_gate_count": 129,
+            "native_2q_gate_count": 8,
+            "native_size": 137
+        },
+        {
+            "native_gate_count": 120,
+            "native_2q_gate_count": 7,
+            "native_size": 127
+        },
+        {
+            "native_gate_count": 121,
+            "native_2q_gate_count": 7,
+            "native_size": 128
+        },
+        {
+            "native_gate_count": 189,
+            "native_2q_gate_count": 13,
+            "native_size": 202
+        },
+        {
+            "native_gate_count": 192,
+            "native_2q_gate_count": 14,
+            "native_size": 206
+        },
+        {
+            "native_gate_count": 174,
+            "native_2q_gate_count": 12,
+            "native_size": 186
+        },
+        {
+            "native_gate_count": 133,
+            "native_2q_gate_count": 7,
+            "native_size": 140
+        },
+        {
+            "native_gate_count": 140,
+            "native_2q_gate_count": 10,
+            "native_size": 150
+        },
+        {
+            "native_gate_count": 169,
+            "native_2q_gate_count": 12,
+            "native_size": 181
+        },
+        {
+            "native_gate_count": 160,
+            "native_2q_gate_count": 10,
+            "native_size": 170
+        },
+        {
+            "native_gate_count": 138,
+            "native_2q_gate_count": 9,
+            "native_size": 147
+        },
+        {
+            "native_gate_count": 175,
+            "native_2q_gate_count": 12,
+            "native_size": 187
+        },
+        {
+            "native_gate_count": 138,
+            "native_2q_gate_count": 8,
+            "native_size": 146
+        },
+        {
+            "native_gate_count": 159,
+            "native_2q_gate_count": 11,
+            "native_size": 170
+        },
+        {
+            "native_gate_count": 147,
+            "native_2q_gate_count": 9,
+            "native_size": 156
+        },
+        {
+            "native_gate_count": 127,
+            "native_2q_gate_count": 8,
+            "native_size": 135
+        },
+        {
+            "native_gate_count": 191,
+            "native_2q_gate_count": 14,
+            "native_size": 205
+        },
+        {
+            "native_gate_count": 139,
+            "native_2q_gate_count": 8,
+            "native_size": 147
+        },
+        {
+            "native_gate_count": 141,
+            "native_2q_gate_count": 9,
+            "native_size": 150
+        },
+        {
+            "native_gate_count": 177,
+            "native_2q_gate_count": 11,
+            "native_size": 188
+        },
+        {
+            "native_gate_count": 156,
+            "native_2q_gate_count": 10,
+            "native_size": 166
+        },
+        {
+            "native_gate_count": 171,
+            "native_2q_gate_count": 12,
+            "native_size": 183
+        },
+        {
+            "native_gate_count": 166,
+            "native_2q_gate_count": 11,
+            "native_size": 177
+        },
+        {
+            "native_gate_count": 135,
+            "native_2q_gate_count": 10,
+            "native_size": 145
+        },
+        {
+            "native_gate_count": 167,
+            "native_2q_gate_count": 12,
+            "native_size": 179
+        },
+        {
+            "native_gate_count": 189,
+            "native_2q_gate_count": 14,
+            "native_size": 203
+        },
+        {
+            "native_gate_count": 171,
+            "native_2q_gate_count": 13,
+            "native_size": 184
+        },
+        {
+            "native_gate_count": 165,
+            "native_2q_gate_count": 11,
+            "native_size": 176
+        },
+        {
+            "native_gate_count": 156,
+            "native_2q_gate_count": 10,
+            "native_size": 166
+        }
+    ],
+    [
+        {
+            "native_gate_count": 346,
+            "native_2q_gate_count": 26,
+            "native_size": 372
+        },
+        {
+            "native_gate_count": 240,
+            "native_2q_gate_count": 15,
+            "native_size": 255
+        },
+        {
+            "native_gate_count": 267,
+            "native_2q_gate_count": 16,
+            "native_size": 283
+        },
+        {
+            "native_gate_count": 261,
+            "native_2q_gate_count": 17,
+            "native_size": 278
+        },
+        {
+            "native_gate_count": 287,
+            "native_2q_gate_count": 20,
+            "native_size": 307
+        },
+        {
+            "native_gate_count": 294,
+            "native_2q_gate_count": 20,
+            "native_size": 314
+        },
+        {
+            "native_gate_count": 225,
+            "native_2q_gate_count": 14,
+            "native_size": 239
+        },
+        {
+            "native_gate_count": 292,
+            "native_2q_gate_count": 20,
+            "native_size": 312
+        },
+        {
+            "native_gate_count": 276,
+            "native_2q_gate_count": 18,
+            "native_size": 294
+        },
+        {
+            "native_gate_count": 270,
+            "native_2q_gate_count": 18,
+            "native_size": 288
+        },
+        {
+            "native_gate_count": 255,
+            "native_2q_gate_count": 17,
+            "native_size": 272
+        },
+        {
+            "native_gate_count": 282,
+            "native_2q_gate_count": 20,
+            "native_size": 302
+        },
+        {
+            "native_gate_count": 294,
+            "native_2q_gate_count": 18,
+            "native_size": 312
+        },
+        {
+            "native_gate_count": 275,
+            "native_2q_gate_count": 19,
+            "native_size": 294
+        },
+        {
+            "native_gate_count": 280,
+            "native_2q_gate_count": 19,
+            "native_size": 299
+        },
+        {
+            "native_gate_count": 268,
+            "native_2q_gate_count": 18,
+            "native_size": 286
+        },
+        {
+            "native_gate_count": 243,
+            "native_2q_gate_count": 16,
+            "native_size": 259
+        },
+        {
+            "native_gate_count": 263,
+            "native_2q_gate_count": 17,
+            "native_size": 280
+        },
+        {
+            "native_gate_count": 254,
+            "native_2q_gate_count": 16,
+            "native_size": 270
+        },
+        {
+            "native_gate_count": 296,
+            "native_2q_gate_count": 21,
+            "native_size": 317
+        },
+        {
+            "native_gate_count": 274,
+            "native_2q_gate_count": 17,
+            "native_size": 291
+        },
+        {
+            "native_gate_count": 305,
+            "native_2q_gate_count": 20,
+            "native_size": 325
+        },
+        {
+            "native_gate_count": 274,
+            "native_2q_gate_count": 19,
+            "native_size": 293
+        },
+        {
+            "native_gate_count": 289,
+            "native_2q_gate_count": 19,
+            "native_size": 308
+        },
+        {
+            "native_gate_count": 193,
+            "native_2q_gate_count": 12,
+            "native_size": 205
+        },
+        {
+            "native_gate_count": 278,
+            "native_2q_gate_count": 20,
+            "native_size": 298
+        },
+        {
+            "native_gate_count": 231,
+            "native_2q_gate_count": 15,
+            "native_size": 246
+        },
+        {
+            "native_gate_count": 354,
+            "native_2q_gate_count": 27,
+            "native_size": 381
+        },
+        {
+            "native_gate_count": 324,
+            "native_2q_gate_count": 22,
+            "native_size": 346
+        },
+        {
+            "native_gate_count": 269,
+            "native_2q_gate_count": 18,
+            "native_size": 287
+        }
+    ],
+    [
+        {
+            "native_gate_count": 1174,
+            "native_2q_gate_count": 84,
+            "native_size": 1258
+        },
+        {
+            "native_gate_count": 1136,
+            "native_2q_gate_count": 81,
+            "native_size": 1217
+        },
+        {
+            "native_gate_count": 1031,
+            "native_2q_gate_count": 70,
+            "native_size": 1101
+        },
+        {
+            "native_gate_count": 1004,
+            "native_2q_gate_count": 64,
+            "native_size": 1068
+        },
+        {
+            "native_gate_count": 1062,
+            "native_2q_gate_count": 74,
+            "native_size": 1136
+        },
+        {
+            "native_gate_count": 962,
+            "native_2q_gate_count": 66,
+            "native_size": 1028
+        },
+        {
+            "native_gate_count": 1045,
+            "native_2q_gate_count": 71,
+            "native_size": 1116
+        },
+        {
+            "native_gate_count": 1075,
+            "native_2q_gate_count": 75,
+            "native_size": 1150
+        },
+        {
+            "native_gate_count": 1032,
+            "native_2q_gate_count": 72,
+            "native_size": 1104
+        },
+        {
+            "native_gate_count": 1015,
+            "native_2q_gate_count": 70,
+            "native_size": 1085
+        },
+        {
+            "native_gate_count": 984,
+            "native_2q_gate_count": 67,
+            "native_size": 1051
+        },
+        {
+            "native_gate_count": 1040,
+            "native_2q_gate_count": 72,
+            "native_size": 1112
+        },
+        {
+            "native_gate_count": 940,
+            "native_2q_gate_count": 63,
+            "native_size": 1003
+        },
+        {
+            "native_gate_count": 923,
+            "native_2q_gate_count": 62,
+            "native_size": 985
+        },
+        {
+            "native_gate_count": 1118,
+            "native_2q_gate_count": 79,
+            "native_size": 1197
+        },
+        {
+            "native_gate_count": 931,
+            "native_2q_gate_count": 60,
+            "native_size": 991
+        },
+        {
+            "native_gate_count": 982,
+            "native_2q_gate_count": 67,
+            "native_size": 1049
+        },
+        {
+            "native_gate_count": 1108,
+            "native_2q_gate_count": 80,
+            "native_size": 1188
+        },
+        {
+            "native_gate_count": 1077,
+            "native_2q_gate_count": 75,
+            "native_size": 1152
+        },
+        {
+            "native_gate_count": 984,
+            "native_2q_gate_count": 65,
+            "native_size": 1049
+        },
+        {
+            "native_gate_count": 997,
+            "native_2q_gate_count": 65,
+            "native_size": 1062
+        },
+        {
+            "native_gate_count": 939,
+            "native_2q_gate_count": 60,
+            "native_size": 999
+        },
+        {
+            "native_gate_count": 1055,
+            "native_2q_gate_count": 71,
+            "native_size": 1126
+        },
+        {
+            "native_gate_count": 985,
+            "native_2q_gate_count": 66,
+            "native_size": 1051
+        },
+        {
+            "native_gate_count": 945,
+            "native_2q_gate_count": 64,
+            "native_size": 1009
+        },
+        {
+            "native_gate_count": 1031,
+            "native_2q_gate_count": 68,
+            "native_size": 1099
+        },
+        {
+            "native_gate_count": 972,
+            "native_2q_gate_count": 64,
+            "native_size": 1036
+        },
+        {
+            "native_gate_count": 1056,
+            "native_2q_gate_count": 73,
+            "native_size": 1129
+        },
+        {
+            "native_gate_count": 994,
+            "native_2q_gate_count": 69,
+            "native_size": 1063
+        },
+        {
+            "native_gate_count": 1002,
+            "native_2q_gate_count": 66,
+            "native_size": 1068
+        }
+    ],
+    [
+        {
+            "native_gate_count": 2055,
+            "native_2q_gate_count": 139,
+            "native_size": 2194
+        },
+        {
+            "native_gate_count": 2017,
+            "native_2q_gate_count": 139,
+            "native_size": 2156
+        },
+        {
+            "native_gate_count": 2007,
+            "native_2q_gate_count": 137,
+            "native_size": 2144
+        },
+        {
+            "native_gate_count": 1966,
+            "native_2q_gate_count": 136,
+            "native_size": 2102
+        },
+        {
+            "native_gate_count": 2067,
+            "native_2q_gate_count": 142,
+            "native_size": 2209
+        },
+        {
+            "native_gate_count": 1929,
+            "native_2q_gate_count": 128,
+            "native_size": 2057
+        },
+        {
+            "native_gate_count": 2050,
+            "native_2q_gate_count": 139,
+            "native_size": 2189
+        },
+        {
+            "native_gate_count": 1853,
+            "native_2q_gate_count": 120,
+            "native_size": 1973
+        },
+        {
+            "native_gate_count": 1906,
+            "native_2q_gate_count": 125,
+            "native_size": 2031
+        },
+        {
+            "native_gate_count": 1965,
+            "native_2q_gate_count": 134,
+            "native_size": 2099
+        },
+        {
+            "native_gate_count": 2085,
+            "native_2q_gate_count": 146,
+            "native_size": 2231
+        },
+        {
+            "native_gate_count": 2030,
+            "native_2q_gate_count": 140,
+            "native_size": 2170
+        },
+        {
+            "native_gate_count": 1984,
+            "native_2q_gate_count": 130,
+            "native_size": 2114
+        },
+        {
+            "native_gate_count": 1984,
+            "native_2q_gate_count": 138,
+            "native_size": 2122
+        },
+        {
+            "native_gate_count": 2023,
+            "native_2q_gate_count": 139,
+            "native_size": 2162
+        },
+        {
+            "native_gate_count": 1995,
+            "native_2q_gate_count": 136,
+            "native_size": 2131
+        },
+        {
+            "native_gate_count": 2067,
+            "native_2q_gate_count": 141,
+            "native_size": 2208
+        },
+        {
+            "native_gate_count": 2120,
+            "native_2q_gate_count": 145,
+            "native_size": 2265
+        },
+        {
+            "native_gate_count": 1877,
+            "native_2q_gate_count": 122,
+            "native_size": 1999
+        },
+        {
+            "native_gate_count": 2099,
+            "native_2q_gate_count": 145,
+            "native_size": 2244
+        },
+        {
+            "native_gate_count": 2026,
+            "native_2q_gate_count": 138,
+            "native_size": 2164
+        },
+        {
+            "native_gate_count": 2127,
+            "native_2q_gate_count": 146,
+            "native_size": 2273
+        },
+        {
+            "native_gate_count": 1863,
+            "native_2q_gate_count": 127,
+            "native_size": 1990
+        },
+        {
+            "native_gate_count": 2021,
+            "native_2q_gate_count": 136,
+            "native_size": 2157
+        },
+        {
+            "native_gate_count": 1869,
+            "native_2q_gate_count": 128,
+            "native_size": 1997
+        },
+        {
+            "native_gate_count": 2003,
+            "native_2q_gate_count": 134,
+            "native_size": 2137
+        },
+        {
+            "native_gate_count": 2026,
+            "native_2q_gate_count": 142,
+            "native_size": 2168
+        },
+        {
+            "native_gate_count": 2086,
+            "native_2q_gate_count": 142,
+            "native_size": 2228
+        },
+        {
+            "native_gate_count": 2099,
+            "native_2q_gate_count": 143,
+            "native_size": 2242
+        },
+        {
+            "native_gate_count": 2113,
+            "native_2q_gate_count": 149,
+            "native_size": 2262
+        }
+    ]
+]

@@ -5,7 +5,12 @@ https://github.com/sandialabs/pyGSTi/blob/master/jupyter_notebooks/Tutorials/alg
 
 For SRB, see:
 https://trueq.quantumbenchmark.com/guides/error_diagnostics/srb.html
+
+NOTE: we do not use TYPE_CHECKING for trueq types because this might fail if
+trueq is not installed when building docs.
 """
+from __future__ import annotations
+
 import logging
 import os
 from collections.abc import Iterable, Sequence
@@ -41,22 +46,26 @@ from qcal.interface.pygsti.transpiler import PyGSTiTranspiler
 from qcal.plotting.utils import calculate_nrows_ncols
 from qcal.qpu.qpu import QPU
 from qcal.settings import Settings
-from qcal.utils import flatten
+from qcal.utils import flatten, get_package_directory
 
 logger = logging.getLogger(__name__)
 
 
 def _build_crb_edesign_for_qubit_label(
-    ql: int | Tuple[int, int],
-    pspec: QPSpec,
-    compilations: Dict[str, CCR],
+    ql:             int | Tuple[int, int],
+    pspec:          QPSpec,
+    compilations:   Dict[str, CCR],
     circuit_depths: Sequence[int],
-    n_circuits: int,
-    randomizeout: bool,
-    citerations: int,
+    n_circuits:     int,
+    randomizeout:   bool,
+    citerations:    int,
 ) -> CliffordRBDesign:
     """
     Build a CRB experiment design for a given qubit label.
+
+    Attempts to load a pre-generated design from the default_experiments
+    directory first; falls back to generating a new one if not found or if
+    loading fails.
 
     Args:
         ql (int | Tuple[int, int]): Qubit label (int for single-qubit RB, or
@@ -73,23 +82,48 @@ def _build_crb_edesign_for_qubit_label(
         CliffordRBDesign: CRB experiment design.
     """
     qubits = list(flatten([ql]))
-    return CliffordRBDesign(
-        pspec=pspec,
-        clifford_compilations=compilations,
-        depths=circuit_depths,
-        circuits_per_depth=n_circuits,
-        qubit_labels=[f'Q{q}' for q in qubits],
-        randomizeout=randomizeout,
-        citerations=citerations,
-        add_default_protocol=True,
+    d = '_'.join(str(depth) for depth in circuit_depths)
+    path = (
+        get_package_directory()
+        / 'qcal'
+        / 'default_experiments'
+        / f'CRB_Q{ql}_depths_{d}_ncircs_{n_circuits}'
     )
+    if randomizeout:
+        path = path.with_name(path.name + '_randout')
+
+    edesign = None
+    if path.exists():
+        try:
+            logger.info(f" Loading pre-generated circuits from {path}/...")
+            protocol_data = pygsti.io.read_data_from_dir(path)
+            edesign = protocol_data.edesign
+        except Exception as e:
+            logger.warning(
+                f" Failed to load pre-generated circuits from "
+                f"{path} due to error: {e}. Regenerating..."
+            )
+
+    if edesign is None:
+        edesign = CliffordRBDesign(
+            pspec=pspec,
+            clifford_compilations=compilations,
+            depths=circuit_depths,
+            circuits_per_depth=n_circuits,
+            qubit_labels=[f'Q{q}' for q in qubits],
+            randomizeout=randomizeout,
+            citerations=citerations,
+            add_default_protocol=True,
+        )
+
+    return edesign
 
 
 def CRB(
     qpu:            QPU,
     config:         Config,
     qubit_labels:   List[int | Tuple[int, int]],
-    circuit_depths: Sequence[int],
+    circuit_depths: Sequence[int] | None = None,
     n_circuits:     int = 30,
     native_gates:   List[str] | None = None,
     pspec:          QPSpec | Dict[int | Tuple[int, int], QPSpec] | None = None,
@@ -108,9 +142,12 @@ def CRB(
             qubit labels to be twirled together. For example, [0, 1, (2, 3)]
             would perform single-qubit RB on 0 and 1, and two-qubit RB on
             (2, 3).
-        circuit_depths (Sequence[int]): a sequence of integers >= 0. The CRB
-            depth is the number of Cliffords in the circuit - 2 before each
-            Clifford is compiled into the native gate-set.
+        circuit_depths (Sequence[int] | None, optional): a sequence of
+            integers >= 0. The CRB depth is the number of Cliffords in the
+            circuit - 2 before each Clifford is compiled into the native
+            gate-set. Defaults to None, in which case ``[2, 8, 32, 128, 256]``
+            is used for single-qubit RB and ``[2, 4, 8, 32, 64]`` for
+            two-qubit RB.
         n_circuits (int, optional): The number of (possibly) different CRB
             circuits sampled at each depth. Defaults to 30.
         native_gates (List[str] | None, optional): a list of the native gates.
@@ -146,7 +183,7 @@ def CRB(
             self,
             config:         Config,
             qubit_labels:   List[int | Tuple[int, int]],
-            circuit_depths: Sequence[int],
+            circuit_depths: Sequence[int] | None = None,
             n_circuits:     int = 30,
             native_gates:   List[str] | None = None,
             pspec:          (
@@ -160,16 +197,24 @@ def CRB(
 
             self._qubit_labels = qubit_labels
             self._qubits = list(flatten(qubit_labels))
-            self._circuit_depths = circuit_depths
             self._n_circuits = n_circuits
+            self._randomizeout = randomizeout
+            self._citerations = citerations
+
+            if circuit_depths is None:
+                circuit_depths = (
+                    [2, 4, 8, 32, 64]
+                    if any(isinstance(ql, tuple) for ql in qubit_labels)
+                    else [2, 8, 32, 128, 256]
+                )
+            self._circuit_depths = circuit_depths
+
             if isinstance(pspec, QPSpec):
                 self._pspec = dict.fromkeys(qubit_labels, pspec)
             elif isinstance(pspec, dict):
                 self._pspec = pspec
             else:
                 self._pspec = {}
-            self._randomizeout = randomizeout
-            self._citerations = citerations
 
             self._compilations = {}
 
@@ -250,6 +295,26 @@ def CRB(
             self._uncertainties = {}
 
         @property
+        def qubit_labels(self) -> Sequence[int | Tuple[int, int]]:
+            """Qubit labels passed at construction."""
+            return self._qubit_labels
+
+        @property
+        def qubits(self) -> List[int]:
+            """Flat list of all qubit indices."""
+            return self._qubits
+
+        @property
+        def circuit_depths(self) -> Sequence[int]:
+            """Circuit depths used for benchmarking."""
+            return self._circuit_depths
+
+        @property
+        def randomizeout(self) -> bool:
+            """Whether output Paulis are randomized."""
+            return self._randomizeout
+
+        @property
         def pspec(self) -> Dict[int | Tuple[int, int], QPSpec]:
             """Processor specs keyed by qubit label."""
             return self._pspec
@@ -319,8 +384,32 @@ def CRB(
 
             if not self._sim_RB:
                 ql = self._qubit_labels[0]
-                # pygsti.io.load_data_from_dir(dirname)
-                self._edesign = CliffordRBDesign(
+                d = '_'.join(str(depth) for depth in self._circuit_depths)
+                path = (
+                    get_package_directory()
+                    / 'qcal'
+                    / 'default_experiments'
+                    / f'CRB_Q{ql}_depths_{d}_ncircs_{self._n_circuits}'
+                )
+                if self._randomizeout:
+                    path = path.with_name(path.name + '_randout')
+
+                self._edesign = None
+                if path.exists():
+                    try:
+                        logger.info(
+                            f" Loading pre-generated circuits from {path}/..."
+                        )
+                        protocol_data = pygsti.io.read_data_from_dir(path)
+                        self._edesign = protocol_data.edesign
+                    except Exception as e:
+                        logger.warning(
+                            f" Failed to load pre-generated circuits from "
+                            f"{path} due to error: {e}. Regenerating..."
+                        )
+
+                if self._edesign is None:
+                    self._edesign = CliffordRBDesign(
                         pspec=self._pspec[ql],
                         clifford_compilations=self._compilations[ql],
                         depths=self._circuit_depths,
@@ -795,10 +884,10 @@ def CRB(
 def SRB(
     qpu:            QPU,
     config:         Config,
-    qubit_labels:   List[int | Tuple[int]],
-    circuit_depths: List[int] | Tuple[int],
+    qubit_labels:   List[int | Tuple[int, int]],
+    circuit_depths: Sequence[int],
     n_circuits:     int = 30,
-    tq_config:      str | Any = None,
+    tq_config:      str | trueq.Config | None = None,  # noqa: F821 # type: ignore
     compiled_pauli: bool = True,
     include_rcal:   bool = False,
     **kwargs
@@ -810,17 +899,17 @@ def SRB(
     Args:
         qpu (QPU): custom QPU object.
         config (Config): qcal Config object.
-        qubit_labels (List[int | Tuple[int]]): a list specifying sets of
+        qubit_labels (List[int | Tuple[int, int]]): a list specifying sets of
             system labels to be twirled together by Clifford gates in each
             circuit. For example, [0, 1, (2, 3)] would perform single-qubit RB
             on 0 and 1, and two-qubit RB on (2, 3).
-        circuit_depths (List[int] | Tuple[int]): a list of positive integers
+        circuit_depths (Sequence[int]): a sequence of positive integers
             specifying how many cycles of random Clifford gates to generate for
             RB, for example, [4, 64, 256].
         n_circuits (int, optional): the number of circuits for each circuit
             depth. Defaults to 30.
-        tq_config (str | Any, optional): True-Q config yaml file or config
-            object. Defaults to None.
+        tq_config (str | trueq.Config | None, optional): True-Q config yaml file
+            or config object. Defaults to None.
         compiled_pauli (bool, optional): whether or not to compile a random
             Pauli gate for each qubit in the cycle preceding a measurement
             operation. Defaults to True.
@@ -835,15 +924,14 @@ def SRB(
 
     class SRB(qpu):
         """True-Q SRB protocol."""
-        import trueq as tq
 
         def __init__(
             self,
             config:          Config,
-            qubit_labels:    List[int | Tuple[int]],
-            circuit_depths:  List[int] | Tuple[int],
+            qubit_labels:    List[int | Tuple[int, int]],
+            circuit_depths:  Sequence[int],
             n_circuits:      int = 30,
-            tq_config:       str | tq.Config = None,
+            tq_config:       str | trueq.Config | None = None,  # noqa: F821 # type: ignore
             compiled_pauli:  bool = True,
             include_rcal:    bool = False,
             **kwargs
