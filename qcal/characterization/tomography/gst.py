@@ -8,7 +8,7 @@ Relevant code repos:
 - https://github.com/sandialabs/pyGSTi
 """
 import logging
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any, Callable, Dict, List, Tuple
 
@@ -53,7 +53,7 @@ from qcal.post_processing.post_process import PostProcessor
 from qcal.qpu.qpu import QPU
 from qcal.results import Results
 from qcal.settings import Settings
-from qcal.utils import flatten, save_init, save_to_pickle
+from qcal.utils import flatten, get_package_directory, save_init, save_to_pickle
 
 logger = logging.getLogger(__name__)
 
@@ -132,6 +132,17 @@ def GST(
             **kwargs
         ) -> None:
             logger.info(f" pyGSTi version: {pygsti.__version__}\n")
+
+            if len(circuit_depths) >= 2 and not np.allclose(
+                circuit_depths,
+                np.geomspace(
+                    circuit_depths[0], circuit_depths[-1], len(circuit_depths)
+                )
+            ):
+                raise ValueError(
+                    "circuit_depths must be exponentially spaced "
+                    f"(e.g., [1, 2, 4, 8, 16, ...]). Got: {circuit_depths}"
+                )
 
             self._qubit_labels = qubit_labels
             self._qubits = sorted(flatten(qubit_labels))
@@ -563,45 +574,79 @@ def GST(
                 }
             return uni
 
+        def _try_load_edesign(self) -> StandardGSTDesign | None:
+            """Hook for subclasses to load a pre-generated edesign.
+
+            Returns:
+                StandardGSTDesign | None: loaded edesign, or None to trigger
+                    full circuit generation.
+            """
+            return None
+
+        def _generate_fiducials_and_germs(self) -> None:
+            """Hook for subclasses to compute fiducials and germs on demand.
+
+            Called by generate_circuits when edesign loading fails and
+            self._prep_fiducials is None. Override in subclasses that defer
+            fiducial/germ computation (e.g. SingleQubitGST 2-qubit path).
+            """
+            pass
+
         def generate_circuits(self):
             """Generate all GST circuits."""
-            print("Prep fiducials:\n", self._prep_fiducials)
-            print("Meas fiducials:\n", self._meas_fiducials)
-            print("Germs:\n", self._germs)
-
             self._protocol = StandardGST(
                 modes=self._modes,
                 target_model=self._target_model
             )
 
-            if self._fpr:
-                fiducial_pairs = find_sufficient_fiducial_pairs_per_germ_greedy(
-                    target_model=self._target_model,
-                    prep_fiducials=self._prep_fiducials,
-                    meas_fiducials=self._meas_fiducials,
-                    germs=self._germs,
-                    prep_povm_tuples="first",
-                    constrain_to_tp=True,
-                    inv_trace_tol= 10,
-                    initial_seed_mode='greedy',
-                    evd_tol=1e-5,
-                    sensitivity_threshold=1e-5,
-                    # seed=1222022,
-                    verbosity=1,
-                    check_complete_fid_set=False
-                )
-            else:
-                fiducial_pairs = None
+            edesign = self._try_load_edesign()
 
-            self._edesign = StandardGSTDesign(
-                processorspec_filename_or_obj=self._pspec,
-                # target_model=self._target_model,
-                prep_fiducial_list_or_filename=self._prep_fiducials,
-                meas_fiducial_list_or_filename=self._meas_fiducials,
-                germ_list_or_filename=self._germs,
-                max_lengths=self._circuit_depths,
-                fiducial_pairs=fiducial_pairs
-            )
+            if edesign is None:
+                if any(
+                    x is None for x in (
+                        self._prep_fiducials,
+                        self._meas_fiducials,
+                        self._germs,
+                    )
+                ):
+                    self._generate_fiducials_and_germs()
+
+                print("Prep fiducials:\n", self._prep_fiducials)
+                print("Meas fiducials:\n", self._meas_fiducials)
+                print("Germs:\n", self._germs)
+
+                if self._fpr:
+                    fiducial_pairs = (
+                        find_sufficient_fiducial_pairs_per_germ_greedy(
+                            target_model=self._target_model,
+                            prep_fiducials=self._prep_fiducials,
+                            meas_fiducials=self._meas_fiducials,
+                            germs=self._germs,
+                            prep_povm_tuples="first",
+                            constrain_to_tp=True,
+                            inv_trace_tol= 10,
+                            initial_seed_mode='greedy',
+                            evd_tol=1e-5,
+                            sensitivity_threshold=1e-5,
+                            # seed=1222022,
+                            verbosity=1,
+                            check_complete_fid_set=False
+                        )
+                    )
+                else:
+                    fiducial_pairs = None
+
+                edesign = StandardGSTDesign(
+                    processorspec_filename_or_obj=self._pspec,
+                    # target_model=self._target_model,
+                    prep_fiducial_list_or_filename=self._prep_fiducials,
+                    meas_fiducial_list_or_filename=self._meas_fiducials,
+                    germ_list_or_filename=self._germs,
+                    max_lengths=self._circuit_depths,
+                    fiducial_pairs=fiducial_pairs
+                )
+
+            self._edesign = edesign
             print(
                 'Number of circuits: ',
                 len(self._edesign.all_circuits_needing_data)
@@ -877,6 +922,7 @@ def SimultaneousGST(
     circuit_depths: List[int] = [1, 2, 4, 8, 16, 32, 64, 128, 256],  # noqa: B006
     modes:          Tuple[str] = ('full TP','CPTPLND','Target','H+S','S'),  # noqa: B006
     fpr:            bool = False,
+    gst_factory:    Callable | None = None,
     **kwargs
 ) -> Callable:
     """Simultaneous Gate Set Tomography.
@@ -938,6 +984,7 @@ def SimultaneousGST(
                 'full TP', 'CPTPLND', 'Target', 'H+S', 'S'
             ),
             fpr:            bool = False,
+            gst_factory:    Callable | None = None,
             **kwargs
         ) -> None:
             self._qubit_labels = qubit_labels
@@ -965,9 +1012,10 @@ def SimultaneousGST(
             self._modes = modes
             self._fpr = fpr
 
+            _factory = gst_factory or GST
             self._gst = {}
             for ql in self._qubit_labels:
-                self._gst[ql] = GST(
+                self._gst[ql] = _factory(
                     qpu=qpu,
                     config=config,
                     qubit_labels=[ql],
@@ -1107,7 +1155,6 @@ def SimultaneousGST(
         def generate_circuits(self):
             """Generate all GST circuits."""
             transpiler = PyGSTiTranspiler()
-
             max_workers = len(self._qubit_labels)
 
             def _generate_one(ql):
@@ -1138,6 +1185,7 @@ def SimultaneousGST(
                 raise ValueError(msg)
 
             # Merge per-index circuits into one CircuitSet
+            logger.info(' Joining circuits across qubit labels...')
             self._circuits = CircuitSet()
             for circuits_i in zip(*tcsets, strict=False):
                 base = circuits_i[0].copy()
@@ -1226,6 +1274,7 @@ def SimultaneousGST(
         circuit_depths=circuit_depths,
         modes=modes,
         fpr=fpr,
+        gst_factory=gst_factory,
         **kwargs
     )
 
@@ -1358,6 +1407,13 @@ def SingleQubitGST(
                 germs = smq1Q_XYI.germs(qubits) if germs is None else germs
 
             elif len(qubits) == 2:
+                self._use_default_circuits = (
+                    pspec is None
+                    and prep_fiducials is None
+                    and meas_fiducials is None
+                    and germs is None
+                )
+
                 if pspec is None:
                     gate_names = [
                         'Gxpi2', 'Gypi2', 'Gii', 'Gxx', 'Gxy','Gyx', 'Gyy'
@@ -1405,30 +1461,31 @@ def SingleQubitGST(
                 if target_model is None:
                     target_model = create_explicit_model(
                         pspec,
-                        # ideal_gate_type='full TP',
-                        # ideal_spam_type='full TP',
-                        # basis='pp',
+                        ideal_gate_type='full TP',
+                        ideal_spam_type='full TP',
+                        basis='pp',
                     )
 
-                if prep_fiducials is None and meas_fiducials is None:
-                    prep_fiducials, meas_fiducials = find_fiducials(
-                        target_model,
-                        candidate_fid_counts={3: 'all upto'},
-                        assume_clifford=True,
-                        verbosity=2
-                    )
+                if not self._use_default_circuits:
+                    if prep_fiducials is None and meas_fiducials is None:
+                        prep_fiducials, meas_fiducials = find_fiducials(
+                            target_model,
+                            candidate_fid_counts={3: 'all upto'},
+                            assume_clifford=True,
+                            verbosity=2
+                        )
 
-                if germs is None:
-                    germs = find_germs(
-                        target_model,
-                        randomize=False,
-                        algorithm='greedy',
-                        assume_real=True,
-                        mode='compactEVD',
-                        float_type=np.double,
-                        candidate_germ_counts={4:'all upto'},
-                        verbosity=2
-                    )
+                    if germs is None:
+                        germs = find_germs(
+                            target_model,
+                            randomize=False,
+                            algorithm='greedy',
+                            assume_real=True,
+                            mode='compactEVD',
+                            float_type=np.double,
+                            candidate_germ_counts={4:'all upto'},
+                            verbosity=2
+                        )
 
             elif len(qubits) > 2:
                 if pspec is None:
@@ -1469,6 +1526,95 @@ def SingleQubitGST(
                 modes=modes,
                 fpr=fpr,
                 **kwargs
+            )
+
+        @staticmethod
+        def _load_sim1q_edesign(
+            qubits:         Sequence[int],
+            circuit_depths: Sequence[int],
+            fpr:            bool
+        ) -> StandardGSTDesign | None:
+            """Load a pre-generated simultaneous single-qubit GST edesign.
+
+            Only applicable when exactly two qubits are passed to
+            SingleQubitGST and no custom fiducials/germs were provided.
+
+            Args:
+                qubits (Sequence[int]): the two qubit labels.
+                circuit_depths (Sequence[int]): GST max circuit depths.
+                fpr (bool): whether FPR was requested.
+
+            Returns:
+                StandardGSTDesign | None: pre-generated edesign, or None if
+                    not found (triggers full circuit generation).
+            """
+            d = '_'.join(str(depth) for depth in circuit_depths)
+            path = (
+                get_package_directory()
+                / 'qcal'
+                / 'default_experiments'
+                / f'GST_sim1Q_depths_{d}'
+            )
+            if fpr:
+                path = path.with_name(path.name + '_fpr')
+
+            if not path.exists():
+                return None
+
+            try:
+                logger.info(
+                    f" Loading pre-generated edesign from {path}/..."
+                )
+                protocol_data = pygsti.io.read_data_from_dir(path)
+                edesign = protocol_data.edesign
+                if list(qubits) != [0, 1]:
+                    edesign = edesign.map_qubit_labels(
+                        {0: qubits[0], 1: qubits[1]}
+                    )
+                return edesign
+            except Exception as e:
+                logger.warning(
+                    f" Failed to load pre-generated edesign from "
+                    f"{path}: {e}. Regenerating..."
+                )
+                return None
+
+        def _try_load_edesign(self) -> StandardGSTDesign | None:
+            """Load a pre-generated edesign when using default circuits.
+
+            Returns:
+                StandardGSTDesign | None: pre-generated edesign, or None if
+                    custom circuit kwargs were provided or no matching
+                    pre-generated directory exists.
+            """
+            if getattr(self, '_use_default_circuits', False):
+                return self._load_sim1q_edesign(
+                    self._qubits, self._circuit_depths, self._fpr
+                )
+            return None
+
+        def _generate_fiducials_and_germs(self) -> None:
+            """Compute fiducials and germs for the 2-qubit simultaneous case.
+
+            Called by generate_circuits when the pre-generated edesign could
+            not be loaded and fiducials/germs were not pre-computed at init
+            time because _use_default_circuits was True.
+            """
+            self._prep_fiducials, self._meas_fiducials = find_fiducials(
+                self._target_model,
+                candidate_fid_counts={3: 'all upto'},
+                assume_clifford=True,
+                verbosity=2
+            )
+            self._germs = find_germs(
+                self._target_model,
+                randomize=False,
+                algorithm='greedy',
+                assume_real=True,
+                mode='compactEVD',
+                float_type=np.double,
+                candidate_germ_counts={4: 'all upto'},
+                verbosity=2
             )
 
     return SingleQubitGST(
@@ -1568,6 +1714,7 @@ def TwoQubitGST(
             circuit_depths=circuit_depths,
             modes=modes,
             fpr=fpr,
+            gst_factory=globals()['TwoQubitGST'],
             **kwargs
         ))
 
@@ -1592,6 +1739,13 @@ def TwoQubitGST(
             **kwargs
         ) -> None:
             if len(qubit_labels) == 1:
+                self._use_default_circuits = (
+                    pspec is None
+                    and prep_fiducials is None
+                    and meas_fiducials is None
+                    and germs is None
+                )
+
                 pspec = (
                     smq2Q_XYCPHASE.processor_spec(qubit_labels[0])
                     if pspec is None else pspec
@@ -1617,45 +1771,102 @@ def TwoQubitGST(
                     if germs is None else germs
                 )
 
+                gst.__init__(self,
+                    config=config,
+                    qubit_labels=qubit_labels,
+                    pspec=pspec,
+                    target_model=target_model,
+                    prep_fiducials=prep_fiducials,
+                    meas_fiducials=meas_fiducials,
+                    germs=germs,
+                    circuit_depths=circuit_depths,
+                    modes=modes,
+                    fpr=fpr,
+                    **kwargs
+                )
+
             elif len(qubit_labels) > 1:
-                pspec = {
-                    ql: smq2Q_XYCPHASE.processor_spec(ql)
-                    for ql in qubit_labels
-                } if pspec is None else pspec
+                gst.__init__(self,
+                    config=config,
+                    qubit_labels=qubit_labels,
+                    pspec=pspec,
+                    target_model=target_model,
+                    prep_fiducials=prep_fiducials,
+                    meas_fiducials=meas_fiducials,
+                    germs=germs,
+                    circuit_depths=circuit_depths,
+                    modes=modes,
+                    fpr=fpr,
+                    gst_factory=globals()['TwoQubitGST'],
+                    **kwargs
+                )
 
-                target_model = {
-                    ql: smq2Q_XYCPHASE.target_model(qubit_labels=ql)
-                    for ql in qubit_labels
-                } if target_model is None else target_model
+        @staticmethod
+        def _load_2q_edesign(
+            qubit_pair:     Tuple[int, int],
+            circuit_depths: Sequence[int],
+            fpr:            bool
+        ) -> StandardGSTDesign | None:
+            """Load a pre-generated two-qubit GST edesign.
 
-                prep_fiducials = {
-                    ql: smq2Q_XYCPHASE.prep_fiducials(ql)
-                    for ql in qubit_labels
-                } if prep_fiducials is None else prep_fiducials
+            Pre-generated 2Q edesigns only exist with FPR; returns None
+            immediately when fpr=False.
 
-                meas_fiducials = {
-                    ql: smq2Q_XYCPHASE.meas_fiducials(ql)
-                    for ql in qubit_labels
-                } if meas_fiducials is None else meas_fiducials
+            Args:
+                qubit_pair (Tuple[int, int]): the two qubit labels.
+                circuit_depths (Sequence[int]): GST max circuit depths.
+                fpr (bool): whether FPR was requested.
 
-                germs = {
-                    ql: smq2Q_XYCPHASE.germs(ql)
-                    for ql in qubit_labels
-                } if germs is None else germs
+            Returns:
+                StandardGSTDesign | None: pre-generated edesign, or None if
+                    fpr=False, not found, or loading fails (triggers full
+                    circuit generation).
+            """
+            if not fpr:
+                return None
 
-            gst.__init__(self,
-                config=config,
-                qubit_labels=qubit_labels,
-                pspec=pspec,
-                target_model=target_model,
-                prep_fiducials=prep_fiducials,
-                meas_fiducials=meas_fiducials,
-                germs=germs,
-                circuit_depths=circuit_depths,
-                modes=modes,
-                fpr=fpr,
-                **kwargs
+            d = '_'.join(str(depth) for depth in circuit_depths)
+            path = (
+                get_package_directory()
+                / 'qcal'
+                / 'default_experiments'
+                / f'GST_2Q_depths_{d}_fpr'
             )
+
+            if not path.exists():
+                return None
+
+            try:
+                logger.info(
+                    f" Loading pre-generated edesign from {path}/..."
+                )
+                protocol_data = pygsti.io.read_data_from_dir(path)
+                edesign = protocol_data.edesign
+                if list(qubit_pair) != [0, 1]:
+                    edesign = edesign.map_qubit_labels(
+                        {0: qubit_pair[0], 1: qubit_pair[1]}
+                    )
+                return edesign
+            except Exception as e:
+                logger.warning(
+                    f" Failed to load pre-generated edesign from "
+                    f"{path}: {e}. Regenerating..."
+                )
+                return None
+
+        def _try_load_edesign(self) -> StandardGSTDesign | None:
+            """Load a pre-generated edesign when using default circuits.
+
+            Returns:
+                StandardGSTDesign | None: pre-generated edesign, or None if
+                    custom circuit kwargs were provided, fpr=False, or no
+                    matching pre-generated directory exists.
+            """
+            if getattr(self, '_use_default_circuits', False):
+                return self._load_2q_edesign(
+                    self._qubit_labels[0], self._circuit_depths, self._fpr
+                )
+            return None
 
     return TwoQubitGST(
         config=config,

@@ -12,7 +12,6 @@ trueq is not installed when building docs.
 from __future__ import annotations
 
 import logging
-import os
 from collections.abc import Iterable, Sequence
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Callable, Dict, List, Tuple
