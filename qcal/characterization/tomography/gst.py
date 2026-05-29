@@ -10,6 +10,7 @@ Relevant code repos:
 import logging
 from collections.abc import Iterable, Sequence
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from functools import cached_property
 from typing import Any, Callable, Dict, List, Tuple
 
 import matplotlib.pyplot as plt
@@ -167,7 +168,7 @@ def GST(
             kwargs.pop('transpiler', None)
             qpu.__init__(self, config=config, transpiler=transpiler, **kwargs)
 
-        @property
+        @cached_property
         def avg_gate_infidelity(self) -> Dict[str, Dict[str, float]]:
             """Average gate infidelity for the gates in the gate set.
 
@@ -214,7 +215,7 @@ def GST(
             """
             return self._dataset
 
-        @property
+        @cached_property
         def diamond_norm(self) -> Dict[str, Dict[str, float]]:
             """Diamond norm for the gates in the gate set.
 
@@ -265,7 +266,7 @@ def GST(
             """
             return self._edesign
 
-        @property
+        @cached_property
         def eigenvalue_avg_gate_infidelity(self) -> Dict[str, Dict[str, float]]:
             """Eigenvalue average gate infidelity for the gates in the gate set.
 
@@ -285,7 +286,7 @@ def GST(
                 }
             return infidelity
 
-        @property
+        @cached_property
         def eigenvalue_diamond_norm(self) -> Dict[str, Dict[str, float]]:
             """Eigenvalue diamond norm for the gates in the gate set.
 
@@ -305,7 +306,7 @@ def GST(
                 }
             return diamondnorm
 
-        @property
+        @cached_property
         def eigenvalue_entanglement_infidelity(self) -> Dict[str, Dict[str, float]]:
             """Eigenvalue entanglement infidelity for the gates in the gate set.
 
@@ -325,7 +326,7 @@ def GST(
                 }
             return infidelity
 
-        @property
+        @cached_property
         def entanglement_infidelity(self) -> Dict[str, Dict[str, float]]:
             """Entanglement infidelity for the gates in the gate set.
 
@@ -374,7 +375,7 @@ def GST(
             """
             return self._germs
 
-        @property
+        @cached_property
         def jtrace_diff(self) -> Dict[str, Dict[str, float]]:
             """Jamiolkowski trace distance for the gates in the gate set.
 
@@ -403,7 +404,7 @@ def GST(
             """
             return self._meas_fiducials
 
-        @property
+        @cached_property
         def models(self) -> Dict[str, ExplicitOpModel]:
             """pyGSTi models object.
 
@@ -424,7 +425,7 @@ def GST(
             """
             return self._modes
 
-        @property
+        @cached_property
         def POVM(self) -> Dict[str, Dict[str, NDArray]]:
             """Estimated Hilbert-Schmidt vectors for the POVM effects.
 
@@ -472,7 +473,7 @@ def GST(
             """
             return self._pspec
 
-        @property
+        @cached_property
         def ptm(self) -> Dict[str, Dict[str, NDArray]]:
             """Pauli Transfer Matrices for each gate in the gate set.
 
@@ -519,7 +520,7 @@ def GST(
             """
             return self._results
 
-        @property
+        @cached_property
         def state_prep(self) -> Dict[str, NDArray]:
             """Estimated Hilbert-Schmidt vector for the initial state rho_0.
 
@@ -531,7 +532,7 @@ def GST(
                 for mode, model in self.models.items()
             }
 
-        @property
+        @cached_property
         def state_prep_fidelity(self) -> Dict[str, float]:
             """State fidelity for the initial state rho_0.
 
@@ -557,7 +558,7 @@ def GST(
             """
             return self._target_model
 
-        @property
+        @cached_property
         def unitarity(self) -> Dict[str, float]:
             """Unitarity for each gate in the gate set.
 
