@@ -345,7 +345,7 @@ class Results:
         """Plot the results in a histogram.
 
         Args:
-            normalize (bool, optional): whether to plot the normalized counts. 
+            normalize (bool, optional): whether to plot the normalized counts.
                 Defaults to False.
         """
         fig = go.Figure()

@@ -1120,7 +1120,7 @@ class ZZ(Gate):
         }
 
 
-two_qubit_gates: Mapping[str, Callable] = defaultdict(
+TWO_QUBIT_GATES: Mapping[str, Callable] = defaultdict(
     lambda: 'Gate not currently supported!', {
         'AGate':       AGate,
         'Barenco':     Barenco,
