@@ -3,13 +3,14 @@
 See https://threeplusone.com/pubs/on_gates.pdf for relevant definitions.
 """
 from collections import defaultdict
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Mapping, Sequence
 from random import gauss, randint
 from typing import Dict, List, Tuple, Union
 
 import numpy as np
 from numpy.typing import NDArray
 
+from qcal.circuit import Circuit, Cycle
 from qcal.gate.gate import Gate
 from qcal.units import ns
 
@@ -270,32 +271,42 @@ class Meas(Gate):
         """
         return True
 
+    @property
+    def unitary(self) -> None:
+        """Single-qubit measurement operations are non-unitary."""
+        return None
+
 
 class MCM(Gate):
     """Class for a single-qubit mid-circuit measurement operation."""
 
     def __init__(
             self,
-            qubits:      int | Tuple[int],
+            qubits:      int | Sequence[int],
             basis:       str = 'Z',
-            apply:       Dict = {},  # noqa: B006
-            dd_qubits:   List | Tuple = [],  # noqa: B006
+            apply:       Dict[str, Cycle | Circuit] | None = None,
+            dd_qubits:   Sequence[int] | None = None,
             dd_method:   str = 'XY_N',
             n_dd_pulses: int = 8,
     ) -> None:
         """Initialize using the meas matrix.
 
         Args:
-            qubits (int | Tuple[int]): qubit label(s).
+            qubits (int | Sequence[int]): qubit label(s).
             basis (str): measurement basis. Defaults to Z.
-            apply (Dict): conditional gates to apply to another qubit depending
-                on the outcomes of the mid-circuit measurement. Defaults to {}.
+            apply (Dict[str, Cycle | Circuit] | None): conditional gates to
+                apply to another qubit depending on the outcomes of the
+                mid-circuit measurement. Defaults to None.
                 Example: apply = {'0': Cycle({Id(1)}), '1': Cycle({X(1)})}.
-            dd_qubits (List | Tuple, optional): which qubits to dynamical
-                decouple during a mid-circuit measurement. Defaults to [].
+            dd_qubits (Sequence[int] | None, optional): which qubits to
+                dynamical decouple during a mid-circuit measurement.
+                Defaults to None.
             dd_method (str): dynamical decoupling protocol. Defaults to 'XY'.
             n_dd_pulses (int): number of pulses for dd protocol. Defaults to 8.
         """
+        apply = {} if apply is None else apply
+        dd_qubits = [] if dd_qubits is None else dd_qubits
+
         super().__init__(meas, qubits)
         self._properties['name'] = 'MCM'
         self._properties['params']['basis'] = basis
@@ -314,6 +325,10 @@ class MCM(Gate):
         return True
 
     @property
+    def unitary(self) -> None:
+        return None
+
+    @property
     def is_single_qubit(self) -> bool:
         """Whether or not the gate acts on a single qubit.
 
@@ -330,8 +345,8 @@ class Reset(Gate):
         self,
         qubit:         int,
         measure_first: bool = True,
-        method:        List[str] = ['active'],  # noqa: B006
-        dd_qubits:     List | Tuple = [],  # noqa: B006
+        method:        Sequence[str] | None = None,
+        dd_qubits:     Sequence[int] | None = None,
         dd_method:     str = 'XY_N',
         n_dd_pulses:   int = 8,
     ) -> None:
@@ -342,25 +357,38 @@ class Reset(Gate):
             measure_first (bool, optional): whether to measure before the
                 reset. Defauls to True. This is unnecessary if a previous
                 measurement was already made for a mid-circuit operation.
-            method (List[str], optional): what method to use for resetting the
-                qubit in the middle of the circuit. Defaults to `['active']`.
-                Also accepted is `['unconditional']` or both in the same list.
-            dd_qubits (List | Tuple, optional): which qubits to dynamical
-                decouple during a mid-circuit measurement. Defaults to [].
+            method (Sequence[str] | None, optional): what method to use for
+                resetting the
+                qubit in the middle of the circuit. Defaults to None.
+                Accepts `['active']` for active reset, or `['unconditional']`
+                for unconditional reset, or both in the same sequence.
+            dd_qubits (Sequence[int] | None, optional): which qubits to
+                dynamical decouple during a mid-circuit measurement.
+                Defaults to None.
             dd_method (str): dynamical decoupling protocol. Defaults to 'XY'.
             n_dd_pulses (int): number of pulses for dd protocol. Defaults to 8.
         """
+        method = ['active'] if method is None else method
+        dd_qubits = [] if dd_qubits is None else dd_qubits
+
         super().__init__(meas, qubit)
         self._properties['name'] = 'Reset'
         self._properties['params']['measure_first'] = measure_first
         self._properties['params']['meas'] = MCM(
             qubit,
-            dd_qubits=dd_qubits, dd_method=dd_method, n_dd_pulses=n_dd_pulses
+            dd_qubits=dd_qubits,
+            dd_method=dd_method,
+            n_dd_pulses=n_dd_pulses
         )
         if not all(elem in ['active', 'unconditional'] for elem in method):
             raise ValueError('Unsupported reset method!')
         else:
             self._properties['params']['method'] = method
+
+    @property
+    def unitary(self) -> None:
+        """Single-qubit measurement/reset operations are non-unitary."""
+        return None
 
 class RandSU2(Gate):
     """Class for a random SU(2) gate."""

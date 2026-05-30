@@ -199,6 +199,16 @@ class Gate:
         return self._matrix
 
     @property
+    def unitary(self) -> NDArray:
+        """The unitary matrix of the gate.
+
+        Returns:
+            NDArray: numpy array of the unitary matrix, or None for
+                non-unitary operations (measurements, reset).
+        """
+        return self._matrix
+
+    @property
     def name(self) -> str:
         """The name of the gate.
 

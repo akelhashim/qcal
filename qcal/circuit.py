@@ -20,12 +20,14 @@ from __future__ import annotations
 import copy
 from collections import Counter, deque
 from collections.abc import Iterable, Sequence
+from functools import reduce
 from itertools import groupby, zip_longest
 from typing import Any, Dict, List, Set, Tuple
 
 import numpy as np
 import pandas as pd
 import plotly.io as pio
+from numpy.typing import NDArray
 
 from qcal.gate.gate import Gate
 from qcal.gate.single_qubit import Meas, basis_rotation
@@ -270,6 +272,26 @@ class Cycle:
             Tuple: qubit labels.
         """
         return tuple(sorted(set(self._qubits)))
+
+    @property
+    def unitary(self) -> NDArray:
+        """The unitary matrix of the cycle (tensor product of gate unitaries).
+
+        Gates are ordered by qubit label before taking the tensor product.
+
+        Raises:
+            ValueError: if any gate in the cycle is non-unitary (e.g. Meas).
+
+        Returns:
+            NDArray: tensor-product unitary of all gates in the cycle.
+        """
+        for gate in self.gates:
+            if gate.unitary is None:
+                raise ValueError(
+                    f"Gate '{gate.name}' on qubits {gate.qubits} is "
+                    "non-unitary."
+                )
+        return reduce(np.kron, [gate.unitary for gate in self.gates])
 
     def append(self, gate_or_gates: Gate | Iterable[Gate]) -> None:
         """Appends a gate to the existing cycle/layer.
@@ -562,6 +584,22 @@ class Circuit:
             Tuple: qubit labels.
         """
         return tuple(sorted(self._qubits))
+
+    @property
+    def unitary(self) -> NDArray:
+        """The unitary matrix of the circuit (ordered product of cycle
+        unitaries).
+
+        Barriers are skipped. Raises if any cycle contains a non-unitary gate.
+
+        Raises:
+            ValueError: if any cycle in the circuit contains a non-unitary gate.
+
+        Returns:
+            NDArray: unitary matrix of the full circuit.
+        """
+        cycles = [c for c in self._cycles if not c.is_barrier]
+        return reduce(np.matmul, [cycle.unitary for cycle in cycles])
 
     @mcm_results.setter
     def mcm_results(self, results: List[Dict | Results] | Dict | Results):
