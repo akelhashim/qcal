@@ -14,11 +14,33 @@ from qcal.circuit import Circuit, Cycle
 from qcal.gate.gate import Gate
 from qcal.units import ns
 
-# TODO: add Clifford gates
-
 
 __all__ = (
     'C',
+    'Cliff0',
+    'Cliff1',
+    'Cliff2',
+    'Cliff3',
+    'Cliff4',
+    'Cliff5',
+    'Cliff6',
+    'Cliff7',
+    'Cliff8',
+    'Cliff9',
+    'Cliff10',
+    'Cliff11',
+    'Cliff12',
+    'Cliff13',
+    'Cliff14',
+    'Cliff15',
+    'Cliff16',
+    'Cliff17',
+    'Cliff18',
+    'Cliff19',
+    'Cliff20',
+    'Cliff21',
+    'Cliff22',
+    'Cliff23',
     'H',
     'Id',
     'Idle',
@@ -191,11 +213,419 @@ class C(Gate):
             qubit (int): qubit label.
         """
         super().__init__(rn(2*np.pi/3, (1, 1, 1)/np.sqrt(3)), qubit)
+        self._properties['alias'] = 'Cliff16'
         self._properties['name'] = 'C'
         self._properties['params'] = {
             'angle': 2*np.pi/3,
             'axis': str((1, 1, 1)/np.sqrt(3))
         }
+
+
+class Cliff0(Gate):
+    """Class for the 0th single-qubit Clifford gate (Identity)."""
+
+    def __init__(self, qubit: int, **kwargs) -> None:
+        """Initialize using the id gate.
+
+        Args:
+            qubit (int): qubit label.
+        """
+        super().__init__(id, qubit)
+        self._properties['alias'] = 'I'
+        self._properties['name'] = 'Cliff0'
+        self._properties['params'] = {'angle': 0, 'axis': None}
+
+
+class Cliff1(Gate):
+    """Class for the 1st single-qubit Clifford gate (X)."""
+
+    def __init__(self, qubit: int, **kwargs) -> None:
+        """Initialize using the x gate.
+
+        Args:
+            qubit (int): qubit label.
+        """
+        super().__init__(x, qubit)
+        self._properties['alias'] = 'X'
+        self._properties['name'] = 'Cliff1'
+        self._properties['params'] = {'angle': np.pi, 'axis': 'x'}
+
+
+class Cliff2(Gate):
+    """Class for the 2nd single-qubit Clifford gate (Y)."""
+
+    def __init__(self, qubit: int, **kwargs) -> None:
+        """Initialize using the y gate.
+
+        Args:
+            qubit (int): qubit label.
+        """
+        super().__init__(y, qubit)
+        self._properties['alias'] = 'Y'
+        self._properties['name'] = 'Cliff2'
+        self._properties['params'] = {'angle': np.pi, 'axis': 'y'}
+
+
+class Cliff3(Gate):
+    """Class for the 3rd single-qubit Clifford gate (Z)."""
+
+    def __init__(self, qubit: int, **kwargs) -> None:
+        """Initialize using the z gate.
+
+        Args:
+            qubit (int): qubit label.
+        """
+        super().__init__(z, qubit)
+        self._properties['alias'] = 'Z'
+        self._properties['name'] = 'Cliff3'
+        self._properties['params'] = {'angle': np.pi, 'axis': 'z'}
+
+
+class Cliff4(Gate):
+    """Class for the 4th single-qubit Clifford gate (X90 = sqrt(X))."""
+
+    def __init__(self, qubit: int, **kwargs) -> None:
+        """Initialize using the rx gate.
+
+        Args:
+            qubit (int): qubit label.
+        """
+        super().__init__(rx(np.pi / 2), qubit)
+        self._properties['alias'] = 'X90'
+        self._properties['name'] = 'Cliff4'
+        self._properties['params'] = {'angle': np.pi / 2, 'axis': 'x'}
+
+
+class Cliff5(Gate):
+    """Class for the 5th single-qubit Clifford gate (X-90 = sqrt(X)†)."""
+
+    def __init__(self, qubit: int, **kwargs) -> None:
+        """Initialize using the rx gate.
+
+        Args:
+            qubit (int): qubit label.
+        """
+        super().__init__(rx(-np.pi / 2), qubit)
+        self._properties['alias'] = 'X-90'
+        self._properties['name'] = 'Cliff5'
+        self._properties['params'] = {'angle': -np.pi / 2, 'axis': 'x'}
+
+
+class Cliff6(Gate):
+    """Class for the 6th single-qubit Clifford gate (Y90 = sqrt(Y))."""
+
+    def __init__(self, qubit: int, **kwargs) -> None:
+        """Initialize using the ry gate.
+
+        Args:
+            qubit (int): qubit label.
+        """
+        super().__init__(ry(np.pi / 2), qubit)
+        self._properties['alias'] = 'Y90'
+        self._properties['name'] = 'Cliff6'
+        self._properties['params'] = {'angle': np.pi / 2, 'axis': 'y'}
+
+
+class Cliff7(Gate):
+    """Class for the 7th single-qubit Clifford gate (Y-90 = sqrt(Y)†)."""
+
+    def __init__(self, qubit: int, **kwargs) -> None:
+        """Initialize using the ry gate.
+
+        Args:
+            qubit (int): qubit label.
+        """
+        super().__init__(ry(-np.pi / 2), qubit)
+        self._properties['alias'] = 'Y-90'
+        self._properties['name'] = 'Cliff7'
+        self._properties['params'] = {'angle': -np.pi / 2, 'axis': 'y'}
+
+
+class Cliff8(Gate):
+    """Class for the 8th single-qubit Clifford gate (Z90 = S = sqrt(Z))."""
+
+    def __init__(self, qubit: int, **kwargs) -> None:
+        """Initialize using the rz gate.
+
+        Args:
+            qubit (int): qubit label.
+        """
+        super().__init__(rz(np.pi / 2), qubit)
+        self._properties['alias'] = 'S, Z90'
+        self._properties['name'] = 'Cliff8'
+        self._properties['params'] = {'angle': np.pi / 2, 'axis': 'z'}
+
+
+class Cliff9(Gate):
+    """Class for the 9th single-qubit Clifford gate (Z-90 = S† = sqrt(Z)†)."""
+
+    def __init__(self, qubit: int, **kwargs) -> None:
+        """Initialize using the rz gate.
+
+        Args:
+            qubit (int): qubit label.
+        """
+        super().__init__(rz(-np.pi / 2), qubit)
+        self._properties['alias'] = 'Sdag, Z-90'
+        self._properties['name'] = 'Cliff9'
+        self._properties['params'] = {'angle': -np.pi / 2, 'axis': 'z'}
+
+
+class Cliff10(Gate):
+    """Class for the 10th single-qubit Clifford gate.
+
+    180° rotation around the (X+Y)/sqrt(2) axis.
+    """
+
+    def __init__(self, qubit: int, **kwargs) -> None:
+        """Initialize using the rn function.
+
+        Args:
+            qubit (int): qubit label.
+        """
+        _axis = np.array([1, 1, 0]) / np.sqrt(2)
+        super().__init__(rn(np.pi, _axis), qubit)
+        self._properties['name'] = 'Cliff10'
+        self._properties['params'] = {'angle': np.pi, 'axis': _axis}
+
+
+class Cliff11(Gate):
+    """Class for the 11th single-qubit Clifford gate.
+
+    180° rotation around the (X-Y)/sqrt(2) axis.
+    """
+
+    def __init__(self, qubit: int, **kwargs) -> None:
+        """Initialize using the rn function.
+
+        Args:
+            qubit (int): qubit label.
+        """
+        _axis = np.array([1, -1, 0]) / np.sqrt(2)
+        super().__init__(rn(np.pi, _axis), qubit)
+        self._properties['name'] = 'Cliff11'
+        self._properties['params'] = {'angle': np.pi, 'axis': _axis}
+
+
+class Cliff12(Gate):
+    """Class for the 12th single-qubit Clifford gate.
+
+    180° rotation around the (Y+Z)/sqrt(2) axis.
+    """
+
+    def __init__(self, qubit: int, **kwargs) -> None:
+        """Initialize using the rn function.
+
+        Args:
+            qubit (int): qubit label.
+        """
+        _axis = np.array([0, 1, 1]) / np.sqrt(2)
+        super().__init__(rn(np.pi, _axis), qubit)
+        self._properties['name'] = 'Cliff12'
+        self._properties['params'] = {'angle': np.pi, 'axis': _axis}
+
+
+class Cliff13(Gate):
+    """Class for the 13th single-qubit Clifford gate.
+
+    180° rotation around the (Y-Z)/sqrt(2) axis.
+    """
+
+    def __init__(self, qubit: int, **kwargs) -> None:
+        """Initialize using the rn function.
+
+        Args:
+            qubit (int): qubit label.
+        """
+        _axis = np.array([0, 1, -1]) / np.sqrt(2)
+        super().__init__(rn(np.pi, _axis), qubit)
+        self._properties['name'] = 'Cliff13'
+        self._properties['params'] = {'angle': np.pi, 'axis': _axis}
+
+
+class Cliff14(Gate):
+    """Class for the 14th single-qubit Clifford gate (H = Hadamard).
+
+    180° rotation around the (X+Z)/sqrt(2) axis.
+    """
+
+    def __init__(self, qubit: int, **kwargs) -> None:
+        """Initialize using the h gate.
+
+        Args:
+            qubit (int): qubit label.
+        """
+        super().__init__(h, qubit)
+        self._properties['alias'] = 'H'
+        self._properties['name'] = 'Cliff14'
+        self._properties['params'] = {
+            'angle': np.pi,
+            'axis': np.array([1, 0, 1]) / np.sqrt(2),
+        }
+
+
+class Cliff15(Gate):
+    """Class for the 15th single-qubit Clifford gate.
+
+    180° rotation around the (X-Z)/sqrt(2) axis.
+    """
+
+    def __init__(self, qubit: int, **kwargs) -> None:
+        """Initialize using the rn function.
+
+        Args:
+            qubit (int): qubit label.
+        """
+        _axis = np.array([1, 0, -1]) / np.sqrt(2)
+        super().__init__(rn(np.pi, _axis), qubit)
+        self._properties['name'] = 'Cliff15'
+        self._properties['params'] = {'angle': np.pi, 'axis': _axis}
+
+
+class Cliff16(Gate):
+    """Class for the 16th single-qubit Clifford gate (C = axis cycling).
+
+    +120° rotation around the (X+Y+Z)/sqrt(3) axis.
+    """
+
+    def __init__(self, qubit: int, **kwargs) -> None:
+        """Initialize using the rn function.
+
+        Args:
+            qubit (int): qubit label.
+        """
+        _axis = np.array([1, 1, 1]) / np.sqrt(3)
+        super().__init__(rn(2 * np.pi / 3, _axis), qubit)
+        self._properties['alias'] = 'C'
+        self._properties['name'] = 'Cliff16'
+        self._properties['params'] = {'angle': 2 * np.pi / 3, 'axis': _axis}
+
+
+class Cliff17(Gate):
+    """Class for the 17th single-qubit Clifford gate (C†).
+
+    -120° rotation around the (X+Y+Z)/sqrt(3) axis.
+    """
+
+    def __init__(self, qubit: int, **kwargs) -> None:
+        """Initialize using the rn function.
+
+        Args:
+            qubit (int): qubit label.
+        """
+        _axis = np.array([1, 1, 1]) / np.sqrt(3)
+        super().__init__(rn(-2 * np.pi / 3, _axis), qubit)
+        self._properties['alias'] = 'Cdag'
+        self._properties['name'] = 'Cliff17'
+        self._properties['params'] = {'angle': -2 * np.pi / 3, 'axis': _axis}
+
+
+class Cliff18(Gate):
+    """Class for the 18th single-qubit Clifford gate.
+
+    +120° rotation around the (X+Y-Z)/sqrt(3) axis.
+    """
+
+    def __init__(self, qubit: int, **kwargs) -> None:
+        """Initialize using the rn function.
+
+        Args:
+            qubit (int): qubit label.
+        """
+        _axis = np.array([1, 1, -1]) / np.sqrt(3)
+        super().__init__(rn(2 * np.pi / 3, _axis), qubit)
+        self._properties['name'] = 'Cliff18'
+        self._properties['params'] = {'angle': 2 * np.pi / 3, 'axis': _axis}
+
+
+class Cliff19(Gate):
+    """Class for the 19th single-qubit Clifford gate.
+
+    -120° rotation around the (X+Y-Z)/sqrt(3) axis.
+    """
+
+    def __init__(self, qubit: int, **kwargs) -> None:
+        """Initialize using the rn function.
+
+        Args:
+            qubit (int): qubit label.
+        """
+        _axis = np.array([1, 1, -1]) / np.sqrt(3)
+        super().__init__(rn(-2 * np.pi / 3, _axis), qubit)
+        self._properties['name'] = 'Cliff19'
+        self._properties['params'] = {'angle': -2 * np.pi / 3, 'axis': _axis}
+
+
+class Cliff20(Gate):
+    """Class for the 20th single-qubit Clifford gate.
+
+    +120° rotation around the (X-Y+Z)/sqrt(3) axis.
+    """
+
+    def __init__(self, qubit: int, **kwargs) -> None:
+        """Initialize using the rn function.
+
+        Args:
+            qubit (int): qubit label.
+        """
+        _axis = np.array([1, -1, 1]) / np.sqrt(3)
+        super().__init__(rn(2 * np.pi / 3, _axis), qubit)
+        self._properties['name'] = 'Cliff20'
+        self._properties['params'] = {'angle': 2 * np.pi / 3, 'axis': _axis}
+
+
+class Cliff21(Gate):
+    """Class for the 21st single-qubit Clifford gate.
+
+    -120° rotation around the (X-Y+Z)/sqrt(3) axis.
+    """
+
+    def __init__(self, qubit: int, **kwargs) -> None:
+        """Initialize using the rn function.
+
+        Args:
+            qubit (int): qubit label.
+        """
+        _axis = np.array([1, -1, 1]) / np.sqrt(3)
+        super().__init__(rn(-2 * np.pi / 3, _axis), qubit)
+        self._properties['name'] = 'Cliff21'
+        self._properties['params'] = {'angle': -2 * np.pi / 3, 'axis': _axis}
+
+
+class Cliff22(Gate):
+    """Class for the 22nd single-qubit Clifford gate.
+
+    +120° rotation around the (-X+Y+Z)/sqrt(3) axis.
+    """
+
+    def __init__(self, qubit: int, **kwargs) -> None:
+        """Initialize using the rn function.
+
+        Args:
+            qubit (int): qubit label.
+        """
+        _axis = np.array([-1, 1, 1]) / np.sqrt(3)
+        super().__init__(rn(2 * np.pi / 3, _axis), qubit)
+        self._properties['name'] = 'Cliff22'
+        self._properties['params'] = {'angle': 2 * np.pi / 3, 'axis': _axis}
+
+
+class Cliff23(Gate):
+    """Class for the 23rd single-qubit Clifford gate.
+
+    -120° rotation around the (-X+Y+Z)/sqrt(3) axis.
+    """
+
+    def __init__(self, qubit: int, **kwargs) -> None:
+        """Initialize using the rn function.
+
+        Args:
+            qubit (int): qubit label.
+        """
+        _axis = np.array([-1, 1, 1]) / np.sqrt(3)
+        super().__init__(rn(-2 * np.pi / 3, _axis), qubit)
+        self._properties['name'] = 'Cliff23'
+        self._properties['params'] = {'angle': -2 * np.pi / 3, 'axis': _axis}
 
 
 class H(Gate):
@@ -208,7 +638,7 @@ class H(Gate):
             qubit (int): qubit label.
         """
         super().__init__(h, qubit)
-        self._properties['alias'] = 'QFT'
+        self._properties['alias'] = 'QFT, Cliff14'
         self._properties['name'] = 'H'
 
 
@@ -222,6 +652,7 @@ class Id(Gate):
             qubit (int): qubit label.
         """
         super().__init__(id, qubit)
+        self._properties['alias'] = 'Cliff0'
         self._properties['name'] = 'I'
         self._properties['params'] = {
             'angle': 0,
@@ -532,7 +963,7 @@ class S(Gate):
             qubit (int): qubit label.
         """
         super().__init__(rz(np.pi/2), qubit)
-        self._properties['alias'] = 'sqrt(Z)\nZ90'
+        self._properties['alias'] = 'sqrt(Z)\nZ90, Cliff8'
         self._properties['name'] = 'S'
         self._properties['params'] = {
             'phase': np.pi/2,
@@ -550,7 +981,7 @@ class SX(Gate):
             qubit (int): qubit label.
         """
         super().__init__(rx(np.pi/2), qubit)
-        self._properties['alias'] = 'V, X90'
+        self._properties['alias'] = 'V, X90, Cliff4'
         self._properties['name'] = 'SX'
         self._properties['params'] = {
             'angle': np.pi/2,
@@ -568,7 +999,7 @@ class SY(Gate):
             qubit (int): qubit label.
         """
         super().__init__(ry(np.pi/2), qubit)
-        self._properties['alias'] = 'Y90'
+        self._properties['alias'] = 'Y90, Cliff6'
         self._properties['name'] = 'SY'
         self._properties['params'] = {
             'angle': np.pi/2,
@@ -586,7 +1017,7 @@ class Sdag(Gate):
             qubit (int): qubit label.
         """
         super().__init__(rz(-np.pi/2), qubit)
-        self._properties['alias'] = 'SqrtZdag\nZ-90'
+        self._properties['alias'] = 'SqrtZdag\nZ-90, Cliff9'
         self._properties['name'] = 'Sdag'
         self._properties['params'] = {
             'phase': -np.pi/2,
@@ -604,7 +1035,7 @@ class SXdag(Gate):
             qubit (int): qubit label.
         """
         super().__init__(rx(-np.pi/2), qubit)
-        self._properties['alias'] = 'Vdag, X-90'
+        self._properties['alias'] = 'Vdag, X-90, Cliff5'
         self._properties['name'] = 'SXdag'
         self._properties['params'] = {
             'angle': -np.pi/2,
@@ -622,7 +1053,7 @@ class SYdag(Gate):
             qubit (int): qubit label.
         """
         super().__init__(ry(-np.pi/2), qubit)
-        self._properties['alias'] = 'Y-90'
+        self._properties['alias'] = 'Y-90, Cliff7'
         self._properties['name'] = 'SYdag'
         self._properties['params'] = {
             'angle': -np.pi/2,
@@ -704,7 +1135,7 @@ class V(Gate):
             qubit (int): qubit label.
         """
         super().__init__(rx(np.pi/2), qubit)
-        self._properties['alias'] = 'SX, X90'
+        self._properties['alias'] = 'SX, X90, Cliff4'
         self._properties['name'] = 'V'
         self._properties['params'] = {
             'angle': np.pi/2,
@@ -722,7 +1153,7 @@ class Vdag(Gate):
             qubit (int): qubit label.
         """
         super().__init__(rx(-np.pi/2), qubit)
-        self._properties['alias'] = 'SXdag, X-90'
+        self._properties['alias'] = 'SXdag, X-90, Cliff5'
         self._properties['name'] = 'Vdag'
         self._properties['params'] = {
             'angle': -np.pi/2,
@@ -769,6 +1200,7 @@ class X(Gate):
                 GE.
         """
         super().__init__(x, qubit)
+        self._properties['alias'] = 'Cliff1'
         self._properties['name'] = 'X'
         self._properties['params'] = {
             'angle': np.pi,
@@ -789,7 +1221,7 @@ class X90(Gate):
                 GE.
         """
         super().__init__(rx(np.pi/2), qubit)
-        self._properties['alias'] = 'V'
+        self._properties['alias'] = 'V, Cliff4'
         self._properties['name'] = 'X90'
         self._properties['params'] = {
             'angle':    np.pi/2,
@@ -810,6 +1242,7 @@ class Y(Gate):
                 GE.
         """
         super().__init__(y, qubit)
+        self._properties['alias'] = 'Cliff2'
         self._properties['name'] = 'Y'
         self._properties['params'] = {
             'angle': np.pi,
@@ -830,6 +1263,7 @@ class Y90(Gate):
                 GE.
         """
         super().__init__(ry(np.pi/2), qubit)
+        self._properties['alias'] = 'Cliff6'
         self._properties['name'] = 'Y90'
         self._properties['params'] = {
             'angle': np.pi/2,
@@ -850,6 +1284,7 @@ class Z(Gate):
                 GE.
         """
         super().__init__(z, qubit)
+        self._properties['alias'] = 'Cliff3'
         self._properties['name'] = 'Z'
         self._properties['params'] = {
             'phase': np.pi,
@@ -868,7 +1303,7 @@ class Z90(Gate):
             qubit (int): qubit label.
         """
         super().__init__(rz(np.pi/2), qubit)
-        self._properties['alias'] = 'sqrt(Z)\nS'
+        self._properties['alias'] = 'sqrt(Z)\nS, Cliff8'
         self._properties['name'] = 'Z90'
         self._properties['params'] = {
             'phase': np.pi/2,
@@ -877,9 +1312,67 @@ class Z90(Gate):
         self._properties['subspace'] = subspace
 
 
+SINGLE_QUBIT_PAULIS: Mapping[str, Callable] = {
+    'I': Id,
+    'X': X,
+    'Y': Y,
+    'Z': Z
+}
+
+SINGLE_QUBIT_CLIFFORDS: Mapping[int, Callable] = {
+    0:  Cliff0,
+    1:  Cliff1,
+    2:  Cliff2,
+    3:  Cliff3,
+    4:  Cliff4,
+    5:  Cliff5,
+    6:  Cliff6,
+    7:  Cliff7,
+    8:  Cliff8,
+    9:  Cliff9,
+    10: Cliff10,
+    11: Cliff11,
+    12: Cliff12,
+    13: Cliff13,
+    14: Cliff14,
+    15: Cliff15,
+    16: Cliff16,
+    17: Cliff17,
+    18: Cliff18,
+    19: Cliff19,
+    20: Cliff20,
+    21: Cliff21,
+    22: Cliff22,
+    23: Cliff23,
+}
+
 SINGLE_QUBIT_GATES: Mapping[str, Callable] = defaultdict(
     lambda: 'Gate not currently supported!', {
-        'C':        C,
+        'C':       C,
+        'Cliff0':  Cliff0,
+        'Cliff1':  Cliff1,
+        'Cliff2':  Cliff2,
+        'Cliff3':  Cliff3,
+        'Cliff4':  Cliff4,
+        'Cliff5':  Cliff5,
+        'Cliff6':  Cliff6,
+        'Cliff7':  Cliff7,
+        'Cliff8':  Cliff8,
+        'Cliff9':  Cliff9,
+        'Cliff10': Cliff10,
+        'Cliff11': Cliff11,
+        'Cliff12': Cliff12,
+        'Cliff13': Cliff13,
+        'Cliff14': Cliff14,
+        'Cliff15': Cliff15,
+        'Cliff16': Cliff16,
+        'Cliff17': Cliff17,
+        'Cliff18': Cliff18,
+        'Cliff19': Cliff19,
+        'Cliff20': Cliff20,
+        'Cliff21': Cliff21,
+        'Cliff22': Cliff22,
+        'Cliff23': Cliff23,
         'H':        H,
         'Id':       Id,
         'Idle':     Idle,

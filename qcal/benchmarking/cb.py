@@ -16,7 +16,14 @@ import numpy as np
 from IPython.display import clear_output
 
 from qcal.analysis.leakage import analyze_leakage
+from qcal.benchmarking.utils import (
+    PauliString,
+    generate_n_qubit_pauli_measurement_groups,
+    generate_random_n_qubit_paulis,
+)
+from qcal.circuit import Barrier, Circuit, CircuitSet, Cycle
 from qcal.config import Config
+from qcal.gate.single_qubit import H, Meas, S, Sdag, X, Y, Z
 from qcal.math.utils import round_to_order_error
 from qcal.qpu.qpu import QPU
 from qcal.settings import Settings
@@ -24,7 +31,391 @@ from qcal.settings import Settings
 logger = logging.getLogger(__name__)
 
 
-__all__ = ['CB', 'SC']
+__all__ = ['CB', 'CB1', 'SC']
+
+
+def _composes_to_identity(
+    cycle_or_circuit: Cycle | Circuit, depth: int
+) -> bool:
+    """Assert that cycle_or_circuit^d ≈ I (up to global phase).
+
+    Strategy: use np.linalg.matrix_power to raise the unitary matrix of the
+    cycle_or_circuit to the specified depth. A matrix is proportional to
+    identity iff M/M[0,0] ≈ I when M[0,0] ≠ 0, or equivalently
+    |tr(M^d)|^2 == dim^2.
+
+    Raises:
+        AssertionError: if M^d is not proportional to identity for the depth.
+    """
+    M = cycle_or_circuit.unitary
+    dim = M.shape[0]
+    Md = np.linalg.matrix_power(M, depth)
+    # Remove global phase via the first non-zero diagonal element
+    diag = np.diag(Md)
+    pivot = next(v for v in diag if abs(v) > 1e-10)
+    phase = pivot / abs(pivot)
+    if np.allclose(Md / phase, np.eye(dim), atol=1e-6):
+        return True
+    else:
+        return False
+        # assert np.allclose(Md / phase, np.eye(dim), atol=1e-6), (
+        #     f"cycle_or_circuit^{d} is not identity (up to global phase). "
+        #     f"Max residual: {np.max(np.abs(Md / phase - np.eye(dim))):.2e}"
+        # )
+
+
+def _prep_cycles(pauli: PauliString, qubits: tuple) -> list[Cycle]:
+    """Return the ordered Cycles that prepare the +1 eigenstate of a Pauli.
+
+    Eigenstate rotations from |0>:
+      I, Z  →  no rotation needed
+      X     →  H  (H|0> = |+>)
+      Y     →  H then S  (S·H|0> = |+i>)
+
+    Because S and H act on the same qubit sequentially, Y-prep requires two
+    separate Cycles.  X and Y qubits both get H in the first Cycle; Y qubits
+    get an additional S in the second Cycle.
+
+    Returns:
+        list[Cycle]: 0, 1, or 2 Cycles (empty list for all-I/Z Pauli).
+    """
+    h_gates = [
+        H(q) for p, q in zip(pauli, qubits, strict=True)
+        if p in ('X', 'Y')
+    ]
+    s_gates = [
+        S(q) for p, q in zip(pauli, qubits, strict=True)
+        if p == 'Y'
+    ]
+    cycles: list[Cycle] = []
+    if h_gates:
+        cycles.append(Cycle(h_gates))
+    if s_gates:
+        cycles.append(Cycle(s_gates))
+    return cycles
+
+
+def _inv_prep_cycles(pauli: PauliString, qubits: tuple) -> list[Cycle]:
+    """Return the ordered Cycles that invert the preparation.
+
+    Rotates the eigenstate basis back to Z so that standard Z-basis
+    measurement recovers the eigenstate parity.
+
+    Inverse rotations:
+      I, Z  →  no rotation
+      X     →  H  (H is self-inverse)
+      Y     →  Sdag then H  ((S·H)^{-1} = H·S^{dag}, applied left-to-right)
+
+    Returns:
+        list[Cycle]: 0, 1, or 2 Cycles.
+    """
+    sdag_gates = [
+        Sdag(q) for p, q in zip(pauli, qubits, strict=True)
+        if p == 'Y'
+    ]
+    h_gates = [
+        H(q) for p, q in zip(pauli, qubits, strict=True)
+        if p in ('X', 'Y')
+    ]
+    cycles: list[Cycle] = []
+    if sdag_gates:
+        cycles.append(Cycle(sdag_gates))
+    if h_gates:
+        cycles.append(Cycle(h_gates))
+    return cycles
+
+
+def _pauli_to_cycle(pauli: PauliString, qubits: tuple) -> Cycle | None:
+    """Convert a PauliString to a Cycle of Pauli gates.
+
+    Identity components are omitted (no gate on that qubit). Returns None
+    if the entire string is identity (caller should skip appending).
+    """
+    gates = []
+    for p, q in zip(pauli, qubits, strict=True):
+        if p == 'X':
+            gates.append(X(q))
+        elif p == 'Y':
+            gates.append(Y(q))
+        elif p == 'Z':
+            gates.append(Z(q))
+    return Cycle(gates) if gates else None
+
+
+def _propagate_sign(
+    decay_pauli:  PauliString,
+    twirl_paulis: list[PauliString],
+) -> int:
+    """Determine the ±1 eigenstate sign after ideal evolution through twirls.
+
+    For each Pauli twirl layer Q_i, count the number of qubit positions
+    where decay_pauli and Q_i have distinct non-identity operators — those
+    positions anticommute as single-qubit Paulis.  If the count is odd, the
+    n-qubit Paulis anticommute and the eigenvalue flips.
+
+    Single-qubit anticommutation rule:
+      P_i·Q_i = -Q_i·P_i  iff  P_i ≠ I  and  Q_i ≠ I  and  P_i ≠ Q_i
+
+    Args:
+        decay_pauli (PauliString): the Pauli decay string, e.g. ('X', 'Z', 'I').
+        twirl_paulis (list[PauliString]): random Pauli layers between cycles.
+
+    Returns:
+        int: +1 or -1.
+    """
+    sign = 1
+    for twirl in twirl_paulis:
+        n_anticommuting = sum(
+            1
+            for p, q in zip(decay_pauli, twirl, strict=True)
+            if p != 'I' and q != 'I' and p != q
+        )
+        if n_anticommuting % 2 == 1:
+            sign *= -1
+    return sign
+
+
+def CB(
+    qpu:              QPU,
+    config:           Config,
+    cycle_or_circuit: Cycle | Circuit,
+    circuit_depths:   Iterable[int],
+    n_decays:         int = 20,
+    n_randomizations: int = 30,
+    **kwargs,
+) -> Callable:
+    """Cycle Benchmarking (CB) without mirror inversion.
+
+    Estimates per-Pauli decay rates for a target cycle or circuit by twirling
+    with random Pauli layers and measuring expectation-value decay vs depth.
+
+    Protocol overview (depth d, Pauli decay string P):
+      1. Sample n_decays random n-qubit Pauli strings; group by QWC measurement
+         basis.
+      2. For each Pauli P, depth d, and randomization index r:
+           a. Build a preparation cycle that rotates |0...0> to the +1
+           eigenstate of P:
+                I, Z  →  identity (|0> is already the +1 eigenstate)
+                X     →  H
+                Y     →  H, then S  (S·H|0> = |+i>, the +1 eigenstate of Y)
+           b. Insert d instances of cycle_or_circuit, with a random Pauli
+              twirl cycle between each adjacent pair (d+2 twirls total).
+           c. Apply the inverse preparation to rotate back to the Z basis.
+           d. Measure all qubits in Z.
+           e. Compute the expected eigenstate sign ±1 by propagating P through
+              the Pauli twirl layers: each twirl Q_i flips the sign if P and Q_i
+              anticommute (odd number of qubit-positions with distinct
+              non-identity Paulis).
+      3. Track per-circuit metadata in the CircuitSet: pauli, depth,
+         randomization, sign.
+      4. For analysis, group circuits by Pauli, depth, and sign, and then sum
+         results, and fit <P>(d) = A * f_P^d to extract the per-Pauli fidelity
+         f_P.
+
+    Prerequisite: cycle_or_circuit composed depth times must equal the identity
+    (up to global phase) for every depth in circuit_depths.
+
+    Args:
+        qpu (QPU): custom QPU object.
+        config (Config): qcal Config object.
+        cycle_or_circuit (Cycle | Circuit): the cycle or sub-circuit to
+            benchmark.
+        circuit_depths (Iterable[int]): number of interleaved cycle_or_circuit
+            instances per circuit, e.g. [1, 2, 4, 8, 16].
+        n_decays (int): number of randomly sampled Pauli decay strings. Defaults
+            to 20. Warning: values below min(20, 4^n - 1) may bias the process
+            fidelity estimate.
+        n_randomizations (int): number of random Pauli twirl instances per
+            (Pauli, depth) pair. Defaults to 30.
+
+    Returns:
+        Callable: CB class instance.
+    """
+
+    class CB(qpu):
+        """qcal-native CB protocol."""
+
+        def __init__(
+            self,
+            config:           Config,
+            cycle_or_circuit: Cycle | Circuit,
+            circuit_depths:   Iterable[int],
+            n_decays:         int = 20,
+            n_randomizations: int = 30,
+            **kwargs,
+        ) -> None:
+            self._cycle_or_circuit = cycle_or_circuit
+            self._circuit_depths = sorted(circuit_depths)
+            self._n_decays = n_decays
+            self._n_randomizations = n_randomizations
+            self._qubits = (
+                cycle_or_circuit.qubits
+                if isinstance(cycle_or_circuit, Cycle)
+                else cycle_or_circuit.labels
+            )
+
+            qpu.__init__(self, config=config, **kwargs)
+
+        def generate_circuits(self) -> None:
+            """Generate all CB circuits and store them in self._circuits.
+
+            For each (Pauli, depth, randomization) triple the circuit is:
+
+              prep_cycles | [cycle_or_circuit | twirl]^{d-1} | cycle_or_circuit
+                          | inv_prep_cycles | Meas
+
+            where there are d-1 Pauli twirl Cycles between the d instances of
+            cycle_or_circuit.
+
+            CircuitSet metadata columns:
+              'pauli'          — joined Pauli string, e.g. 'XZI'
+              'depth'          — number of cycle_or_circuit instances
+              'randomization'  — integer index 0..n_randomizations-1
+              'sign'           — ±1 expected eigenstate sign under ideal evolution
+            """
+            logger.info(" Generating circuits...")
+
+            sampled_paulis = generate_random_n_qubit_paulis(
+                self._qubits, n_random_paulis=self._n_decays
+            )
+            pauli_groups = generate_n_qubit_pauli_measurement_groups(sampled_paulis)
+
+            circuits: list[Circuit] = []
+            pauli_labels: list[str] = []
+            depths: list[int] = []
+            randomizations: list[int] = []
+            signs: list[int] = []
+
+            meas_cycle = Cycle([Meas(q) for q in self._qubits])
+
+            for group in pauli_groups:
+                for pauli in group.paulis:
+                    pauli_str = ''.join(pauli)
+                    prep  = _prep_cycles(pauli, self._qubits)
+                    inv   = _inv_prep_cycles(pauli, self._qubits)
+
+                    for depth in self._circuit_depths:
+                        for r in range(self._n_randomizations):
+                            # Sample d-1 random Pauli twirl strings
+                            twirl_strings = generate_random_n_qubit_paulis(
+                                self._qubits, n_random_paulis=depth - 1
+                            )
+                            sign = _propagate_sign(pauli, twirl_strings)
+
+                            all_cycles: list[Cycle] = list(prep)
+
+                            for i in range(depth):
+                                if isinstance(self._cycle_or_circuit, Cycle):
+                                    all_cycles.append(self._cycle_or_circuit)
+                                else:
+                                    all_cycles.extend([
+                                        c for c in self._cycle_or_circuit.cycles
+                                        if not isinstance(c, Barrier)
+                                    ])
+                                if i < depth - 1:
+                                    twirl_cycle = _pauli_to_cycle(
+                                        twirl_strings[i], self._qubits
+                                    )
+                                    if twirl_cycle is not None:
+                                        all_cycles.append(twirl_cycle)
+
+                            all_cycles.extend(inv)
+                            all_cycles.append(meas_cycle)
+
+                            circuits.append(Circuit(all_cycles))
+                            pauli_labels.append(pauli_str)
+                            depths.append(depth)
+                            randomizations.append(r)
+                            signs.append(sign)
+
+            self._circuits = CircuitSet(circuits)
+            self._circuits['pauli'] = pauli_labels
+            self._circuits['depth'] = depths
+            self._circuits['randomization'] = randomizations
+            self._circuits['sign'] = signs
+
+        # ------------------------------------------------------------------
+        # Analysis and plotting
+        # ------------------------------------------------------------------
+
+        def analyze(self) -> None:
+            """Fit per-Pauli decay curves and estimate the cycle error rate.
+
+            For each unique Pauli P and depth d, compute the mean expectation value:
+
+              EV(P, d) = mean over randomizations of s_r * (p_0 - p_1)
+
+            where s_r is the circuit's sign (+1 or -1), p_0 is the probability
+            of measuring |0...0> (correct eigenstate after ideal InvPrep), and
+            p_1 = 1 - p_0.
+
+            Using CircuitSet:
+              for each pauli_str in unique paulis:
+                evs = []
+                for depth in self._circuit_depths:
+                  for sign in (+1, -1):
+                    subset = self._circuits.subset(
+                        pauli=pauli_str, depth=depth, sign=sign
+                    )
+                    if len(subset) == 0:
+                      continue
+                    result = subset.sum_result()  # aggregated counts
+                    p0 = result.probabilities.get('0' * n_qubits, 0.0)
+                    ev = sign * (2 * p0 - 1)
+                    evs.append(ev)
+                  mean_ev = mean(evs) for this depth
+                Fit mean_ev vs depth to A * f_P^d.
+
+            The process infidelity is:
+              e_F = (d^2 - 1) / d^2 * (1 - average f_P over sampled Paulis)
+
+            TODO: implement fitting using qcal.fitting or scipy.optimize.curve_fit.
+            """
+            logger.info(" Analyzing the results...")
+            raise NotImplementedError
+
+        def plot(self) -> None:
+            """Plot per-Pauli decay curves (mean EV vs depth) with fitted exponentials.
+
+            One subplot per sampled Pauli string showing:
+              - Scatter: mean EV per depth
+              - Line: fitted A * f_P^depth
+              - Legend entry with f_P ± uncertainty
+
+            TODO: implement after analyze() is complete.
+            """
+            raise NotImplementedError
+
+        def save(self) -> None:
+            """Save all circuits and data."""
+            clear_output(wait=True)
+            self._data_manager._exp_id += (
+                f"_CB{''.join('Q' + str(q) for q in self._qubits)}"
+            )
+            if Settings.save_data:
+                qpu.save(self)
+
+        def final(self) -> None:
+            """Final benchmarking method."""
+            print(f"\nRuntime: {repr(self._runtime)[8:]}\n")
+
+        def run(self) -> None:
+            """Run all experimental methods and analyze results."""
+            self.generate_circuits()
+            qpu.run(self, self._circuits, save=False)
+            self.save()
+            self.analyze()
+            self.plot()
+            self.final()
+
+    return CB(
+        config=config,
+        cycle_or_circuit=cycle_or_circuit,
+        circuit_depths=circuit_depths,
+        n_decays=n_decays,
+        n_randomizations=n_randomizations,
+        **kwargs,
+    )
 
 
 def compute_cycle_infidelity(
@@ -59,7 +450,7 @@ def compute_cycle_infidelity(
     return (e_C, err_C)
 
 
-def CB(
+def CB1(
     qpu:                  QPU,
     config:               Config,
     cycle:                dict | trueq.Cycle,  # noqa: F821 # type: ignore
@@ -253,7 +644,7 @@ def CB(
             """Save all circuits and data."""
             clear_output(wait=True)
             self._data_manager._exp_id += (
-                f"_CB{''.join('Q' + str(q) for q in self._circuits.labels)}"
+                f"_CB1{''.join('Q' + str(q) for q in self._circuits.labels)}"
             )
             if Settings.save_data:
                 qpu.save(self)
