@@ -519,27 +519,115 @@ def prepend_delay_to_program(program: Program, delay: float) -> Program:  # type
     return program.prepend_instructions([DELAY(q, delay) for q in qubits])
 
 
-def prepend_esp_to_measure(program: Program) -> Program:  # type: ignore  # noqa: F821
+def prepend_esp_to_measure(
+    program:              Program,  # type: ignore  # noqa: F821
+    qubits:               Sequence[int] | None = None,
+    fence_between_cycles: bool = False,
+) -> Program:  # type: ignore  # noqa: F821
     """Prepend an EF Pi pulse (ESP) to each measurement in a PyQuil program.
+
+    When ``fence_between_cycles=True`` (default), the function operates on
+    fenced cycles: for each block of instructions between a pair of FENCE
+    instructions that contains measurements, a single EF pi cycle is inserted
+    immediately before the original measurement cycle. The EF pi cycle is
+    bounded on each side by a global FENCE across all program qubits, so
+    qubits that do not receive an EF pi pulse simply idle for the duration.
+    Measurements appearing outside a fenced block are handled with the same
+    global FENCE delimiters.
+
+    When ``fence_between_cycles=False``, the function iterates over
+    instructions directly and inserts two EF X90 pulses immediately before
+    each matching measurement, without any surrounding FENCE instructions.
 
     Args:
         program (Program): the program to update.
+        qubits (Sequence[int] | None, optional): qubit indices to which the EF
+            pi pulse should be applied. When ``None``, the pulse is prepended
+            before every measurement. Defaults to ``None``.
+        fence_between_cycles (bool, optional): if ``True``, groups instructions
+            by fenced cycle before inserting EF pi pulses, surrounding the EF
+            pi cycle with global FENCEs. If ``False``, inserts EF pi pulses
+            inline before each matching measurement with no FENCEs added.
+            Defaults to ``False``.
 
     Returns
         Program: the updated program.
     """
     try:
         from pyquil import Program
-        from pyquil.quilbase import Measurement
+        from pyquil.gates import FENCE
+        from pyquil.quilbase import Fence, Measurement
     except ImportError as exc:
         raise ImportError("Unable to import PyQuil!") from exc
 
+    all_qubits = program.get_qubit_indices()
     new_program: Program = program.copy_everything_except_instructions()
-    for instr in program.instructions:
-        if isinstance(instr, Measurement):
-            new_program += add_X90(instr.qubit, **{'subspace': 'EF'})
-            new_program += add_X90(instr.qubit, **{'subspace': 'EF'})
-        new_program += instr
+
+    if not fence_between_cycles:
+        for instr in program.instructions:
+            if isinstance(instr, Measurement):
+                if qubits is None or _qubit_index(instr.qubit) in qubits:
+                    new_program += add_X90(instr.qubit, **{'subspace': 'EF'})
+                    new_program += add_X90(instr.qubit, **{'subspace': 'EF'})
+            new_program += instr
+        return new_program
+
+    instrs = list(program.instructions)
+    i = 0
+    while i < len(instrs):
+        instr = instrs[i]
+
+        if isinstance(instr, Fence):
+            opening_fence = instr
+            i += 1
+
+            block: List = []
+            while i < len(instrs) and not isinstance(instrs[i], Fence):
+                block.append(instrs[i])
+                i += 1
+
+            closing_fence = instrs[i] if i < len(instrs) else None
+            if i < len(instrs):
+                i += 1
+
+            measure_instrs = [b for b in block if isinstance(b, Measurement)]
+            if measure_instrs:
+                new_program += FENCE(*all_qubits)
+                for meas in measure_instrs:
+                    if qubits is None or _qubit_index(meas.qubit) in qubits:
+                        new_program += add_X90(meas.qubit, **{'subspace': 'EF'})
+                        new_program += add_X90(meas.qubit, **{'subspace': 'EF'})
+                new_program += FENCE(*all_qubits)
+
+            new_program += opening_fence
+            for b in block:
+                new_program += b
+            if closing_fence is not None:
+                new_program += closing_fence
+
+        else:
+            if isinstance(instr, Measurement):
+                # Collect all consecutive unfenced measurements as a virtual
+                # cycle so they share a single EF pi cycle.
+                meas_run: List = []
+                while i < len(instrs) and isinstance(instrs[i], Measurement):
+                    meas_run.append(instrs[i])
+                    i += 1
+                esp_meas = [
+                    m for m in meas_run
+                    if qubits is None or _qubit_index(m.qubit) in qubits
+                ]
+                if esp_meas:
+                    new_program += FENCE(*all_qubits)
+                    for meas in esp_meas:
+                        new_program += add_X90(meas.qubit, **{'subspace': 'EF'})
+                        new_program += add_X90(meas.qubit, **{'subspace': 'EF'})
+                    new_program += FENCE(*all_qubits)
+                for m in meas_run:
+                    new_program += m
+            else:
+                new_program += instr
+                i += 1
 
     return new_program
 
