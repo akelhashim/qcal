@@ -279,6 +279,90 @@ def _qubit_index(q: Qubit | FormalArgument | int) -> int:  # type: ignore  # noq
         raise TypeError(f"Unrecognized qubit object: {type(q).__name__}")
 
 
+def add_active_reset(
+    program:    Program,  # type: ignore  # noqa: F821
+    n_resets:   int = 1,
+    esp:        bool = False,
+    esp_qubits: Sequence[int] | None = None,
+) -> Program:  # type: ignore  # noqa: F821
+    """Prepend active resets to a PyQuil program using Quil jump statements.
+
+    For each reset cycle, every qubit in the program is measured into a
+    dedicated ``ro_reset`` register. A ``JUMP-UNLESS`` branch skips the
+    correction pulses when the qubit is already in |0⟩. Successive reset
+    cycles are separated by global FENCEs across all program qubits; a final
+    global FENCE follows the last reset before the main program body.
+
+    The correction sequence applied when a qubit is measured as |1⟩ depends
+    on whether excited state promotion (ESP) is enabled for that qubit:
+
+    - If ``esp=True`` and the qubit is in ``esp_qubits``: two
+      ``RX_F12(π/2)`` pulses (EF subspace) then two ``RX(π/2)`` pulses
+      (GE subspace).
+    - Otherwise: two ``RX(π/2)`` pulses (GE subspace) then two
+      ``RX_F12(π/2)`` pulses (EF subspace).
+
+    Args:
+        program (Program): the program to prepend active reset to.
+        n_resets (int, optional): number of active reset cycles to perform.
+            Defaults to 1.
+        esp (bool, optional): whether to use excited state promotion for
+            qubits listed in ``esp_qubits``. Defaults to ``False``.
+        esp_qubits (Sequence[int] | None, optional): qubit indices that
+            receive the ESP-ordered correction sequence. Only relevant when
+            ``esp=True``. Defaults to ``None``.
+
+    Returns:
+        Program: a new program with active reset cycles prepended before the
+        original instructions.
+    """
+    try:
+        from pyquil import Program
+        from pyquil.gates import DELAY, FENCE, MEASURE
+        from pyquil.quilatom import MemoryReference, Qubit
+        from pyquil.quilbase import Jump, JumpTarget, JumpUnless, Label
+    except ImportError as exc:
+        raise ImportError("Unable to import PyQuil!") from exc
+
+    all_qubits = sorted(program.get_qubit_indices())
+    esp_set = set(esp_qubits) if esp_qubits is not None else set()
+
+    new_program: Program = program.copy_everything_except_instructions()
+    for r in range(n_resets):
+        new_program += FENCE(*all_qubits)
+
+        for q in all_qubits:
+            label_false = Label(f"ar_{r}_{q}_false")
+            label_done  = Label(f"ar_{r}_{q}_done")
+            cref = MemoryReference(f"ro{q}", 0)
+            qubit_obj = Qubit(q)
+
+            new_program += MEASURE(q, cref)
+            new_program += JumpUnless(label_false, cref)
+            # $when_true: qubit measured |1⟩, apply correction pulses
+            if esp and q in esp_set:
+                new_program += add_X90(qubit_obj, **{'subspace': 'EF'})
+                new_program += add_X90(qubit_obj, **{'subspace': 'EF'})
+                new_program += add_X90(qubit_obj, **{'subspace': 'GE'})
+                new_program += add_X90(qubit_obj, **{'subspace': 'GE'})
+            else:
+                new_program += add_X90(qubit_obj, **{'subspace': 'GE'})
+                new_program += add_X90(qubit_obj, **{'subspace': 'GE'})
+                new_program += add_X90(qubit_obj, **{'subspace': 'EF'})
+                new_program += add_X90(qubit_obj, **{'subspace': 'EF'})
+            new_program += Jump(label_done)
+            # $when_false: qubit measured |0⟩, nothing to do
+            new_program += JumpTarget(label_false)
+            new_program += JumpTarget(label_done)
+
+    new_program += FENCE(*all_qubits)
+
+    for instr in program.instructions:
+        new_program += instr
+
+    return new_program
+
+
 def add_dd_sequence_during_operation(
     program:    Program,  # type: ignore  # noqa: F821
     operation:  Gate | Measurement,  # type: ignore  # noqa: F821
