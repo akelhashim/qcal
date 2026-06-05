@@ -389,7 +389,10 @@ def to_pyquil(
         return
 
     tprogram = Program()
-    classical_ref = tprogram.declare('ro', 'BIT', circuit.n_qubits)
+    qubit_to_cref = {
+        q: tprogram.declare(f'ro{q}', 'BIT', 1)
+        for q in circuit.qubits
+    }
     if circuit_for_loop:
         for sub_circuit, n_reps in circuit.partitions:
             if n_reps == 1:
@@ -397,7 +400,7 @@ def to_pyquil(
                         circuit=Circuit(sub_circuit),
                         gate_mapper=gate_mapper,
                         qubits=circuit.qubits,
-                        classical_ref=classical_ref,
+                        qubit_to_cref=qubit_to_cref,
                         cycles_to_defcircuits=cycles_to_defcircuits,
                         fence_between_cycles=fence_between_cycles
                 )
@@ -410,7 +413,7 @@ def to_pyquil(
                     circuit=Circuit(sub_circuit),
                     gate_mapper=gate_mapper,
                     qubits=circuit.qubits,
-                    classical_ref=classical_ref,
+                    qubit_to_cref=qubit_to_cref,
                     cycles_to_defcircuits=cycles_to_defcircuits,
                     fence_between_cycles=fence_between_cycles
                 )
@@ -431,7 +434,7 @@ def to_pyquil(
         tprogram += transpile_circuit(
             circuit=circuit,
             gate_mapper=gate_mapper,
-            classical_ref=classical_ref,
+            qubit_to_cref=qubit_to_cref,
             cycles_to_defcircuits=cycles_to_defcircuits,
             fence_between_cycles=fence_between_cycles
         )
@@ -443,7 +446,7 @@ def transpile_circuit(
     circuit:               Circuit,
     gate_mapper:           GateMapper,
     qubits:                Iterable[int] | None = None,
-    classical_ref:         pyquil.quilatom.MemoryReference | None = None,  # noqa: F821 # type: ignore
+    qubit_to_cref:         Dict | None = None,
     cycles_to_defcircuits: bool = False,
     fence_between_cycles:  bool = True,
 ):
@@ -458,8 +461,9 @@ def transpile_circuit(
             is useful for transpiling circuit partitions into for-loops, in
             which case the qubits in the partition may be a subset of the qubits
             in the entire circuit.
-        classical_ref (pyquil.quilatom.MemoryReference | None, optional):
-            classical memory reference to store the measurement result.
+        qubit_to_cref (Dict | None, optional): mapping from qubit index to
+            classical memory reference. When ``None``, a fresh ``ro`` register
+            is declared and the mapping is built from ``circuit.qubits``.
             Defaults to ``None``.
         cycles_to_defcircuits (bool, optional): whether to write each
             distinct cycle as a DEFCIRCUIT definition and invoke it by name.
@@ -483,9 +487,11 @@ def transpile_circuit(
     tprogram = Program()
     tprogram_body = Program()
 
-    if classical_ref is None:
-        classical_ref = tprogram.declare('ro', 'BIT', circuit.n_qubits)
-    qubit_to_cref = {q: classical_ref[i] for i, q in enumerate(circuit.qubits)}
+    if qubit_to_cref is None:
+        qubit_to_cref = {
+            q: tprogram.declare(f'ro{q}', 'BIT', 1)
+            for q in circuit.qubits
+        }
 
     if cycles_to_defcircuits:
         cycle_defs = {}
@@ -538,7 +544,7 @@ def transpile_cycle(
     gate_mapper:           GateMapper,
     qubit_to_cref:         Dict,
     cycles_to_defcircuits: bool = False,
-):
+) -> Program:  # type: ignore # noqa: F821
     """Transpile a single qcal Cycle to a PyQuil Program.
 
     Args:

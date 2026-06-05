@@ -632,23 +632,31 @@ def prepend_esp_to_measure(
     return new_program
 
 
-def prepend_measure_to_program(program: Program) -> Program:  # type: ignore  # noqa: F821
+def prepend_measure_to_program(
+    program: Program,  # type: ignore  # noqa: F821
+    delay:   float = 2e-6,
+) -> Program:  # type: ignore  # noqa: F821
     """Prepend a measure to a PyQuil program.
 
     Args:
         program (Program): the program to update.
+        delay (float, optional): delay in seconds to insert after each
+            measurement. Defaults to 2 µs.
 
     Returns:
         Program: the updated program.
     """
     try:
-        from pyquil.gates import MEASURE
+        from pyquil.gates import DELAY, MEASURE
     except ImportError as exc:
         raise ImportError("Unable to import PyQuil!") from exc
 
-    qubits = program.get_qubit_indices()
-    measure = [MEASURE(q, ('ro', i)) for i, q in enumerate(sorted(qubits))]
-    return program.prepend_instructions(measure)
+    qubits = sorted(program.get_qubit_indices())
+    instrs = []
+    for q in qubits:
+        instrs.append(MEASURE(q, (f'ro{q}', 0)))
+        instrs.append(DELAY(q, delay))
+    return program.prepend_instructions(instrs)
 
 
 def replace_parallel_cycles(
