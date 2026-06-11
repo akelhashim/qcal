@@ -361,6 +361,7 @@ def RZ_F12(theta, q) -> Any:
 def to_pyquil(
     circuit:               Circuit,
     gate_mapper:           GateMapper,
+    cycle_replacement:     Dict[Cycle, str] | None = None,
     circuit_for_loop:      bool = False,
     cycles_to_defcircuits: bool = False,
     fence_between_cycles:  bool = True,
@@ -370,6 +371,9 @@ def to_pyquil(
     Args:
         circuit (Circuit): qcal circuit.
         gate_mapper (GateMapper): map between qcal to quil gates.
+        cycle_replacement (Dict[Cycle, str] | None, optional): mapping from
+                qcal Cycles to PyQuil DEFCIRCUIT name, used to replace entire
+                cycle with a single DEFCIRCUIT call. Defaults to ``None``.
         circuit_for_loop (bool, optional): loops over circuit partitions for
                 circuits with repeated structures. Defaults to ``False``.
         cycles_to_defcircuits (bool, optional): whether to write each
@@ -389,36 +393,42 @@ def to_pyquil(
         return
 
     tprogram = Program()
+    declarations = Program()
     qubit_to_cref = {
-        q: tprogram.declare(f'ro{q}', 'BIT', 1)
+        q: declarations.declare(f'ro{q}', 'BIT', 1)
         for q in circuit.qubits
     }
     if circuit_for_loop:
         for sub_circuit, n_reps in circuit.partitions:
             if n_reps == 1:
-                tprogram += transpile_circuit(
+                _declarations, _tprogram = transpile_circuit(
                         circuit=Circuit(sub_circuit),
                         gate_mapper=gate_mapper,
                         qubits=circuit.qubits,
+                        cycle_replacement=cycle_replacement,
                         qubit_to_cref=qubit_to_cref,
                         cycles_to_defcircuits=cycles_to_defcircuits,
                         fence_between_cycles=fence_between_cycles
                 )
+                declarations += _declarations
+                tprogram += _tprogram
 
             elif n_reps > 1:
-                counter = tprogram.declare(
+                counter = declarations.declare(
                     f'counter{to_pyquil._counter}', 'INTEGER'
                 )
-                tsub_program = transpile_circuit(
+                _declarations, _tsub_program = transpile_circuit(
                     circuit=Circuit(sub_circuit),
                     gate_mapper=gate_mapper,
                     qubits=circuit.qubits,
+                    cycle_replacement=cycle_replacement,
                     qubit_to_cref=qubit_to_cref,
                     cycles_to_defcircuits=cycles_to_defcircuits,
                     fence_between_cycles=fence_between_cycles
                 )
+                declarations += _declarations
 
-                loop = tsub_program.with_loop(
+                loop = _tsub_program.with_loop(
                     num_iterations=n_reps,
                     iteration_count_reference=counter,
                     start_label=LabelPlaceholder(f'START{to_pyquil._counter}'),
@@ -431,22 +441,28 @@ def to_pyquil(
         tprogram.resolve_label_placeholders()
 
     else:
-        tprogram += transpile_circuit(
+        _declarations, _tprogram = transpile_circuit(
             circuit=circuit,
             gate_mapper=gate_mapper,
+            cycle_replacement=cycle_replacement,
             qubit_to_cref=qubit_to_cref,
             cycles_to_defcircuits=cycles_to_defcircuits,
             fence_between_cycles=fence_between_cycles
         )
+        declarations += _declarations
+        tprogram += _tprogram
 
-    return tprogram
+    return declarations + tprogram
 
 
 def transpile_circuit(
     circuit:               Circuit,
     gate_mapper:           GateMapper,
     qubits:                Iterable[int] | None = None,
-    qubit_to_cref:         Dict | None = None,
+    cycle_replacement:     Dict[Cycle, str] | None = None,
+    qubit_to_cref:         (
+        Dict[int, pyquil.quilatom.MemoryReference] | None  # type: ignore # noqa: F821
+    ) = None,
     cycles_to_defcircuits: bool = False,
     fence_between_cycles:  bool = True,
 ):
@@ -461,10 +477,13 @@ def transpile_circuit(
             is useful for transpiling circuit partitions into for-loops, in
             which case the qubits in the partition may be a subset of the qubits
             in the entire circuit.
-        qubit_to_cref (Dict | None, optional): mapping from qubit index to
-            classical memory reference. When ``None``, a fresh ``ro`` register
-            is declared and the mapping is built from ``circuit.qubits``.
-            Defaults to ``None``.
+        cycle_replacement (Dict[Cycle, str] | None, optional): mapping from
+                qcal Cycles to PyQuil DEFCIRCUIT name, used to replace entire
+                cycle with a single DEFCIRCUIT call. Defaults to ``None``.
+        qubit_to_cref (Dict[int, pyquil.quilatom.MemoryReference] | None,
+            optional): mapping from qubit index to classical memory reference.
+            When ``None``, a fresh ``ro`` register is declared and the mapping
+            is built from ``circuit.qubits``. Defaults to ``None``.
         cycles_to_defcircuits (bool, optional): whether to write each
             distinct cycle as a DEFCIRCUIT definition and invoke it by name.
             Defaults to ``False``.
@@ -485,39 +504,45 @@ def transpile_circuit(
 
     qubits = circuit.qubits if qubits is None else qubits
     tprogram = Program()
-    tprogram_body = Program()
+    declarations = Program()
 
     if qubit_to_cref is None:
         qubit_to_cref = {
-            q: tprogram.declare(f'ro{q}', 'BIT', 1)
+            q: declarations.declare(f'ro{q}', 'BIT', 1)
             for q in circuit.qubits
         }
 
-    if cycles_to_defcircuits:
-        cycle_defs = {}
-
+    cycle_defs = {}
     for i, cycle in enumerate(circuit):
         if fence_between_cycles:
-            tprogram_body += FENCE(*qubits)
+            tprogram += FENCE(*qubits)
 
         if isinstance(cycle, Barrier):
-            tprogram_body += FENCE(*cycle.qubits)
+            tprogram += FENCE(*cycle.qubits)
 
         else:
-            if cycles_to_defcircuits:
-                tcycle = transpile_cycle(
-                    cycle, gate_mapper, qubit_to_cref, cycles_to_defcircuits
-                )
+            # Determine defcircuit name: caller-supplied takes priority,
+            # otherwise auto-generate if cycles_to_defcircuits is set.
+            if cycle_replacement and cycle in cycle_replacement:
+                cycle_key = cycle_replacement[cycle]
+            elif cycles_to_defcircuits:
                 cycle_key = next(
                     (k for k, c in cycle_defs.items() if c == cycle),
-                    None
+                    f'Cycle_{i}'
                 )
-                if not cycle_key:
-                    cycle_key = f'Cycle_{i}'
-                    cycle_defs[cycle_key] = cycle
+            else:
+                cycle_key = None
 
-                    # Create the DefCircuit and add it to the program
-                    tprogram += DefCircuit(
+            if cycle_key is not None:
+                if cycle_key not in cycle_defs:
+                    cycle_defs[cycle_key] = cycle
+                    tcycle = transpile_cycle(
+                        cycle=cycle,
+                        gate_mapper=gate_mapper,
+                        qubit_to_cref=qubit_to_cref,
+                        cycles_to_defcircuits=True
+                    )
+                    declarations += DefCircuit(
                         name=cycle_key,
                         parameters=[],
                         qubits=[
@@ -525,24 +550,26 @@ def transpile_circuit(
                         ],
                         instructions=tcycle.instructions,
                     )
-
-                tprogram_body += Program(
-                    f"{cycle_key} {' '.join(str(q) for q in qubits)}"
+                tprogram += Program(
+                    f"{cycle_key} {' '.join(str(q) for q in cycle.qubits)}"
                 )
 
             else:
-                tprogram_body += transpile_cycle(
-                    cycle, gate_mapper, qubit_to_cref, cycles_to_defcircuits
+                tprogram += transpile_cycle(
+                    cycle=cycle,
+                    gate_mapper=gate_mapper,
+                    qubit_to_cref=qubit_to_cref,
+                    cycles_to_defcircuits=False
                 )
 
-    tprogram += tprogram_body
-    return tprogram
+    # tprogram += tprogram_body
+    return (declarations, tprogram)
 
 
 def transpile_cycle(
     cycle:                 Cycle,
     gate_mapper:           GateMapper,
-    qubit_to_cref:         Dict,
+    qubit_to_cref:         Dict[int, pyquil.quilatom.MemoryReference],  # type: ignore # noqa: F821
     cycles_to_defcircuits: bool = False,
 ) -> Program:  # type: ignore # noqa: F821
     """Transpile a single qcal Cycle to a PyQuil Program.
@@ -550,8 +577,9 @@ def transpile_cycle(
     Args:
         cycle: qcal Cycle.
         gate_mapper (GateMapper): map between qcal to PyQuil gates.
-        qubit_to_cref (Dict): mapping from qubit label to classical memory
-            reference, used to route measurement results.
+        qubit_to_cref (Dict[int, pyquil.quilatom.MemoryReference]): mapping from
+            qubit label to classical memory reference, used to route measurement
+            results.
         cycles_to_defcircuits (bool, optional): whether to write each
             distinct cycle as a DEFCIRCUIT definition and invoke it by name.
             Defaults to ``False``.
@@ -619,6 +647,7 @@ class PyQuilTranspiler(Transpiler):
     def __init__(
         self,
         gate_mapper:           Dict | GateMapper | None = None,
+        cycle_replacement:     Dict[Cycle, str] | None = None,
         circuit_for_loop:      bool = False,
         cycles_to_defcircuits: bool = False,
         fence_between_cycles:  bool = True,
@@ -628,6 +657,9 @@ class PyQuilTranspiler(Transpiler):
         Args:
             gate_mapper (Dict | GateMapper | None, optional): dictionary which
                 maps qcal gates to pyquil gates. Defaults to ``None``.
+            cycle_replacement (Dict[Cycle, str] | None, optional): mapping from
+                qcal Cycles to PyQuil DEFCIRCUIT name, used to replace entire
+                cycle with a single DEFCIRCUIT call. Defaults to ``None``.
             circuit_for_loop (bool, optional): loops over circuit partitions for
                 circuits with repeated structures. Defaults to ``False``.
             cycles_to_defcircuits (bool, optional): whether to write each
@@ -647,6 +679,7 @@ class PyQuilTranspiler(Transpiler):
         elif isinstance(gate_mapper, dict):
             gate_mapper = GateMapper(gate_mapper)
 
+        self._cycle_replacement = cycle_replacement
         self._circuit_for_loop = circuit_for_loop
         self._cycle_to_defcircuits = cycles_to_defcircuits
         self._fence_between_cycles = fence_between_cycles
@@ -673,6 +706,7 @@ class PyQuilTranspiler(Transpiler):
                 to_pyquil(
                     circuit=circuit,
                     gate_mapper=self._gate_mapper,
+                    cycle_replacement=self._cycle_replacement,
                     circuit_for_loop=self._circuit_for_loop,
                     cycles_to_defcircuits=self._cycle_to_defcircuits,
                     fence_between_cycles=self._fence_between_cycles
