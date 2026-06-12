@@ -6,7 +6,10 @@ https://github.com/sandialabs/pyGSTi/blob/master/pygsti/processors/processorspec
 """
 import itertools
 import logging
-from typing import Dict, List, Tuple
+from collections.abc import Sequence
+from typing import Dict
+
+from pygsti.processors import QubitProcessorSpec
 
 from qcal.config import Config
 from qcal.gate.single_qubit import SINGLE_QUBIT_GATES
@@ -15,7 +18,7 @@ from qcal.gate.two_qubit import TWO_QUBIT_GATES
 logger = logging.getLogger(__name__)
 
 
-GATE_MAPPER = {
+GATE_MAPPER: Dict[str, str] = {
     'X90':   'Gxpi2',
     'Y90':   'Gypi2',
     'Z90':   'Gzpi2',
@@ -30,19 +33,19 @@ __all__ = 'pygsti_pspec'
 
 
 def pygsti_pspec(
-    config: Config,
-    qubits: List[int] | Tuple[int],
-    native_gates: List[str] = ['X90', 'Y90'],  # noqa: B006
-    availability: Dict | None = None,
+    config:                Config,
+    qubits:                Sequence[int],
+    native_gates:          Sequence[str] = ('X90', 'Y90'),
+    availability:          Dict | None = None,
     nonstd_gate_unitaries: Dict | None = None,
     **kwargs
-):
+) -> QubitProcessorSpec:
     """Generates a pyGSTi qubit processor spec.
 
     Args:
         config (Config): qcal ```Config``` object.
-        qubits (List[int] | Tuple[int]): qubit labels.
-        native_gates (List[str], optional): native gates. Defaults to
+        qubits (Sequence[int]): qubit labels.
+        native_gates (Sequence[str], optional): native gates. Defaults to
             ['X90', 'Y90']. These can be formatted in qcal or pyGSTi
             format.
         availability (Dict | None, optional): a dictionary whose keys are gate
@@ -56,8 +59,6 @@ def pygsti_pspec(
     Returns:
         QubitProcessorSpec: pyGSTi qubit processor spec object.
     """
-    from pygsti.processors import QubitProcessorSpec
-
     num_qubits = len(qubits)
     qubit_labels = [f'Q{q}' for q in qubits]
     pairings = list(itertools.combinations(qubits, 2))

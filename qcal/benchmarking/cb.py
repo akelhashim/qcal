@@ -4,6 +4,9 @@ See:
 https://www.nature.com/articles/s41467-019-13068-7
 https://trueq.quantumbenchmark.com/guides/error_diagnostics/cb.html
 https://trueq.quantumbenchmark.com/api/protocols.html#trueq.make_cb
+
+NOTE: we do not use TYPE_CHECKING for trueq types because this might fail if
+trueq is not installed when building docs.
 """
 from __future__ import annotations
 
@@ -64,7 +67,7 @@ def CB(
     config:               Config,
     cycle:                dict | trueq.Cycle,  # noqa: F821 # type: ignore
     circuit_depths:       Iterable[int],
-    tq_config:            str | trueq.Config = None,  # noqa: F821 # type: ignore
+    tq_config:            str | trueq.Config | None = None,  # noqa: F821 # type: ignore
     n_circuits:           int = 30,
     n_decays:             int = 20,
     targeted_errors:      Iterable[str] | trueq.math.Weyls | None = None,  # noqa: F821 # type: ignore
@@ -86,8 +89,8 @@ def CB(
         circuit_depths (Iterable[int]): a list of positive integers specifying
             how many interleaved cycles of the target cycle and
             random Pauli operators to generate, for example, [4, 16, 64].
-        tq_config (str | trueq.Config, optional): True-Q config yaml file or
-            config object. Defaults to None.
+        tq_config (str | trueq.Config | None, optional): True-Q config yaml file
+            or config object. Defaults to None.
         n_circuits (int, optional): the number of circuits for each circuit
             depth. Defaults to 30.
         n_decays (int, optional): an integer specifying the total number of
@@ -130,8 +133,6 @@ def CB(
 
     class CB(qpu):
         """True-Q CB protocol."""
-
-        # import trueq as tq
 
         def __init__(
             self,

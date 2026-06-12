@@ -370,7 +370,7 @@ def plot_error_rates(
     )
     pfig.update_layout(
         height=450,
-        width=min(200 * len(qlabels), 1000),
+        width=min(150 * len(qlabels), 1000),
         margin={'t': 40, 'r': 20, 'b': 60, 'l': 80},
         template='plotly_white',
         paper_bgcolor='white',
