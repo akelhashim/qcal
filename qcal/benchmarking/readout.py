@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Sequence
 from typing import Callable, List, Tuple
 
 import pandas as pd
@@ -19,12 +20,12 @@ logger = logging.getLogger(__name__)
 
 
 def ReadoutFidelity(
-        qpu:    QPU,
-        config: Config,
-        qubits: List | Tuple,
-        gate:   str = 'X90',
-        **kwargs
-    ) -> Callable:
+    qpu:    QPU,
+    config: Config,
+    qubits: Sequence[int],
+    gate:   str = 'X90',
+    **kwargs
+) -> Callable:
     """Function which passes a custom QPU to the ReadoutFidelity class.
 
     Basic example useage:
@@ -37,7 +38,7 @@ def ReadoutFidelity(
     Args:
         qpu (QPU): custom QPU object.
         config (Config): qcal Config object.
-        qubits (List | Tuple): qubits to measure.
+        qubits (Sequence[int]): qubits to measure.
         gate (str, optional): native gate used for state preparation. Defaults 
             to 'X90'.
 
@@ -52,12 +53,13 @@ def ReadoutFidelity(
         This class inherits a custom QPU from the ReadoutFidelity function.
         """
 
-        def __init__(self,
-                config: Config,
-                qubits: List | Tuple,
-                gate:   str = 'X90',
-                **kwargs
-            ) -> None:
+        def __init__(
+            self,
+            config: Config,
+            qubits: Sequence[int],
+            gate:   str = 'X90',
+            **kwargs
+        ) -> None:
             """Initialize the ReadoutFidelity class within the function.
 
             """
@@ -66,7 +68,8 @@ def ReadoutFidelity(
                 **kwargs
             )
             self._qubits = sorted(qubits)
-            assert gate in ('X90', 'X'), 'gate must be an X90 or X!'
+            if gate not in ('X90', 'X'):
+                raise ValueError('gate must be an X90 or X!')
             self._gate = gate
             self._cmat = None
 

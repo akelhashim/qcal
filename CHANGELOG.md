@@ -11,9 +11,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Default single- and two-qubit CRB experiment designs
-- Default single- and two-qubit GST experiment designs
-
 ### Changed
 
 ### Deprecated
@@ -23,6 +20,58 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 ### Security
+
+## [3.0.0] - 2026-06-12
+
+### Breaking
+
+- Changed calculate_cz_frequency to calculate_parametric_cz_frequency
+
+### Added
+
+- Twirled RPE for ZZ phase estimation
+
+### Changed
+
+- JAZZ can measure static and driven ZZs in full qutrit space
+- Default ploly save option to png
+- Automatically map characterization methods to 0 for EF subspace experimentas by default
+
+## [2.0.0] - 2026-06-12
+
+### Breaking
+
+- Change dynamical decoupling XY name to XY_N
+
+### Added
+
+- Circuit for-loops for pyquil
+- Automatic leakage analysis for CRB
+- plot_mock_sequence for psuedo-visualization of pulse sequence of circuits
+- Fit for decaying cosine with exponential baseline
+- __eq__ for Gate, Cycle, Circuit, and CircuitSet
+- PyQuil cycles_to_defcircuits kwarg in transpilation
+- XX-type (CPMG) dynamical decoupling sequencies
+- Make simultaneous DD sequences syncopated for canceling ZZ
+- PyQuil helper function for adding DD sequences during targeted operations
+- Excited State Promotion (ESP) for PyQuil programs
+- Active reset for PyQuil programs
+- cycle_replacement option for custom DEFCIRCUIT names in PyQuil transpilation
+
+### Changed
+
+- uncertainty_of_product to account for correlations using the covariance
+- T2* EF fit to decaying cosine with exponential baseline
+- Default time spacing for coherence measurements to exponential
+- Declare individual classical registers for qubit measurements
+- 2Q gate definitions now accept either Gate((0, 1)) or Gate(0, 1)
+
+### Removed
+
+### Fixed
+
+- length -> time in example config
+- Circuit generation bug for simultaneous single-qubit GST on two qubits
 
 ## [1.2.0] - 2026-05-13
 
@@ -186,7 +235,9 @@ post-processing
 - Single- and two-qubit benchmarking methods
 - Advanced compilation tools
 
-[Unreleased]: https://github.com/akelhashim/qcal/compare/v1.2.0...HEAD
+[Unreleased]: https://github.com/akelhashim/qcal/compare/v3.0.0...HEAD
+[3.0.0]: https://github.com/akelhashim/qcal/releases/tag/v3.0.0
+[2.0.0]: https://github.com/akelhashim/qcal/releases/tag/v2.0.0
 [1.2.0]: https://github.com/akelhashim/qcal/releases/tag/v1.2.0
 [1.1.1]: https://github.com/akelhashim/qcal/releases/tag/v1.1.1
 [1.1.0]: https://github.com/akelhashim/qcal/releases/tag/v1.1.0

@@ -6,6 +6,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **qcal** is a Python package for quantum calibration, characterization, and benchmarking of superconducting quantum systems. It was developed for operating full-stack systems at the Advanced Quantum Testbed (Berkeley Lab). The three primary workflows are: **calibration** (optimize gate parameters), **characterization** (measure system properties), and **benchmarking** (assess performance metrics).
 
+## Code Style
+
+- Limit code lines to **79 characters** and docstring/comment lines to
+  **79 characters**, per PEP 8.
+
 ## Commands
 
 ```bash

@@ -38,7 +38,9 @@ from pygsti.processors import QubitProcessorSpec
 from pygsti.protocols import StandardGST, StandardGSTDesign
 from pygsti.protocols.gst import ModelEstimateResults
 from pygsti.protocols.protocol import ProtocolData
+from pygsti.tools import ppvec_to_stdmx
 from pygsti.tools.internalgates import standard_gatename_unitaries
+from pygsti.tools.optools import fidelity, unitarity
 
 from qcal.circuit import CircuitSet
 from qcal.config import Config
@@ -62,14 +64,14 @@ logger = logging.getLogger(__name__)
 def GST(
     qpu:            QPU,
     config:         Config,
-    qubit_labels:   Iterable[int | Tuple[int]],
-    pspec:          Any | None = None,
-    target_model:   Any | None = None,
-    prep_fiducials: Any | None = None,
-    meas_fiducials: Any | None = None,
-    germs:          Any | None = None,
-    circuit_depths: List[int] = [1, 2, 4, 8, 16, 32, 64, 128, 256],  # noqa: B006
-    modes:          Tuple[str] = ('full TP','CPTPLND','Target','H+S','S'),  # noqa: B006
+    qubit_labels:   Sequence[int | Tuple[int]],
+    pspec:          QubitProcessorSpec | None = None,
+    target_model:   ExplicitOpModel | None = None,
+    prep_fiducials: Sequence[Circuit] | None = None,
+    meas_fiducials: Sequence[Circuit] | None = None,
+    germs:          Sequence[Circuit] | None = None,
+    circuit_depths: Sequence[int] = (1, 2, 4, 8, 16, 32, 64, 128, 256),
+    modes:          Tuple[str] = ('full TP','CPTPLND','Target','H+S','S'),
     fpr:            bool = False,
     **kwargs
 ) -> Callable:
@@ -78,35 +80,36 @@ def GST(
     Args:
         qpu (QPU): custom QPU object.
         config (Config): qcal Config object.
-        qubit_labels (Iterable[int | Tuple[int]]): a list specifying sets of
-            system labels on which to perform GST.
-        pspec (Any | Dict[int, Any] | None, optional): a pyGSTi ProcessorSpec
-            object. Defaults to None.
-        target_model (Any | Dict[int, Any] | None, optional): a pyGSTi Model
-            object. Defaults to None.
-        prep_fiducials (Any | Dict[int, Any] | None, optional): a list of pyGSTi
-            fiducial circuits. Defaults to None.
-        meas_fiducials (Any | Dict[int, Any] | None, optional): a list of pyGSTi
-            fiducial circuits. Defaults to None.
-        germs (Any | Dict[int, Any] | None, optional): a list of pyGSTi germ
-            circuits. Defaults to None.
-        circuit_depths (List[int], optional): a list of positive integers
-            specifying the circuit depths. Defaults to ```[1, 2, 4, 8, 16, 32,
-            64, 128, 256]```.
-        modes (Tuple[str], optional): a tuple of strings specifying the modes
-            to be used in the GST protocol. Defaults to ```('full TP',
-            'CPTPLND', 'Target', 'H+S', 'S')```. These correspond to different
-            types of parameterizations/constraints to apply to the estimated
+        qubit_labels (Sequence[int | Tuple[int]]): a list specifying
+            sets of system labels on which to perform GST.
+        pspec (QubitProcessorSpec | None, optional): a pyGSTi
+            ProcessorSpec object. Defaults to None.
+        target_model (ExplicitOpModel | None, optional): a pyGSTi
+            Model object. Defaults to None.
+        prep_fiducials (Sequence[Circuit] | None, optional): a list
+            of pyGSTi fiducial circuits. Defaults to None.
+        meas_fiducials (Sequence[Circuit] | None, optional): a list
+            of pyGSTi fiducial circuits. Defaults to None.
+        germs (Sequence[Circuit] | None, optional): a list of pyGSTi
+            germ circuits. Defaults to None.
+        circuit_depths (Sequence[int], optional): a list of positive
+            integers specifying the circuit depths. Defaults to
+            ``[1, 2, 4, 8, 16, 32, 64, 128, 256]``.
+        modes (Tuple[str], optional): a tuple of strings specifying
+            the modes to be used in the GST protocol. Defaults to
+            ``('full TP', 'CPTPLND', 'Target', 'H+S', 'S')``. These
+            correspond to different types of
+            parameterizations/constraints to apply to the estimated
             model. Allowed values are:
             - 'full': full (completely unconstrained)
             - 'TP': TP-constrained
             - 'CPTPLND': Lindbladian CPTP-constrained
-            - 'H+S': Only Hamiltonian + Stochastic errors allowed (CPTP)
+            - 'H+S': Only Hamiltonian + Stochastic errors (CPTP)
             - 'S': Only Stochastic errors allowed (CPTP)
             - 'Target': use the target (ideal) gates as the estimate
             - <model>: any key in the models_to_test argument
-        fpr (bool, optional): whether to use Fiducial Pair Reduction (FPR).
-            Defaults to False.
+        fpr (bool, optional): whether to use Fiducial Pair Reduction
+            (FPR). Defaults to False.
 
     Returns:
         Callable: GST class instance.
@@ -119,13 +122,13 @@ def GST(
         def __init__(
             self,
             config:         Config,
-            qubit_labels:   Iterable[int | Tuple[int]],
-            pspec:          Any | None = None,
-            target_model:   Any | None = None,
-            prep_fiducials: Any | None = None,
-            meas_fiducials: Any | None = None,
-            germs:          Any | None = None,
-            circuit_depths: List[int] = [1, 2, 4, 8, 16, 32, 64, 128, 256],  # noqa: B006
+            qubit_labels:   Sequence[int | Tuple[int]],
+            pspec:          QubitProcessorSpec | None = None,
+            target_model:   ExplicitOpModel | None = None,
+            prep_fiducials: Sequence[Circuit] | None = None,
+            meas_fiducials: Sequence[Circuit] | None = None,
+            germs:          Sequence[Circuit] | None = None,
+            circuit_depths: Sequence[int] = (1, 2, 4, 8, 16, 32, 64, 128, 256),
             modes:          Tuple[str] = (
                 'full TP', 'CPTPLND', 'Target', 'H+S', 'S'
             ),
@@ -189,29 +192,29 @@ def GST(
             return infidelity
 
         @property
-        def circuit_depths(self) -> List[int]:
+        def circuit_depths(self) -> Sequence[int]:
             """GST circuit depths.
 
             Returns:
-                List[int]: GST max circuit depths.
+                Sequence[int]: GST max circuit depths.
             """
             return self._circuit_depths
 
         @property
-        def data(self) -> ProtocolData:
+        def data(self) -> ProtocolData | None:
             """pyGSTi data object.
 
             Returns:
-                ProtocolData: pyGSTi data object.
+                ProtocolData | None: pyGSTi data object.
             """
             return self._data
 
         @property
-        def dataset(self) -> DataSet:
+        def dataset(self) -> DataSet | None:
             """pyGSTi dataset object.
 
             Returns:
-                DataSet: pyGSTi dataset object.
+                DataSet | None: pyGSTi dataset object.
             """
             return self._dataset
 
@@ -258,11 +261,11 @@ def GST(
             return diamondnorm
 
         @property
-        def edesign(self) -> StandardGSTDesign:
+        def edesign(self) -> StandardGSTDesign | None:
             """pyGSTi edesign.
 
             Returns:
-                StandardGSTDesign: pyGSTi edesign.
+                StandardGSTDesign | None: pyGSTi edesign.
             """
             return self._edesign
 
@@ -367,11 +370,11 @@ def GST(
             return infidelity
 
         @property
-        def germs(self) -> List[Circuit]:
+        def germs(self) -> Sequence[Circuit] | None:
             """GST germs.
 
             Returns:
-                List[Circuit]: GST germs.
+                Sequence[Circuit] | None: GST germs.
             """
             return self._germs
 
@@ -396,11 +399,11 @@ def GST(
             return jtrace_diff
 
         @property
-        def meas_fiducials(self) -> List[Circuit]:
+        def meas_fiducials(self) -> Sequence[Circuit] | None:
             """GST measurement fiducials.
 
             Returns:
-                List[Circuit]: GST measurement fiducials.
+                Sequence[Circuit] | None: GST measurement fiducials.
             """
             return self._meas_fiducials
 
@@ -441,11 +444,11 @@ def GST(
             }
 
         @property
-        def prep_fiducials(self) -> List[Circuit]:
+        def prep_fiducials(self) -> Sequence[Circuit] | None:
             """GST preparation fiducials.
 
             Returns:
-                List[Circuit]: GST preparation fiducials.
+                Sequence[Circuit] | None: GST preparation fiducials.
             """
             return self._prep_fiducials
 
@@ -465,11 +468,11 @@ def GST(
             return self._protocol
 
         @property
-        def pspec(self) -> QubitProcessorSpec:
+        def pspec(self) -> QubitProcessorSpec | None:
             """pyGSTi processor spec.
 
             Returns:
-                QubitProcessorSpec: pyGSTi processor spec.
+                QubitProcessorSpec | None: pyGSTi processor spec.
             """
             return self._pspec
 
@@ -512,11 +515,11 @@ def GST(
             return self._qubit_labels
 
         @property
-        def results(self) -> ModelEstimateResults:
+        def results(self) -> ModelEstimateResults | None:
             """pyGSTi results object.
 
             Returns:
-                ModelEstimateResults: pyGSTi results object.
+                ModelEstimateResults | None: pyGSTi results object.
             """
             return self._results
 
@@ -539,8 +542,6 @@ def GST(
             Returns:
                 Dict[str, float]: state fidelity for each model.
             """
-            from pygsti.tools import ppvec_to_stdmx
-            from pygsti.tools.optools import fidelity
             return {
                 mode: fidelity(
                     ppvec_to_stdmx(self._target_model.prep.to_dense()),
@@ -550,11 +551,11 @@ def GST(
             }
 
         @property
-        def target_model(self) -> ExplicitOpModel:
+        def target_model(self) -> ExplicitOpModel | None:
             """GST target model.
 
             Returns:
-                ExplicitOpModel: GST target model.
+                ExplicitOpModel | None: GST target model.
             """
             return self._target_model
 
@@ -563,10 +564,9 @@ def GST(
             """Unitarity for each gate in the gate set.
 
             Returns:
-                Dict[str, float]: unitarity for each gate in the gate set for
-                    each model.
+                Dict[str, Dict[str, float]]: unitarity for each gate in
+                    the gate set for each model.
             """
-            from pygsti.tools.optools import unitarity
             uni = {}
             for mode, model in self.models.items():
                 uni[mode] = {
@@ -864,7 +864,7 @@ def GST(
                 )
                 save_properties = {
                     'toImageButtonOptions': {
-                        'format': 'svg', # one of png, svg, jpeg, webp
+                        'format': 'png', # one of png, svg, jpeg, webp
                         'filename': 'qpu_layout',
                         # 'height': 500,
                         # 'width': 1000,
@@ -914,14 +914,14 @@ def GST(
 def SimultaneousGST(
     qpu:            QPU,
     config:         Config,
-    qubit_labels:   Iterable[int | Tuple[int]],
-    pspec:          Dict[int | Tuple[int], Any] | None = None,
-    target_model:   Dict[int | Tuple[int], Any] | None = None,
-    prep_fiducials: Dict[int | Tuple[int], Any] | None = None,
-    meas_fiducials: Dict[int | Tuple[int], Any] | None = None,
-    germs:          Dict[int | Tuple[int], Any] | None = None,
-    circuit_depths: List[int] = [1, 2, 4, 8, 16, 32, 64, 128, 256],  # noqa: B006
-    modes:          Tuple[str] = ('full TP','CPTPLND','Target','H+S','S'),  # noqa: B006
+    qubit_labels:   Sequence[int | Tuple[int]],
+    pspec:          Dict[int | Tuple[int], QubitProcessorSpec] | None = None,
+    target_model:   Dict[int | Tuple[int], ExplicitOpModel] | None = None,
+    prep_fiducials: Dict[int | Tuple[int], Sequence[Circuit]] | None = None,
+    meas_fiducials: Dict[int | Tuple[int], Sequence[Circuit]] | None = None,
+    germs:          Dict[int | Tuple[int], Sequence[Circuit]] | None = None,
+    circuit_depths: Sequence[int] = (1, 2, 4, 8, 16, 32, 64, 128, 256),
+    modes:          Tuple[str] = ('full TP','CPTPLND','Target','H+S','S'),
     fpr:            bool = False,
     gst_factory:    Callable | None = None,
     **kwargs
@@ -933,35 +933,41 @@ def SimultaneousGST(
     Args:
         qpu (QPU): custom QPU object.
         config (Config): qcal Config object.
-        qubit_labels (Iterable[int | Tuple[int]]): a list specifying sets of
-            system labels on which to perform GST.
-        pspec (Dict[int | Tuple[int], Any] | None, optional): a dictionary of
-            pyGSTi ProcessorSpec objects. Defaults to None.
-        target_model (Dict[int | Tuple[int], Any] | None, optional): a
-            dictionary of pyGSTi Model objects. Defaults to None.
-        prep_fiducials (Dict[int | Tuple[int], Any] | None, optional): a
-            dictionary of lists of pyGSTi fiducial circuits. Defaults to None.
-        meas_fiducials (Dict[int | Tuple[int], Any] | None, optional): a
-            dictionary of lists of pyGSTi fiducial circuits. Defaults to None.
-        germs (Dict[int | Tuple[int], Any] | None, optional): a dictionary of
-            lists of pyGSTi germ circuits. Defaults to None.
-        circuit_depths (List[int], optional): a list of positive integers
-            specifying the circuit depths. Defaults to ```[1, 2, 4, 8, 16, 32,
-            64, 128, 256]```.
-        modes (Tuple[str], optional): a tuple of strings specifying the modes
-            to be used in the GST protocol. Defaults to ```('full TP',
-            'CPTPLND', 'Target', 'H+S', 'S')```. These correspond to different
-            types of parameterizations/constraints to apply to the estimated
+        qubit_labels (Sequence[int | Tuple[int]]): a list specifying
+            sets of system labels on which to perform GST.
+        pspec (Dict[int | Tuple[int], QubitProcessorSpec] | None,
+            optional): a dictionary of pyGSTi ProcessorSpec objects.
+            Defaults to None.
+        target_model (Dict[int | Tuple[int], ExplicitOpModel] | None,
+            optional): a dictionary of pyGSTi Model objects. Defaults
+            to None.
+        prep_fiducials (Dict[int | Tuple[int], Sequence[Circuit]] |
+            None, optional): a dictionary of lists of pyGSTi fiducial
+            circuits. Defaults to None.
+        meas_fiducials (Dict[int | Tuple[int], Sequence[Circuit]] |
+            None, optional): a dictionary of lists of pyGSTi fiducial
+            circuits. Defaults to None.
+        germs (Dict[int | Tuple[int], Sequence[Circuit]] | None,
+            optional): a dictionary of lists of pyGSTi germ circuits.
+            Defaults to None.
+        circuit_depths (Sequence[int], optional): a list of positive
+            integers specifying the circuit depths. Defaults to
+            ``[1, 2, 4, 8, 16, 32, 64, 128, 256]``.
+        modes (Tuple[str], optional): a tuple of strings specifying
+            the modes to be used in the GST protocol. Defaults to
+            ``('full TP', 'CPTPLND', 'Target', 'H+S', 'S')``. These
+            correspond to different types of
+            parameterizations/constraints to apply to the estimated
             model. Allowed values are:
             - 'full': full (completely unconstrained)
             - 'TP': TP-constrained
             - 'CPTPLND': Lindbladian CPTP-constrained
-            - 'H+S': Only Hamiltonian + Stochastic errors allowed (CPTP)
+            - 'H+S': Only Hamiltonian + Stochastic errors (CPTP)
             - 'S': Only Stochastic errors allowed (CPTP)
             - 'Target': use the target (ideal) gates as the estimate
             - <model>: any key in the models_to_test argument
-        fpr (bool, optional): whether to use Fiducial Pair Reduction (FPR).
-            Defaults to False.
+        fpr (bool, optional): whether to use Fiducial Pair Reduction
+            (FPR). Defaults to False.
 
     Returns:
         Callable: SimultaneousGST class instance.
@@ -974,13 +980,23 @@ def SimultaneousGST(
         def __init__(
             self,
             config:         Config,
-            qubit_labels:   Iterable[int | Tuple[int]],
-            pspec:          Dict[int | Tuple[int], Any] | None = None,
-            target_model:   Dict[int | Tuple[int], Any] | None = None,
-            prep_fiducials: Dict[int | Tuple[int], Any] | None = None,
-            meas_fiducials: Dict[int | Tuple[int], Any] | None = None,
-            germs:          Dict[int | Tuple[int], Any] | None = None,
-            circuit_depths: List[int] = [1, 2, 4, 8, 16, 32, 64, 128, 256],  # noqa: B006
+            qubit_labels:   Sequence[int | Tuple[int]],
+            pspec:          (
+                Dict[int | Tuple[int], QubitProcessorSpec] | None
+            ) = None,
+            target_model:   (
+                Dict[int | Tuple[int], ExplicitOpModel] | None
+            ) = None,
+            prep_fiducials: (
+                Dict[int | Tuple[int], Sequence[Circuit]] | None
+            ) = None,
+            meas_fiducials: (
+                Dict[int | Tuple[int], Sequence[Circuit]] | None
+            ) = None,
+            germs:          (
+                Dict[int | Tuple[int], Sequence[Circuit]] | None
+            ) = None,
+            circuit_depths: Sequence[int] = (1, 2, 4, 8, 16, 32, 64, 128, 256),
             modes:          Tuple[str] = (
                 'full TP', 'CPTPLND', 'Target', 'H+S', 'S'
             ),
@@ -1054,7 +1070,7 @@ def SimultaneousGST(
             return self._gst_property_by_qubit_label('avg_gate_infidelity')
 
         @property
-        def circuit_depths(self) -> List[int]:
+        def circuit_depths(self) -> Sequence[int]:
             return self._circuit_depths
 
         @property
@@ -1283,14 +1299,24 @@ def SimultaneousGST(
 def SingleQubitGST(
     qpu:            QPU,
     config:         Config,
-    qubits:         Iterable[int],
-    pspec:          Any | Dict[int, Any] | None = None,
-    target_model:   Any | Dict[int, Any] | None = None,
-    prep_fiducials: Any | Dict[int, Any] | None = None,
-    meas_fiducials: Any | Dict[int, Any] | None = None,
-    germs:          Any | Dict[int, Any] | None = None,
-    circuit_depths: List[int] = [1, 2, 4, 8, 16, 32, 64, 128, 256],  # noqa: B006
-    modes:          Tuple[str] = ('full TP','CPTPLND','Target','H+S','S'),  # noqa: B006
+    qubits:         Sequence[int],
+    pspec:          (
+        QubitProcessorSpec | Dict[int, QubitProcessorSpec] | None
+    ) = None,
+    target_model:   (
+        ExplicitOpModel | Dict[int, ExplicitOpModel] | None
+    ) = None,
+    prep_fiducials: (
+        Sequence[Circuit] | Dict[int, Sequence[Circuit]] | None
+    ) = None,
+    meas_fiducials: (
+        Sequence[Circuit] | Dict[int, Sequence[Circuit]] | None
+    ) = None,
+    germs:          (
+        Sequence[Circuit] | Dict[int, Sequence[Circuit]] | None
+    ) = None,
+    circuit_depths: Sequence[int] = (1, 2, 4, 8, 16, 32, 64, 128, 256),
+    modes:          Tuple[str] = ('full TP','CPTPLND','Target','H+S','S'),
     fpr:            bool = False,
     **kwargs
 ) -> Callable:
@@ -1301,35 +1327,43 @@ def SingleQubitGST(
     Args:
         qpu (QPU): custom QPU object.
         config (Config): qcal Config object.
-        qubits (Iterable[int]): a list specifying the qubits on which to perform
-            GST.
-        pspec (Any | Dict[int, Any] | None, optional): a pyGSTi ProcessorSpec
-            object or a dictionary of such objects. Defaults to None.
-        target_model (Any | Dict[int, Any] | None, optional): a pyGSTi Model
-            object or a dictionary of such objects. Defaults to None.
-        prep_fiducials (Any | Dict[int, Any] | None, optional): a list of pyGSTi
-            fiducial circuits or a dictionary of such objects. Defaults to None.
-        meas_fiducials (Any | Dict[int, Any] | None, optional): a list of pyGSTi
-            fiducial circuits or a dictionary of such objects. Defaults to None.
-        germs (Any | Dict[int, Any] | None, optional): a list of pyGSTi germ
-            circuits or a dictionary of such objects. Defaults to None.
-        circuit_depths (List[int], optional): a list of positive integers
-            specifying the circuit depths. Defaults to ```[1, 2, 4, 8, 16, 32,
-            64, 128, 256]```.
-        modes (Tuple[str], optional): a tuple of strings specifying the modes
-            to be used in the GST protocol. Defaults to ```('full TP',
-            'CPTPLND', 'Target', 'H+S', 'S')```. These correspond to different
-            types of parameterizations/constraints to apply to the estimated
+        qubits (Sequence[int]): a list specifying the qubits on which
+            to perform GST.
+        pspec (QubitProcessorSpec | Dict[int, QubitProcessorSpec] |
+            None, optional): a pyGSTi ProcessorSpec object or a
+            dictionary of such objects. Defaults to None.
+        target_model (ExplicitOpModel | Dict[int, ExplicitOpModel] |
+            None, optional): a pyGSTi Model object or a dictionary of
+            such objects. Defaults to None.
+        prep_fiducials (Sequence[Circuit] |
+            Dict[int, Sequence[Circuit]] | None, optional): a list of
+            pyGSTi fiducial circuits or a dictionary of such objects.
+            Defaults to None.
+        meas_fiducials (Sequence[Circuit] |
+            Dict[int, Sequence[Circuit]] | None, optional): a list of
+            pyGSTi fiducial circuits or a dictionary of such objects.
+            Defaults to None.
+        germs (Sequence[Circuit] | Dict[int, Sequence[Circuit]] |
+            None, optional): a list of pyGSTi germ circuits or a
+            dictionary of such objects. Defaults to None.
+        circuit_depths (Sequence[int], optional): a list of positive
+            integers specifying the circuit depths. Defaults to
+            ``[1, 2, 4, 8, 16, 32, 64, 128, 256]``.
+        modes (Tuple[str], optional): a tuple of strings specifying
+            the modes to be used in the GST protocol. Defaults to
+            ``('full TP', 'CPTPLND', 'Target', 'H+S', 'S')``. These
+            correspond to different types of
+            parameterizations/constraints to apply to the estimated
             model. Allowed values are:
             - 'full': full (completely unconstrained)
             - 'TP': TP-constrained
             - 'CPTPLND': Lindbladian CPTP-constrained
-            - 'H+S': Only Hamiltonian + Stochastic errors allowed (CPTP)
+            - 'H+S': Only Hamiltonian + Stochastic errors (CPTP)
             - 'S': Only Stochastic errors allowed (CPTP)
             - 'Target': use the target (ideal) gates as the estimate
             - <model>: any key in the models_to_test argument
-        fpr (bool, optional): whether to use Fiducial Pair Reduction (FPR).
-            Defaults to False.
+        fpr (bool, optional): whether to use Fiducial Pair Reduction
+            (FPR). Defaults to False.
 
     Returns:
         Callable: SingleQubitGST class instance.
@@ -1371,13 +1405,23 @@ def SingleQubitGST(
         def __init__(
             self,
             config:         Config,
-            qubits:         Iterable[int],
-            pspec:          Any | Dict[int, Any] | None = None,
-            target_model:   Any | Dict[int, Any] | None = None,
-            prep_fiducials: Any | Dict[int, Any] | None = None,
-            meas_fiducials: Any | Dict[int, Any] | None = None,
-            germs:          Any | Dict[int, Any] | None = None,
-            circuit_depths: List[int] = [1, 2, 4, 8, 16, 32, 64, 128, 256],  # noqa: B006
+            qubits:         Sequence[int],
+            pspec:          (
+                QubitProcessorSpec | Dict[int, QubitProcessorSpec] | None
+            ) = None,
+            target_model:   (
+                ExplicitOpModel | Dict[int, ExplicitOpModel] | None
+            ) = None,
+            prep_fiducials: (
+                Sequence[Circuit] | Dict[int, Sequence[Circuit]] | None
+            ) = None,
+            meas_fiducials: (
+                Sequence[Circuit] | Dict[int, Sequence[Circuit]] | None
+            ) = None,
+            germs: (
+                Sequence[Circuit] | Dict[int, Sequence[Circuit]] | None
+            ) = None,
+            circuit_depths: Sequence[int] = (1, 2, 4, 8, 16, 32, 64, 128, 256),
             modes:          Tuple[str] = (
                 'full TP', 'CPTPLND', 'Target', 'H+S', 'S'
             ),
@@ -1417,7 +1461,7 @@ def SingleQubitGST(
 
                 if pspec is None:
                     gate_names = [
-                        'Gxpi2', 'Gypi2', 'Gii', 'Gxx', 'Gxy','Gyx', 'Gyy'
+                        'Gxpi2', 'Gypi2', 'Gii', 'Gxx', 'Gxy', 'Gyx', 'Gyy'
                     ]
 
                     # Define a global 2-qubit idle
@@ -1636,14 +1680,24 @@ def SingleQubitGST(
 def TwoQubitGST(
     qpu:            QPU,
     config:         Config,
-    qubit_labels:   Iterable[Tuple[int]],
-    pspec:          Any | Dict[Tuple[int], Any] | None = None,
-    target_model:   Any | Dict[Tuple[int], Any] | None = None,
-    prep_fiducials: Any | Dict[Tuple[int], Any] | None = None,
-    meas_fiducials: Any | Dict[Tuple[int], Any] | None = None,
-    germs:          Any | Dict[Tuple[int], Any] | None = None,
-    circuit_depths: List[int] = [1, 2, 4, 8, 16, 32, 64, 128],  # noqa: B006
-    modes:          Tuple[str] = ('full TP','CPTPLND','Target','H+S','S'),  # noqa: B006
+    qubit_labels:   Sequence[Tuple[int]],
+    pspec: (
+        QubitProcessorSpec | Dict[Tuple[int], QubitProcessorSpec] | None
+    ) = None,
+    target_model: (
+        ExplicitOpModel | Dict[Tuple[int], ExplicitOpModel] | None
+    ) = None,
+    prep_fiducials: (
+        Sequence[Circuit] | Dict[Tuple[int], Sequence[Circuit]] | None
+    ) = None,
+    meas_fiducials: (
+        Sequence[Circuit] | Dict[Tuple[int], Sequence[Circuit]] | None
+    ) = None,
+    germs: (
+        Sequence[Circuit] | Dict[Tuple[int], Sequence[Circuit]] | None
+    ) = None,
+    circuit_depths: Sequence[int] = (1, 2, 4, 8, 16, 32, 64, 128),
+    modes:          Tuple[str] = ('full TP','CPTPLND','Target','H+S','S'),
     fpr:            bool = False,
     **kwargs
 ) -> Callable:
@@ -1654,35 +1708,47 @@ def TwoQubitGST(
     Args:
         qpu (QPU): custom QPU object.
         config (Config): qcal Config object.
-        qubit_labels (Iterable[Tuple[int]]): a list of tuples of ints specifying
-            sets of qubit labels on which to perform two-qubit GST.
-        pspec (Any | Dict[int, Any] | None, optional): a pyGSTi ProcessorSpec
-            object or a dictionary of such objects. Defaults to None.
-        target_model (Any | Dict[int, Any] | None, optional): a pyGSTi Model
-            object or a dictionary of such objects. Defaults to None.
-        prep_fiducials (Any | Dict[int, Any] | None, optional): a list of pyGSTi
-            fiducial circuits or a dictionary of such objects. Defaults to None.
-        meas_fiducials (Any | Dict[int, Any] | None, optional): a list of pyGSTi
-            fiducial circuits or a dictionary of such objects. Defaults to None.
-        germs (Any | Dict[int, Any] | None, optional): a list of pyGSTi germ
-            circuits or a dictionary of such objects. Defaults to None.
-        circuit_depths (List[int], optional): a list of positive integers
-            specifying the circuit depths. Defaults to ```[1, 2, 4, 8, 16, 32,
-            64, 128, 256]```.
-        modes (Tuple[str], optional): a tuple of strings specifying the modes
-            to be used in the GST protocol. Defaults to ```('full TP',
-            'CPTPLND', 'Target', 'H+S', 'S')```. These correspond to different
-            types of parameterizations/constraints to apply to the estimated
+        qubit_labels (Sequence[Tuple[int]]): a list of tuples of ints
+            specifying sets of qubit labels on which to perform
+            two-qubit GST.
+        pspec (QubitProcessorSpec |
+            Dict[Tuple[int], QubitProcessorSpec] | None, optional): a
+            pyGSTi ProcessorSpec object or a dictionary of such
+            objects. Defaults to None.
+        target_model (ExplicitOpModel |
+            Dict[Tuple[int], ExplicitOpModel] | None, optional): a
+            pyGSTi Model object or a dictionary of such objects.
+            Defaults to None.
+        prep_fiducials (Sequence[Circuit] |
+            Dict[Tuple[int], Sequence[Circuit]] | None, optional): a
+            list of pyGSTi fiducial circuits or a dictionary of such
+            objects. Defaults to None.
+        meas_fiducials (Sequence[Circuit] |
+            Dict[Tuple[int], Sequence[Circuit]] | None, optional): a
+            list of pyGSTi fiducial circuits or a dictionary of such
+            objects. Defaults to None.
+        germs (Sequence[Circuit] |
+            Dict[Tuple[int], Sequence[Circuit]] | None, optional): a
+            list of pyGSTi germ circuits or a dictionary of such
+            objects. Defaults to None.
+        circuit_depths (Sequence[int], optional): a list of positive
+            integers specifying the circuit depths. Defaults to
+            ``[1, 2, 4, 8, 16, 32, 64, 128]``.
+        modes (Tuple[str], optional): a tuple of strings specifying
+            the modes to be used in the GST protocol. Defaults to
+            ``('full TP', 'CPTPLND', 'Target', 'H+S', 'S')``. These
+            correspond to different types of
+            parameterizations/constraints to apply to the estimated
             model. Allowed values are:
             - 'full': full (completely unconstrained)
             - 'TP': TP-constrained
             - 'CPTPLND': Lindbladian CPTP-constrained
-            - 'H+S': Only Hamiltonian + Stochastic errors allowed (CPTP)
+            - 'H+S': Only Hamiltonian + Stochastic errors (CPTP)
             - 'S': Only Stochastic errors allowed (CPTP)
             - 'Target': use the target (ideal) gates as the estimate
             - <model>: any key in the models_to_test argument
-        fpr (bool, optional): whether to use Fiducial Pair Reduction (FPR).
-            Defaults to False.
+        fpr (bool, optional): whether to use Fiducial Pair Reduction
+            (FPR). Defaults to False.
 
     Returns:
         Callable: TwoQubitGST class instance.
@@ -1726,13 +1792,31 @@ def TwoQubitGST(
         def __init__(
             self,
             config:         Config,
-            qubit_labels:   Iterable[Tuple[int]],
-            pspec:          Any | Dict[Tuple[int], Any] | None = None,
-            target_model:   Any | Dict[Tuple[int], Any] | None = None,
-            prep_fiducials: Any | Dict[Tuple[int], Any] | None = None,
-            meas_fiducials: Any | Dict[Tuple[int], Any] | None = None,
-            germs:          Any | Dict[Tuple[int], Any] | None = None,
-            circuit_depths: List[int] = [1, 2, 4, 8, 16, 32, 64, 128, 256],  # noqa: B006
+            qubit_labels:   Sequence[Tuple[int]],
+            pspec:          (
+                QubitProcessorSpec
+                | Dict[Tuple[int], QubitProcessorSpec]
+                | None
+            ) = None,
+            target_model:   (
+                ExplicitOpModel | Dict[Tuple[int], ExplicitOpModel] | None
+            ) = None,
+            prep_fiducials: (
+                Sequence[Circuit]
+                | Dict[Tuple[int], Sequence[Circuit]]
+                | None
+            ) = None,
+            meas_fiducials: (
+                Sequence[Circuit]
+                | Dict[Tuple[int], Sequence[Circuit]]
+                | None
+            ) = None,
+            germs: (
+                Sequence[Circuit]
+                | Dict[Tuple[int], Sequence[Circuit]]
+                | None
+            ) = None,
+            circuit_depths: Sequence[int] = (1, 2, 4, 8, 16, 32, 64, 128, 256),
             modes:          Tuple[str] = (
                 'full TP', 'CPTPLND', 'Target', 'H+S', 'S'
             ),
@@ -1887,14 +1971,24 @@ def TwoQubitGST(
 def QuantumInstrumentGST(
     qpu:            QPU,
     config:         Config,
-    qubits:         Iterable[int],
-    pspec:          Any | Dict[int, Any] | None = None,
-    target_model:   Any | Dict[int, Any] | None = None,
-    prep_fiducials: Any | Dict[int, Any] | None = None,
-    meas_fiducials: Any | Dict[int, Any] | None = None,
-    germs:          Any | Dict[int, Any] | None = None,
-    circuit_depths: List[int] = [1],  # noqa: B006
-    modes:          Tuple[str] = ('Target', 'full TP'),  # noqa: B006
+    qubits:         Sequence[int],
+    pspec:          (
+        QubitProcessorSpec | Dict[int, QubitProcessorSpec] | None
+    ) = None,
+    target_model:   (
+        ExplicitOpModel | Dict[int, ExplicitOpModel] | None
+    ) = None,
+    prep_fiducials: (
+        Sequence[Circuit] | Dict[int, Sequence[Circuit]] | None
+    ) = None,
+    meas_fiducials: (
+        Sequence[Circuit] | Dict[int, Sequence[Circuit]] | None
+    ) = None,
+    germs:          (
+        Sequence[Circuit] | Dict[int, Sequence[Circuit]] | None
+    ) = None,
+    circuit_depths: Sequence[int] = (1,),
+    modes:          Tuple[str] = ('Target', 'full TP'),
     # fpr:            bool = False,
     **kwargs
 ) -> Callable:
@@ -1905,35 +1999,32 @@ def QuantumInstrumentGST(
     Args:
         qpu (QPU): custom QPU object.
         config (Config): qcal Config object.
-        qubits (Iterable[int]): a list specifying the qubits on which to perform
-            GST.
-        pspec (Any | Dict[int, Any] | None, optional): a pyGSTi ProcessorSpec
-            object or a dictionary of such objects. Defaults to None.
-        target_model (Any | Dict[int, Any] | None, optional): a pyGSTi Model
-            object or a dictionary of such objects. Defaults to None.
-        prep_fiducials (Any | Dict[int, Any] | None, optional): a list of pyGSTi
-            fiducial circuits or a dictionary of such objects. Defaults to None.
-        meas_fiducials (Any | Dict[int, Any] | None, optional): a list of pyGSTi
-            fiducial circuits or a dictionary of such objects. Defaults to None.
-        germs (Any | Dict[int, Any] | None, optional): a list of pyGSTi germ
-            circuits or a dictionary of such objects. Defaults to None.
-        circuit_depths (List[int], optional): a list of positive integers
-            specifying the circuit depths. Defaults to ```[1, 2, 4, 8, 16, 32,
-            64, 128, 256]```.
-        modes (Tuple[str], optional): a tuple of strings specifying the modes
-            to be used in the GST protocol. Defaults to ```('full TP',
-            'CPTPLND', 'Target', 'H+S', 'S')```. These correspond to different
-            types of parameterizations/constraints to apply to the estimated
-            model. Allowed values are:
-            - 'full': full (completely unconstrained)
-            - 'TP': TP-constrained
-            - 'CPTPLND': Lindbladian CPTP-constrained
-            - 'H+S': Only Hamiltonian + Stochastic errors allowed (CPTP)
-            - 'S': Only Stochastic errors allowed (CPTP)
-            - 'Target': use the target (ideal) gates as the estimate
-            - <model>: any key in the models_to_test argument
-        fpr (bool, optional): whether to use Fiducial Pair Reduction (FPR).
-            Defaults to False.
+        qubits (Sequence[int]): a list specifying the qubits on which
+            to perform GST.
+        pspec (QubitProcessorSpec | Dict[int, QubitProcessorSpec] |
+            None, optional): a pyGSTi ProcessorSpec object or a
+            dictionary of such objects. Defaults to None.
+        target_model (ExplicitOpModel | Dict[int, ExplicitOpModel] |
+            None, optional): a pyGSTi Model object or a dictionary of
+            such objects. Defaults to None.
+        prep_fiducials (Sequence[Circuit] |
+            Dict[int, Sequence[Circuit]] | None, optional): a list of
+            pyGSTi fiducial circuits or a dictionary of such objects.
+            Defaults to None.
+        meas_fiducials (Sequence[Circuit] |
+            Dict[int, Sequence[Circuit]] | None, optional): a list of
+            pyGSTi fiducial circuits or a dictionary of such objects.
+            Defaults to None.
+        germs (Sequence[Circuit] | Dict[int, Sequence[Circuit]] |
+            None, optional): a list of pyGSTi germ circuits or a
+            dictionary of such objects. Defaults to None.
+        circuit_depths (Sequence[int], optional): a list of positive
+            integers specifying the circuit depths. Defaults to
+            ``[1]``.
+        modes (Tuple[str], optional): a tuple of strings specifying
+            the modes to be used in the GST protocol. Defaults to
+            ``('Target', 'full TP')``. Only 'Target' and 'full TP'
+            are currently supported for Quantum Instrument GST.
     """
     if len(qubits) == 1:
         gst = type(GST(
@@ -1973,14 +2064,24 @@ def QuantumInstrumentGST(
         def __init__(
             self,
             config:         Config,
-            qubits:         Iterable[int],
-            pspec:          Any | Dict[int, Any] | None = None,
-            target_model:   Any | Dict[int, Any] | None = None,
-            prep_fiducials: Any | Dict[int, Any] | None = None,
-            meas_fiducials: Any | Dict[int, Any] | None = None,
-            germs:          Any | Dict[int, Any] | None = None,
-            circuit_depths: List[int] = [1],  # noqa: B006
-            modes:          Tuple[str] = ('Target', 'full TP'),  # noqa: B006
+            qubits:         Sequence[int],
+            pspec:          (
+                QubitProcessorSpec | Dict[int, QubitProcessorSpec] | None
+            ) = None,
+            target_model:   (
+                ExplicitOpModel | Dict[int, ExplicitOpModel] | None
+            ) = None,
+            prep_fiducials: (
+                Sequence[Circuit] | Dict[int, Sequence[Circuit]] | None
+            ) = None,
+            meas_fiducials: (
+                Sequence[Circuit] | Dict[int, Sequence[Circuit]] | None
+            ) = None,
+            germs: (
+                Sequence[Circuit] | Dict[int, Sequence[Circuit]] | None
+            ) = None,
+            circuit_depths: Sequence[int] = (1,),
+            modes:          Tuple[str] = ('Target', 'full TP'),
             # fpr:            bool = False,
             **kwargs
         ) -> None:

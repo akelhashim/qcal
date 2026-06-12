@@ -18,14 +18,14 @@ logger = logging.getLogger(__name__)
 
 
 def plot_freq_spectrum(
-        config:         Config,
-        qubits:         List | Tuple | None = None,
-        qubit_pairs:    List | Tuple | None = None,
-        plot_GE:        bool = True,
-        plot_EF:        bool = False,
-        plot_readout:   bool = False,
-        plot_two_qubit: bool = False,
-    ) -> None:
+    config:         Config,
+    qubits:         List | Tuple | None = None,
+    qubit_pairs:    List | Tuple | None = None,
+    plot_GE:        bool = True,
+    plot_EF:        bool = False,
+    plot_readout:   bool = False,
+    plot_two_qubit: bool = False,
+) -> None:
     """Plot the frequency spectrum for the frequencies in the config.
 
     Args:
@@ -65,7 +65,9 @@ def plot_freq_spectrum(
     # https://plotly.com/python/builtin-colorscales/
     colors = px.colors.sample_colorscale(
         'Bluered' if len(qubits) <= 2 else 'jet',
-        [0.5] if len(qubits) == 1 else [n/(len(qubits) - 1) for n in range(len(qubits))]
+        [0.5] if len(qubits) == 1 else [
+            n/(len(qubits) - 1) for n in range(len(qubits))
+        ]
     )
 
     n_points = 0
@@ -74,7 +76,9 @@ def plot_freq_spectrum(
     colors_tq = (
         px.colors.sample_colorscale(
             'RdBu',
-            [0.5] if n_points == 1 else [n/(n_points - 1) for n in range(n_points)]
+            [0.5] if n_points == 1 else [
+                n/(n_points - 1) for n in range(n_points)
+            ]
         )
         if n_points > 0 else ['#000000']
     )
