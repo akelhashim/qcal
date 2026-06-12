@@ -9,6 +9,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Breaking
 
+### Added
+
+### Changed
+
+### Deprecated
+
+### Removed
+
+### Fixed
+
+### Security
+
+## [2.0.0] - 2026-06-12
+
+### Breaking
+
 - Change dynamical decoupling XY name to XY_N
 
 ### Added
@@ -34,8 +50,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Declare individual classical registers for qubit measurements
 - 2Q gate definitions now accept either Gate((0, 1)) or Gate(0, 1)
 
-### Deprecated
-
 ### Removed
 
 - Artificial detuning for T2echo and T2XY experiments
@@ -45,8 +59,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - RPE uncertainty to include uncertainty due to shot noise
 - Circuit get_index, remove, replace methods
 - CircuitSet subset and sum_results methods
-
-### Security
 
 ## [1.2.0] - 2026-05-13
 
@@ -210,7 +222,8 @@ post-processing
 - Single- and two-qubit benchmarking methods
 - Advanced compilation tools
 
-[Unreleased]: https://github.com/akelhashim/qcal/compare/v1.2.0...HEAD
+[Unreleased]: https://github.com/akelhashim/qcal/compare/v2.0.0...HEAD
+[2.0.0]: https://github.com/akelhashim/qcal/releases/tag/v2.0.0
 [1.2.0]: https://github.com/akelhashim/qcal/releases/tag/v1.2.0
 [1.1.1]: https://github.com/akelhashim/qcal/releases/tag/v1.1.1
 [1.1.0]: https://github.com/akelhashim/qcal/releases/tag/v1.1.0
