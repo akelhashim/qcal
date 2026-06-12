@@ -9,9 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Breaking
 
+- Changed calculate_cz_frequency to calculate_parametric_cz_frequency
+
 ### Added
 
+- Twirled RPE for ZZ phase estimation
+
 ### Changed
+
+- JAZZ can measure static and driven ZZs in full qutrit space
+- Default ploly save option to png
+- Automatically map characterization methods to 0 for EF subspace experimentas by default
 
 ### Deprecated
 
@@ -52,13 +60,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 
-- Artificial detuning for T2echo and T2XY experiments
-
 ### Fixed
 
-- RPE uncertainty to include uncertainty due to shot noise
-- Circuit get_index, remove, replace methods
-- CircuitSet subset and sum_results methods
+- length -> time in example config
+- Circuit generation bug for simultaneous single-qubit GST on two qubits
 
 ## [1.2.0] - 2026-05-13
 

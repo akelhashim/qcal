@@ -413,7 +413,7 @@ def plot_error_rates(
     )
     save_properties = {
         'toImageButtonOptions': {
-            'format': 'svg',
+            'format': 'png',
             'filename': 'error_rates',
             'scale': 10,
         }

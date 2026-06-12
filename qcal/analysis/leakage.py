@@ -215,7 +215,7 @@ def analyze_leakage(circuits: Any, filename: str | None = None) -> Dict:
     )
     pfig.show(config={
         'toImageButtonOptions': {
-            'format': 'svg',
+            'format': 'png',
             'filename': 'leakage',
             'scale': 10,
         }

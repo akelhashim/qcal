@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Callable, Dict, List, Tuple
+from typing import Callable, Dict, Sequence, Tuple
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -34,15 +34,17 @@ from .utils import find_pulse_index, in_range
 logger = logging.getLogger(__name__)
 
 
-def calculate_cz_frequency(
-        config: Config, qubit_pairs: List[Tuple], intermediate_state: str = '02'
-    ):
-    """Calculate the drive frequency for the 11 -> {02, 20} CZ gate.
+def calculate_parametric_cz_frequency(
+    config: Config,
+    qubit_pairs: Sequence[Tuple[int, int]],
+    intermediate_state: str = '02'
+) -> None:
+    """Calculate the drive frequency for the parametric 11 -> {02, 20} CZ gate.
 
     Args:
         config (Config): qcal Config object.
-        qubit_pairs (List[Tuple]): list of qubit pairs.
-        intermediate_state (str, optional): intermediate state of the gate. 
+        qubit_pairs (Sequence[Tuple[int, int]]): sequence of qubit pairs.
+        intermediate_state (str, optional): intermediate state of the gate.
             Defaults to '02'. '20' is also accepted.
     """
     assert intermediate_state in ('02', '20'), (
@@ -76,14 +78,14 @@ def calculate_cz_frequency(
 
 
 def tomography_circuits(
-        qubit_pairs: List[Tuple], n_elements: int, n_gates: int = 1
-    ) -> CircuitSet:
+    qubit_pairs: Sequence[Tuple[int, int]], n_elements: int, n_gates: int = 1
+) -> CircuitSet:
     """Partial tomography circuits for CZ sweeps.
 
     Args:
-        qubit_pairs (List[Tuple]): list of qubit pairs.
-        n_elements (int):          size of parameter sweep.
-        n_gates (int, optional):   number of gates for pulse repetition.
+        qubit_pairs (Sequence[Tuple[int, int]]): sequence of qubit pairs.
+        n_elements (int): size of parameter sweep.
+        n_gates (int, optional): number of gates for pulse repetition.
             Defaults to 1.
 
     Returns:
@@ -191,15 +193,15 @@ def tomography_circuits(
 
 
 def AmpFreqSweep(
-        qpu:         QPU,
-        config:      Config,
-        qubit_pairs: List[Tuple],
-        amplitudes:  ArrayLike | NDArray | Dict[ArrayLike | NDArray],
-        frequencies: ArrayLike | NDArray | Dict[ArrayLike | NDArray],
-        n_gates:     int = 1,
-        params:      Dict | None = None,
-        **kwargs
-    ) -> Callable:
+    qpu:         QPU,
+    config:      Config,
+    qubit_pairs: Sequence[Tuple[int, int]],
+    amplitudes:  ArrayLike | Dict[Tuple[int, int], ArrayLike],
+    frequencies: ArrayLike | Dict[Tuple[int, int], ArrayLike],
+    n_gates:     int = 1,
+    params:      Dict | None = None,
+    **kwargs
+) -> Callable:
     """Amplitude & Frequency sweep for CZ gate.
 
     This sweep searches a 2D lanscape to find the where the conditionality is
@@ -222,14 +224,14 @@ def AmpFreqSweep(
     Args:
         qpu (QPU): custom QPU object.
         config (Config): qcal Config object.
-        qubit_pairs (List[Tuple]): pairs of qubit labels for the two-qubit gate
-            calibration.
-        amplitudes (ArrayLike | NDArray | Dict[ArrayLike | NDArray]): array of
+        qubit_pairs (Sequence[Tuple[int, int]]): pairs of qubit labels for the
+            two-qubit gate calibration.
+        amplitudes (ArrayLike | Dict[Tuple[int, int], ArrayLike]): array of
             amplitudes to sweep over for calibrating the two-qubit CZ gate.
             These amplitudes are swept over both the control and target qubit
             lines. If calibrating multiple gates at the same time, this should
             be a dictionary mapping two arrays to each qubit pair label.
-        frequencies (ArrayLike | NDArray | Dict[ArrayLike | NDArray]): array of
+        frequencies (ArrayLike | Dict[Tuple[int, int], ArrayLike]): array of
             frequencies to sweep over for calibrating the two-qubit CZ gate.
             If calibrating multiple gates at the same time, this should be a
             dictionary mapping an array to each qubit pair label.
@@ -248,15 +250,16 @@ def AmpFreqSweep(
         This class inherits a custom QPU from the AmpFreqSweep function.
         """
 
-        def __init__(self,
-                config:      Config,
-                qubit_pairs: List[Tuple],
-                amplitudes:  ArrayLike | Dict[ArrayLike],
-                frequencies: ArrayLike | Dict[ArrayLike],
-                n_gates:     int = 1,
-                params:      Dict | None = None,
-                **kwargs
-            ) -> None:
+        def __init__(
+            self,
+            config:      Config,
+            qubit_pairs: Sequence[Tuple[int, int]],
+            amplitudes:  ArrayLike | Dict[Tuple[int, int], ArrayLike],
+            frequencies: ArrayLike | Dict[Tuple[int, int], ArrayLike],
+            n_gates:     int = 1,
+            params:      Dict | None = None,
+            **kwargs
+        ) -> None:
             """Initialize the AmpFreqSweep within the function."""
             qpu.__init__(self, config=config, **kwargs)
             Calibration.__init__(self, config)
@@ -315,20 +318,20 @@ def AmpFreqSweep(
             return self._frequencies
 
         @property
-        def qubit_pairs(self) -> List[Tuple]:
+        def qubit_pairs(self) -> Sequence[Tuple[int, int]]:
             """Qubit pair labels.
 
             Returns:
-                List[Tuple]: qubit pairs.
+                Sequence[Tuple[int, int]]: qubit pairs.
             """
             return self._qubits
 
         @property
-        def conditionality(self) -> Dict[Tuple]:
+        def conditionality(self) -> Dict[Tuple[int, int]]:
             """Conditionality computed at each phase value.
 
             Returns:
-                Dict[Tuple]: conditionality for each pair.
+                Dict[Tuple[int, int]]: conditionality for each pair.
             """
             return self._R
 
@@ -540,15 +543,15 @@ def AmpFreqSweep(
 
 
 def Amplitude(
-        qpu:          QPU,
-        config:       Config,
-        qubit_pairs:  List[Tuple],
-        amplitudes:   ArrayLike | NDArray | Dict[ArrayLike | NDArray],
-        n_gates:      int = 1,
-        relative_amp: bool = False,
-        params:       Dict | None = None,
-        **kwargs
-    ) -> Callable:
+    qpu:          QPU,
+    config:       Config,
+    qubit_pairs:  Sequence[Tuple[int, int]],
+    amplitudes:   ArrayLike | Dict[Tuple[int, int], ArrayLike],
+    n_gates:      int = 1,
+    relative_amp: bool = False,
+    params:       Dict | None = None,
+    **kwargs
+) -> Callable:
     """Amplitude calibration for CZ gate.
 
     This calibration finds the amplitude for both drive lines where the
@@ -569,9 +572,9 @@ def Amplitude(
     Args:
         qpu (QPU): custom QPU object.
         config (Config): qcal Config object.
-        qubit_pairs (List[Tuple]): pairs of qubit labels for the two-qubit gate
-            calibration.
-        amplitudes (ArrayLike | NDArray | Dict[ArrayLike | NDArray]): array of
+        qubit_pairs (Sequence[Tuple[int, int]]): pairs of qubit labels for the
+            two-qubit gate calibration.
+        amplitudes (ArrayLike | Dict[Tuple[int, int], ArrayLike]): array of
             amplitudes to sweep over for calibrating the two-qubit CZ gate.
             These amplitudes are swept over both the control and target qubit
             lines. If calibrating multiple gates at the same time, this should
@@ -596,15 +599,16 @@ def Amplitude(
         function.
         """
 
-        def __init__(self,
-                config:       Config,
-                qubit_pairs:  List[Tuple],
-                amplitudes:   ArrayLike | Dict[ArrayLike],
-                n_gates:      int = 1,
-                relative_amp: bool = False,
-                params:       Dict | None = None,
-                **kwargs
-            ) -> None:
+        def __init__(
+            self,
+            config:       Config,
+            qubit_pairs:  Sequence[Tuple[int, int]],
+            amplitudes:   ArrayLike | Dict[Tuple[int, int], ArrayLike],
+            n_gates:      int = 1,
+            relative_amp: bool = False,
+            params:       Dict | None = None,
+            **kwargs
+        ) -> None:
             """Initialize the Amplitude class within the function."""
             qpu.__init__(self, config=config, **kwargs)
             Calibration.__init__(self, config)
@@ -659,20 +663,20 @@ def Amplitude(
             return self._amplitudes
 
         @property
-        def qubit_pairs(self) -> List[Tuple]:
+        def qubit_pairs(self) -> Sequence[Tuple[int, int]]:
             """Qubit pair labels.
 
             Returns:
-                List[Tuple]: qubit pairs.
+                Sequence[Tuple[int, int]]: qubit pairs.
             """
             return self._qubits
 
         @property
-        def conditionality(self) -> Dict[Tuple]:
+        def conditionality(self) -> Dict[Tuple[int, int]]:
             """Conditionality computed at each phase value.
 
             Returns:
-                Dict[Tuple]: conditionality for each pair.
+                Dict[Tuple[int, int]]: conditionality for each pair.
             """
             return self._R
 
@@ -895,15 +899,15 @@ def Amplitude(
 
 
 def Frequency(
-        qpu:           QPU,
-        config:        Config,
-        qubit_pairs:   List[Tuple],
-        frequencies:   ArrayLike | NDArray | Dict[ArrayLike | NDArray],
-        n_gates:       int = 1,
-        relative_freq: bool = False,
-        params:        Dict | None = None,
-        **kwargs
-    ) -> Callable:
+    qpu:           QPU,
+    config:        Config,
+    qubit_pairs:   Sequence[Tuple[int, int]],
+    frequencies:   ArrayLike | Dict[Tuple[int, int], ArrayLike],
+    n_gates:       int = 1,
+    relative_freq: bool = False,
+    params:        Dict | None = None,
+    **kwargs
+) -> Callable:
     """Frequency calibration for CZ gate.
 
     This calibration finds the frequency where the conditionality is a maximum.
@@ -923,9 +927,9 @@ def Frequency(
     Args:
         qpu (QPU): custom QPU object.
         config (Config): qcal Config object.
-        qubit_pairs (List[Tuple]): pairs of qubit labels for the two-qubit gate
-            calibration.
-        frequencies (ArrayLike | NDArray | Dict[ArrayLike | NDArray]): array of
+        qubit_pairs (Sequence[Tuple[int, int]]): pairs of qubit labels for the
+            two-qubit gate calibration.
+        frequencies (ArrayLike | Dict[Tuple[int, int], ArrayLike]): array of
             frequencies to sweep over for calibrating the two-qubit CZ gate.
             If calibrating multiple gates at the same time, this should be a
             dictionary mapping an array to each qubit pair label.
@@ -949,15 +953,16 @@ def Frequency(
         function.
         """
 
-        def __init__(self,
-                config:        Config,
-                qubit_pairs:   List[Tuple],
-                frequencies:   ArrayLike | Dict[ArrayLike],
-                n_gates:       int = 1,
-                relative_freq: bool = False,
-                params:        Dict | None = None,
-                **kwargs
-            ) -> None:
+        def __init__(
+            self,
+            config:        Config,
+            qubit_pairs:   Sequence[Tuple[int, int]],
+            frequencies:   ArrayLike | Dict[Tuple[int, int], ArrayLike],
+            n_gates:       int = 1,
+            relative_freq: bool = False,
+            params:        Dict | None = None,
+            **kwargs
+        ) -> None:
             """Initialize the Amplitude class within the function."""
             qpu.__init__(self, config=config, **kwargs)
             Calibration.__init__(self, config)
@@ -1002,20 +1007,20 @@ def Frequency(
             return self._frequencies
 
         @property
-        def qubit_pairs(self) -> List[Tuple]:
+        def qubit_pairs(self) -> Sequence[Tuple[int, int]]:
             """Qubit pair labels.
 
             Returns:
-                List[Tuple]: qubit pairs.
+                Sequence[Tuple[int, int]]: qubit pairs.
             """
             return self._qubits
 
         @property
-        def conditionality(self) -> Dict[Tuple]:
+        def conditionality(self) -> Dict[Tuple[int, int]]:
             """Conditionality computed at each phase value.
 
             Returns:
-                Dict[Tuple]: conditionality for each pair.
+                Dict[Tuple[int, int]]: conditionality for each pair.
             """
             return self._R
 
@@ -1219,13 +1224,13 @@ def Frequency(
 
 
 def RelativeAmp(
-        qpu:         QPU,
-        config:      Config,
-        qubit_pairs: List[Tuple],
-        amplitudes:  ArrayLike | NDArray | Dict[ArrayLike | NDArray],
-        params:      Dict | None = None,
-        **kwargs
-    ) -> Callable:
+    qpu:         QPU,
+    config:      Config,
+    qubit_pairs: Sequence[Tuple[int, int]],
+    amplitudes:  ArrayLike | Dict[Tuple[int, int], ArrayLike],
+    params:      Dict | None = None,
+    **kwargs
+) -> Callable:
     """Relative amplitude calibration for CZ gate.
 
     This calibration finds a relative amplitude between the drive lines where
@@ -1246,9 +1251,9 @@ def RelativeAmp(
     Args:
         qpu (QPU): custom QPU object.
         config (Config): qcal Config object.
-        qubit_pairs (List[Tuple]): pairs of qubit labels for the two-qubit gate
-            calibration.
-        amplitudes (ArrayLike | NDArray | Dict[ArrayLike | NDArray]): array of
+        qubit_pairs (Sequence[Tuple[int, int]]): pairs of qubit labels for the
+            two-qubit gate calibration.
+        amplitudes (ArrayLike | Dict[Tuple[int, int], ArrayLike]): array of
             relative amps to sweep over for calibrating the two-qubit CZ gate.
             These amplitudes are swept over the target qubit line and are
             relative to the amplitude on the control qubit line. If calibrating
@@ -1268,13 +1273,14 @@ def RelativeAmp(
         function.
         """
 
-        def __init__(self,
-                config:      Config,
-                qubit_pairs: List[Tuple],
-                amplitudes:  ArrayLike | Dict[ArrayLike],
-                params:      Dict | None = None,
-                **kwargs
-            ) -> None:
+        def __init__(
+            self,
+            config:      Config,
+            qubit_pairs: Sequence[Tuple[int, int]],
+            amplitudes:  ArrayLike | Dict[Tuple[int, int], ArrayLike],
+            params:      Dict | None = None,
+            **kwargs
+        ) -> None:
             """Initialize the RelativeAmp class within the function."""
             qpu.__init__(self, config=config, **kwargs)
             Calibration.__init__(self, config)
@@ -1325,20 +1331,20 @@ def RelativeAmp(
             return self._amplitudes
 
         @property
-        def qubit_pairs(self) -> List[Tuple]:
+        def qubit_pairs(self) -> Sequence[Tuple[int, int]]:
             """Qubit pair labels.
 
             Returns:
-                List[Tuple]: qubit pairs.
+                Sequence[Tuple[int, int]]: qubit pairs.
             """
             return self._qubits
 
         @property
-        def conditionality(self) -> Dict[Tuple]:
+        def conditionality(self) -> Dict[Tuple[int, int]]:
             """Conditionality computed at each phase value.
 
             Returns:
-                Dict[Tuple]: conditionality for each pair.
+                Dict[Tuple[int, int]]: conditionality for each pair.
             """
             return self._R
 
@@ -1474,13 +1480,13 @@ def RelativeAmp(
 
 
 def RelativePhase(
-        qpu:         QPU,
-        config:      Config,
-        qubit_pairs: List[Tuple],
-        phases:      ArrayLike | NDArray | Dict[ArrayLike | NDArray],
-        params:      Dict | None = None,
-        **kwargs
-    ) -> Callable:
+    qpu:         QPU,
+    config:      Config,
+    qubit_pairs: Sequence[Tuple[int, int]],
+    phases:      ArrayLike | Dict[Tuple[int, int], ArrayLike],
+    params:      Dict | None = None,
+    **kwargs
+) -> Callable:
     """Relative phase calibration for CZ gate.
 
     This calibration finds a relative phase between the drive lines where the
@@ -1501,12 +1507,12 @@ def RelativePhase(
     Args:
         qpu (QPU): custom QPU object.
         config (Config): qcal Config object.
-        qubit_pairs (List[Tuple]): pairs of qubit labels for the two-qubit gate
-            calibration.
-        phases (ArrayLike | NDArray | Dict[ArrayLike | NDArray]): array of
-            phases to sweep over for calibrating the two-qubit gate
-            phases. If calibrating multiple gates at the same time, this
-            should be a dictionary mapping an array to a qubit pair label.
+        qubit_pairs (Sequence[Tuple[int, int]]): pairs of qubit labels for the
+            two-qubit gate calibration.
+        phases (ArrayLike | Dict[Tuple[int, int], ArrayLike]): array of
+            phases to sweep over for calibrating the two-qubit gate phases.
+            If calibrating multiple gates at the same time, this should be a
+            dictionary mapping an array to a qubit pair label.
         params (Dict): dictionary mapping the qubit labels to the config
             parameter to sweep over.
 
@@ -1521,13 +1527,14 @@ def RelativePhase(
         function.
         """
 
-        def __init__(self,
-                config:      Config,
-                qubit_pairs: List[Tuple],
-                phases:      ArrayLike | Dict[ArrayLike],
-                params:      Dict | None = None,
-                **kwargs
-            ) -> None:
+        def __init__(
+            self,
+            config:      Config,
+            qubit_pairs: Sequence[Tuple[int, int]],
+            phases:      ArrayLike | Dict[Tuple[int, int], ArrayLike],
+            params:      Dict | None = None,
+            **kwargs
+        ) -> None:
             """Initialize the RelativePhase class within the function."""
             qpu.__init__(self, config=config, **kwargs)
             Calibration.__init__(self, config)
@@ -1563,20 +1570,20 @@ def RelativePhase(
             return self._phases
 
         @property
-        def qubit_pairs(self) -> List[Tuple]:
+        def qubit_pairs(self) -> Sequence[Tuple[int, int]]:
             """Qubit pair labels.
 
             Returns:
-                List[Tuple]: qubit pairs.
+                Sequence[Tuple[int, int]]: qubit pairs.
             """
             return self._qubits
 
         @property
-        def conditionality(self) -> Dict[Tuple]:
+        def conditionality(self) -> Dict[Tuple[int, int]]:
             """Conditionality computed at each phase value.
 
             Returns:
-                Dict[Tuple]: conditionality for each pair.
+                Dict[Tuple[int, int]]: conditionality for each pair.
             """
             return self._R
 
@@ -1713,13 +1720,13 @@ def RelativePhase(
 
 
 def LocalPhases(
-        qpu:         QPU,
-        config:      Config,
-        qubit_pairs: List[Tuple],
-        phases:      NDArray | Dict = np.pi * np.linspace(-1, 1, 21),
-        params:      Dict | None = None,
-        **kwargs
-    ) -> Callable:
+    qpu:         QPU,
+    config:      Config,
+    qubit_pairs: Sequence[Tuple[int, int]],
+    phases:      NDArray | Dict | None = None,
+    params:      Dict | None = None,
+    **kwargs
+) -> Callable:
     """Local phase calibration for CZ gate.
 
     This calibration finds the local phases to calibrate the IZ and ZI terms in
@@ -1738,13 +1745,13 @@ def LocalPhases(
     Args:
         qpu (QPU): custom QPU object.
         config (Config): qcal Config object.
-        qubit_pairs (List[Tuple]): pairs of qubit labels for the two-qubit gate
-            calibration.
+        qubit_pairs (Sequence[Tuple[int, int]]): pairs of qubit labels for the
+            two-qubit gate calibration.
         phases (NDArray | Dict, optional): array of phases to sweep over for
-            calibrating the local phases of the gate. Defaults to ```np.pi *
-            np.linspace(-1, 1, 21)```. If calibrating multiple gates at the same
-            time, this should be a dictionary mapping an array to a qubit pair
-            label.
+            calibrating the local phases of the gate. Defaults to None. If
+            None, it defaults to```np.pi * np.linspace(-1, 1, 21)```. If
+            calibrating multiple gates at the same time, this should be a
+            dictionary mapping an array to a qubit pair label.
         params (Dict): dictionary mapping the qubit labels to the config
             parameter to sweep over.
 
@@ -1759,19 +1766,23 @@ def LocalPhases(
         function.
         """
 
-        def __init__(self,
-                config:      Config,
-                qubit_pairs: List[Tuple],
-                phases:      NDArray | Dict = np.pi * np.linspace(-1, 1, 21),
-                params:      Dict | None = None,
-                **kwargs
-            ) -> None:
+        def __init__(
+            self,
+            config:      Config,
+            qubit_pairs: Sequence[Tuple[int, int]],
+            phases:      NDArray | Dict | None = None,
+            params:      Dict | None = None,
+            **kwargs
+        ) -> None:
             """Initialize the LocalPhases class within the function."""
             qpu.__init__(self, config=config, **kwargs)
             Calibration.__init__(self, config)
 
             self._qubits = qubit_pairs
 
+            phases = phases if phases is not None else (
+                np.pi * np.linspace(-1, 1, 21)
+            )
             if not isinstance(phases, dict):
                 self._phases = dict.fromkeys(qubit_pairs, phases)
             else:
@@ -1817,20 +1828,20 @@ def LocalPhases(
             return self._phases
 
         @property
-        def qubit_pairs(self) -> List[Tuple]:
+        def qubit_pairs(self) -> Sequence[Tuple[int, int]]:
             """Qubit pair labels.
 
             Returns:
-                List[Tuple]: qubit pairs.
+                Sequence[Tuple[int, int]]: qubit pairs.
             """
             return self._qubits
 
         @property
-        def conditionality(self) -> Dict[Tuple]:
+        def conditionality(self) -> Dict[Tuple[int, int]]:
             """Conditionality computed at each phase value.
 
             Returns:
-                Dict[Tuple]: conditionality for each pair.
+                Dict[Tuple[int, int]]: conditionality for each pair.
             """
             return self._R
 
@@ -2233,15 +2244,15 @@ def LocalPhases(
 
 
 def SpectatorPhase(
-        qpu:                QPU,
-        config:             Config,
-        qubit_pairs:        List[Tuple],
-        spectator_qubits:   List[int],
-        conditional_qubits: List[int],
-        phases:             NDArray | Dict = np.pi * np.linspace(-1, 1, 21),
-        params:             Dict | None = None,
-        **kwargs
-    ) -> Callable:
+    qpu:                QPU,
+    config:             Config,
+    qubit_pairs:        Sequence[Tuple[int, int]],
+    spectator_qubits:   Sequence[int],
+    conditional_qubits: Sequence[int],
+    phases:             NDArray | Dict | None = None,
+    params:             Dict | None = None,
+    **kwargs
+) -> Callable:
     """Spectator phase calibration for CZ gate.
 
     This calibration finds a the local phase on a spectator qubit that minimizes
@@ -2262,16 +2273,16 @@ def SpectatorPhase(
     Args:
         qpu (QPU): custom QPU object.
         config (Config): qcal Config object.
-        qubit_pairs (List[Tuple]): pairs of qubit labels for the two-qubit gate
-            calibration.
-        spectator_qubits (int): spectator qubits.
-        conditional_qubits (int): CZ qubits on which the conditional phase of
-            the spectator qubits depend.
+        qubit_pairs (Sequence[Tuple[int, int]]): pairs of qubit labels for the
+            two-qubit gate calibration.
+        spectator_qubits (Sequence[int]): spectator qubits.
+        conditional_qubits (Sequence[int]): CZ qubits on which the
+            conditional phase of the spectator qubits depend.
         phases (NDArray | Dict, optional): array of phases to sweep over for
-            calibrating the spectator phases. Defaults to ```np.pi *
-            np.linspace(-1, 1, 21)```. If calibrating multiple gates at the same
-            time, this can be a dictionary mapping an array to a spectator qubit
-            label.
+            calibrating the spectator phases. Defaults to None. If None, it
+            defaults to ```np.pi * np.linspace(-1, 1, 21)```. If calibrating
+            multiple gates at the same time, this can be a dictionary mapping
+            an array to a spectator qubit label.
         params (Dict): dictionary mapping the qubit labels to the config
             parameter to sweep over.
 
@@ -2286,15 +2297,16 @@ def SpectatorPhase(
         function.
         """
 
-        def __init__(self,
-                config:             Config,
-                qubit_pairs:        List[Tuple],
-                spectator_qubits:   List[int],
-                conditional_qubits: List[int],
-                phases:             NDArray | Dict = np.pi*np.linspace(-1,1,21),
-                params:             Dict | None = None,
-                **kwargs
-            ) -> None:
+        def __init__(
+            self,
+            config:             Config,
+            qubit_pairs:        Sequence[Tuple[int, int]],
+            spectator_qubits:   Sequence[int],
+            conditional_qubits: Sequence[int],
+            phases:             NDArray | Dict | None = None,
+            params:             Dict | None = None,
+            **kwargs
+        ) -> None:
             """Initialize the SpectatorPhase class within the function."""
             qpu.__init__(self, config=config, **kwargs)
             Calibration.__init__(self, config)
@@ -2303,6 +2315,9 @@ def SpectatorPhase(
             self._squbits = spectator_qubits
             self._cqubits = conditional_qubits
 
+            phases = phases if phases is not None else (
+                np.pi * np.linspace(-1, 1, 21)
+            )
             if not isinstance(phases, dict):
                 self._phases = dict.fromkeys(self._squbits, phases)
             else:
@@ -2342,38 +2357,38 @@ def SpectatorPhase(
             return self._phases
 
         @property
-        def qubit_pairs(self) -> List[Tuple]:
+        def qubit_pairs(self) -> Sequence[Tuple[int, int]]:
             """Qubit pair labels.
 
             Returns:
-                List[Tuple]: qubit pairs.
+                Sequence[Tuple[int, int]]: qubit pairs.
             """
             return self._qubits
 
         @property
-        def spectator_qubits(self) -> int:
+        def spectator_qubits(self) -> Sequence[int]:
             """Spectator qubits.
 
             Returns:
-                int: spectator qubits.
+                Sequence[int]: spectator qubits.
             """
             return self._squbits
 
         @property
-        def conditional_qubits(self) -> int:
+        def conditional_qubits(self) -> Sequence[int]:
             """Conditional qubits.
 
             Returns:
-                int: conditional qubits.
+                Sequence[int]: conditional qubits.
             """
             return self._cqubits
 
         @property
-        def conditionality(self) -> Dict[Tuple]:
+        def conditionality(self) -> Dict[Tuple[int, int]]:
             """Conditionality computed at each phase value.
 
             Returns:
-                Dict[Tuple]: conditionality for each pair.
+                Dict[Tuple[int, int]]: conditionality for each pair.
             """
             return self._R
 

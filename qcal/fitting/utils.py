@@ -17,7 +17,9 @@ def est_freq_fft(
     Args:
         x (ArrayLike): x data.
         y (ArrayLike): y data.
-        padding_factor (int, optional): _description_. Defaults to 4.
+        padding_factor (int, optional): zero-padding multiplier applied to the
+            signal before FFT; larger values increase frequency resolution.
+            Defaults to 10.
 
     Returns:
         float: estimated frequency.
@@ -39,15 +41,21 @@ def est_freq_fft(
     # Zero pad the signal
     n_orig = len(y_detrend)
     n_padded = n_orig * padding_factor
-    y_padded = np.zeros(n_padded)
+    y_padded = np.zeros(n_padded, dtype=y_detrend.dtype)
     y_padded[:n_orig] = y_detrend
 
-    # Compute FFT with zero padding
-    yf = np.fft.rfft(y_padded)
-    xf = np.fft.rfftfreq(n_padded, dx)
+    # Compute FFT
+    if np.iscomplexobj(y):
+        yf = np.fft.fft(y_padded.astype(complex))
+        xf = np.fft.fftfreq(n_padded, dx)
+        # Exclude DC bin (index 0) when searching for peak
+        magnitudes = np.abs(yf)
+        magnitudes[0] = 0
+        idx = np.argmax(magnitudes)
+    else:
+        yf = np.fft.rfft(y_padded)
+        xf = np.fft.rfftfreq(n_padded, dx)
+        idx = np.argmax(np.abs(yf[1:])) + 1
 
-    # Find peak frequency (exclude zero frequency)
-    idx = np.argmax(np.abs(yf[1:])) + 1
     freq = xf[idx]
-
     return freq
