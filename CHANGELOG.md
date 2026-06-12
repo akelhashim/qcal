@@ -11,6 +11,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Default single- and two-qubit CRB experiment designs
+- Default single- and two-qubit GST experiment designs
+
 ### Changed
 
 ### Deprecated
