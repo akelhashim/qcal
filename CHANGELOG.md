@@ -9,6 +9,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Breaking
 
+### Added
+
+### Changed
+
+### Deprecated
+
+### Removed
+
+### Fixed
+
+### Security
+
+## [3.0.0] - 2026-06-12
+
+### Breaking
+
 - Changed calculate_cz_frequency to calculate_parametric_cz_frequency
 
 ### Added
@@ -20,14 +36,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - JAZZ can measure static and driven ZZs in full qutrit space
 - Default ploly save option to png
 - Automatically map characterization methods to 0 for EF subspace experimentas by default
-
-### Deprecated
-
-### Removed
-
-### Fixed
-
-### Security
 
 ## [2.0.0] - 2026-06-12
 
@@ -227,7 +235,8 @@ post-processing
 - Single- and two-qubit benchmarking methods
 - Advanced compilation tools
 
-[Unreleased]: https://github.com/akelhashim/qcal/compare/v2.0.0...HEAD
+[Unreleased]: https://github.com/akelhashim/qcal/compare/v3.0.0...HEAD
+[3.0.0]: https://github.com/akelhashim/qcal/releases/tag/v3.0.0
 [2.0.0]: https://github.com/akelhashim/qcal/releases/tag/v2.0.0
 [1.2.0]: https://github.com/akelhashim/qcal/releases/tag/v1.2.0
 [1.1.1]: https://github.com/akelhashim/qcal/releases/tag/v1.1.1
