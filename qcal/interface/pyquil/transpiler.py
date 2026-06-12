@@ -1,13 +1,17 @@
 """Submodule for handling transpilation from qcal to pyquil circuits.
 
+NOTE: we do not use TYPE_CHECKING for PyQuil types because this might fail if
+PyQuil is not installed when building docs.
 """
+from __future__ import annotations
+
 import logging
 from collections.abc import Callable, Iterator, Mapping
-from typing import Any, Dict, List
+from typing import Any, Dict, Iterable, List
 
 import numpy as np
 
-from qcal.circuit import Barrier, Circuit, CircuitSet
+from qcal.circuit import Barrier, Circuit, CircuitSet, Cycle
 from qcal.transpilation.transpiler import Transpiler
 from qcal.transpilation.utils import GateMapper
 from qcal.units import ns
@@ -20,6 +24,25 @@ __all__ = ('Transpiler',)
 
 def add_CNOT(q0: int, q1: int, **kwargs) -> Iterator:
     """Add a CNOT gate.
+
+    Args:
+        q0 (int): control qubit label.
+        q1 (int): target qubit label.
+
+    Yields:
+        Iterator: CNOT gate.
+    """
+    try:
+        from pyquil.gates import CNOT
+    except ImportError:
+        logger.warning(' Unable to import pyquil!')
+        return
+
+    yield CNOT(q0, q1)
+
+
+def add_CX(q0: int, q1: int, **kwargs) -> Iterator:
+    """Add a CX gate.
 
     Args:
         q0 (int): control qubit label.
@@ -94,22 +117,29 @@ def add_ISWAP(q0: int, q1: int, **kwargs) -> Iterator:
     yield ISWAP(q0, q1)
 
 
-# def add_Measure(qubit: int, **kwargs) -> Iterator:
-#     """Add a Measurement.
+def add_Measure(
+    qubit: int,
+    classical_ref: pyquil.quilatom.MemoryReference | None = None,  # noqa: F821 # type: ignore
+    **kwargs
+) -> Iterator:
+    """Add a Measurement.
 
-#     Args:
-#         qubit (int): qubit label.
+    Args:
+        qubit (int): qubit label.
+        classical_ref (pyquil.quilatom.MemoryReference | None, optional):
+            classical memory reference to store the measurement result.
+            Defaults to ``None``.
 
-#     Yields:
-#         Iterator: Measurement
-#     """
-#     try:
-#         from pyquil.gates import Measure
-#     except ImportError:
-#         logger.warning(' Unable to import pyquil!')
-#         return
+    Yields:
+        Iterator: Measurement
+    """
+    try:
+        from pyquil.gates import MEASURE
+    except ImportError:
+        logger.warning(' Unable to import pyquil!')
+        return
 
-#     yield Measure(qubit)
+    yield MEASURE(qubit, classical_ref)
 
 
 def add_SXdag(qubit: int, **kwargs) -> Iterator:
@@ -329,104 +359,329 @@ def RZ_F12(theta, q) -> Any:
 
 
 def to_pyquil(
-    circuit:              Circuit,
-    gate_mapper:          GateMapper,
-    fence_between_cycles: bool = False,
-):
-    """Transpile a qcal circuit to a pyquil Program.
+    circuit:               Circuit,
+    gate_mapper:           GateMapper,
+    cycle_replacement:     Dict[Cycle, str] | None = None,
+    circuit_for_loop:      bool = False,
+    cycles_to_defcircuits: bool = False,
+    fence_between_cycles:  bool = True,
+) -> Program:  # type: ignore # noqa: F821
+    """Transpile a qcal circuit to a PyQuil Program.
 
     Args:
         circuit (Circuit): qcal circuit.
         gate_mapper (GateMapper): map between qcal to quil gates.
+        cycle_replacement (Dict[Cycle, str] | None, optional): mapping from
+                qcal Cycles to PyQuil DEFCIRCUIT name, used to replace entire
+                cycle with a single DEFCIRCUIT call. Defaults to ``None``.
+        circuit_for_loop (bool, optional): loops over circuit partitions for
+                circuits with repeated structures. Defaults to ``False``.
+        cycles_to_defcircuits (bool, optional): whether to write each
+            distinct cycle as a DEFCIRCUIT definition and invoke it by name.
+            Defaults to ``False``.
         fence_between_cycles (bool, optional): whether to add a fence
-            between every cycle. Defaults to False.
+            between every cycle. Defaults to ``True``.
 
     Returns:
-        Program: pyquil Program.
+        Program: PyQuil Program.
     """
     try:
-        from pyquil.gates import FENCE
-        from pyquil.quil import Program
+        from pyquil import Program
+        from pyquil.quilatom import LabelPlaceholder
     except ImportError:
         logger.warning(' Unable to import pyquil!')
         return
 
     tprogram = Program()
-    ro = tprogram.declare('ro', 'BIT', circuit.n_qubits)
-    for cycle in circuit:
+    declarations = Program()
+    qubit_to_cref = {
+        q: declarations.declare(f'ro{q}', 'BIT', 1)
+        for q in circuit.qubits
+    }
+    if circuit_for_loop:
+        for sub_circuit, n_reps in circuit.partitions:
+            if n_reps == 1:
+                _declarations, _tprogram = transpile_circuit(
+                        circuit=Circuit(sub_circuit),
+                        gate_mapper=gate_mapper,
+                        qubits=circuit.qubits,
+                        cycle_replacement=cycle_replacement,
+                        qubit_to_cref=qubit_to_cref,
+                        cycles_to_defcircuits=cycles_to_defcircuits,
+                        fence_between_cycles=fence_between_cycles
+                )
+                declarations += _declarations
+                tprogram += _tprogram
+
+            elif n_reps > 1:
+                counter = declarations.declare(
+                    f'counter{to_pyquil._counter}', 'INTEGER'
+                )
+                _declarations, _tsub_program = transpile_circuit(
+                    circuit=Circuit(sub_circuit),
+                    gate_mapper=gate_mapper,
+                    qubits=circuit.qubits,
+                    cycle_replacement=cycle_replacement,
+                    qubit_to_cref=qubit_to_cref,
+                    cycles_to_defcircuits=cycles_to_defcircuits,
+                    fence_between_cycles=fence_between_cycles
+                )
+                declarations += _declarations
+
+                loop = _tsub_program.with_loop(
+                    num_iterations=n_reps,
+                    iteration_count_reference=counter,
+                    start_label=LabelPlaceholder(f'START{to_pyquil._counter}'),
+                    end_label=LabelPlaceholder(f'END{to_pyquil._counter}'),
+                )
+                tprogram += loop
+
+                to_pyquil._counter += 1
+
+        tprogram.resolve_label_placeholders()
+
+    else:
+        _declarations, _tprogram = transpile_circuit(
+            circuit=circuit,
+            gate_mapper=gate_mapper,
+            cycle_replacement=cycle_replacement,
+            qubit_to_cref=qubit_to_cref,
+            cycles_to_defcircuits=cycles_to_defcircuits,
+            fence_between_cycles=fence_between_cycles
+        )
+        declarations += _declarations
+        tprogram += _tprogram
+
+    return declarations + tprogram
+
+
+def transpile_circuit(
+    circuit:               Circuit,
+    gate_mapper:           GateMapper,
+    qubits:                Iterable[int] | None = None,
+    cycle_replacement:     Dict[Cycle, str] | None = None,
+    qubit_to_cref:         (
+        Dict[int, pyquil.quilatom.MemoryReference] | None  # type: ignore # noqa: F821
+    ) = None,
+    cycles_to_defcircuits: bool = False,
+    fence_between_cycles:  bool = True,
+):
+    """Transpile a qcal circuit to a PyQuil Program.
+
+    Args:
+        circuit (Circuit): qcal circuit.
+        gate_mapper (GateMapper): map between qcal to quil gates.
+        qubits (Iterable[int] | None, optional): qubits to include in the
+            program. Defaults to ``None``, in which case all qubits in the
+            passed circuit are included. Being able to pass the circuit qubits
+            is useful for transpiling circuit partitions into for-loops, in
+            which case the qubits in the partition may be a subset of the qubits
+            in the entire circuit.
+        cycle_replacement (Dict[Cycle, str] | None, optional): mapping from
+                qcal Cycles to PyQuil DEFCIRCUIT name, used to replace entire
+                cycle with a single DEFCIRCUIT call. Defaults to ``None``.
+        qubit_to_cref (Dict[int, pyquil.quilatom.MemoryReference] | None,
+            optional): mapping from qubit index to classical memory reference.
+            When ``None``, a fresh ``ro`` register is declared and the mapping
+            is built from ``circuit.qubits``. Defaults to ``None``.
+        cycles_to_defcircuits (bool, optional): whether to write each
+            distinct cycle as a DEFCIRCUIT definition and invoke it by name.
+            Defaults to ``False``.
+        fence_between_cycles (bool, optional): whether to add a fence
+            between every cycle. Defaults to ``True``.
+
+    Returns:
+        Program: PyQuil Program.
+    """
+    try:
+        from pyquil.gates import FENCE
+        from pyquil.quil import Program
+        from pyquil.quilatom import FormalArgument
+        from pyquil.quilbase import DefCircuit
+    except ImportError:
+        logger.warning(' Unable to import pyquil!')
+        return
+
+    qubits = circuit.qubits if qubits is None else qubits
+    tprogram = Program()
+    declarations = Program()
+
+    if qubit_to_cref is None:
+        qubit_to_cref = {
+            q: declarations.declare(f'ro{q}', 'BIT', 1)
+            for q in circuit.qubits
+        }
+
+    cycle_defs = {}
+    for i, cycle in enumerate(circuit):
         if fence_between_cycles:
-            tprogram += FENCE(*circuit.qubits)
+            tprogram += FENCE(*qubits)
 
         if isinstance(cycle, Barrier):
             tprogram += FENCE(*cycle.qubits)
-        else:
-            for gate in cycle:
-                if gate.name in ['Meas', 'MCM']:
-                    tprogram += gate_mapper[gate.name](
-                        gate.qubits[0],
-                        ro[circuit.qubits.index(gate.qubits[0])]
-                    )
-                else:
-                    tprogram += gate_mapper[gate.name](
-                        *gate.qubits, **{
-                            **{'subspace': gate.properties.get('subspace','GE')},
-                            **gate.properties.get('params',{})
-                        }
-                    )
 
+        else:
+            # Determine defcircuit name: caller-supplied takes priority,
+            # otherwise auto-generate if cycles_to_defcircuits is set.
+            if cycle_replacement and cycle in cycle_replacement:
+                cycle_key = cycle_replacement[cycle]
+            elif cycles_to_defcircuits:
+                cycle_key = next(
+                    (k for k, c in cycle_defs.items() if c == cycle),
+                    f'Cycle_{i}'
+                )
+            else:
+                cycle_key = None
+
+            if cycle_key is not None:
+                if cycle_key not in cycle_defs:
+                    cycle_defs[cycle_key] = cycle
+                    tcycle = transpile_cycle(
+                        cycle=cycle,
+                        gate_mapper=gate_mapper,
+                        qubit_to_cref=qubit_to_cref,
+                        cycles_to_defcircuits=True
+                    )
+                    declarations += DefCircuit(
+                        name=cycle_key,
+                        parameters=[],
+                        qubits=[
+                            FormalArgument(f'q{i}') for i in cycle.qubits
+                        ],
+                        instructions=tcycle.instructions,
+                    )
+                tprogram += Program(
+                    f"{cycle_key} {' '.join(str(q) for q in cycle.qubits)}"
+                )
+
+            else:
+                tprogram += transpile_cycle(
+                    cycle=cycle,
+                    gate_mapper=gate_mapper,
+                    qubit_to_cref=qubit_to_cref,
+                    cycles_to_defcircuits=False
+                )
+
+    # tprogram += tprogram_body
+    return (declarations, tprogram)
+
+
+def transpile_cycle(
+    cycle:                 Cycle,
+    gate_mapper:           GateMapper,
+    qubit_to_cref:         Dict[int, pyquil.quilatom.MemoryReference],  # type: ignore # noqa: F821
+    cycles_to_defcircuits: bool = False,
+) -> Program:  # type: ignore # noqa: F821
+    """Transpile a single qcal Cycle to a PyQuil Program.
+
+    Args:
+        cycle: qcal Cycle.
+        gate_mapper (GateMapper): map between qcal to PyQuil gates.
+        qubit_to_cref (Dict[int, pyquil.quilatom.MemoryReference]): mapping from
+            qubit label to classical memory reference, used to route measurement
+            results.
+        cycles_to_defcircuits (bool, optional): whether to write each
+            distinct cycle as a DEFCIRCUIT definition and invoke it by name.
+            Defaults to ``False``.
+
+    Returns:
+        Program: PyQuil Program for this cycle.
+    """
+    try:
+        from pyquil.quil import Program
+        from pyquil.quilatom import FormalArgument
+    except ImportError:
+        logger.warning(' Unable to import pyquil!')
+        return
+
+    tprogram = Program()
+    for gate in cycle:
+        if gate.name in ['Meas', 'MCM']:
+            tprogram += gate_mapper[gate.name](
+                gate.qubits[0],
+                qubit_to_cref[gate.qubits[0]]
+            )
+        else:
+            if cycles_to_defcircuits:
+                qubits = [FormalArgument(f'q{i}') for i in gate.qubits]
+            else:
+                qubits = gate.qubits
+
+            tprogram += gate_mapper[gate.name](
+                *qubits, **{
+                    **{'subspace': gate.properties.get('subspace', 'GE')},
+                    **gate.properties.get('params', {})
+                }
+            )
     return tprogram
 
 
-class PyquilTranspiler(Transpiler):
-    """qcal to Pyquil Transpiler."""
+to_pyquil._counter = 0
+DEFAULT_GATEMAPPER: Mapping[str, Callable] = GateMapper(
+    {
+        'CNOT':     add_CNOT,
+        'CX':       add_CNOT,
+        'CZ':       add_CZ,
+        'I':        add_Idle,
+        'Idle':     add_Idle,
+        'iSWAP':    add_ISWAP,
+        'MCM':      add_Measure,
+        'Meas':     add_Measure,
+        'VirtualZ': add_Rz,
+        'SXdag':    add_SXdag,
+        'SYdag':    add_SYdag,
+        'Rz':       add_Rz,
+        'X':        add_X,
+        'X90':      add_X90,
+        'Y':        add_Y,
+        'Y90':      add_Y90,
+        'Z':        add_Rz,
+        'Z90':      add_Rz,
+    }
+)
+class PyQuilTranspiler(Transpiler):
+    """qcal to PyQuil Transpiler."""
 
     # __slots__ = ('_gate_mapper',)
 
     def __init__(
         self,
-        gate_mapper:          Dict | GateMapper | None = None,
-        fence_between_cycles: bool = False,
+        gate_mapper:           Dict | GateMapper | None = None,
+        cycle_replacement:     Dict[Cycle, str] | None = None,
+        circuit_for_loop:      bool = False,
+        cycles_to_defcircuits: bool = False,
+        fence_between_cycles:  bool = True,
     ) -> None:
         """Initialize with a GateMapper.
 
         Args:
             gate_mapper (Dict | GateMapper | None, optional): dictionary which
                 maps qcal gates to pyquil gates. Defaults to ``None``.
+            cycle_replacement (Dict[Cycle, str] | None, optional): mapping from
+                qcal Cycles to PyQuil DEFCIRCUIT name, used to replace entire
+                cycle with a single DEFCIRCUIT call. Defaults to ``None``.
+            circuit_for_loop (bool, optional): loops over circuit partitions for
+                circuits with repeated structures. Defaults to ``False``.
+            cycles_to_defcircuits (bool, optional): whether to write each
+                distinct cycle as a DEFCIRCUIT definition and invoke it by name.
+                Defaults to ``False``.
             fence_between_cycles (bool, optional): whether to add a fence
                 between every cycle. Defaults to ``True``.
         """
         try:
             import pyquil  # noqa: F401
-            from pyquil.gates import MEASURE
         except ImportError:
             logger.warning(' Unable to import pyquil!')
             return
 
         if gate_mapper is None:
-            gate_mapper: Mapping[str, Callable] = GateMapper(
-                {
-                    'CNOT':     add_CNOT,
-                    'CZ':       add_CZ,
-                    'I':        add_Idle,
-                    'Idle':     add_Idle,
-                    'iSWAP':    add_ISWAP,
-                    'MCM':      MEASURE,
-                    'Meas':     MEASURE,
-                    'VirtualZ': add_Rz,
-                    'SXdag':    add_SXdag,
-                    'SYdag':    add_SYdag,
-                    'Rz':       add_Rz,
-                    'X':        add_X,
-                    'X90':      add_X90,
-                    'Y':        add_Y,
-                    'Y90':      add_Y90,
-                    'Z':        add_Rz,
-                    'Z90':      add_Rz,
-                }
-            )
+            gate_mapper = DEFAULT_GATEMAPPER
         elif isinstance(gate_mapper, dict):
             gate_mapper = GateMapper(gate_mapper)
 
+        self._cycle_replacement = cycle_replacement
+        self._circuit_for_loop = circuit_for_loop
+        self._cycle_to_defcircuits = cycles_to_defcircuits
         self._fence_between_cycles = fence_between_cycles
 
         super().__init__(gate_mapper=gate_mapper)
@@ -449,9 +704,17 @@ class PyquilTranspiler(Transpiler):
         for circuit in circuits:
             tprograms.append(
                 to_pyquil(
-                    circuit, self._gate_mapper, self._fence_between_cycles
+                    circuit=circuit,
+                    gate_mapper=self._gate_mapper,
+                    cycle_replacement=self._cycle_replacement,
+                    circuit_for_loop=self._circuit_for_loop,
+                    cycles_to_defcircuits=self._cycle_to_defcircuits,
+                    fence_between_cycles=self._fence_between_cycles
                 )
             )
+
+        if self._circuit_for_loop:
+            to_pyquil._counter = 0
 
         tprograms = CircuitSet(circuits=tprograms)
         return tprograms

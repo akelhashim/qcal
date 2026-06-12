@@ -228,6 +228,7 @@ def CRB(
                 DefaultRunner() if self._sim_RB else RB()
             )
             self._edesign = None
+            self._edesigns = None
             self._data = None
             self._dataset = None
             self._results = None
@@ -323,6 +324,9 @@ def CRB(
                         for ql in self._qubit_labels
                     ]
                     edesigns = [f.result() for f in futures]
+                self._edesigns = dict(
+                    zip(self._qubit_labels, edesigns, strict=True)
+                )
                 self._edesign = SimultaneousExperimentDesign(
                     edesigns
                 )
@@ -338,7 +342,7 @@ def CRB(
             if Settings.save_data:
                 self._data_manager.create_data_path()
                 pygsti.io.write_empty_protocol_data(
-                    self._data_manager._save_path,
+                    self.data_manager.save_path,
                     self._edesign,
                     sparse=True,
                     clobber_ok=True
@@ -355,7 +359,7 @@ def CRB(
             logger.info(' Analyzing the results...')
             self._dataset = generate_pygsti_dataset(
                 self._circuits,
-                save_path=self._data_manager._save_path + 'data/'
+                save_path=self.data_manager.save_path + 'data/'
                 if Settings.save_data else None
             )
             self._data = ProtocolData(self._edesign, self._dataset)
@@ -496,7 +500,7 @@ def CRB(
             if not self._sim_RB:
                 if self._results is not None and Settings.save_data:
                     self._results.plot(
-                        figpath=self._data_manager._save_path +
+                        figpath=self.data_manager.save_path +
                         'CRB_decay.png' if Settings.save_data
                         else None
                     )
@@ -506,7 +510,7 @@ def CRB(
                 for qtup in self._qtups:
                     if self._results[qtup] is not None and Settings.save_data:
                         self._results[qtup].plot(
-                            figpath=self._data_manager._save_path +
+                            figpath=self.data_manager.save_path +
                             f'{"".join(qtup)}_CRB_decay.png'
                             if Settings.save_data else None
                         )
@@ -727,15 +731,15 @@ def CRB(
                     self._error_rates,
                     self._uncertainties,
                     ylabel='Process Infidelity',
-                    save_path=self._data_manager._save_path
+                    save_path=self.data_manager.save_path
                     if Settings.save_data else None
                 )
 
-            # if any(circ.results.dim == 3 for circ in self._transpiled_circuits):
-            #     analyze_leakage(
-            #         self._transpiled_circuits,
-            #         filename=self._data_manager._save_path
-            #     )
+            if any(circ.results.dim == 3 for circ in self._transpiled_circuits):
+                analyze_leakage(
+                    self._transpiled_circuits,
+                    filename=self.data_manager.save_path
+                )
 
         def final(self) -> None:
             """Final benchmarking method."""
@@ -751,14 +755,14 @@ def CRB(
             self.final()
 
     return CRB(
-        config,
-        qubit_labels,
-        circuit_depths,
-        n_circuits,
-        native_gates,
-        pspec,
-        randomizeout,
-        citerations,
+        config=config,
+        qubit_labels=qubit_labels,
+        circuit_depths=circuit_depths,
+        n_circuits=n_circuits,
+        native_gates=native_gates,
+        pspec=pspec,
+        randomizeout=randomizeout,
+        citerations=citerations,
         **kwargs
     )
 
@@ -928,14 +932,14 @@ def SRB(
             fig.set_tight_layout(True)
             if Settings.save_data:
                 fig.savefig(
-                    self._data_manager._save_path + 'SRB_decays.png',
+                    self.data_manager.save_path + 'SRB_decays.png',
                     dpi=600
                 )
                 fig.savefig(
-                    self._data_manager._save_path + 'SRB_decays.pdf'
+                    self.data_manager.save_path + 'SRB_decays.pdf'
                 )
                 fig.savefig(
-                    self._data_manager._save_path + 'SRB_decays.svg'
+                    self.data_manager.save_path + 'SRB_decays.svg'
                 )
             plt.show()
 
@@ -956,20 +960,20 @@ def SRB(
             fig.set_tight_layout(True)
             if Settings.save_data:
                 fig.savefig(
-                    self._data_manager._save_path + 'SRB_infidelities.png',
+                    self.data_manager.save_path + 'SRB_infidelities.png',
                     dpi=600
                 )
                 fig.savefig(
-                    self._data_manager._save_path + 'SRB_infidelities.pdf'
+                    self.data_manager.save_path + 'SRB_infidelities.pdf'
                 )
                 fig.savefig(
-                    self._data_manager._save_path + 'SRB_infidelities.svg'
+                    self.data_manager.save_path + 'SRB_infidelities.svg'
                 )
             plt.show()
 
             if any(res.dim == 3 for res in self._circuits.results):
                 analyze_leakage(
-                    self._circuits, filename=self._data_manager._save_path
+                    self._circuits, filename=self.data_manager.save_path
                 )
 
         def final(self) -> None:

@@ -2,6 +2,7 @@
 
 """
 import logging
+
 import pandas as pd
 import plotly.express as px
 
@@ -19,18 +20,18 @@ def CDF(df: pd.DataFrame, x: str, color: str) -> None:
     fig = px.ecdf(df, x=x, color=color, marginal="histogram")
     fig.update_traces(
         nbinsx=50,  # number of bins for X-axis histogram
-        selector=dict(type="histogram")
+        selector={"type": "histogram"}
     )
     fig.update_layout(
         yaxis_title="Cumulative Probability",
-        
+
         # Change axis title font sizes
-        xaxis_title_font=dict(size=20),
-        yaxis_title_font=dict(size=20),
-        
+        xaxis_title_font={"size": 20},
+        yaxis_title_font={"size": 20},
+
         # Change tick label font sizes
-        xaxis_tickfont=dict(size=14),
-        yaxis_tickfont=dict(size=14)
+        xaxis_tickfont={"size": 14},
+        yaxis_tickfont={"size": 14}
     )
 
     save_properties = {

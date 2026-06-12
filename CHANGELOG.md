@@ -9,15 +9,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Breaking
 
+- Change dynamical decoupling XY name to XY_N
+
 ### Added
 
+- Circuit for-loops for pyquil
+- Automatic leakage analysis for CRB
+- plot_mock_sequence for psuedo-visualization of pulse sequence of circuits
+- Fit for decaying cosine with exponential baseline
+- __eq__ for Gate, Cycle, Circuit, and CircuitSet
+- PyQuil cycles_to_defcircuits kwarg in transpilation
+- XX-type (CPMG) dynamical decoupling sequencies
+- Make simultaneous DD sequences syncopated for canceling ZZ
+- PyQuil helper function for adding DD sequences during targeted operations
+- Excited State Promotion (ESP) for PyQuil programs
+- Active reset for PyQuil programs
+- cycle_replacement option for custom DEFCIRCUIT names in PyQuil transpilation
+
 ### Changed
+
+- uncertainty_of_product to account for correlations using the covariance
+- T2* EF fit to decaying cosine with exponential baseline
+- Default time spacing for coherence measurements to exponential
+- Declare individual classical registers for qubit measurements
+- 2Q gate definitions now accept either Gate((0, 1)) or Gate(0, 1)
 
 ### Deprecated
 
 ### Removed
 
+- Artificial detuning for T2echo and T2XY experiments
+
 ### Fixed
+
+- RPE uncertainty to include uncertainty due to shot noise
+- Circuit get_index, remove, replace methods
+- CircuitSet subset and sum_results methods
 
 ### Security
 

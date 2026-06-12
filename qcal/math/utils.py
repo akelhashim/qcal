@@ -2,10 +2,10 @@
 
 """
 import logging
-import numpy as np
-
-from numpy.typing import NDArray
 from typing import List, Tuple
+
+import numpy as np
+from numpy.typing import NDArray
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +30,7 @@ def round_sig_figures(x: float, n_sig_figs: int = 1) -> float:
 
     Args:
         x (float): number to round.
-        n_sig_decimals (int, optional): number of significant figures. 
+        n_sig_decimals (int, optional): number of significant figures.
             Defaults to 1.
 
     Returns:
@@ -84,20 +84,47 @@ def uncertainty_of_exp(val: float, err: float, p: float | int) -> float:
     return abs(p) * err * val**(p - 1)
 
 
-def uncertainty_of_product(values: NDArray, errors: NDArray) -> float:
+def uncertainty_of_product(
+        values: NDArray,
+        stds:   NDArray | None = None,
+        cov:    NDArray | None = None,
+    ) -> float:
     """Computes the uncertainty of a product of values.
 
-    c = a * b
-    err(c) = c * sqrt( (err(a)/a)^2 +  (err(b)/b)^2 )
+    Without covariance:
+        c = a * b
+        err(c) = |c| * sqrt( (err(a)/a)^2 + (err(b)/b)^2 )
+
+    With covariance matrix Cov:
+        (err(f)/f)^2 = sum_{i,j} Cov(x_i, x_j) / (x_i * x_j) = v^T C v,
+        with v_i = 1 / x_i.
+        => err(c) = |c| * sqrt( v^T @ Cov @ v )
+
+    Note: values must be non-zero (relative-error formulation).
 
     Args:
         values (NDArray): values.
-        errors (NDArray): uncertainty of each value.
+        stds (NDArray | None): standard deviations of each value. Required
+            when cov is ``None``.
+        cov (NDArray | None): covariance matrix of the values. Defaults to
+            ``None``. When provided, ``stds`` is ignored and the full
+            off-diagonal correlations are used.
 
     Returns:
-        float: uncertainty of product of values.
+        float: uncertainty of the product.
     """
-    return np.prod(values) * np.sqrt(np.sum((errors / values) ** 2))
+    if cov is None and stds is None:
+        raise ValueError("Must provide either `stds` or `cov`.")
+
+    c = np.prod(values)
+    v = 1.0 / values
+
+    if cov is not None:
+        rel_var = v @ cov @ v
+    else:
+        rel_var = np.sum((stds / values) ** 2)
+
+    return float(np.abs(c) * np.sqrt(max(rel_var, 0.0)))
 
 
 def uncertainty_of_sum(errors: List | NDArray) -> float:
