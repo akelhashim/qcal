@@ -11,9 +11,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Default single- and two-qubit CRB experiment designs
-- Default single- and two-qubit GST experiment designs
-
 ### Changed
 
 ### Deprecated
@@ -23,6 +20,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 ### Security
+
+## [3.1.0] - 2026-06-12
+
+### Added
+
+- Default single- and two-qubit CRB experiment designs
+- Default single- and two-qubit GST experiment designs
 
 ## [3.0.0] - 2026-06-12
 
@@ -238,7 +242,8 @@ post-processing
 - Single- and two-qubit benchmarking methods
 - Advanced compilation tools
 
-[Unreleased]: https://github.com/akelhashim/qcal/compare/v3.0.0...HEAD
+[Unreleased]: https://github.com/akelhashim/qcal/compare/v3.1.0...HEAD
+[3.1.0]: https://github.com/akelhashim/qcal/releases/tag/v3.1.0
 [3.0.0]: https://github.com/akelhashim/qcal/releases/tag/v3.0.0
 [2.0.0]: https://github.com/akelhashim/qcal/releases/tag/v2.0.0
 [1.2.0]: https://github.com/akelhashim/qcal/releases/tag/v1.2.0
