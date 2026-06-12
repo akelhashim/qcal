@@ -497,7 +497,7 @@ def add_dd_sequence_during_operation(
 
 
 def add_delay_after_measurements(
-        program: Program, delay: float  # type: ignore  # noqa: F821
+    program: Program, delay: float  # type: ignore  # noqa: F821
 ) -> Program:  # type: ignore  # noqa: F821
     """Add a delay after each measurement in a PyQuil program.
 

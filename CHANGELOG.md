@@ -22,12 +22,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - XX-type (CPMG) dynamical decoupling sequencies
 - Make simultaneous DD sequences syncopated for canceling ZZ
 - PyQuil helper function for adding DD sequences during targeted operations
+- Excited State Promotion (ESP) for PyQuil programs
+- Active reset for PyQuil programs
+- cycle_replacement option for custom DEFCIRCUIT names in PyQuil transpilation
 
 ### Changed
 
 - uncertainty_of_product to account for correlations using the covariance
 - T2* EF fit to decaying cosine with exponential baseline
 - Default time spacing for coherence measurements to exponential
+- Declare individual classical registers for qubit measurements
+- 2Q gate definitions now accept either Gate((0, 1)) or Gate(0, 1)
 
 ### Deprecated
 
