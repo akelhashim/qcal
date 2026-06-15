@@ -643,7 +643,7 @@ def GST(
                     prep_fiducial_list_or_filename=self._prep_fiducials,
                     meas_fiducial_list_or_filename=self._meas_fiducials,
                     germ_list_or_filename=self._germs,
-                    max_lengths=self._circuit_depths,
+                    max_lengths=list(self._circuit_depths),
                     fiducial_pairs=fiducial_pairs
                 )
 

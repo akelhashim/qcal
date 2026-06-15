@@ -10,8 +10,6 @@ from typing import Any, Callable, List
 
 import pandas as pd
 
-import qcal as qc
-
 logger = logging.getLogger(__name__)
 
 
@@ -38,7 +36,7 @@ def get_package_directory() -> pathlib.Path:
         pathlib.Path: repo root when installed in editable mode, or the
             site-packages directory when installed normally.
     """
-    return pathlib.Path(qc.__file__).parent.parent
+    return pathlib.Path(__file__).parent.parent
 
 
 def load_from_pickle(filename: str) -> Any:
