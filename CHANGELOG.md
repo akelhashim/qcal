@@ -19,11 +19,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+### Security
+
+## [3.1.1] - 2026-06-15
+
+### Fixed
+
 - Bug: qc.__file__ is None when importing qcal as qc; changed to __file__
 - Bug: QuantumInstrumentGST failing when the circuit depth [1] is written as a tuple
 - Include default_experiments in pyproject.toml when installing via pip
-
-### Security
 
 ## [3.1.0] - 2026-06-12
 
@@ -246,7 +250,8 @@ post-processing
 - Single- and two-qubit benchmarking methods
 - Advanced compilation tools
 
-[Unreleased]: https://github.com/akelhashim/qcal/compare/v3.1.0...HEAD
+[Unreleased]: https://github.com/akelhashim/qcal/compare/v3.1.1...HEAD
+[3.1.1]: https://github.com/akelhashim/qcal/releases/tag/v3.1.1
 [3.1.0]: https://github.com/akelhashim/qcal/releases/tag/v3.1.0
 [3.0.0]: https://github.com/akelhashim/qcal/releases/tag/v3.0.0
 [2.0.0]: https://github.com/akelhashim/qcal/releases/tag/v2.0.0
