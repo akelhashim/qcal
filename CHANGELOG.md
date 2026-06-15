@@ -19,6 +19,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Bug: qc.__file__ is None when importing qcal as qc; changed to __file__
+
 ### Security
 
 ## [3.1.0] - 2026-06-12
