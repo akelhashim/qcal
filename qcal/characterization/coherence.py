@@ -46,6 +46,7 @@ def T1(
     gate:       str = 'X90',
     subspace:   str = 'GE',
     n_elements: int = 50,
+    mapto0:     bool = True,
     **kwargs
 ) -> Callable:
     """T1 coherence characterization.
@@ -65,12 +66,15 @@ def T1(
         config (Config): qcal Config object.
         qubits (Sequence[int]): qubits to measure.
         t_max (float, option): maximum wait time. Defaults to 500 us.
-        gate (str, optional): native gate used for state preparation. Defaults
-            to 'X90'.
+        gate (str, optional): native gate used for state preparation.
+            Defaults to 'X90'.
         subspace (str, optional): qubit subspace for T1 measurement.
             Defaults to 'GE'.
-        n_elements (int, optional): number of delays starting from 0 to t_max.
-            Defaults to 50.
+        n_elements (int, optional): number of delays starting from 0
+            to t_max. Defaults to 50.
+        mapto0 (bool, optional): map EF measurements back to the
+            computational subspace by appending EF and GE pi pulses,
+            so that a |2> outcome is read as |0>. Defaults to True.
 
     Returns:
         Callable: T1 class.
@@ -91,6 +95,7 @@ def T1(
             gate:       str = 'X90',
             subspace:   str = 'GE',
             n_elements: int = 50,
+            mapto0:     bool = True,
             **kwargs
         ) -> None:
             """Initialize the T1 experiment class within the function."""
@@ -112,6 +117,7 @@ def T1(
                     f"'subspace' must be one of 'GE' or 'EF', not {subspace}!"
                 )
             self._subspace = subspace
+            self._mapto0 = mapto0
 
             self._times = {
                 q: np.concatenate([
@@ -179,6 +185,23 @@ def T1(
                 circuit.append(
                     Cycle({Idle(q, duration=t) for q in self._qubits}),
                 )
+
+                if self._subspace == 'GE' and self._mapto0:
+                    circuit.extend([
+                        Barrier(self._qubits),
+                        Cycle({X90(q, subspace='GE') for q in self._qubits}),
+                        Cycle({X90(q, subspace='GE') for q in self._qubits}),
+                    ])
+                elif self._subspace == 'EF' and self._mapto0:
+                    circuit.extend([
+                        Barrier(self._qubits),
+                        Cycle({X90(q, subspace='EF') for q in self._qubits}),
+                        Cycle({X90(q, subspace='EF') for q in self._qubits}),
+                        Barrier(self._qubits),
+                        Cycle({X90(q, subspace='GE') for q in self._qubits}),
+                        Cycle({X90(q, subspace='GE') for q in self._qubits}),
+                    ])
+
                 circuit.measure()
 
                 circuits.append(circuit)
@@ -190,8 +213,10 @@ def T1(
             """Analyze the data."""
             logger.info(' Analyzing the data...')
 
-            pop = {'GE': '1', 'EF': '2'}
-            # Fit the probability of being in 1 from the time sweep to an
+            ge_pop = '0' if self._mapto0 else '1'
+            ef_pop = '0' if self._mapto0 else '2'
+            pop = {'GE': ge_pop, 'EF': ef_pop}
+            # Fit the probability of being in 0 (2) from the time sweep to an
             # exponential
             for i, q in enumerate(self._qubits):
                 prob1 = []
@@ -212,7 +237,12 @@ def T1(
                 params.add('a', value=a)
                 params.add('b', value=b)
                 params.add('c', value=c)
-                self._fit[q].fit(self._times[q], prob1, params=params)
+                weights = np.full(
+                    len(self._times[q]), 1.0 / np.sqrt(self._n_shots),
+                )
+                self._fit[q].fit(
+                    self._times[q], prob1, params=params, weights=weights
+                )
 
                 # If the fit was successful, write to the config
                 if self._fit[q].fit_success:
@@ -242,13 +272,21 @@ def T1(
 
         def plot(self):
             """Plot the data."""
+            if self._subspace == 'GE':
+                ylabel = (
+                    r'$|0\rangle$ Population' if self._mapto0
+                    else r'$|1\rangle$ Population'
+                )
+            elif self._subspace == 'EF':
+                ylabel = (
+                    r'$|0\rangle$ Population' if self._mapto0
+                    else r'$|2\rangle$ Population'
+                )
+
             Characterize.plot(self,
                 xlabel=r'Time ($\mu$s)',
-                ylabel=(
-                    r'$|2\rangle$ Population' if self._subspace == 'EF' else
-                    r'$|1\rangle$ Population'
-                ),
-                flabel=r'$T_1$',
+                ylabel=ylabel,
+                flabel=rf'$T_{{1,{self._subspace}}}$',
                 save_path=self._data_manager._save_path
             )
 
@@ -273,6 +311,7 @@ def T1(
         gate=gate,
         subspace=subspace,
         n_elements=n_elements,
+        mapto0=mapto0,
         **kwargs
     )
 
@@ -286,6 +325,7 @@ def T2(
     echo:       bool = False,
     subspace:   str = 'GE',
     n_elements: int = 50,
+    mapto0:     bool = True,
     **kwargs
 ) -> Callable:
     """T2 coherence characterization.
@@ -308,14 +348,17 @@ def T2(
         config (Config): qcal Config object.
         qubits (Sequence[int]): qubits to measure.
         t_max (float, optional): maximum wait time. Defaults to 250 us.
-        detuning (float, optional): artificial detuning from the actual qubit
-            frequency. Defaults to 100 * kHz.
+        detuning (float, optional): artificial detuning from the actual
+            qubit frequency. Defaults to 100 * kHz.
         echo (bool, optional): whether to echo the qubit in the middle.
             Defaults to False.
         subspace (str, optional): qubit subspace for T2 measurement.
             Defaults to 'GE'.
-        n_elements (int, optional): number of delays starting from 0 to t_max.
-            Defaults to 50.
+        n_elements (int, optional): number of delays starting from 0
+            to t_max. Defaults to 50.
+        mapto0 (bool, optional): map EF measurements back to the
+            computational subspace by appending EF and GE pi pulses,
+            so that a |2> outcome is read as |0>. Defaults to True.
 
     Returns:
         Callable: T2 class.
@@ -337,6 +380,7 @@ def T2(
             echo:       bool = False,
             subspace:   str = 'GE',
             n_elements: int = 50,
+            mapto0:     bool = True,
             **kwargs
         ) -> None:
             """Initialize the T2 experiment class within the function."""
@@ -354,6 +398,7 @@ def T2(
                     f"'subspace' must be one of 'GE' or 'EF', not {subspace}!"
                 )
             self._subspace = subspace
+            self._mapto0 = mapto0
 
             if echo:
                 t_start = t_max / n_elements / 2
@@ -377,7 +422,7 @@ def T2(
                     )
                     for q in qubits
                 }
-            elif echo:
+            elif echo: # TODO: fit double exponential for EF subspace
                 self._params = {
                     q: f'single_qubit/{q}/{subspace}/T2e' for q in qubits
                 }
@@ -422,6 +467,10 @@ def T2(
                         Cycle({Rz(q, phase, subspace=self._subspace)
                                for q in self._qubits}),
                         Barrier(self._qubits),
+                        Cycle(  # maps t=0 back to |0> (|1>) for GE (EF)
+                            {Z(q, subspace=self._subspace)
+                             for q in self._qubits}
+                        ),
                     ])
                 elif self._echo:
                     circuit.extend([
@@ -437,10 +486,19 @@ def T2(
                     ])
 
                 # Basis preparation
-                circuit.append(
-                    Cycle({X90(q, subspace=self._subspace)
-                           for q in self._qubits})
-                )
+                circuit.extend([
+                    Cycle(
+                        {X90(q, subspace=self._subspace) for q in self._qubits}
+                    ),
+                    Barrier(self._qubits)
+                ])
+
+                if self._subspace == 'EF' and self._mapto0:
+                    circuit.extend([
+                        Cycle({X90(q, subspace='GE') for q in self._qubits}),
+                        Cycle({X90(q, subspace='GE') for q in self._qubits}),
+                        Barrier(self._qubits),
+                    ])
 
                 circuit.measure()
                 circuits.append(circuit)
@@ -456,7 +514,8 @@ def T2(
             """Analyze the data."""
             logger.info(' Analyzing the data...')
 
-            pop = {'GE': '0', 'EF': '1'}
+            ef_pop = '0' if self._mapto0 else '1'
+            pop = {'GE': '0', 'EF': ef_pop}
             # Fit the probability of being in 1 from the time sweep to an
             # exponential
             for i, q in enumerate(self._qubits):
@@ -509,7 +568,12 @@ def T2(
                         params.add('f', value=b)
                         params.add('g', value=g)
 
-                self._fit[q].fit(self._times[q], prob0, params=params)
+                weights = np.full(
+                    len(self._times[q]), 1.0 / np.sqrt(self._n_shots),
+                )
+                self._fit[q].fit(
+                    self._times[q], prob0, params=params, weights=weights
+                )
 
                 # If the fit was successful, write to the config
                 if self._fit[q].fit_success:
@@ -539,13 +603,18 @@ def T2(
 
         def plot(self):
             """Plot the data."""
+            if self._subspace == 'EF' and not self._mapto0:
+                ylabel = r'$|1\rangle$ Population'
+            else:
+                ylabel = r'$|0\rangle$ Population'
+
             Characterize.plot(self,
                 xlabel=r'Time ($\mu$s)',
-                ylabel=(
-                    r'$|1\rangle$ Population' if self._subspace == 'EF' else
-                    r'$|0\rangle$ Population'
+                ylabel=ylabel,
+                flabel=(
+                    rf'$T_{{2E,{self._subspace}}}$' if self._echo
+                    else rf'$T_{{2,{self._subspace}}}$'
                 ),
-                flabel=r'$T_{2E}$' if self._echo else r'$T_2$',
                 save_path=self._data_manager._save_path
             )
 
@@ -571,6 +640,7 @@ def T2(
         echo=echo,
         subspace=subspace,
         n_elements=n_elements,
+        mapto0=mapto0,
         **kwargs
     )
 
@@ -585,6 +655,7 @@ def T2DD(
     dd_method:  str = 'XY_N',
     n_elements: int = 50,
     n_pulses:   int | None = None,
+    mapto0:     bool = True,
     **kwargs
 ) -> Callable:
     """T2 dynamical decoupling coherence characterization.
@@ -604,18 +675,22 @@ def T2DD(
         config (Config): qcal Config object.
         qubits (Sequence[int]): qubits to measure.
         t_max (float, optional): maximum wait time. Defaults to 250 us.
-        gate_time (float | None, optional): X90 gate time used to compute DD
-            idle intervals. If None, the value is looked up from the config.
-            Defaults to None.
+        gate_time (float | None, optional): X90 gate time used to
+            compute DD idle intervals. If None, the value is looked up
+            from the config. Defaults to None.
         subspace (str, optional): qubit subspace for T2 measurement.
             Defaults to 'GE'.
-        dd_method (str, optional): the DD method to use. Defaults to 'XY_N'.
-        n_elements (int, optional): number of delays starting from 0 to t_max.
-            Defaults to 50.
-        n_pulses (int | None, optional): number of pulses. Defaults to None.
-            For example, for n_pulses = 4, this performs an XY4 DD sequence. If
-            None, the number of pulses will be determined by the total idle
-            time.
+        dd_method (str, optional): the DD method to use.
+            Defaults to 'XY_N'.
+        n_elements (int, optional): number of delays starting from 0
+            to t_max. Defaults to 50.
+        n_pulses (int | None, optional): number of pulses. Defaults to
+            None. For example, for n_pulses = 4, this performs an XY4
+            DD sequence. If None, the number of pulses will be
+            determined by the total idle time.
+        mapto0 (bool, optional): map EF measurements back to the
+            computational subspace by appending EF and GE pi pulses,
+            so that a |2> outcome is read as |0>. Defaults to True.
 
     Returns:
         Callable: T2DD class.
@@ -639,6 +714,7 @@ def T2DD(
             dd_method:  str = 'XY_N',
             n_elements: int = 50,
             n_pulses:   int | None = None,
+            mapto0:     bool = True,
             **kwargs
         ) -> None:
             """Initialize the T2 XY experiment class within the function."""
@@ -657,6 +733,7 @@ def T2DD(
                     f"'subspace' must be one of 'GE' or 'EF', not {subspace}!"
                 )
             self._subspace = subspace
+            self._mapto0 = mapto0
 
             self._dd_method = dd_method
 
@@ -672,6 +749,7 @@ def T2DD(
             self._params = {
                 q: f'single_qubit/{q}/{subspace}/T2DD' for q in qubits
             }
+            # TODO: fit double exponential for EF subspace
             self._fit = {q: FitExponential() for q in qubits}
 
         @property
@@ -731,8 +809,19 @@ def T2DD(
                     }),
                     Cycle({
                         X90(q, subspace=self._subspace) for q in self._qubits
-                    })
+                    }),
+                    Barrier(self._qubits),
                 ])
+
+                if self._subspace == 'EF' and self._mapto0:
+                    circuit.extend([
+                        # Cycle({X90(q, subspace='EF') for q in self._qubits}),
+                        # Cycle({X90(q, subspace='EF') for q in self._qubits}),
+                        # Barrier(self._qubits),
+                        Cycle({X90(q, subspace='GE') for q in self._qubits}),
+                        Cycle({X90(q, subspace='GE') for q in self._qubits}),
+                        Barrier(self._qubits),
+                    ])
 
                 circuit.measure()
                 circuits.append(circuit)
@@ -744,7 +833,8 @@ def T2DD(
             """Analyze the data."""
             logger.info(' Analyzing the data...')
 
-            pop = {'GE': '0', 'EF': '1'}
+            ef_pop = '0' if self._mapto0 else '1'
+            pop = {'GE': '0', 'EF': ef_pop}
             # Fit the probability of being in 0 from the time sweep to an
             # exponential
             for i, q in enumerate(self._qubits):
@@ -765,7 +855,12 @@ def T2DD(
                 params.add('a', value=-a)
                 params.add('b', value=b)
                 params.add('c', value=c)
-                self._fit[q].fit(self._times[q], prob0, params=params)
+                weights = np.full(
+                    len(self._times[q]), 1.0 / np.sqrt(self._n_shots),
+                )
+                self._fit[q].fit(
+                    self._times[q], prob0, params=params, weights=weights
+                )
 
                 # If the fit was successful, write to the config
                 if self._fit[q].fit_success:
@@ -795,13 +890,15 @@ def T2DD(
 
         def plot(self):
             """Plot the data."""
+            if self._subspace == 'EF' and not self._mapto0:
+                ylabel = r'$|1\rangle$ Population'
+            else:
+                ylabel = r'$|0\rangle$ Population'
+
             Characterize.plot(self,
                 xlabel=r'Time ($\mu$s)',
-                ylabel=(
-                    r'$|2\rangle$ Population' if self._subspace == 'EF' else
-                    r'$|1\rangle$ Population'
-                ),
-                flabel=r'$T_{2DD}$',
+                ylabel=ylabel,
+                flabel=rf'$T_{{2DD,{self._subspace}}}$',
                 save_path=self._data_manager._save_path
             )
 
@@ -828,6 +925,7 @@ def T2DD(
         dd_method=dd_method,
         n_elements=n_elements,
         n_pulses=n_pulses,
+        mapto0=mapto0,
         **kwargs
     )
 

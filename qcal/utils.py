@@ -3,6 +3,7 @@
 import functools
 import inspect
 import logging
+import pathlib
 import pickle
 from collections.abc import Iterable
 from typing import Any, Callable, List
@@ -10,20 +11,6 @@ from typing import Any, Callable, List
 import pandas as pd
 
 logger = logging.getLogger(__name__)
-
-
-def load_from_pickle(filename: str) -> Any:
-    """Load data from a pickle file.
-
-    Args:
-        filename (str): filename of the saved data.
-
-    Returns:
-        Any: loaded data.
-    """
-    with open(f'{filename}', 'rb') as handle:
-        data = pickle.load(handle)
-    return data
 
 
 def flatten(xs: List):
@@ -40,6 +27,31 @@ def flatten(xs: List):
             yield from flatten(x)
         else:
             yield x
+
+
+def get_package_directory() -> pathlib.Path:
+    """Return the root directory of the qcal package.
+
+    Returns:
+        pathlib.Path: repo root when installed in editable mode, or the
+            site-packages directory when installed normally.
+    """
+    return pathlib.Path(__file__).parent.parent
+
+
+def load_from_pickle(filename: str) -> Any:
+    """Load data from a pickle file.
+
+    Args:
+        filename (str): filename of the saved data.
+
+    Returns:
+        Any: loaded data.
+    """
+    with open(f'{filename}', 'rb') as handle:
+        data = pickle.load(handle)
+    return data
+
 
 def save_init(init: Callable) -> Callable:
     """Decorator that saves the arguments passed to a class's __init__ method.

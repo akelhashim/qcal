@@ -364,7 +364,7 @@ class Results:
             xaxis={
                 'tickvals': list(range(len(self.states))),
                 'ticktext': self.states,
-                'title': 'Bit String',
+                'title': 'Dit String',
                 'titlefont_size': 20,
                 'tickfont_size': 15
             },

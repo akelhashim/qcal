@@ -82,6 +82,9 @@ where = ["."]
 include = ["qcal*"]
 exclude = ["tests*", "docs*", "examples*", "*.tests", "*.tests.*"]
 
+[tool.setuptools.package-data]
+"qcal" = ["default_experiments/**/*"]
+
 # Black configuration
 [tool.black]
 line-length = 88

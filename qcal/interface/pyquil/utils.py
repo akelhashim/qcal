@@ -279,6 +279,90 @@ def _qubit_index(q: Qubit | FormalArgument | int) -> int:  # type: ignore  # noq
         raise TypeError(f"Unrecognized qubit object: {type(q).__name__}")
 
 
+def add_active_reset(
+    program:    Program,  # type: ignore  # noqa: F821
+    n_resets:   int = 1,
+    esp:        bool = False,
+    esp_qubits: Sequence[int] | None = None,
+) -> Program:  # type: ignore  # noqa: F821
+    """Prepend active resets to a PyQuil program using Quil jump statements.
+
+    For each reset cycle, every qubit in the program is measured into a
+    dedicated ``ro_reset`` register. A ``JUMP-UNLESS`` branch skips the
+    correction pulses when the qubit is already in |0⟩. Successive reset
+    cycles are separated by global FENCEs across all program qubits; a final
+    global FENCE follows the last reset before the main program body.
+
+    The correction sequence applied when a qubit is measured as |1⟩ depends
+    on whether excited state promotion (ESP) is enabled for that qubit:
+
+    - If ``esp=True`` and the qubit is in ``esp_qubits``: two
+      ``RX_F12(π/2)`` pulses (EF subspace) then two ``RX(π/2)`` pulses
+      (GE subspace).
+    - Otherwise: two ``RX(π/2)`` pulses (GE subspace) then two
+      ``RX_F12(π/2)`` pulses (EF subspace).
+
+    Args:
+        program (Program): the program to prepend active reset to.
+        n_resets (int, optional): number of active reset cycles to perform.
+            Defaults to 1.
+        esp (bool, optional): whether to use excited state promotion for
+            qubits listed in ``esp_qubits``. Defaults to ``False``.
+        esp_qubits (Sequence[int] | None, optional): qubit indices that
+            receive the ESP-ordered correction sequence. Only relevant when
+            ``esp=True``. Defaults to ``None``.
+
+    Returns:
+        Program: a new program with active reset cycles prepended before the
+        original instructions.
+    """
+    try:
+        from pyquil import Program
+        from pyquil.gates import DELAY, FENCE, MEASURE
+        from pyquil.quilatom import MemoryReference, Qubit
+        from pyquil.quilbase import Jump, JumpTarget, JumpUnless, Label
+    except ImportError as exc:
+        raise ImportError("Unable to import PyQuil!") from exc
+
+    all_qubits = sorted(program.get_qubit_indices())
+    esp_set = set(esp_qubits) if esp_qubits is not None else set()
+
+    new_program: Program = program.copy_everything_except_instructions()
+    for r in range(n_resets):
+        new_program += FENCE(*all_qubits)
+
+        for q in all_qubits:
+            label_false = Label(f"ar_{r}_{q}_false")
+            label_done  = Label(f"ar_{r}_{q}_done")
+            cref = MemoryReference(f"ro{q}", 0)
+            qubit_obj = Qubit(q)
+
+            new_program += MEASURE(q, cref)
+            new_program += JumpUnless(label_false, cref)
+            # $when_true: qubit measured |1⟩, apply correction pulses
+            if esp and q in esp_set:
+                new_program += add_X90(qubit_obj, **{'subspace': 'EF'})
+                new_program += add_X90(qubit_obj, **{'subspace': 'EF'})
+                new_program += add_X90(qubit_obj, **{'subspace': 'GE'})
+                new_program += add_X90(qubit_obj, **{'subspace': 'GE'})
+            else:
+                new_program += add_X90(qubit_obj, **{'subspace': 'GE'})
+                new_program += add_X90(qubit_obj, **{'subspace': 'GE'})
+                new_program += add_X90(qubit_obj, **{'subspace': 'EF'})
+                new_program += add_X90(qubit_obj, **{'subspace': 'EF'})
+            new_program += Jump(label_done)
+            # $when_false: qubit measured |0⟩, nothing to do
+            new_program += JumpTarget(label_false)
+            new_program += JumpTarget(label_done)
+
+    new_program += FENCE(*all_qubits)
+
+    for instr in program.instructions:
+        new_program += instr
+
+    return new_program
+
+
 def add_dd_sequence_during_operation(
     program:    Program,  # type: ignore  # noqa: F821
     operation:  Gate | Measurement,  # type: ignore  # noqa: F821
@@ -413,7 +497,7 @@ def add_dd_sequence_during_operation(
 
 
 def add_delay_after_measurements(
-        program: Program, delay: float  # type: ignore  # noqa: F821
+    program: Program, delay: float  # type: ignore  # noqa: F821
 ) -> Program:  # type: ignore  # noqa: F821
     """Add a delay after each measurement in a PyQuil program.
 
@@ -519,48 +603,144 @@ def prepend_delay_to_program(program: Program, delay: float) -> Program:  # type
     return program.prepend_instructions([DELAY(q, delay) for q in qubits])
 
 
-def prepend_esp_to_measure(program: Program) -> Program:  # type: ignore  # noqa: F821
+def prepend_esp_to_measure(
+    program:              Program,  # type: ignore  # noqa: F821
+    qubits:               Sequence[int] | None = None,
+    fence_between_cycles: bool = False,
+) -> Program:  # type: ignore  # noqa: F821
     """Prepend an EF Pi pulse (ESP) to each measurement in a PyQuil program.
+
+    When ``fence_between_cycles=True`` (default), the function operates on
+    fenced cycles: for each block of instructions between a pair of FENCE
+    instructions that contains measurements, a single EF pi cycle is inserted
+    immediately before the original measurement cycle. The EF pi cycle is
+    bounded on each side by a global FENCE across all program qubits, so
+    qubits that do not receive an EF pi pulse simply idle for the duration.
+    Measurements appearing outside a fenced block are handled with the same
+    global FENCE delimiters.
+
+    When ``fence_between_cycles=False``, the function iterates over
+    instructions directly and inserts two EF X90 pulses immediately before
+    each matching measurement, without any surrounding FENCE instructions.
 
     Args:
         program (Program): the program to update.
+        qubits (Sequence[int] | None, optional): qubit indices to which the EF
+            pi pulse should be applied. When ``None``, the pulse is prepended
+            before every measurement. Defaults to ``None``.
+        fence_between_cycles (bool, optional): if ``True``, groups instructions
+            by fenced cycle before inserting EF pi pulses, surrounding the EF
+            pi cycle with global FENCEs. If ``False``, inserts EF pi pulses
+            inline before each matching measurement with no FENCEs added.
+            Defaults to ``False``.
 
     Returns
         Program: the updated program.
     """
     try:
         from pyquil import Program
-        from pyquil.quilbase import Measurement
+        from pyquil.gates import FENCE
+        from pyquil.quilbase import Fence, Measurement
     except ImportError as exc:
         raise ImportError("Unable to import PyQuil!") from exc
 
+    all_qubits = program.get_qubit_indices()
     new_program: Program = program.copy_everything_except_instructions()
-    for instr in program.instructions:
-        if isinstance(instr, Measurement):
-            new_program += add_X90(instr.qubit, **{'subspace': 'EF'})
-            new_program += add_X90(instr.qubit, **{'subspace': 'EF'})
-        new_program += instr
+
+    if not fence_between_cycles:
+        for instr in program.instructions:
+            if isinstance(instr, Measurement):
+                if qubits is None or _qubit_index(instr.qubit) in qubits:
+                    new_program += add_X90(instr.qubit, **{'subspace': 'EF'})
+                    new_program += add_X90(instr.qubit, **{'subspace': 'EF'})
+            new_program += instr
+        return new_program
+
+    instrs = list(program.instructions)
+    i = 0
+    while i < len(instrs):
+        instr = instrs[i]
+
+        if isinstance(instr, Fence):
+            opening_fence = instr
+            i += 1
+
+            block: List = []
+            while i < len(instrs) and not isinstance(instrs[i], Fence):
+                block.append(instrs[i])
+                i += 1
+
+            closing_fence = instrs[i] if i < len(instrs) else None
+            if i < len(instrs):
+                i += 1
+
+            measure_instrs = [b for b in block if isinstance(b, Measurement)]
+            if measure_instrs:
+                new_program += FENCE(*all_qubits)
+                for meas in measure_instrs:
+                    if qubits is None or _qubit_index(meas.qubit) in qubits:
+                        new_program += add_X90(meas.qubit, **{'subspace': 'EF'})
+                        new_program += add_X90(meas.qubit, **{'subspace': 'EF'})
+                new_program += FENCE(*all_qubits)
+
+            new_program += opening_fence
+            for b in block:
+                new_program += b
+            if closing_fence is not None:
+                new_program += closing_fence
+
+        else:
+            if isinstance(instr, Measurement):
+                # Collect all consecutive unfenced measurements as a virtual
+                # cycle so they share a single EF pi cycle.
+                meas_run: List = []
+                while i < len(instrs) and isinstance(instrs[i], Measurement):
+                    meas_run.append(instrs[i])
+                    i += 1
+                esp_meas = [
+                    m for m in meas_run
+                    if qubits is None or _qubit_index(m.qubit) in qubits
+                ]
+                if esp_meas:
+                    new_program += FENCE(*all_qubits)
+                    for meas in esp_meas:
+                        new_program += add_X90(meas.qubit, **{'subspace': 'EF'})
+                        new_program += add_X90(meas.qubit, **{'subspace': 'EF'})
+                    new_program += FENCE(*all_qubits)
+                for m in meas_run:
+                    new_program += m
+            else:
+                new_program += instr
+                i += 1
 
     return new_program
 
 
-def prepend_measure_to_program(program: Program) -> Program:  # type: ignore  # noqa: F821
+def prepend_measure_to_program(
+    program: Program,  # type: ignore  # noqa: F821
+    delay:   float = 2e-6,
+) -> Program:  # type: ignore  # noqa: F821
     """Prepend a measure to a PyQuil program.
 
     Args:
         program (Program): the program to update.
+        delay (float, optional): delay in seconds to insert after each
+            measurement. Defaults to 2 µs.
 
     Returns:
         Program: the updated program.
     """
     try:
-        from pyquil.gates import MEASURE
+        from pyquil.gates import DELAY, MEASURE
     except ImportError as exc:
         raise ImportError("Unable to import PyQuil!") from exc
 
-    qubits = program.get_qubit_indices()
-    measure = [MEASURE(q, ('ro', i)) for i, q in enumerate(sorted(qubits))]
-    return program.prepend_instructions(measure)
+    qubits = sorted(program.get_qubit_indices())
+    instrs = []
+    for q in qubits:
+        instrs.append(MEASURE(q, (f'ro{q}', 0)))
+        instrs.append(DELAY(q, delay))
+    return program.prepend_instructions(instrs)
 
 
 def replace_parallel_cycles(
