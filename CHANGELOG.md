@@ -9,7 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Breaking
 
+- Added rigetti-quax as a dependency
+
 ### Added
+
+- StateVectorSimulator for simulating ideal circuit outputs.
 
 ### Changed
 
