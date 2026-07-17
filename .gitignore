@@ -22,3 +22,7 @@ build/
 qcal.egg-info/
 
 quantum_calibration.egg-info/
+
+.vscode/
+
+.claude/
