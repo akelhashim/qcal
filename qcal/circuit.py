@@ -112,7 +112,16 @@ class Barrier:
 
     @property
     def qubits(self) -> Tuple:
-        """Empty tuple of qubit labels.
+        """(Empty) tuple of qubit labels.
+
+        Returns:
+            Tuple: empty tuple.
+        """
+        return self._qubits
+
+    @property
+    def qudits(self) -> Tuple:
+        """(Empty) tuple of qudit labels.
 
         Returns:
             Tuple: empty tuple.
@@ -256,6 +265,15 @@ class Cycle:
         return len(self.qubits)
 
     @property
+    def n_qudits(self) -> int:
+        """The number of qudits in the cycle/layer.
+
+        Returns:
+            int: number of qudits.
+        """
+        return len(self.qudits)
+
+    @property
     def gates(self) -> List:
         """The gates in the cycle/layer.
 
@@ -272,6 +290,15 @@ class Cycle:
             Tuple: qubit labels.
         """
         return tuple(sorted(set(self._qubits)))
+
+    @property
+    def qudits(self) -> Tuple:
+        """The qudit labels for the cycle/layer.
+
+        Returns:
+            Tuple: qudit labels.
+        """
+        return self._qubits
 
     @property
     def unitary(self) -> NDArray:
@@ -543,6 +570,15 @@ class Circuit:
         return len(self.qubits)
 
     @property
+    def n_qudits(self) -> int:
+        """The number of qudits in the circuit.
+
+        Returns:
+            int: number of qudits.
+        """
+        return len(self.qudits)
+
+    @property
     def partitions(self) -> List:
         """Repeated circuit partitions.
 
@@ -584,6 +620,15 @@ class Circuit:
             Tuple: qubit labels.
         """
         return tuple(sorted(self._qubits))
+
+    @property
+    def qudits(self) -> Tuple[int]:
+        """The qudits in the circuit.
+
+        Returns:
+            Tuple: qudit labels.
+        """
+        return self._qubits
 
     @property
     def unitary(self) -> NDArray:

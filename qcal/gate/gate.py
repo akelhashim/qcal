@@ -149,28 +149,40 @@ class Gate:
         return self._properties['dim']
 
     @property
-    def is_single_qubit(self) -> bool: # TODO: make compatible with qutrits
+    def is_single_qubit(self) -> bool:
         """Whether or not the gate acts on a single qubit.
 
         Returns:
             bool: single-qubit gate or not.
         """
-        if len(self.qubits) == 1:
-            return True
-        else:
-            return False
+        return len(self.qubits) == 1 and self.dim == 2
 
     @property
-    def is_multi_qubit(self) -> bool: # TODO: make compatible with qutrits
+    def is_single_qudit(self) -> bool:
+        """Whether or not the gate acts on a single qudit.
+
+        Returns:
+            bool: single-qudit gate or not.
+        """
+        return len(self.qudits) == 1
+
+    @property
+    def is_multi_qubit(self) -> bool:
         """Whether or not the gate acts on multiple qubits.
 
         Returns:
             bool: multi-qubit gate or not.
         """
-        if len(self.qubits) > 1:
-            return True
-        else:
-            return False
+        return len(self.qubits) > 1 and self.dim == 2 ** len(self.qubits)
+
+    @property
+    def is_multi_qudit(self) -> bool:
+        """Whether or not the gate acts on multiple qudits.
+
+        Returns:
+            bool: multi-qudit gate or not.
+        """
+        return len(self.qudits) > 1
 
     @property
     def is_measurement(self) -> bool:
@@ -253,3 +265,12 @@ class Gate:
             tuple: qubit label(s).
         """
         return self._properties['qubits']
+
+    @property
+    def qudits(self) -> tuple:
+        """The qudit(s) that the gate acts on.
+
+        Returns:
+            tuple: qudit label(s).
+        """
+        return self.qubits

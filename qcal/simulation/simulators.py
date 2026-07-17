@@ -85,40 +85,40 @@ class StateVectorSimulator:
             tuple: (counts dict, quax.StateVector) where counts maps
                 bitstrings to counts (int) or probabilities (float).
         """
-        qubits = sorted(circuit.qubits)
-        n_qubits = len(qubits)
-        qubit_to_idx = {q: i for i, q in enumerate(qubits)}
+        qudits = sorted(circuit.qudits)
+        n_qudits = len(qudits)
+        qudit_to_idx = {q: i for i, q in enumerate(qudits)}
 
-        state = quax.zero_state_vector(n_qubits=n_qubits)
+        state = quax.zero_state_vector(n_qudits=n_qudits)
 
-        meas_qubits: list = []
+        meas_qudits: list = []
         for cycle in circuit:
             if cycle.is_barrier:
                 continue
             for gate in cycle:
                 if gate.is_measurement:
-                    meas_qubits.extend(gate.qubits)
+                    meas_qudits.extend(gate.qudits)
                     continue
-                n_g = len(gate.qubits)
+                n_g = len(gate.qudits)
                 d = round(gate.unitary.shape[0] ** (1 / n_g))
                 U = quax.Unitary.from_matrix(
                     jnp.array(gate.unitary, dtype=complex),
                     dims=((d,) * n_g, (d,) * n_g),
                 )
                 subsystem = tuple(
-                    qubit_to_idx[q] for q in gate.qubits
+                    qudit_to_idx[q] for q in gate.qudits
                 )
                 state = quax.targeted_apply_unitary(
                     U, state, subsystem
                 )
 
-        if meas_qubits:
+        if meas_qudits:
             meas_idx = [
-                qubit_to_idx[q]
-                for q in sorted(set(meas_qubits))
+                qudit_to_idx[q]
+                for q in sorted(set(meas_qudits))
             ]
         else:
-            meas_idx = list(range(n_qubits))
+            meas_idx = list(range(n_qudits))
 
         probs = np.asarray(quax.probabilities(state), dtype=float)
         probs /= probs.sum()
@@ -129,7 +129,7 @@ class StateVectorSimulator:
                 if probs[raw] == 0.0:
                     continue
                 bits = ''.join(
-                    str((raw >> (n_qubits - 1 - m)) & 1)
+                    str((raw >> (n_qudits - 1 - m)) & 1)
                     for m in meas_idx
                 )
                 counts[bits] = (
@@ -141,7 +141,7 @@ class StateVectorSimulator:
             )
             for raw in sampled:
                 bits = ''.join(
-                    str((int(raw) >> (n_qubits - 1 - m)) & 1)
+                    str((int(raw) >> (n_qudits - 1 - m)) & 1)
                     for m in meas_idx
                 )
                 counts[bits] = counts.get(bits, 0) + 1
