@@ -2,15 +2,18 @@
 
 See https://threeplusone.com/pubs/on_gates.pdf for relevant definitions.
 """
+from __future__ import annotations
+
 from collections import defaultdict
 from collections.abc import Callable, Mapping, Sequence
 from random import gauss, randint
-from typing import Dict, List, Tuple, Union
+from typing import TYPE_CHECKING, Dict, List, Tuple, Union
 
 import numpy as np
 from numpy.typing import NDArray
 
-from qcal.circuit import Circuit, Cycle
+if TYPE_CHECKING:
+    from qcal.circuit import Circuit, Cycle
 from qcal.gate.gate import Gate
 from qcal.units import ns
 

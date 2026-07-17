@@ -10,7 +10,7 @@ from sympy import Matrix
 
 class Gate:
 
-    __slots__ = ['_matrix', '_properties']
+    __slots__ = ['_matrix', '_properties', '_unitary']
 
     def __init__(self,
         matrix: NDArray,
@@ -23,6 +23,7 @@ class Gate:
             qubits (int | tuple): qubit label(s).
         """
         self._matrix = matrix
+        self._unitary = matrix
         self._properties = {
             'alias':  None,
             'dim':    self._matrix.shape[0],
@@ -206,7 +207,16 @@ class Gate:
             NDArray: numpy array of the unitary matrix, or None for
                 non-unitary operations (measurements, reset).
         """
-        return self._matrix
+        return self._unitary
+
+    @unitary.setter
+    def unitary(self, matrix: NDArray) -> None:
+        """Set a measured (potentially imperfect) unitary matrix.
+
+        Args:
+            matrix (NDArray): numpy array of the measured unitary.
+        """
+        self._unitary = matrix
 
     @property
     def name(self) -> str:
