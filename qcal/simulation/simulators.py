@@ -115,8 +115,12 @@ class StateVectorSimulator:
         """
         qudits = sorted(circuit.qudits)
         n_qudits = len(qudits)
+        # Map qudit label → position index used by quax subsystem args
         qudit_to_idx = {q: i for i, q in enumerate(qudits)}
 
+        # Determine each qudit's Hilbert-space dimension (default qubit).
+        # A gate acting on n_g qudits with a d^n_g × d^n_g unitary implies
+        # local dimension d for each of its qudits.
         qudit_dim = dict.fromkeys(qudits, 2)
         for cycle in circuit:
             if cycle.is_barrier:
@@ -129,9 +133,11 @@ class StateVectorSimulator:
                 for q in gate.qudits:
                     qudit_dim[q] = max(qudit_dim[q], d)
 
+        # Initialize |0...0⟩ in the joint Hilbert space
         all_dims = tuple(qudit_dim[q] for q in qudits)
         state = quax.zero_state_vector(dims=all_dims)
 
+        # Apply gates cycle by cycle; collect measured qudits for readout
         meas_qudits: list = []
         for cycle in circuit:
             if cycle.is_barrier:
@@ -153,6 +159,7 @@ class StateVectorSimulator:
                     U, state, subsystem
                 )
 
+        # Which qudit positions contribute to the output bitstring
         if meas_qudits:
             meas_idx = [
                 qudit_to_idx[q]
@@ -161,6 +168,12 @@ class StateVectorSimulator:
         else:
             meas_idx = list(range(n_qudits))
 
+        # strides[i] is the place value of qudit i in the flat probability
+        # array index. quax lays out the joint state as a big-endian mixed-
+        # radix integer: index = d0*d1*...*d_{n-1} with qudit 0 most
+        # significant. For a 3-qudit system with dims (d0, d1, d2):
+        #   strides = [d1*d2, d2, 1]
+        # so the digit for qudit m is (raw // strides[m]) % all_dims[m].
         strides = []
         for i in range(n_qudits):
             s = 1
@@ -168,11 +181,13 @@ class StateVectorSimulator:
                 s *= all_dims[j]
             strides.append(s)
 
+        # Normalize to guard against floating-point drift
         probs = np.asarray(quax.probabilities(state), dtype=float)
         probs /= probs.sum()
         counts: dict = {}
 
         if self._n_shots is None:
+            # Return the exact probability distribution
             for raw in range(len(probs)):
                 if probs[raw] == 0.0:
                     continue
@@ -184,6 +199,7 @@ class StateVectorSimulator:
                     counts.get(bits, 0.0) + float(probs[raw])
                 )
         else:
+            # Sample shot outcomes from the distribution
             sampled = np.random.choice(
                 len(probs), size=self._n_shots, p=probs
             )
