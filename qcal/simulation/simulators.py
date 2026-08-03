@@ -102,9 +102,7 @@ class StateVectorSimulator:
                     qudit_dim[q] = max(qudit_dim[q], d)
 
         all_dims = tuple(qudit_dim[q] for q in qudits)
-        state = quax.zero_state_vector(
-            n_qudits=n_qudits, dims=all_dims
-        )
+        state = quax.zero_state_vector(dims=all_dims)
 
         meas_qudits: list = []
         for cycle in circuit:
