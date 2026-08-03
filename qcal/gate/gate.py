@@ -213,12 +213,21 @@ class Gate:
 
     @property
     def unitary(self) -> NDArray:
-        """The unitary matrix of the gate.
+        """The unitary matrix of the gate in the full qudit space.
+
+        For 2×2 gates with ``subspace='EF'``, the matrix is embedded
+        into the |1⟩–|2⟩ block of a 3×3 qutrit space. All other
+        gates are returned as-is.
 
         Returns:
             NDArray: numpy array of the unitary matrix, or None for
                 non-unitary operations (measurements, reset).
         """
+        if (self._properties['subspace'] == 'EF'
+                and self._unitary.shape[0] == 2):
+            U = np.eye(3, dtype=complex)
+            U[1:3, 1:3] = self._unitary
+            return U
         return self._unitary
 
     @unitary.setter

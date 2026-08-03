@@ -89,7 +89,22 @@ class StateVectorSimulator:
         n_qudits = len(qudits)
         qudit_to_idx = {q: i for i, q in enumerate(qudits)}
 
-        state = quax.zero_state_vector(n_qudits=n_qudits)
+        qudit_dim = dict.fromkeys(qudits, 2)
+        for cycle in circuit:
+            if cycle.is_barrier:
+                continue
+            for gate in cycle:
+                if gate.is_measurement:
+                    continue
+                n_g = len(gate.qudits)
+                d = round(gate.unitary.shape[0] ** (1 / n_g))
+                for q in gate.qudits:
+                    qudit_dim[q] = max(qudit_dim[q], d)
+
+        all_dims = tuple(qudit_dim[q] for q in qudits)
+        state = quax.zero_state_vector(
+            n_qudits=n_qudits, dims=all_dims
+        )
 
         meas_qudits: list = []
         for cycle in circuit:
@@ -120,6 +135,13 @@ class StateVectorSimulator:
         else:
             meas_idx = list(range(n_qudits))
 
+        strides = []
+        for i in range(n_qudits):
+            s = 1
+            for j in range(i + 1, n_qudits):
+                s *= all_dims[j]
+            strides.append(s)
+
         probs = np.asarray(quax.probabilities(state), dtype=float)
         probs /= probs.sum()
         counts: dict = {}
@@ -129,7 +151,7 @@ class StateVectorSimulator:
                 if probs[raw] == 0.0:
                     continue
                 bits = ''.join(
-                    str((raw >> (n_qudits - 1 - m)) & 1)
+                    str((raw // strides[m]) % all_dims[m])
                     for m in meas_idx
                 )
                 counts[bits] = (
@@ -141,7 +163,7 @@ class StateVectorSimulator:
             )
             for raw in sampled:
                 bits = ''.join(
-                    str((int(raw) >> (n_qudits - 1 - m)) & 1)
+                    str((int(raw) // strides[m]) % all_dims[m])
                     for m in meas_idx
                 )
                 counts[bits] = counts.get(bits, 0) + 1

@@ -14,8 +14,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - StateVectorSimulator for simulating ideal circuit outputs.
+- Single- and two-qutrit gates
 
 ### Changed
+
+- gate.unitary embeds a subspace unitary in qutrit dimension if subspace='EF'
 
 ### Deprecated
 

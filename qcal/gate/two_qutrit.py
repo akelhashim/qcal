@@ -14,7 +14,6 @@ from numpy.typing import NDArray
 
 from qcal.gate.gate import Gate
 
-
 __all__ = (
     'CP3',
     'CSUM',
