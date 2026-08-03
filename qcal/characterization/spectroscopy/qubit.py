@@ -7,7 +7,7 @@ from qcal.characterization.characterize import Characterize
 from qcal.circuit import Cycle, Circuit, CircuitSet
 from qcal.config import Config
 from qcal.fitting.fit import FitLinear
-from qcal.gate.single_qubit import Meas, X90
+from qcal.gates.single_qubit import Meas, X90
 from qcal.qpu.qpu import QPU
 from qcal.characterization.spectroscopy.utils import find_inflection_points
 from qcal.units import GHz

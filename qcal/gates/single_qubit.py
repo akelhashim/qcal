@@ -14,7 +14,7 @@ from numpy.typing import NDArray
 
 if TYPE_CHECKING:
     from qcal.circuit import Circuit, Cycle
-from qcal.gate.gate import Gate
+from qcal.gates.gate import Gate
 from qcal.units import ns
 
 # TODO: add Clifford gates

@@ -12,8 +12,8 @@ from typing import Dict
 from pygsti.processors import QubitProcessorSpec
 
 from qcal.config import Config
-from qcal.gate.single_qubit import SINGLE_QUBIT_GATES
-from qcal.gate.two_qubit import TWO_QUBIT_GATES
+from qcal.gates.single_qubit import SINGLE_QUBIT_GATES
+from qcal.gates.two_qubit import TWO_QUBIT_GATES
 
 logger = logging.getLogger(__name__)
 

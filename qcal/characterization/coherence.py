@@ -22,7 +22,7 @@ from qcal.fitting.fit import (
     FitDecayingCosineExponential,
     FitExponential,
 )
-from qcal.gate.single_qubit import X90, Idle, Rz, X, Z
+from qcal.gates.single_qubit import X90, Idle, Rz, X, Z
 from qcal.math.utils import (
     reciprocal_uncertainty,
     round_to_order_error,

@@ -8,7 +8,7 @@ import numpy as np
 from pygsti import remove_duplicates
 from pygsti.circuits import Circuit as PyGSTiCircuit
 
-from qcal.gate import gate
+from qcal.gates import gate
 from qcal.utils import flatten
 
 GateLayer = Optional[List[List[tuple]]]

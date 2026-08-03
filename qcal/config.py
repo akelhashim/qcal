@@ -19,8 +19,8 @@ import pandas as pd
 import yaml
 
 import qcal.settings as settings
-from qcal.gate.single_qubit import SINGLE_QUBIT_GATES
-from qcal.gate.two_qubit import TWO_QUBIT_GATES
+from qcal.gates.single_qubit import SINGLE_QUBIT_GATES
+from qcal.gates.two_qubit import TWO_QUBIT_GATES
 from qcal.math.utils import round_sig_figures
 
 logger = logging.getLogger(__name__)

@@ -29,8 +29,8 @@ import pandas as pd
 import plotly.io as pio
 from numpy.typing import NDArray
 
-from qcal.gate.gate import Gate
-from qcal.gate.single_qubit import Meas, basis_rotation
+from qcal.gates.gate import Gate
+from qcal.gates.single_qubit import Meas, basis_rotation
 from qcal.plotting.sequence import plot_mock_sequence
 from qcal.results import Results
 

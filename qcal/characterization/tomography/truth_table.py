@@ -6,7 +6,7 @@ import qcal.settings as settings
 from qcal.characterization.characterize import Characterize
 from qcal.circuit import Cycle, Circuit, CircuitSet
 from qcal.config import Config
-from qcal.gate.single_qubit import Id, X90
+from qcal.gates.single_qubit import Id, X90
 from qcal.managers.classification_manager import ClassificationManager
 from qcal.math.utils import (
     uncertainty_of_sum, round_to_order_error

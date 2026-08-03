@@ -19,7 +19,7 @@ Workflow
 --------
 1. Construct a :class:`~qcal.circuit.Circuit` from
    :class:`~qcal.circuit.Cycle` objects using gates from
-   ``qcal.gate``.
+   ``qcal.gates``.
 2. Create a :class:`StateVectorSimulator` (optionally with a default
    ``n_shots``).
 3. Call :meth:`StateVectorSimulator.run` — this attaches a

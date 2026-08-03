@@ -13,7 +13,7 @@ from IPython.display import clear_output
 import qcal.settings as settings
 from qcal.circuit import Barrier, Circuit, CircuitSet, Cycle
 from qcal.config import Config
-from qcal.gate.single_qubit import X90, Id, Meas, X
+from qcal.gates.single_qubit import X90, Id, Meas, X
 from qcal.qpu.qpu import QPU
 
 logger = logging.getLogger(__name__)

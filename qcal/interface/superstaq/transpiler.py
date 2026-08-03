@@ -6,8 +6,8 @@ from collections import defaultdict
 from typing import Dict, List
 
 from qcal.circuit import Barrier, Circuit, CircuitSet, Cycle, Layer
-from qcal.gate.single_qubit import X90, Meas, Rz, X
-from qcal.gate.two_qubit import CNOT, CX, CZ
+from qcal.gates.single_qubit import X90, Meas, Rz, X
+from qcal.gates.two_qubit import CNOT, CX, CZ
 from qcal.transpilation.transpiler import Transpiler
 
 logger = logging.getLogger(__name__)

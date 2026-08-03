@@ -12,7 +12,7 @@ from typing import Tuple
 import numpy as np
 from numpy.typing import NDArray
 
-from qcal.gate.gate import Gate
+from qcal.gates.gate import Gate
 
 __all__ = (
     'CP3',

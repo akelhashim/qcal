@@ -18,7 +18,7 @@ import qcal.settings as settings
 from qcal.benchmarking.readout import ReadoutFidelity
 from qcal.circuit import Barrier, Circuit, CircuitSet, Cycle
 from qcal.config import Config
-from qcal.gate.single_qubit import X90, Id, X
+from qcal.gates.single_qubit import X90, Id, X
 from qcal.machine_learning.clustering import GaussianMixture
 from qcal.managers.classification_manager import ClassificationManager
 from qcal.plotting.utils import calculate_nrows_ncols
