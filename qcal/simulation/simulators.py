@@ -1,5 +1,33 @@
 """Submodule for simulation of quantum circuits.
 
+Simulation is backed by `rigetti-quax
+<https://github.com/rigetti/quax>`_, a JAX-based quantum circuit
+simulator. quax represents quantum states as ``StateVector`` or
+``DensityMatrix`` objects and applies gates via exact linear algebra
+on the full Hilbert space. Because it is built on JAX, gate
+applications are JIT-compiled on the first call and run efficiently
+on CPU or GPU thereafter.
+
+The primary entry point is :class:`StateVectorSimulator`, which
+evolves an initial |0...0⟩ state through every non-measurement gate
+in a circuit and records the resulting probability distribution.
+Both qubits (d=2) and qutrits (d=3) are supported; the simulator
+detects the required per-qudit dimension from gate unitaries
+automatically.
+
+Workflow
+--------
+1. Construct a :class:`~qcal.circuit.Circuit` from
+   :class:`~qcal.circuit.Cycle` objects using gates from
+   ``qcal.gate``.
+2. Create a :class:`StateVectorSimulator` (optionally with a default
+   ``n_shots``).
+3. Call :meth:`StateVectorSimulator.run` — this attaches a
+   :class:`~qcal.results.Results` object to each circuit and stores
+   the final ``quax.StateVector`` in :attr:`StateVectorSimulator.states`.
+
+When ``n_shots=None`` (the default), the exact probability
+distribution is stored rather than sampled counts.
 """
 from __future__ import annotations
 
