@@ -2,11 +2,10 @@
 
 Simulation is backed by `rigetti-quax
 <https://github.com/rigetti/quax>`_, a JAX-based quantum circuit
-simulator. quax represents quantum states as ``StateVector`` or
-``DensityMatrix`` objects and applies gates via exact linear algebra
-on the full Hilbert space. Because it is built on JAX, gate
-applications are JIT-compiled on the first call and run efficiently
-on CPU or GPU thereafter.
+simulator. quax represents quantum states as ``StateVector`` objects
+and applies gates via exact linear algebra on the full Hilbert space.
+Because it is built on JAX, gate applications are JIT-compiled on the
+first call and run efficiently on CPU or GPU thereafter.
 
 The primary entry point is :class:`StateVectorSimulator`, which
 evolves an initial |0...0⟩ state through every non-measurement gate
@@ -103,11 +102,15 @@ class StateVectorSimulator:
         """
         return self._n_shots
 
-    def _simulate(self, circuit: Circuit) -> tuple:
+    def _simulate(
+        self, circuit: Circuit, n_shots: int | None
+    ) -> tuple:
         """Simulate a single circuit and return counts and final state.
 
         Args:
             circuit (Circuit): qcal Circuit to simulate.
+            n_shots (int | None): shots to sample, or ``None`` for
+                exact probabilities.
 
         Returns:
             tuple: (counts dict, quax.StateVector) where counts maps
@@ -186,7 +189,7 @@ class StateVectorSimulator:
         probs /= probs.sum()
         counts: dict = {}
 
-        if self._n_shots is None:
+        if n_shots is None:
             # Return the exact probability distribution
             for raw in range(len(probs)):
                 if probs[raw] == 0.0:
@@ -201,7 +204,7 @@ class StateVectorSimulator:
         else:
             # Sample shot outcomes from the distribution
             sampled = np.random.choice(
-                len(probs), size=self._n_shots, p=probs
+                len(probs), size=n_shots, p=probs
             )
             for raw in sampled:
                 bits = ''.join(
@@ -231,8 +234,7 @@ class StateVectorSimulator:
                 the instance default when given. Defaults to
                 ``None``.
         """
-        if n_shots is not None:
-            self._n_shots = n_shots
+        _n_shots = n_shots if n_shots is not None else self._n_shots
 
         if isinstance(circuits, CircuitSet):
             self._circuits = circuits
@@ -243,6 +245,6 @@ class StateVectorSimulator:
 
         self._states = []
         for circuit in self._circuits:
-            counts, state = self._simulate(circuit)
+            counts, state = self._simulate(circuit, _n_shots)
             circuit.results = counts
             self._states.append(state)
