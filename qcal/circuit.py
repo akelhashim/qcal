@@ -30,7 +30,7 @@ import plotly.io as pio
 from numpy.typing import NDArray
 
 from qcal.gate.gate import Gate
-from qcal.gate.single_qubit import Meas, basis_rotation
+from qcal.gate.single_qubit import Meas, basis_rotation, prep_rotation
 from qcal.plotting.sequence import plot_mock_sequence
 from qcal.results import Results
 
@@ -877,6 +877,36 @@ class Circuit:
         """Removes the first cycle/layer at the front of the circuit."""
         self._cycles.popleft()
         self._update_qubits()
+
+    def prepare(
+        self,
+        pauli:  str,
+        qubits: Sequence[int] | None = None,
+    ) -> None:
+        """Prepends a preparation cycle to the front of the circuit.
+
+        The preparation cycle rotates the qubits from the ground state to
+        the +1 eigenstate of the given Pauli string.
+
+        Args:
+            pauli (str): Pauli string defining the eigenstate to prepare
+                (e.g. 'XYZ'), with one character per qubit in `qubits`.
+            qubits (Sequence[int] | None, optional): qubits to prepare.
+                Defaults to None.
+        """
+        if qubits is None:
+            qubits = self.qubits
+
+        if len(pauli) != len(qubits):
+            raise ValueError(
+                "Length of pauli string must match number of qubits to prepare!"
+            )
+
+        prep_cycle = Cycle(
+            {prep_rotation(q, p) for q, p in zip(qubits, pauli, strict=False)}
+        )
+        if not all(p.upper() in ('I', 'Z') for p in pauli):
+            self.prepend(prep_cycle)
 
     def prepend(
             self, cycle_or_layer: Barrier | Cycle | Layer | Iterable

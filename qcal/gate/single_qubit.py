@@ -2,18 +2,21 @@
 
 See https://threeplusone.com/pubs/on_gates.pdf for relevant definitions.
 """
+from __future__ import annotations
+
 from collections import defaultdict
 from collections.abc import Callable, Mapping, Sequence
 from random import gauss, randint
-from typing import Dict, List, Tuple, Union
+from typing import TYPE_CHECKING, Dict, List, Tuple, Union
 
 import numpy as np
 from numpy.typing import NDArray
 
-from qcal.circuit import Circuit, Cycle
 from qcal.gate.gate import Gate
 from qcal.units import ns
 
+if TYPE_CHECKING:
+    from qcal.circuit import Circuit, Cycle
 
 __all__ = (
     'C',
@@ -115,6 +118,31 @@ def basis_rotation(meas):
         'Z': Id(meas.qubits[0])
     }
     return basis_map[meas.properties['params']['basis'].upper()]
+
+
+def prep_rotation(qubit: int, pauli: str) -> Gate:
+    """Returns the gate which rotates the qubit to the +1 eigenstate of the
+    given Pauli operator.
+
+    Args:
+        qubit (int): qubit label.
+        pauli (str): Pauli operator ('I', 'X', 'Y', or 'Z').
+
+    Returns:
+        Gate: gate object.
+    """
+    if pauli.upper() not in ('I', 'X', 'Y', 'Z'):
+        raise ValueError(
+            f"Invalid Pauli operator: {pauli}. "
+            "Must be one of 'I', 'X', 'Y', or 'Z'."
+        )
+    prep_map = {
+        'I': Id(qubit),
+        'X': Ry(qubit, np.pi/2),
+        'Y': Rx(qubit, -np.pi/2),
+        'Z': Id(qubit)
+    }
+    return prep_map[pauli.upper()]
 
 
 def rn(theta: float, n: Union[List, Tuple, NDArray]) -> NDArray:
