@@ -34,13 +34,17 @@ def format_gate_text(gate: Gate):
     if gate.unitary is not None:
         text += (
             'Unitary: <br>  '
-            + np.array_str(np.around(gate.unitary, 3)).replace("\n ", "<br>" + '   ')
+            + np.array_str(np.around(gate.unitary, 3)).replace(
+                "\n ", "<br>" + '   '
+            )
             + '<br>'
         )
     else:
         text += (
             'Matrix: <br>  '
-            + np.array_str(np.around(gate.matrix, 3)).replace("\n ", "<br>" + '   ')
+            + np.array_str(np.around(gate.matrix, 3)).replace(
+                "\n ", "<br>" + '   '
+            )
             + '<br>'
         )
     if gate.locally_equivalent is not None:
