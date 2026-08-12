@@ -1,6 +1,6 @@
-"""Noise model wrappers for the DensityMatrixSimulator.
+"""Error model wrappers for the DensityMatrixSimulator.
 
-Each :class:`NoiseModel` maps broad gate categories
+Each :class:`ErrorModel` maps broad gate categories
 (``'single_qubit'``, ``'two_qubit'``, ``'single_qutrit'``,
 ``'two_qutrit'``) to ``quax`` noise channels, rather than
 requiring a channel per gate class.
@@ -15,9 +15,9 @@ canonical gate-name dictionaries in ``qcal.gates``:
 
 Use :func:`gate_category` to find the category for any gate class
 name. The :class:`~qcal.simulation.simulators.DensityMatrixSimulator`
-calls :meth:`NoiseModel.channel_for` on each gate during simulation.
+calls :meth:`ErrorModel.channel_for` on each gate during simulation.
 
-Most noise models accept a *dims* tuple implicitly through separate
+Most error models accept a *dims* tuple implicitly through separate
 per-category parameters: qubit categories always use ``dims=(2,)``
 and qutrit categories always use ``dims=(3,)`` when calling the
 underlying ``quax.channels.*`` functions.
@@ -25,7 +25,7 @@ underlying ``quax.channels.*`` functions.
 Example::
 
     from qcal.simulation import DensityMatrixSimulator
-    from qcal.simulation.noise_models import DepolarizingNoise
+    from qcal.simulation.error_models import DepolarizingNoise
 
     noise = DepolarizingNoise(single_qubit=0.001, two_qubit=0.01)
     sim = DensityMatrixSimulator(noise_model=noise)
@@ -44,6 +44,7 @@ import numpy as np
 import pandas as pd
 import quax
 
+from qcal.gates.gate import Gate
 from qcal.gates.single_qubit import SINGLE_QUBIT_GATES
 from qcal.gates.single_qutrit import SINGLE_QUTRIT_GATES
 from qcal.gates.two_qubit import TWO_QUBIT_GATES
@@ -58,7 +59,7 @@ __all__ = (
     'TWO_QUTRIT_NAMES',
     'gate_category',
     'RelaxationParams',
-    'NoiseModel',
+    'ErrorModel',
     'DepolarizingNoise',
     'AmplitudeDamping',
     'DephasingNoise',
@@ -67,7 +68,8 @@ __all__ = (
     'LeakageNoise',
     'SeepageNoise',
     'RelaxationNoise',
-    'CustomNoiseModel',
+    'UnitaryError',
+    'CustomErrorModel',
 )
 
 # ---------------------------------------------------------------------------
@@ -303,7 +305,7 @@ def _qutrit_thermal_relaxation_channel(
 # Base class
 # ---------------------------------------------------------------------------
 
-class NoiseModel(ABC):
+class ErrorModel(ABC):
     """Abstract base class for category-based noise models.
 
     Subclasses build a ``quax`` channel for each gate category and
@@ -412,7 +414,7 @@ class NoiseModel(ABC):
         """Return a per-instance noise channel for a gate, or ``None``.
 
         The default implementation always returns ``None``. Override in
-        subclasses (e.g. :class:`CustomNoiseModel`) to provide channels
+        subclasses (e.g. :class:`CustomErrorModel`) to provide channels
         keyed to specific gate instances rather than gate categories.
 
         Args:
@@ -429,7 +431,7 @@ class NoiseModel(ABC):
 # Typical noise models
 # ---------------------------------------------------------------------------
 
-class DepolarizingNoise(NoiseModel):
+class DepolarizingNoise(ErrorModel):
     """Depolarizing noise applied uniformly by gate category.
 
     Delegates to ``quax.channels.depolarizing(rate, dims=(d,))``
@@ -501,7 +503,7 @@ class DepolarizingNoise(NoiseModel):
         return self._channels.get(category)
 
 
-class AmplitudeDamping(NoiseModel):
+class AmplitudeDamping(ErrorModel):
     """Amplitude-damping (T1) noise applied uniformly by gate category.
 
     Delegates to ``quax.channels.amplitude_damping(rate, dims=(d,))``
@@ -571,7 +573,7 @@ class AmplitudeDamping(NoiseModel):
         return self._channels.get(category)
 
 
-class DephasingNoise(NoiseModel):
+class DephasingNoise(ErrorModel):
     """Dephasing (T2) noise applied uniformly by gate category.
 
     Qubit categories use ``quax.channels.dephasing(rate)`` and model
@@ -670,7 +672,7 @@ class DephasingNoise(NoiseModel):
         return self._channels.get(category)
 
 
-class BitFlipNoise(NoiseModel):
+class BitFlipNoise(ErrorModel):
     """Bit-flip noise applied uniformly by gate category.
 
     Qubit categories use ``quax.channels.bit_flip(rate)`` (GE flip).
@@ -749,7 +751,7 @@ class BitFlipNoise(NoiseModel):
         return self._channels.get(category)
 
 
-class PhaseFlipNoise(NoiseModel):
+class PhaseFlipNoise(ErrorModel):
     """Phase-flip noise applied uniformly by gate category.
 
     Qubit categories use ``quax.channels.phase_flip(rate)`` (GE
@@ -828,7 +830,7 @@ class PhaseFlipNoise(NoiseModel):
         return self._channels.get(category)
 
 
-class RelaxationNoise(NoiseModel):
+class RelaxationNoise(ErrorModel):
     """Relaxation noise (T1 + pure dephasing Tφ) applied by gate category.
 
     Combines T1 (energy relaxation) and pure dephasing (Tφ) into a
@@ -854,7 +856,7 @@ class RelaxationNoise(NoiseModel):
 
     Example::
 
-        from qcal.simulation.noise_models import (
+        from qcal.simulation.error_models import (
             RelaxationNoise, RelaxationParams,
         )
         noise = RelaxationNoise(
@@ -935,7 +937,7 @@ class RelaxationNoise(NoiseModel):
         return self._channels.get(category)
 
 
-class LeakageNoise(NoiseModel):
+class LeakageNoise(ErrorModel):
     """Leakage noise (|1⟩→|2⟩) for qutrit gate categories.
 
     Delegates to ``quax.channels.leakage(rate)``. Qutrit-only;
@@ -990,7 +992,7 @@ class LeakageNoise(NoiseModel):
         return self._channels.get(category)
 
 
-class SeepageNoise(NoiseModel):
+class SeepageNoise(ErrorModel):
     """Seepage noise (|2⟩→|1⟩) for qutrit gate categories.
 
     Delegates to ``quax.channels.seepage(rate)``. Qutrit-only;
@@ -1043,6 +1045,186 @@ class SeepageNoise(NoiseModel):
         if category is None:
             return None
         return self._channels.get(category)
+
+
+# ---------------------------------------------------------------------------
+# Unitary (coherent) channel helper
+# ---------------------------------------------------------------------------
+
+_UNITARY_DIMS: dict = {
+    2: ((2,),    (2,)),
+    3: ((3,),    (3,)),
+    4: ((2, 2),  (2, 2)),
+    9: ((3, 3),  (3, 3)),
+}
+
+
+def _unitary_channel(
+    U: Optional[np.ndarray],
+) -> Optional[quax.KrausMap]:
+    """Build a single-Kraus-operator KrausMap from a unitary U.
+
+    Returns ``None`` if *U* is ``None`` or numerically the identity
+    (``np.allclose(U, np.eye(d))``).
+
+    Supported shapes and inferred ``dims``:
+
+    - ``(2, 2)`` → ``dims=((2,), (2,))`` (single qubit)
+    - ``(3, 3)`` → ``dims=((3,), (3,))`` (single qutrit)
+    - ``(4, 4)`` → ``dims=((2, 2), (2, 2))`` (joint two-qubit)
+    - ``(9, 9)`` → ``dims=((3, 3), (3, 3))`` (joint two-qutrit)
+
+    Args:
+        U (np.ndarray | None): square unitary matrix, or ``None``.
+
+    Returns:
+        quax.KrausMap | None: rank-1 channel, or ``None``.
+
+    Raises:
+        ValueError: if the matrix shape is not one of the four
+            recognised forms.
+    """
+    if U is None:
+        return None
+    U = np.asarray(U, dtype=complex)
+    d = U.shape[0]
+    if np.allclose(U, np.eye(d)):
+        return None
+    dims = _UNITARY_DIMS.get(d)
+    if dims is None:
+        raise ValueError(
+            f'UnitaryError: unsupported matrix size {d}×{d}. '
+            'Expected 2×2, 3×3, 4×4, or 9×9.'
+        )
+    kraus = jnp.array(U[np.newaxis])   # shape (1, d, d)
+    return quax.KrausMap.from_matrix(kraus, dims=dims)
+
+
+class UnitaryError(ErrorModel):
+    """Coherent (unitary) error channel applied by gate category or instance.
+
+    After each gate, the error channel ρ → U ρ U† is applied, where U
+    is a fixed unitary matrix.  This is a rank-1 (single-Kraus-operator)
+    channel and therefore preserves state purity.
+
+    Two levels of granularity are supported:
+
+    * **Category-level** (*single_qubit*, *two_qubit*, etc.) — the same
+      unitary is applied after every gate in that category.
+    * **Per-gate-instance** (*gate_unitaries*) — a specific unitary for
+      an individual gate instance (e.g. ``CZ((0, 1))``).  These take
+      priority over the category-level channel: if a gate matches an
+      entry in *gate_unitaries*, only the per-gate unitary is applied;
+      the category channel is not applied for that gate.
+
+    When no channel is configured for a gate (identity or ``None``), no
+    channel is added and the simulation is equivalent to a state-vector
+    simulation.
+
+    The *two_qubit* (and *two_qutrit*) parameter accepts either a
+    per-qudit local unitary (2×2 or 3×3, broadcast independently to
+    each qudit of the gate) or a joint unitary over the whole gate
+    subsystem (4×4 or 9×9).
+
+    Example::
+
+        import numpy as np
+        from qcal.simulation.error_models import UnitaryError
+        from qcal.gates.single_qubit import X
+        from qcal.gates.two_qubit import CZ
+
+        # Category-level: small Rz over-rotation on every single-qubit gate
+        theta = 0.05  # radians
+        Rz = np.array([
+            [np.exp(-0.5j * theta), 0],
+            [0,                     np.exp(0.5j * theta)],
+        ])
+        noise = UnitaryError(single_qubit=Rz)
+
+        # Per-gate: different unitary on a specific CZ instance
+        noise = UnitaryError(
+            single_qubit=Rz,
+            gate_unitaries={CZ((0, 1)): U_cz_error},
+        )
+
+        # U = I → equivalent to the state-vector simulator
+        noise = UnitaryError()   # all None, no channels added
+
+    Args:
+        single_qubit (np.ndarray | None): 2×2 unitary error for
+            single-qubit gates. ``None`` or the identity means no
+            channel. Defaults to ``None``.
+        two_qubit (np.ndarray | None): unitary error for two-qubit
+            gates.  May be 2×2 (applied independently to each qubit)
+            or 4×4 (applied jointly to the gate subsystem). ``None``
+            or the identity means no channel. Defaults to ``None``.
+        single_qutrit (np.ndarray | None): 3×3 unitary error for
+            single-qutrit gates. Defaults to ``None``.
+        two_qutrit (np.ndarray | None): unitary error for two-qutrit
+            gates.  May be 3×3 (per-qutrit) or 9×9 (joint). Defaults
+            to ``None``.
+        gate_unitaries (dict | None): mapping from gate instances (e.g.
+            ``CZ((0, 1))``) to unitary error matrices. Gate instances
+            are compared by value using
+            :meth:`~qcal.gates.gate.Gate.__eq__`. A ``None`` matrix or
+            the identity matrix is treated as no channel. Defaults to
+            ``None``.
+    """
+
+    def __init__(
+        self,
+        single_qubit:   Optional[np.ndarray] = None,
+        two_qubit:      Optional[np.ndarray] = None,
+        single_qutrit:  Optional[np.ndarray] = None,
+        two_qutrit:     Optional[np.ndarray] = None,
+        gate_unitaries: Optional[dict[Gate, np.ndarray]] = None,
+    ) -> None:
+        super().__init__()
+        self._channels: Dict[str, Optional[quax.KrausMap]] = {
+            'single_qubit':  _unitary_channel(single_qubit),
+            'two_qubit':     _unitary_channel(two_qubit),
+            'single_qutrit': _unitary_channel(single_qutrit),
+            'two_qutrit':    _unitary_channel(two_qutrit),
+        }
+        self._gate_channels: dict = {
+            gate: _unitary_channel(U)
+            for gate, U in (gate_unitaries or {}).items()
+        }
+
+    def channel_for(
+        self, gate_name: str
+    ) -> Optional[quax.KrausMap]:
+        """Return the category-level unitary channel for a gate, or ``None``.
+
+        Args:
+            gate_name (str): ``type(gate).__name__``.
+
+        Returns:
+            quax.KrausMap | None: single-Kraus-operator channel, or
+                ``None`` if the category has no configured unitary.
+        """
+        category = gate_category(gate_name)
+        if category is None:
+            return None
+        return self._channels.get(category)
+
+    def channel_for_gate(
+        self, gate
+    ) -> Optional[quax.KrausMap]:
+        """Return the per-instance unitary channel for ``gate``, or ``None``.
+
+        Looks up the gate by value in the *gate_unitaries* dict supplied
+        at construction.  Returns ``None`` if no entry was registered for
+        this gate instance.
+
+        Args:
+            gate: gate instance, e.g. ``CZ((0, 1))``.
+
+        Returns:
+            quax.KrausMap | None: single-Kraus-operator channel, or
+                ``None``.
+        """
+        return self._gate_channels.get(gate)
 
 
 # ---------------------------------------------------------------------------
@@ -1259,20 +1441,20 @@ def _pauli_noise_to_kraus(pauli_probs: dict) -> quax.KrausMap:
 # Custom (composite) noise model
 # ---------------------------------------------------------------------------
 
-class CustomNoiseModel(NoiseModel):
-    """Compose multiple :class:`NoiseModel` instances into one.
+class CustomErrorModel(ErrorModel):
+    """Compose multiple :class:`ErrorModel` instances into one.
 
     Channels from each sub-model are composed sequentially in the order the
     sub-models are passed (left to right). Confusion matrices are resolved
     from the instance's own dict first, then from sub-models in order —
     allowing per-instance overrides without modifying sub-models.
 
-    ``CustomNoiseModel`` is itself a :class:`NoiseModel` and may therefore
-    appear as a sub-model inside another ``CustomNoiseModel``.
+    ``CustomErrorModel`` is itself a :class:`ErrorModel` and may therefore
+    appear as a sub-model inside another ``CustomErrorModel``.
 
     Example::
 
-        noise = CustomNoiseModel(
+        noise = CustomErrorModel(
             DepolarizingNoise(single_qubit=0.01),
             RelaxationNoise(
                 single_qubit=RelaxationParams(
@@ -1284,21 +1466,21 @@ class CustomNoiseModel(NoiseModel):
         sim = DensityMatrixSimulator(noise_model=noise)
 
     Args:
-        *noise_models (NoiseModel): sub-models to compose. Accepts zero or
-            more sub-models; an empty ``CustomNoiseModel`` returns ``None``
+        *error_models (ErrorModel): sub-models to compose. Accepts zero or
+            more sub-models; an empty ``CustomErrorModel`` returns ``None``
             for all channels.
     """
 
-    def __init__(self, *noise_models: NoiseModel) -> None:
+    def __init__(self, *error_models: ErrorModel) -> None:
         super().__init__()
-        self._noise_models: List[NoiseModel] = list(noise_models)
+        self._error_models: List[ErrorModel] = list(error_models)
         # gate instance → SuperOp (populated by from_PTM)
         self._gate_channels: dict = {}
 
     @property
-    def noise_models(self) -> List[NoiseModel]:
+    def error_models(self) -> List[ErrorModel]:
         """Sub-models held by this composite."""
-        return self._noise_models
+        return self._error_models
 
     def channel_for(
         self, gate_name: str
@@ -1317,7 +1499,7 @@ class CustomNoiseModel(NoiseModel):
                 ``None``.
         """
         channels = [
-            ch for m in self._noise_models
+            ch for m in self._error_models
             if (ch := m.channel_for(gate_name)) is not None
         ]
         if not channels:
@@ -1342,7 +1524,7 @@ class CustomNoiseModel(NoiseModel):
         mat = self._confusion_matrices.get(qudit)
         if mat is not None:
             return mat
-        for m in self._noise_models:
+        for m in self._error_models:
             mat = m.confusion_matrix_for(qudit)
             if mat is not None:
                 return mat
@@ -1391,7 +1573,7 @@ class CustomNoiseModel(NoiseModel):
         ch = self._gate_channels.get(gate)
         if ch is not None:
             return ch
-        for m in self._noise_models:
+        for m in self._error_models:
             ch = m.channel_for_gate(gate)
             if ch is not None:
                 return ch
@@ -1401,8 +1583,8 @@ class CustomNoiseModel(NoiseModel):
     def from_PTM(
         cls,
         gate_ptm_dict: dict,
-    ) -> 'CustomNoiseModel':
-        """Create a :class:`CustomNoiseModel` from per-gate PTMs.
+    ) -> 'CustomErrorModel':
+        """Create a :class:`CustomErrorModel` from per-gate PTMs.
 
         Each entry maps a gate instance to its error channel expressed as a
         Pauli Transfer Matrix.  The PTM convention is
@@ -1424,7 +1606,7 @@ class CustomNoiseModel(NoiseModel):
 
             # Identity-like error on X(0) (slightly depolarised)
             ptm = np.diag([1, 0.99, 0.99, 0.99])
-            noise = CustomNoiseModel.from_PTM({gates.X(0): ptm})
+            noise = CustomErrorModel.from_PTM({gates.X(0): ptm})
             sim = DensityMatrixSimulator(noise_model=noise)
 
         Args:
@@ -1432,7 +1614,7 @@ class CustomNoiseModel(NoiseModel):
                 Each PTM must be a square (d²×d²) real or complex array.
 
         Returns:
-            CustomNoiseModel: new model carrying per-gate PTM channels.
+            CustomErrorModel: new model carrying per-gate PTM channels.
         """
         model = cls()
         for gate, ptm in gate_ptm_dict.items():
@@ -1447,8 +1629,8 @@ class CustomNoiseModel(NoiseModel):
     def from_PNR(
         cls,
         gate_pauli_dict: dict,
-    ) -> 'CustomNoiseModel':
-        """Create a :class:`CustomNoiseModel` from Pauli Noise Reconstruction.
+    ) -> 'CustomErrorModel':
+        """Create a :class:`CustomErrorModel` from Pauli Noise Reconstruction.
 
         Each entry maps a gate instance to a ``{Pauli_string: probability}``
         dict representing the stochastic Pauli error channel on that gate.
@@ -1470,7 +1652,7 @@ class CustomNoiseModel(NoiseModel):
             import qcal.gates.single_qubit as sq
             import qcal.gates.two_qubit as tq
 
-            noise = CustomNoiseModel.from_PNR({
+            noise = CustomErrorModel.from_PNR({
                 sq.X(0):      {'Z': 0.002, 'X': 0.001},
                 tq.CZ((0,1)): {'ZI': 0.005, 'IZ': 0.003, 'ZZ': 0.001},
             })
@@ -1483,7 +1665,7 @@ class CustomNoiseModel(NoiseModel):
                 equal the gate's qudit count.
 
         Returns:
-            CustomNoiseModel: new model carrying per-gate Pauli channels.
+            CustomErrorModel: new model carrying per-gate Pauli channels.
 
         Raises:
             ValueError: if Pauli string lengths do not match the gate's

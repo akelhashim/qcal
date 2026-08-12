@@ -15,7 +15,7 @@ Three classes are provided:
 :class:`StateVectorSimulator`
     Noiseless statevector simulation. Evolves an initial |0...0⟩
     state through every non-measurement gate and records the exact
-    probability distribution (or sampled counts).
+    probability distribution (or sampled results).
 
 :class:`DensityMatrixSimulator`
     Noisy density-matrix simulation. Evolves an initial
@@ -37,7 +37,7 @@ Workflow
    :class:`~qcal.results.Results` object to each circuit.
 
 When ``n_shots=None`` (the default), the exact probability
-distribution is stored rather than sampled counts.
+distribution is stored rather than sampled results.
 """
 from __future__ import annotations
 
@@ -51,7 +51,7 @@ import quax
 
 from qcal.circuit import Circuit, CircuitSet
 from qcal.gates.single_qubit import MCM
-from qcal.simulation.noise_models import NoiseModel
+from qcal.simulation.error_models import ErrorModel
 
 logger = logging.getLogger(__name__)
 
@@ -72,11 +72,20 @@ class Simulator(ABC):
         Args:
             n_shots (int | None, optional): default number of shots per circuit.
                 If ``None``, the exact probability distribution is returned
-                instead of sampled counts. Defaults to ``None``.
+                instead of sampled results. Defaults to ``None``.
         """
         self._n_shots = n_shots
         self._circuits = None
         self._states = None
+
+    @property
+    def circuits(self) -> CircuitSet | None:
+        """Circuits from the last call to run().
+
+        Returns:
+            CircuitSet | None: all circuits from the last run.
+        """
+        return self._circuits
 
     @property
     def n_shots(self) -> int | None:
@@ -88,13 +97,14 @@ class Simulator(ABC):
         return self._n_shots
 
     @property
-    def circuits(self) -> CircuitSet | None:
-        """Circuits from the last call to run().
+    def results(self) -> list[dict] | None:
+        """Results from the last call to run().
 
         Returns:
-            CircuitSet | None: all circuits from the last run.
+            list[dict] | None: one results dict per circuit, or ``None`` if
+                ``run()`` has not been called.
         """
-        return self._circuits
+        return self._results
 
     @property
     def states(self) -> list | None:
@@ -110,7 +120,7 @@ class Simulator(ABC):
     def _simulate(
         self, circuit: Circuit, n_shots: int | None
     ) -> tuple:
-        """Simulate a single circuit and return counts and final state.
+        """Simulate a single circuit and return results and final state.
 
         Args:
             circuit (Circuit): qcal Circuit to simulate.
@@ -118,8 +128,8 @@ class Simulator(ABC):
                 probabilities.
 
         Returns:
-            tuple: (counts dict, state) where counts maps bitstrings
-                to counts (int) or probabilities (float).
+            tuple: (results dict, state) where results maps bitstrings
+                to results (int) or probabilities (float).
         """
 
     def run(
@@ -130,7 +140,7 @@ class Simulator(ABC):
         """Simulate circuits and attach Results to each circuit.
 
         After calling this method, each circuit's ``.results`` attribute holds a
-        Results object with sampled ditstring counts (or exact probabilities
+        Results object with sampled ditstring results (or exact probabilities
         when ``n_shots`` is ``None``).
 
         Args:
@@ -150,10 +160,12 @@ class Simulator(ABC):
                 circuits = [circuits]
             self._circuits = CircuitSet(circuits=circuits)
 
+        self._results = []
         self._states = []
         for circuit in self._circuits:
-            counts, state = self._simulate(circuit, _n_shots)
-            circuit.results = counts
+            results, state = self._simulate(circuit, _n_shots)
+            circuit.results = results
+            self._results.append(results)
             self._states.append(state)
 
 
@@ -185,7 +197,7 @@ class StateVectorSimulator(Simulator):
     def _simulate(
         self, circuit: Circuit, n_shots: int | None
     ) -> tuple:
-        """Simulate a single circuit and return counts and final state.
+        """Simulate a single circuit and return results and final state.
 
         Args:
             circuit (Circuit): qcal Circuit to simulate.
@@ -193,8 +205,8 @@ class StateVectorSimulator(Simulator):
                 exact probabilities.
 
         Returns:
-            tuple: (counts dict, quax.StateVector) where counts maps
-                bitstrings to counts (int) or probabilities (float).
+            tuple: (results dict, quax.StateVector) where results maps
+                bitstrings to results (int) or probabilities (float).
         """
         qudits = sorted(circuit.qudits)
         n_qudits = len(qudits)
@@ -267,7 +279,7 @@ class StateVectorSimulator(Simulator):
         # Normalize to guard against floating-point drift
         probs = np.asarray(quax.probabilities(state), dtype=float)
         probs /= probs.sum()
-        counts: dict = {}
+        results: dict = {}
 
         if n_shots is None:
             # Return the exact probability distribution
@@ -278,8 +290,8 @@ class StateVectorSimulator(Simulator):
                     str((raw // strides[m]) % all_dims[m])
                     for m in meas_idx
                 )
-                counts[bits] = (
-                    counts.get(bits, 0.0) + float(probs[raw])
+                results[bits] = (
+                    results.get(bits, 0.0) + float(probs[raw])
                 )
         else:
             # Sample shot outcomes from the distribution
@@ -291,9 +303,9 @@ class StateVectorSimulator(Simulator):
                     str((int(raw) // strides[m]) % all_dims[m])
                     for m in meas_idx
                 )
-                counts[bits] = counts.get(bits, 0) + 1
+                results[bits] = results.get(bits, 0) + 1
 
-        return counts, state
+        return results, state
 
 
 class DensityMatrixSimulator(Simulator):
@@ -307,12 +319,12 @@ class DensityMatrixSimulator(Simulator):
 
     The *noise_model* may be either:
 
-    * A :class:`~qcal.simulation.noise_models.NoiseModel` instance
-      (e.g. :class:`~qcal.simulation.noise_models.DepolarizingNoise`)
+    * A :class:`~qcal.simulation.error_models.ErrorModel` instance
+      (e.g. :class:`~qcal.simulation.error_models.DepolarizingNoise`)
       that assigns channels by broad gate category
       (``'single_qubit'``, ``'two_qubit'``, etc.)::
 
-          from qcal.simulation.noise_models import DepolarizingNoise
+          from qcal.simulation.error_models import DepolarizingNoise
           noise = DepolarizingNoise(single_qubit=0.001, two_qubit=0.01)
           sim = DensityMatrixSimulator(noise_model=noise)
           sim.run(circuit)
@@ -331,14 +343,14 @@ class DensityMatrixSimulator(Simulator):
 
     def __init__(
         self,
-        noise_model: NoiseModel | dict | None = None,
+        noise_model: ErrorModel | dict | None = None,
         n_shots:     int | None = None,
     ) -> None:
         """Initialize a DensityMatrixSimulator.
 
         Args:
-            noise_model (NoiseModel | dict | None, optional): either a
-                :class:`~qcal.simulation.noise_models.NoiseModel`
+            noise_model (ErrorModel | dict | None, optional): either a
+                :class:`~qcal.simulation.error_models.ErrorModel`
                 instance (category-based) or a ``dict`` mapping
                 gate-class names to ``quax.KrausMap`` / ``quax.SuperOp``
                 channels. The channel is applied immediately after each
@@ -351,12 +363,12 @@ class DensityMatrixSimulator(Simulator):
         self._noise_model = noise_model if noise_model is not None else {}
 
     @property
-    def noise_model(self) -> NoiseModel | dict:
+    def noise_model(self) -> ErrorModel | dict:
         """The active noise model.
 
         Returns:
-            NoiseModel | dict: a
-                :class:`~qcal.simulation.noise_models.NoiseModel`
+            ErrorModel | dict: a
+                :class:`~qcal.simulation.error_models.ErrorModel`
                 instance or a gate-name → channel dict.
         """
         return self._noise_model
@@ -431,7 +443,7 @@ class DensityMatrixSimulator(Simulator):
     def _simulate(
         self, circuit: Circuit, n_shots: int | None
     ) -> tuple:
-        """Simulate a single circuit and return counts and final state.
+        """Simulate a single circuit and return results and final state.
 
         Args:
             circuit (Circuit): qcal Circuit to simulate.
@@ -439,7 +451,7 @@ class DensityMatrixSimulator(Simulator):
                 exact probabilities.
 
         Returns:
-            tuple: (counts dict, quax.DensityMatrix).
+            tuple: (results dict, quax.DensityMatrix).
         """
         qudits = sorted(circuit.qudits)
         n_qudits = len(qudits)
@@ -509,7 +521,7 @@ class DensityMatrixSimulator(Simulator):
                                     f'Q{q}', d,
                                 )
                                 if isinstance(
-                                    self._noise_model, NoiseModel
+                                    self._noise_model, ErrorModel
                                 )
                                 else None
                             )
@@ -550,22 +562,18 @@ class DensityMatrixSimulator(Simulator):
                     U, rho, subsystem
                 )
                 gate_name = type(gate).__name__
-                if isinstance(self._noise_model, NoiseModel):
-                    channel = self._noise_model.channel_for(gate_name)
+                if isinstance(self._noise_model, ErrorModel):
+                    channel = self._noise_model.channel_for_gate(gate)
+                    if channel is None:
+                        channel = self._noise_model.channel_for(
+                            gate_name
+                        )
                 else:
                     channel = self._noise_model.get(gate_name)
                 if channel is not None:
                     rho = self._apply_channel(
                         channel, rho, subsystem
                     )
-                if isinstance(self._noise_model, NoiseModel):
-                    gate_channel = (
-                        self._noise_model.channel_for_gate(gate)
-                    )
-                    if gate_channel is not None:
-                        rho = self._apply_channel(
-                            gate_channel, rho, subsystem
-                        )
 
         if mcm_qudits and n_shots is None:
             raise ValueError(
@@ -594,7 +602,7 @@ class DensityMatrixSimulator(Simulator):
         probs /= probs.sum()
 
         # Classical per-qudit readout smearing for terminal Meas gates
-        if isinstance(self._noise_model, NoiseModel):
+        if isinstance(self._noise_model, ErrorModel):
             for q in sorted(set(meas_qudits)):
                 cmat = self._noise_model.confusion_matrix_for(f'Q{q}')
                 if cmat is None:
@@ -611,7 +619,7 @@ class DensityMatrixSimulator(Simulator):
                         )
                 probs = probs_new / probs_new.sum()
 
-        counts: dict = {}
+        results: dict = {}
 
         if n_shots is None:
             # No MCM gates (guard above ensures this)
@@ -622,8 +630,8 @@ class DensityMatrixSimulator(Simulator):
                     str((raw // strides[qudit_to_idx[q]]) % all_dims[qudit_to_idx[q]])
                     for q in all_meas
                 )
-                counts[bits] = (
-                    counts.get(bits, 0.0) + float(probs[raw])
+                results[bits] = (
+                    results.get(bits, 0.0) + float(probs[raw])
                 )
         else:
             sampled = np.random.choice(
@@ -638,13 +646,13 @@ class DensityMatrixSimulator(Simulator):
                     )
                     for q in all_meas
                 )
-                counts[bits] = counts.get(bits, 0) + 1
+                results[bits] = results.get(bits, 0) + 1
 
             # Populate circuit.mcm_results: one Results entry per cycle
             # with MCM gates, sampled jointly from the pre-instrument
             # joint probability distribution over that cycle's MCM qudits.
             if mcm_gate_records:
-                mcm_counts_list = []
+                mcm_results_list = []
                 for cycle_mcm_qudits, joint_flat in mcm_gate_records:
                     cycle_mcm_dims = tuple(
                         all_dims[qudit_to_idx[q]]
@@ -659,7 +667,7 @@ class DensityMatrixSimulator(Simulator):
                     cycle_outcomes = np.random.choice(
                         len(joint_flat), size=n_shots, p=joint_flat
                     )
-                    gate_counts: dict = {}
+                    gate_results: dict = {}
                     for shot in range(n_shots):
                         raw = int(cycle_outcomes[shot])
                         bits = ''.join(
@@ -669,11 +677,11 @@ class DensityMatrixSimulator(Simulator):
                             )
                             for k in range(len(cycle_mcm_qudits))
                         )
-                        gate_counts[bits] = (
-                            gate_counts.get(bits, 0) + 1
+                        gate_results[bits] = (
+                            gate_results.get(bits, 0) + 1
                         )
-                    mcm_counts_list.append(gate_counts)
+                    mcm_results_list.append(gate_results)
                 circuit._mcm_results = []
-                circuit.mcm_results = mcm_counts_list
+                circuit.mcm_results = mcm_results_list
 
-        return counts, rho
+        return results, rho

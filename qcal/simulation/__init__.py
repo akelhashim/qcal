@@ -1,11 +1,11 @@
-from .noise_models import (
+from .error_models import (
     AmplitudeDamping,
     BitFlipNoise,
-    CustomNoiseModel,
+    CustomErrorModel,
     DephasingNoise,
     DepolarizingNoise,
+    ErrorModel,
     LeakageNoise,
-    NoiseModel,
     PhaseFlipNoise,
     RelaxationParams,
     SeepageNoise,
@@ -14,6 +14,7 @@ from .noise_models import (
     TWO_QUBIT_NAMES,
     SINGLE_QUTRIT_NAMES,
     TWO_QUTRIT_NAMES,
+    UnitaryError,
     gate_category,
 )
 from .simulators import (

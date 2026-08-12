@@ -10,12 +10,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Breaking
 
 - Added rigetti-quax as a dependency
-- Rename qcal.gate module to qcal.gates
+- Rename `qcal.gate module` to `qcal.gates`
+- Rename `Examples` to `examples` and `Tutorials` to `tutorials`
 
 ### Added
 
-- StateVectorSimulator for simulating ideal circuit outputs.
+- `StateVectorSimulator` for simulating ideal circuit outputs
+- `DensityMatrixSimulator` for simulating noisy circuits
+- Error models module for building error models for simulation
 - Single- and two-qutrit gates
+- Emulator backend for emulating experiments
+- Simulation and Emulation example notebooks
 
 ### Changed
 
@@ -26,6 +31,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Removed
 
 ### Fixed
+
+- `circuit.draw()` didn't correctly draw qudit gates
 
 ### Security
 
@@ -226,7 +233,7 @@ jupyter notebooks).
 - save_raw_data will save all classified reads in circuits dataframe for qubic
 post-processing
 - Save GST results object as a pkl file
-- Examples: config and Tutorials
+- examples: config and tutorials
 
 ### Changed
 
