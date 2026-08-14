@@ -776,7 +776,7 @@ class PyQuilTranspiler(Transpiler):
 
         self._cycle_replacement = cycle_replacement
         self._circuit_for_loop = circuit_for_loop
-        self._cycle_to_defcircuits = cycles_to_defcircuits
+        self._cycles_to_defcircuits = cycles_to_defcircuits
         self._fence_between_cycles = fence_between_cycles
         self._randomly_compile = randomly_compile
         self._rc_kwargs = rc_kwargs if rc_kwargs is not None else {
@@ -810,7 +810,7 @@ class PyQuilTranspiler(Transpiler):
                     gate_mapper=self._gate_mapper,
                     cycle_replacement=self._cycle_replacement,
                     circuit_for_loop=self._circuit_for_loop,
-                    cycles_to_defcircuits=self._cycle_to_defcircuits,
+                    cycles_to_defcircuits=self._cycles_to_defcircuits,
                     fence_between_cycles=self._fence_between_cycles,
                     randomly_compile=self._randomly_compile,
                     rc_kwargs=self._rc_kwargs,
