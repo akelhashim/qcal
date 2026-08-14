@@ -76,10 +76,16 @@ from qcal.gate.single_qubit import (
 )
 
 
-def _zxzxz_angles(U: NDArray) -> tuple[float, float, float]:
+def unitary_to_zxzxz(U: NDArray) -> tuple[float, float, float]:
     """Return (a, b, c) for [Rz(a), X90, Rz(b), X90, Rz(c)] in order.
 
     The effective unitary is Rz(c)·X90·Rz(b)·X90·Rz(a) = U up to global phase.
+
+    Args:
+        U (NDArray): 2x2 unitary matrix.
+
+    Returns:
+        tuple[float, float, float]: angles (a, b, c) in radians
     """
     # Cast to complex so sqrt(-1) works for real matrices like X, H, Z
     d = complex(np.linalg.det(U))
@@ -100,8 +106,14 @@ def _zxzxz_angles(U: NDArray) -> tuple[float, float, float]:
 
 def _decomp(matrix: NDArray):
     """Return f(qubit) -> [Rz(a), X90, Rz(b), X90, Rz(c)] for the given unitary.
+
+    Args:
+        matrix (NDArray): 2x2 unitary matrix.
+
+    Returns:
+        callable: f(qubit) -> list of 5 gates implementing the unitary.
     """
-    a, b, c = _zxzxz_angles(matrix)
+    a, b, c = unitary_to_zxzxz(matrix)
 
     def _factory(qubit: int) -> list:
         return [
@@ -220,4 +232,4 @@ ZXZXZ_DECOMPOSITIONS.update({
     Z90:     ZXZXZ_DECOMPOSITIONS['Z90'],
 })
 
-__all__ = ('ZXZXZ_DECOMPOSITIONS',)
+__all__ = ('ZXZXZ_DECOMPOSITIONS', 'unitary_to_zxzxz')
