@@ -910,6 +910,7 @@ def to_qubic(
         pulses:             defaultdict,
         hardware_vz_qubits: List[str] = [],  # noqa: B006
         circuit_for_loop:   bool = False,
+        cycle_barriers:     bool = True,
     ) -> List:
     """Compile a qcal circuit to a qubic circuit.
 
@@ -926,6 +927,14 @@ def to_qubic(
             'Q3']```.
         circuit_for_loop (bool, optional): loops over circuit partitions for
             circuits with repeated structures. Defaults to False.
+        cycle_barriers (bool, optional): insert a global barrier before
+            every cycle. Defaults to True (historical behavior). When
+            False, only explicit Barrier objects in the circuit
+            synchronize qubits, so each qubit's timeline runs
+            independently (e.g. desynchronized delays followed by
+            immediate per-qubit readout). Per-qubit ordering is still
+            guaranteed by the scoped barriers emitted by add_measurement
+            and multi-qubit gates.
 
     Returns:
         List: transpiled qubic circuit.
@@ -1083,11 +1092,12 @@ def to_qubic(
         for cycle in circuit.cycles:
 
             if not cycle.is_barrier:
-                qubic_circuit.append(
-                    {'name': 'barrier',
-                    #  'qubit': [f'Q{q}' for q in circuit.qubits]
-                    }
-                )
+                if cycle_barriers:
+                    qubic_circuit.append(
+                        {'name': 'barrier',
+                        #  'qubit': [f'Q{q}' for q in circuit.qubits]
+                        }
+                    )
                 for gate in cycle:
 
                     name = gate.name
@@ -1127,6 +1137,7 @@ class Transpiler:
             hardware_vz_qubits: List[str] = [],  # noqa: B006
             circuit_for_loop:   bool = False,
             reload_pulse:       bool = True,
+            cycle_barriers:     bool = True,
         ) -> None:
         """Initialize with a qcal Config object.
 
@@ -1178,6 +1189,7 @@ class Transpiler:
         self._hardware_vz_qubits = hardware_vz_qubits
         self._circuit_for_loop = circuit_for_loop
         self._reload_pulse = reload_pulse
+        self._cycle_barriers = cycle_barriers
         self._pulses = defaultdict(lambda: False, {})
 
     @property
@@ -1232,7 +1244,8 @@ class Transpiler:
                     gate_mapper=self._gate_mapper,
                     pulses=self._pulses,
                     hardware_vz_qubits=self._hardware_vz_qubits,
-                    circuit_for_loop=self._circuit_for_loop
+                    circuit_for_loop=self._circuit_for_loop,
+                    cycle_barriers=self._cycle_barriers
                 )
             )
 
