@@ -998,11 +998,12 @@ def to_qubic(
             if n_reps == 1:
                 for cycle in sub_circuit:
                     if not cycle.is_barrier:
-                        qubic_circuit.append(
-                            {'name': 'barrier',
-                            #  'qubit': [f'Q{q}' for q in circuit.qubits]
-                            }
-                        )
+                        if cycle_barriers:
+                            qubic_circuit.append(
+                                {'name': 'barrier',
+                                #  'qubit': [f'Q{q}' for q in circuit.qubits]
+                                }
+                            )
                         for gate in cycle:
                             name = gate.name
                             if 'phase' in gate.properties['params'].keys():
@@ -1037,11 +1038,12 @@ def to_qubic(
                 loop_circuit = []
                 for cycle in sub_circuit:
                     if not cycle.is_barrier:
-                        loop_circuit.append(
-                            {'name': 'barrier',
-                             'qubit': [f'Q{q}' for q in circuit.qubits]
-                            }
-                        )
+                        if cycle_barriers:
+                            loop_circuit.append(
+                                {'name': 'barrier',
+                                 'qubit': [f'Q{q}' for q in circuit.qubits]
+                                }
+                            )
                         for gate in cycle:
                             name = gate.name
                             if 'phase' in gate.properties['params'].keys():
