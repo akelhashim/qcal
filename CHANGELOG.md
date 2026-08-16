@@ -33,6 +33,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - `circuit.draw()` didn't correctly draw qudit gates
+- `plot_mock_sequence` not handling qudits correctly
 
 ### Security
 

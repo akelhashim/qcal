@@ -23,12 +23,12 @@ logger = logging.getLogger(__name__)
 
 
 def plot_pulse(
-        config:          Config,
-        pulse_duration:  float,
-        pulse_envelope:  NDArray[np.complex64],
-        pulse_qubit:     int | None = None,
-        neighbor_qubits: List[int] | None = None
-    ) -> None:
+    config:          Config,
+    pulse_duration:  float,
+    pulse_envelope:  NDArray[np.complex64],
+    pulse_qubit:     int | None = None,
+    neighbor_qubits: List[int] | None = None
+) -> None:
     """Plot the time and frequency domain of a pulse.
 
     The frequency domain gives the spectral amplitude of the Fourier spectra of
@@ -208,11 +208,11 @@ def plot_pulse(
 
 
 def plot_mock_sequence(
-        circuit:                Circuit,
-        single_qubit_gate_time: float = 20 * ns,
-        two_qubit_gate_time:    float = 100 * ns,
-        measurement_time:       float = 1 * us,
-    ) -> None:
+    circuit:                Circuit,
+    single_qubit_gate_time: float = 20 * ns,
+    two_qubit_gate_time:    float = 100 * ns,
+    measurement_time:       float = 1 * us,
+) -> None:
     """Plot a mock pulse sequence for a qcal Circuit.
 
     Each gate in each cycle is rendered as a pulse envelope on a per-qubit
@@ -233,16 +233,16 @@ def plot_mock_sequence(
     pio.templates.default = 'plotly'
 
     SAMPLE_RATE = 8e9
-    QUBIT_COLORS = [
+    QUDIT_COLORS = [
         'steelblue', 'firebrick', 'seagreen', 'darkorange', 'mediumpurple',
         'saddlebrown', 'deeppink', 'teal', 'goldenrod', 'slategray',
     ]
 
-    all_qubits = sorted(circuit.qubits)
-    n_qubits = len(all_qubits)
-    qubit_row   = {q: i + 1 for i, q in enumerate(all_qubits)}
-    qubit_color = {
-        q: QUBIT_COLORS[i % len(QUBIT_COLORS)] for i, q in enumerate(all_qubits)
+    all_qudits = sorted(circuit.qudits)
+    n_qubits = len(all_qudits)
+    qudit_row   = {q: i + 1 for i, q in enumerate(all_qudits)}
+    qudit_color = {
+        q: QUDIT_COLORS[i % len(QUDIT_COLORS)] for i, q in enumerate(all_qudits)
     }
 
     vertical_spacing = min(0.08, 0.6 / max(1, n_qubits - 1))
@@ -250,7 +250,7 @@ def plot_mock_sequence(
         rows=n_qubits, cols=1,
         shared_xaxes=True,
         vertical_spacing=vertical_spacing,
-        subplot_titles=[f'Q{q}' for q in all_qubits],
+        subplot_titles=[f'Q{q}' for q in all_qudits],
     )
 
     t_current = 0.0
@@ -263,17 +263,17 @@ def plot_mock_sequence(
 
         for gate in cycle.gates:
             name = gate.properties['name']
-            gate_qubits = gate.qubits
+            gate_qudits = gate.qudits
 
             if gate.is_measurement:
                 duration = measurement_time
                 envelope_fn = square
                 amp = 1.0
-            elif gate.is_multi_qubit:
+            elif gate.is_multi_qudit:
                 duration = two_qubit_gate_time
                 envelope_fn = cosine_square
                 amp = 1.0
-            elif gate.is_single_qubit:
+            elif gate.is_single_qudit:
                 if name in ('Rz', 'S', 'Sdag', 'VirtualZ', 'Z', 'Z90'):
                     duration = 0.0
                 elif name == 'Idle':
@@ -294,10 +294,10 @@ def plot_mock_sequence(
 
             envelope = envelope_fn(duration, SAMPLE_RATE, amp=amp)
             t = np.linspace(t_current, t_current + duration, len(envelope))
-            label = f"{name}({', '.join(str(q) for q in gate_qubits)})"
+            label = f"{name}({', '.join(str(q) for q in gate_qudits)})"
 
-            for q in gate_qubits:
-                if q not in qubit_row:
+            for q in gate_qudits:
+                if q not in qudit_row:
                     continue
                 fig.add_trace(
                     go.Scatter(
@@ -305,7 +305,7 @@ def plot_mock_sequence(
                         y=np.real(envelope),
                         mode='lines',
                         name=label,
-                        line={'color': qubit_color[q], 'width': 2},
+                        line={'color': qudit_color[q], 'width': 2},
                         showlegend=False,
                         hovertemplate=(
                             f'{label}<br>'
@@ -313,7 +313,7 @@ def plot_mock_sequence(
                             'Amplitude: %{y:.3f}<extra></extra>'
                         ),
                     ),
-                    row=qubit_row[q], col=1,
+                    row=qudit_row[q], col=1,
                 )
 
         t_current += cycle_duration
