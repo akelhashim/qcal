@@ -11,6 +11,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `barrier_between_cycles` flag on the QubiC transpilation path
+  (`to_qubic()`, `Transpiler`, `QubicQPU`). Defaults to True (unchanged
+  behavior). When False, no automatic barriers are inserted between
+  cycles: only explicit Barrier objects synchronize qubits, enabling
+  desynchronized per-qubit execution (e.g. concurrent measurements with
+  per-qubit randomized delays)
+
 ### Changed
 
 ### Deprecated

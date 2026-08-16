@@ -50,7 +50,7 @@ class QubicQPU(QPU):
                 circuit_for_loop:    bool = False,
                 raster_circuits:     bool = False,
                 reload_pulse:        bool = True,
-                cycle_barriers:      bool = True,
+                barrier_between_cycles: bool = True,
                 reload_cmd:          bool = True,
                 reload_freq:         bool = True,
                 reload_env:          bool = True,
@@ -109,12 +109,12 @@ class QubicQPU(QPU):
                 effects of drift on the timescale of a measurement.
             reload_pulse (bool): reloads the stored pulses when compiling each
                 circuit. Defaults to True.
-            cycle_barriers (bool, optional): insert a global barrier before
-                every circuit cycle during QubiC transpilation. Defaults
-                to True (historical behavior). Set False for
-                desynchronized execution: only explicit Barrier objects
-                synchronize qubits, so each qubit's readout fires right
-                after its own gates or delays.
+            barrier_between_cycles (bool, optional): insert a global
+                barrier before every circuit cycle during QubiC
+                transpilation. Defaults to True (historical behavior).
+                Set False for desynchronized execution: only explicit
+                Barrier objects synchronize qubits, so each qubit's
+                readout fires right after its own gates or delays.
             reload_cmd (bool, optional): reload pulse command buffer for each
                 batched circuit. Defaults to True.
             reload_freq (bool, optional): reload pulse frequencies when loading
@@ -180,7 +180,7 @@ class QubicQPU(QPU):
             hardware_vz_qubits=hardware_vz_qubits,
             circuit_for_loop=circuit_for_loop,
             reload_pulse=reload_pulse,
-            cycle_barriers=cycle_barriers
+            barrier_between_cycles=barrier_between_cycles
         )
         self._fpga_config = FPGAConfig(jump_cond_clks=6)
         self._channel_config = load_channel_configs(
