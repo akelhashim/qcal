@@ -312,12 +312,16 @@ class Cycle:
         Returns:
             NDArray: tensor-product unitary of all gates in the cycle.
         """
+        if not self.gates:
+            return np.eye(2 ** self.n_qubits)
+
         for gate in self.gates:
             if gate.unitary is None:
                 raise ValueError(
                     f"Gate '{gate.name}' on qubits {gate.qubits} is "
                     "non-unitary."
                 )
+
         return reduce(np.kron, [gate.unitary for gate in self.gates])
 
     def append(self, gate_or_gates: Gate | Iterable[Gate]) -> None:
@@ -644,6 +648,9 @@ class Circuit:
             NDArray: unitary matrix of the full circuit.
         """
         cycles = [c for c in self._cycles if not c.is_barrier]
+        if not cycles:
+            return np.eye(2 ** self.n_qubits)
+
         return reduce(np.matmul, [cycle.unitary for cycle in cycles])
 
     @mcm_results.setter
