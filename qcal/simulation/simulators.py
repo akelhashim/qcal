@@ -146,10 +146,9 @@ class Simulator(ABC):
         Args:
             circuits (Circuit | CircuitSet | List[Circuit]): circuit(s)
                 to simulate.
-            n_shots (int | None, optional): shots per circuit.
-                ``None`` returns exact probabilities. Overrides
-                the instance default when given. Defaults to
-                ``None``.
+            n_shots (int | None, optional): shots per circuit. ``None`` returns
+                exact probabilities. Overrides the instance default when given.
+                Defaults to ``None``.
         """
         _n_shots = n_shots if n_shots is not None else self._n_shots
 
@@ -177,6 +176,31 @@ class StateVectorSimulator(Simulator):
     sampled from the resulting probability distribution.
 
     Basic example usage::
+
+            sim = StateVectorSimulator()
+            sim.run(circuit)
+            print(circuit.results)
+
+    To simulate non-ideal evolution, overwrite a gate's
+    ``.unitary`` attribute with a custom matrix before calling
+    :meth:`run`. The simulator reads each gate's unitary at
+    simulation time, so any replacement is used as-is::
+
+        import numpy as np
+        from qcal.circuit import Circuit, Cycle
+        from qcal.gates.single_qubit import X
+
+        # Build a circuit with an X gate on qubit 0
+        gate = X(0)
+
+        # Replace with a slightly over-rotated unitary
+        theta = np.pi + 0.1          # pi-pulse with 0.1 rad error
+        gate.unitary = np.array([
+            [np.cos(theta / 2), -1j * np.sin(theta / 2)],
+            [-1j * np.sin(theta / 2),  np.cos(theta / 2)],
+        ])
+
+        circuit = Circuit([Cycle({gate})])
 
         sim = StateVectorSimulator()
         sim.run(circuit)
@@ -339,6 +363,15 @@ class DensityMatrixSimulator(Simulator):
           }
           sim = DensityMatrixSimulator(noise_model=noise_model)
           sim.run(circuit)
+
+    Mid-circuit measurement (MCM) note:
+        MCM outcomes (``circuit.mcm_results``) and terminal outcomes
+        (``circuit.results``) are each sampled from their correct
+        marginal distributions, but the two samplings are independent.
+        Shot-by-shot cross-correlations — e.g. the joint distribution
+        P(terminal=0 | MCM=1) — are not preserved. A per-shot
+        conditional (quantum-trajectory) simulation is required to
+        capture that correlation.
     """
 
     def __init__(
@@ -540,8 +573,14 @@ class DensityMatrixSimulator(Simulator):
                                 )
                             )
                             mcm_qudits.add(q)
-                            # Unconditional post-MCM state: sum over
-                            # the outcome axis of rho_outs.matrix
+                            # NOTE: Unconditional post-MCM state: average
+                            # over all measurement outcomes. This gives
+                            # the correct marginal state for subsequent
+                            # gates, but discards conditioning on the
+                            # specific MCM outcome, so MCM outcomes and
+                            # terminal outcomes are sampled from
+                            # independent marginals rather than a joint
+                            # distribution. See class docstring.
                             rho = quax.DensityMatrix.from_matrix(
                                 jnp.sum(rho_outs.matrix, axis=0),
                                 all_dims,
@@ -651,6 +690,10 @@ class DensityMatrixSimulator(Simulator):
             # Populate circuit.mcm_results: one Results entry per cycle
             # with MCM gates, sampled jointly from the pre-instrument
             # joint probability distribution over that cycle's MCM qudits.
+            # Note: these samples are drawn independently of the terminal
+            # measurement samples above, so shot index i in mcm_results
+            # does not correspond to the same trajectory as results[i].
+            # See class docstring for details.
             if mcm_gate_records:
                 mcm_results_list = []
                 for cycle_mcm_qudits, joint_flat in mcm_gate_records:
