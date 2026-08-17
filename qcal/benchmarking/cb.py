@@ -191,12 +191,13 @@ def _is_sub_pauli(q: PauliString, p: PauliString) -> bool:
 
 
 def CB(
-    qpu:              QPU,
-    config:           Config,
-    cycle_or_circuit: Cycle | Circuit,
-    circuit_depths:   Iterable[int],
-    n_decays:         int = 20,
-    n_randomizations: int = 30,
+    qpu:                QPU,
+    config:             Config,
+    cycle_or_circuit:   Cycle | Circuit,
+    circuit_depths:     Iterable[int],
+    n_decays:           int = 20,
+    n_randomizations:   int = 30,
+    decompose_to_zxzxz: bool = False,
     **kwargs,
 ) -> Callable:
     """Cycle Benchmarking (CB) without mirror inversion.
@@ -243,6 +244,9 @@ def CB(
             fidelity estimate.
         n_randomizations (int): number of random Pauli twirl instances per
             (Pauli, depth) pair. Defaults to 30.
+        decompose_to_zxzxz (bool): whether to decompose all single-qubit gates
+            to ZXZXZ decomposition. Defaults to False. Setting to True can be
+            useful when implementing CB using hardware-efficient randomization.
 
     Returns:
         Callable: CB class instance.
@@ -253,17 +257,19 @@ def CB(
 
         def __init__(
             self,
-            config:           Config,
-            cycle_or_circuit: Cycle | Circuit,
-            circuit_depths:   Iterable[int],
-            n_decays:         int = 20,
-            n_randomizations: int = 30,
+            config:             Config,
+            cycle_or_circuit:   Cycle | Circuit,
+            circuit_depths:     Iterable[int],
+            n_decays:           int = 20,
+            n_randomizations:   int = 30,
+            decompose_to_zxzxz: bool = False,
             **kwargs,
         ) -> None:
             self._cycle_or_circuit = cycle_or_circuit
             self._circuit_depths = sorted(circuit_depths)
             self._n_decays = n_decays
             self._n_randomizations = n_randomizations
+            self._decompose_to_zxzxz = decompose_to_zxzxz
             self._qubits = (
                 cycle_or_circuit.qubits
                 if isinstance(cycle_or_circuit, Cycle)
@@ -287,7 +293,7 @@ def CB(
             For each (Pauli, depth, randomization) triple the circuit is:
 
               prepare(P) | twirl | barrier | [cycle_or_circuit | twirl
-                        | barrier]^d | measure(P)
+                         | barrier]^d | measure(P)
 
             CircuitSet metadata columns:
               'pauli'          — joined Pauli string, e.g. 'XZI'
@@ -330,13 +336,16 @@ def CB(
                                 self._qubits, n_random_paulis=depth + 1
                             )
                             sign = _propagate_sign(
-                                pauli, twirl_strings,
+                                pauli,
+                                twirl_strings,
                                 self._cycle_or_circuit.unitary,
-                                depth,
+                                depth
                             )
 
                             all_cycles: list[Cycle] = []
 
+                            # if self._decompose_to_zxzxz:
+                                
                             leading = _pauli_to_cycle(
                                 twirl_strings[0], self._qubits
                             )
