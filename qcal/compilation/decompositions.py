@@ -166,6 +166,7 @@ ZXZXZ_DECOMPOSITIONS: dict[str | type, callable] = {
         rn(-2 * np.pi / 3, np.array([-1., 1., 1.]) / np.sqrt(3))
     ),
     'H':       _decomp(h),
+    'I':       _decomp(np.eye(2)),
     'Id':      _decomp(np.eye(2)),
     'S':       _decomp(rz(np.pi / 2)),
     'Sdag':    _decomp(rz(-np.pi / 2)),
