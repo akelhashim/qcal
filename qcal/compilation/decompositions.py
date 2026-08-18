@@ -15,9 +15,12 @@ U' satisfy:
 
 from which a, b, c are extracted directly.
 """
+from functools import lru_cache
+
 import numpy as np
 from numpy.typing import NDArray
 
+from qcal.circuit import Circuit, Cycle
 from qcal.gate.single_qubit import (
     SX,
     SY,
@@ -75,6 +78,12 @@ from qcal.gate.single_qubit import (
     z,
 )
 
+__all__ = (
+    'ZXZXZ_DECOMPOSITIONS', 'unitary_to_zxzxz', 'pauli_to_cycle'
+)
+
+PauliString = tuple[str, ...]
+
 
 def unitary_to_zxzxz(U: NDArray) -> tuple[float, float, float]:
     """Return (a, b, c) for [Rz(a), X90, Rz(b), X90, Rz(c)] in order.
@@ -121,6 +130,28 @@ def _decomp(matrix: NDArray):
         ]
 
     return _factory
+
+
+@lru_cache(maxsize=None)
+def decompose_to_zxzxz(label: str, qubit: int) -> tuple:
+    """Return the cached ZXZXZ gate decomposition for one (label, qubit).
+
+    Cache domain is naturally bounded: at most len(ZXZXZ_DECOMPOSITIONS)
+    distinct labels times the number of qubits on the device, so every
+    reachable (label, qubit) pair can be cached without unbounded
+    growth. This turns per-qubit gate construction (Rz/X90 matrix
+    building, Gate hashing, etc.) into a one-time cost per pair,
+    regardless of how many callers or circuits request it.
+
+    Args:
+        label (str): single-qubit gate label, e.g. 'X' or 'Cliff5'.
+        qubit (int): qubit label.
+
+    Returns:
+        tuple: the 5-gate [Rz, X90, Rz, X90, Rz] decomposition, in
+            application order.
+    """
+    return tuple(ZXZXZ_DECOMPOSITIONS[label](qubit))
 
 
 ZXZXZ_DECOMPOSITIONS: dict[str | type, callable] = {
@@ -233,4 +264,67 @@ ZXZXZ_DECOMPOSITIONS.update({
     Z90:     ZXZXZ_DECOMPOSITIONS['Z90'],
 })
 
-__all__ = ('ZXZXZ_DECOMPOSITIONS', 'unitary_to_zxzxz')
+
+# Local alias so `pauli_to_cycle`'s `decompose_to_zxzxz` parameter can
+# shadow the module-level function name without losing the reference.
+_zxzxz_gates = decompose_to_zxzxz
+
+
+@lru_cache(maxsize=1024)
+def pauli_to_cycle(
+        pauli: PauliString, qubits: tuple, decompose_to_zxzxz: bool = False
+) -> Circuit:
+    """Convert a PauliString to a Cycle (or subcircuit) of Pauli gates.
+
+    Cached (bounded): the number of distinct n-qubit Pauli strings is 4^n,
+    so for small n (few-qubit benchmarked cycles) the same twirl/prep
+    pattern recurs often across randomizations/depths and caching avoids
+    rebuilding it; for large n the cache simply stays capped at `maxsize`
+    (a fixed, bounded footprint) rather than growing without bound. The
+    returned Circuit is shared across cache hits rather than copied: callers
+    only ever `.extend()` it (never mutate its cycles in place).
+
+    Args:
+        pauli (PauliString): tuple of single-qubit Pauli labels,
+            e.g. ('X', 'Z', 'I').
+        qubits (tuple): qubit labels corresponding to each position in
+            pauli.
+        decompose_to_zxzxz (bool): whether to decompose all single-qubit gates
+            to ZXZXZ decomposition. Defaults to False. Setting to True can be
+            useful when implementing CB using hardware-efficient randomization.
+
+    Returns:
+        Circuit: a Circuit containing a Cycle of I/X/Y/Z gate for each
+            non-identity entry of pauli, or a Circuit containing the ZXZXZ
+            decomposition of each Pauli gate.
+    """
+    circuit = Circuit()
+    if decompose_to_zxzxz:
+        # Each qubit's decomposition is the same fixed-length [Rz, X90, Rz,
+        # X90, Rz] sequence, so transposing across qubits and appending one
+        # shared Cycle per step gives the same result as `.join()`-ing each
+        # qubit's sub-circuit in one at a time, without `.join()`'s
+        # per-call rebuild of every existing Cycle.
+        gate_lists = [
+            _zxzxz_gates(p, q)
+            for p, q in zip(pauli, qubits, strict=True)
+        ]
+        for gates_at_step in zip(*gate_lists, strict=True):
+            circuit.append(Cycle(gates_at_step))
+
+    else:
+        cycle = Cycle()
+        for p, q in zip(pauli, qubits, strict=True):
+            match p:
+                case 'I':
+                    cycle.append(Id(q))
+                case 'X':
+                    cycle.append(X(q))
+                case 'Y':
+                    cycle.append(Y(q))
+                case 'Z':
+                    cycle.append(Z(q))
+
+        circuit.append(cycle)
+
+    return circuit
