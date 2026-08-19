@@ -146,14 +146,13 @@ def _qutrit_bit_flip_channel(
 ) -> quax.KrausMap:
     """Build a single-qutrit bit-flip KrausMap.
 
-    Applies X₀₁ (|0⟩↔|1⟩) with rate γ_ge and X₁₂ (|1⟩↔|2⟩) with
-    rate γ_ef. Kraus operators are:
+    Composes independent GE and EF bit-flip channels so each rate is
+    unconstrained. Kraus operators (GE channel applied first):
 
-        K₀ = √(1−γ_ge−γ_ef) I₃
-        K₁ = √γ_ge  X₀₁
-        K₂ = √γ_ef  X₁₂
-
-    Requires γ_ge + γ_ef ≤ 1.
+        K₀₀ = √(1−γ_ge)·√(1−γ_ef) I₃
+        K₀₁ = √γ_ge·√(1−γ_ef)      X₀₁
+        K₁₀ = √(1−γ_ge)·√γ_ef      X₁₂
+        K₁₁ = √(γ_ge·γ_ef)          X₁₂·X₀₁
 
     Args:
         gamma_ge (float): GE bit-flip rate (0 ≤ γ ≤ 1).
@@ -162,12 +161,14 @@ def _qutrit_bit_flip_channel(
     Returns:
         quax.KrausMap: single-qutrit bit-flip channel.
     """
-    k0 = np.sqrt(1.0 - gamma_ge - gamma_ef) * np.eye(3, dtype=complex)
-    k1 = np.array([[0, 1, 0], [1, 0, 0], [0, 0, 1]], dtype=complex)  # X01
-    k2 = np.array([[1, 0, 0], [0, 0, 1], [0, 1, 0]], dtype=complex)  # X12
-    k1 *= np.sqrt(gamma_ge)
-    k2 *= np.sqrt(gamma_ef)
-    matrix = jnp.array(np.stack([k0, k1, k2]))
+    x01 = np.array([[0, 1, 0], [1, 0, 0], [0, 0, 1]], dtype=complex)
+    x12 = np.array([[1, 0, 0], [0, 0, 1], [0, 1, 0]], dtype=complex)
+    eye = np.eye(3, dtype=complex)
+    k00 = np.sqrt((1.0 - gamma_ge) * (1.0 - gamma_ef)) * eye
+    k01 = np.sqrt(gamma_ge * (1.0 - gamma_ef)) * x01
+    k10 = np.sqrt((1.0 - gamma_ge) * gamma_ef) * x12
+    k11 = np.sqrt(gamma_ge * gamma_ef) * (x12 @ x01)
+    matrix = jnp.array(np.stack([k00, k01, k10, k11]))
     return quax.KrausMap.from_matrix(matrix, dims=((3,), (3,)))
 
 
@@ -176,14 +177,13 @@ def _qutrit_phase_flip_channel(
 ) -> quax.KrausMap:
     """Build a single-qutrit phase-flip KrausMap.
 
-    Applies Z₀₁ = diag(1,−1,1) with rate γ_ge and
-    Z₁₂ = diag(1,1,−1) with rate γ_ef. Kraus operators are:
+    Composes independent GE and EF phase-flip channels so each rate is
+    unconstrained. Kraus operators (GE channel applied first):
 
-        K₀ = √(1−γ_ge−γ_ef) I₃
-        K₁ = √γ_ge  Z₀₁
-        K₂ = √γ_ef  Z₁₂
-
-    Requires γ_ge + γ_ef ≤ 1.
+        K₀₀ = √(1−γ_ge)·√(1−γ_ef) I₃
+        K₀₁ = √γ_ge·√(1−γ_ef)      Z₀₁
+        K₁₀ = √(1−γ_ge)·√γ_ef      Z₁₂
+        K₁₁ = √(γ_ge·γ_ef)          Z₁₂·Z₀₁
 
     Args:
         gamma_ge (float): GE phase-flip rate (0 ≤ γ ≤ 1).
@@ -192,12 +192,14 @@ def _qutrit_phase_flip_channel(
     Returns:
         quax.KrausMap: single-qutrit phase-flip channel.
     """
-    k0 = np.sqrt(1.0 - gamma_ge - gamma_ef) * np.eye(3, dtype=complex)
-    k1 = np.diag([1.0, -1.0, 1.0]).astype(complex)   # Z01
-    k2 = np.diag([1.0, 1.0, -1.0]).astype(complex)   # Z12
-    k1 *= np.sqrt(gamma_ge)
-    k2 *= np.sqrt(gamma_ef)
-    matrix = jnp.array(np.stack([k0, k1, k2]))
+    z01 = np.diag([1.0, -1.0, 1.0]).astype(complex)
+    z12 = np.diag([1.0, 1.0, -1.0]).astype(complex)
+    eye = np.eye(3, dtype=complex)
+    k00 = np.sqrt((1.0 - gamma_ge) * (1.0 - gamma_ef)) * eye
+    k01 = np.sqrt(gamma_ge * (1.0 - gamma_ef)) * z01
+    k10 = np.sqrt((1.0 - gamma_ge) * gamma_ef) * z12
+    k11 = np.sqrt(gamma_ge * gamma_ef) * (z12 @ z01)
+    matrix = jnp.array(np.stack([k00, k01, k10, k11]))
     return quax.KrausMap.from_matrix(matrix, dims=((3,), (3,)))
 
 
