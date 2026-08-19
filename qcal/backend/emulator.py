@@ -44,10 +44,10 @@ logger = logging.getLogger(__name__)
 
 __all__ = ('Emulator',)
 
-# Path to the bundled example config shipped with the repository.
+# Path to the example config shipped with the repository
 _EXAMPLE_CONFIG = (
     pathlib.Path(__file__).parent.parent.parent
-    / 'Examples' / 'config' / 'config.yaml'
+    / 'examples' / 'config' / 'config.yaml'
 )
 
 
