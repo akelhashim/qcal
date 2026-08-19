@@ -26,10 +26,11 @@ from qcal.benchmarking.utils import (
     generate_random_n_qubit_paulis,
 )
 from qcal.circuit import Barrier, Circuit, CircuitSet, Cycle
-from qcal.compilation.decompositions import ZXZXZ_DECOMPOSITIONS
+from qcal.compilation.decompositions import pauli_to_cycle
+from qcal.compilation.pauli_conjugation import conjugate_pauli
+from qcal.compilation.utils import composes_to_identity
 from qcal.config import Config
 from qcal.fitting.fit import FitExponential
-from qcal.gate.single_qubit import SINGLE_QUBIT_PAULIS, Id, X, Y, Z
 from qcal.math.utils import round_to_order_error
 from qcal.qpu.qpu import QPU
 from qcal.settings import Settings
@@ -38,196 +39,6 @@ logger = logging.getLogger(__name__)
 
 
 __all__ = ['CB', 'CB1', 'SC']
-
-
-def _composes_to_identity(
-    cycle_or_circuit: Cycle | Circuit, depth: int
-) -> bool:
-    """Check whether cycle_or_circuit^depth ≈ I (up to global phase).
-
-    Strategy: use np.linalg.matrix_power to raise the unitary matrix of the
-    cycle_or_circuit to the specified depth. A matrix is proportional to
-    identity iff M/M[0,0] ≈ I when M[0,0] ≠ 0, or equivalently
-    |tr(M^d)|^2 == dim^2.
-
-    Args:
-        cycle_or_circuit (Cycle | Circuit): the cycle or circuit to check.
-        depth (int): the number of times to compose cycle_or_circuit.
-
-    Returns:
-        bool: True if cycle_or_circuit^depth is identity (up to global
-            phase), False otherwise.
-    """
-    M = cycle_or_circuit.unitary
-    dim = M.shape[0]
-    Md = np.linalg.matrix_power(M, depth)
-    # Remove global phase via the first non-zero diagonal element
-    diag = np.diag(Md)
-    pivot = next(v for v in diag if abs(v) > 1e-10)
-    phase = pivot / abs(pivot)
-    if np.allclose(Md / phase, np.eye(dim), atol=1e-6):
-        return True
-    else:
-        return False
-        # assert np.allclose(Md / phase, np.eye(dim), atol=1e-6), (
-        #     f"cycle_or_circuit^{d} is not identity (up to global phase). "
-        #     f"Max residual: {np.max(np.abs(Md / phase - np.eye(dim))):.2e}"
-        # )
-
-
-def _pauli_str_to_matrix(pauli: PauliString) -> np.ndarray:
-    """Build the n-qubit Pauli matrix for a PauliString.
-
-    Args:
-        pauli (PauliString): tuple of single-qubit Pauli labels,
-            e.g. ('X', 'Z', 'I').
-
-    Returns:
-        np.ndarray: the 2^n x 2^n matrix given by the Kronecker product
-            of the corresponding single-qubit Pauli matrices.
-    """
-    mat = SINGLE_QUBIT_PAULIS[pauli[0]](0).matrix.astype(complex)
-    for p in pauli[1:]:
-        mat = np.kron(mat, SINGLE_QUBIT_PAULIS[p](0).matrix)
-    return mat
-
-
-def _identify_pauli_str(M: np.ndarray, n: int) -> PauliString:
-    """Return Pauli labels for an n-qubit Pauli matrix, ignoring phase.
-
-    Uses recursive block decomposition: for σ_k ⊗ rest, the 2x2 block
-    structure of M in the first qubit's index uniquely identifies σ_k.
-
-    Args:
-        M (np.ndarray): 2^n x 2^n matrix proportional to an n-qubit
-            Pauli operator.
-        n (int): number of qubits.
-
-    Returns:
-        PauliString: tuple of single-qubit Pauli labels identifying M,
-            e.g. ('X', 'Z', 'I').
-    """
-    if n == 0:
-        return ()
-    half = M.shape[0] // 2
-    M00, M01 = M[:half, :half], M[:half, half:]
-    M10, M11 = M[half:, :half], M[half:, half:]
-
-    if np.allclose(M01, 0) and np.allclose(M10, 0):
-        if np.allclose(M00, M11):
-            label, rest = 'I', M00
-        else:
-            label, rest = 'Z', M00
-    elif np.allclose(M01, M10):
-        label, rest = 'X', M01
-    else:
-        label, rest = 'Y', -1j * M10
-
-    return (label,) + _identify_pauli_str(rest, n - 1)
-
-
-def _conjugated_pauli(
-    pauli: PauliString, U: np.ndarray
-) -> PauliString:
-    """Return the Pauli string of U P U†, ignoring global phase.
-
-    Args:
-        pauli (PauliString): tuple of single-qubit Pauli labels for P.
-        U (np.ndarray): unitary matrix to conjugate P by.
-
-    Returns:
-        PauliString: tuple of single-qubit Pauli labels for U P U†.
-    """
-    P = _pauli_str_to_matrix(pauli)
-    return _identify_pauli_str(U @ P @ U.conj().T, len(pauli))
-
-
-def _pauli_to_cycle(
-        pauli: PauliString, qubits: tuple, decompose_to_zxzxz: bool = False
-) -> Circuit:
-    """Convert a PauliString to a Cycle (or subcircuit) of Pauli gates.
-
-    Args:
-        pauli (PauliString): tuple of single-qubit Pauli labels,
-            e.g. ('X', 'Z', 'I').
-        qubits (tuple): qubit labels corresponding to each position in
-            pauli.
-        decompose_to_zxzxz (bool): whether to decompose all single-qubit gates
-            to ZXZXZ decomposition. Defaults to False. Setting to True can be
-            useful when implementing CB using hardware-efficient randomization.
-
-    Returns:
-        Circuit: a Circuit containing a Cycle of I/X/Y/Z gate for each
-            non-identity entry of pauli, or a Circuit containing the ZXZXZ
-            decomposition of each Pauli gate.
-    """
-    circuit = Circuit()
-    if decompose_to_zxzxz:
-        for p, q in zip(pauli, qubits, strict=True):
-            circuit.join(Circuit(ZXZXZ_DECOMPOSITIONS[p](q)))
-
-    else:
-        cycle = Cycle()
-        for p, q in zip(pauli, qubits, strict=True):
-            match p:
-                case 'I':
-                    cycle.append(Id(q))
-                case 'X':
-                    cycle.append(X(q))
-                case 'Y':
-                    cycle.append(Y(q))
-                case 'Z':
-                    cycle.append(Z(q))
-
-        circuit.append(cycle)
-
-    return circuit
-
-
-def _propagate_sign(
-    decay_pauli:   PauliString,
-    twirl_paulis:  list[PauliString],
-    cycle_unitary: np.ndarray,
-    depth:         int,
-) -> int:
-    """Determine the ±1 eigenstate sign after ideal evolution.
-
-    In the Heisenberg picture, the measurement observable S is propagated
-    backward through the circuit.  Each application of the cycle G
-    transforms S → G†SG, so the effective Pauli that twirl layer i sees
-    alternates between S and G(S) = GSG†.
-
-    For 0-indexed twirl position i (i = 0 is the leading twirl, before the
-    first cycle application), the effective Pauli is:
-      G(S)  if (i + depth) % 2 == 1
-      S     otherwise
-
-    The sign flips whenever the effective Pauli and the twirl anticommute
-    (odd number of qubit positions where both are non-identity and differ).
-
-    Args:
-        decay_pauli (PauliString): the Pauli decay string,
-            e.g. ('X', 'Z', 'I').
-        twirl_paulis (list[PauliString]): all d+1 Pauli twirl layers.
-        cycle_unitary (np.ndarray): unitary matrix of the benchmarked
-            cycle.
-        depth (int): number of cycle applications d.
-
-    Returns:
-        int: +1 or -1.
-    """
-    g_pauli = _conjugated_pauli(decay_pauli, cycle_unitary)
-    sign = 1
-    for i, twirl in enumerate(twirl_paulis):
-        effective = g_pauli if (i + depth) % 2 == 1 else decay_pauli
-        n_anticommuting = sum(
-            1
-            for p, q in zip(effective, twirl, strict=True)
-            if p != 'I' and q != 'I' and p != q
-        )
-        if n_anticommuting % 2 == 1:
-            sign *= -1
-    return sign
 
 
 def CB(
@@ -310,14 +121,20 @@ def CB(
             self._n_decays = n_decays
             self._n_randomizations = n_randomizations
             self._decompose_to_zxzxz = decompose_to_zxzxz
-            self._qubits = (
-                cycle_or_circuit.qubits
-                if isinstance(cycle_or_circuit, Cycle)
-                else cycle_or_circuit.labels
-            )
+            self._qubits = cycle_or_circuit.qubits
 
-            for depth in self._circuit_depths:
-                if not _composes_to_identity(cycle_or_circuit, depth):
+            # If cycle_or_circuit^base_depth = I, then for any multiple
+            # k*base_depth, cycle_or_circuit^(k*base_depth) =
+            # (cycle_or_circuit^base_depth)^k = I automatically, so only
+            # depths that are not multiples of the smallest depth need an
+            # explicit check.
+            base_depth = self._circuit_depths[0]
+            depths_to_check = [base_depth] + [
+                depth for depth in self._circuit_depths[1:]
+                if depth % base_depth != 0
+            ]
+            for depth in depths_to_check:
+                if not composes_to_identity(cycle_or_circuit, depth):
                     raise ValueError(
                         f"cycle_or_circuit^{depth} is not the identity "
                         "(up to global phase). CB requires that "
@@ -399,14 +216,13 @@ def CB(
                             _propagate_sign(
                                 pauli,
                                 twirl_strings,
-                                self._cycle_or_circuit.unitary,
+                                self._cycle_or_circuit,
                                 depth
                             )
                             for pauli in group.paulis
                         ]
 
                         circuit = Circuit()
-
                         # State prep: +1 eigenstate of the group's shared
                         # basis, which is simultaneously a +1 eigenstate
                         # of every Pauli in the group.
@@ -418,7 +234,7 @@ def CB(
 
                         # Initial twirl
                         circuit.extend(
-                            _pauli_to_cycle(
+                            pauli_to_cycle(
                                 twirl_strings[0],
                                 self._qubits,
                                 self._decompose_to_zxzxz
@@ -439,7 +255,7 @@ def CB(
 
                             # Twirling layer
                             circuit.extend(
-                                _pauli_to_cycle(
+                                pauli_to_cycle(
                                     twirl_strings[i + 1],
                                     self._qubits,
                                     self._decompose_to_zxzxz
@@ -1209,3 +1025,49 @@ def SC(
         include_rcal=include_rcal,
         **kwargs,
     )
+
+
+def _propagate_sign(
+    decay_pauli:      PauliString,
+    twirl_paulis:     list[PauliString],
+    cycle_or_circuit: Cycle | Circuit,
+    depth:            int,
+) -> int:
+    """Determine the ±1 eigenstate sign after ideal evolution.
+
+    In the Heisenberg picture, the measurement observable S is propagated
+    backward through the circuit.  Each application of the cycle G
+    transforms S → G†SG, so the effective Pauli that twirl layer i sees
+    alternates between S and G(S) = GSG†.
+
+    For 0-indexed twirl position i (i = 0 is the leading twirl, before the
+    first cycle application), the effective Pauli is:
+      G(S)  if (i + depth) % 2 == 1
+      S     otherwise
+
+    The sign flips whenever the effective Pauli and the twirl anticommute
+    (odd number of qubit positions where both are non-identity and differ).
+
+    Args:
+        decay_pauli (PauliString): the Pauli decay string, ordered by
+            `cycle_or_circuit.qubits`, e.g. ('X', 'Z', 'I').
+        twirl_paulis (list[PauliString]): all d+1 Pauli twirl layers.
+        cycle_or_circuit (Cycle | Circuit): the benchmarked cycle or
+            circuit.
+        depth (int): number of cycle applications d.
+
+    Returns:
+        int: +1 or -1.
+    """
+    g_pauli, _ = conjugate_pauli(decay_pauli, cycle_or_circuit)
+    sign = 1
+    for i, twirl in enumerate(twirl_paulis):
+        effective = g_pauli if (i + depth) % 2 == 1 else decay_pauli
+        n_anticommuting = sum(
+            1
+            for p, q in zip(effective, twirl, strict=True)
+            if p != 'I' and q != 'I' and p != q
+        )
+        if n_anticommuting % 2 == 1:
+            sign *= -1
+    return sign
