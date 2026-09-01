@@ -152,6 +152,34 @@ def add_Measure(
     yield MEASURE(qubit, classical_ref)
 
 
+def add_MCM(
+    qubits: Iterable[int],
+    classical_refs: Iterable[
+        pyquil.quilatom.MemoryReference | None  # type: ignore # noqa: F821
+    ],
+    **kwargs
+) -> Iterator:
+    """Add a mid-circuit measurement, possibly over multiple qubits.
+
+    Args:
+        qubits (Iterable[int]): qubit label(s).
+        classical_refs (Iterable[pyquil.quilatom.MemoryReference | None]):
+            classical memory reference(s) to store the measurement
+            result(s), one per qubit in `qubits`.
+
+    Yields:
+        Iterator: Measurement(s).
+    """
+    try:
+        from pyquil.gates import MEASURE
+    except ImportError:
+        logger.warning(' Unable to import pyquil!')
+        return
+
+    for qubit, classical_ref in zip(qubits, classical_refs, strict=True):
+        yield MEASURE(qubit, classical_ref)
+
+
 def add_SXdag(qubit: int, **kwargs) -> Iterator:
     """Add an SXdag (X-90) gate.
 
@@ -721,11 +749,6 @@ def transpile_circuit(
         tprogram.readout_configuation = readout_configuation
         tprogram.readout_source_phases = readout_tracker.source_phases
 
-    # if randomized_compiling:
-    #     tprogram = rc_configuration.build_quil_program() + tprogram
-    #     tprogram.rc_configuration = rc_configuration
-    #     tprogram.rc_source_phases = rc_tracker.source_phases
-
     return (declarations, tprogram)
 
 
@@ -774,10 +797,15 @@ def transpile_cycle(
     tracking = rc_tracker is not None or readout_tracker is not None
     tprogram = Program()
     for gate in cycle:
-        if gate.name in ['Meas', 'MCM']:
+        if gate.name == 'Meas':
             tprogram += gate_mapper[gate.name](
                 gate.qubits[0],
                 qubit_to_cref[gate.qubits[0]]
+            )
+        elif gate.name == 'MCM':
+            tprogram += gate_mapper[gate.name](
+                gate.qubits,
+                [qubit_to_cref[q] for q in gate.qubits]
             )
         elif rc_tracker is not None and gate.name in PHASE_GATES:
             tprogram += rc_tracker.emit_phase_gate(gate)
@@ -815,7 +843,7 @@ DEFAULT_GATEMAPPER: Mapping[str, Callable] = GateMapper(
         'I':        add_Idle,
         'Idle':     add_Idle,
         'iSWAP':    add_ISWAP,
-        'MCM':      add_Measure,
+        'MCM':      add_MCM,
         'Meas':     add_Measure,
         'VirtualZ': add_Rz,
         'SXdag':    add_SXdag,
