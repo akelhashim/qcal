@@ -123,16 +123,41 @@ class Results:
         self._results = results
         self.__raw_results = copy.deepcopy(results)
         self._confusion_matrix = None
-        self._df = pd.DataFrame([results], index=['counts'], dtype='object')
-        self._df = pd.concat(
-            [self._df,
+        self.__df = None
+
+        if confusion_matrix is not None:
+            self.apply_readout_correction(confusion_matrix)
+
+    def _rebuild_df(self) -> None:
+        """(Re)build the counts/probabilities DataFrame from self._results.
+
+        The counts row is assigned first (not via the `_df` property) so
+        that `self.populations` (via `n_shots`/`counts`) reads the
+        already-cached counts row instead of recursing back into `_df`.
+        """
+        self.__df = pd.DataFrame(
+            [self._results], index=['counts'], dtype='object'
+        )
+        self.__df = pd.concat(
+            [self.__df,
              pd.DataFrame([self.populations], index=['probabilities'])
             ],
             join='inner'
         )
 
-        if confusion_matrix is not None:
-            self.apply_readout_correction(confusion_matrix)
+    @property
+    def _df(self) -> pd.DataFrame:
+        """Lazily-built counts/probabilities DataFrame.
+
+        Deferred until first access: most Circuit objects are constructed
+        without results ever being assigned to them (e.g. transient
+        sub-circuits during circuit generation), so building this eagerly
+        in `__init__` wastes a pandas DataFrame + concat on every one of
+        them.
+        """
+        if self.__df is None:
+            self._rebuild_df()
+        return self.__df
 
     def __getitem__(self, item: str) -> pd.Series:
         """Index the dataframe by bitstring.
@@ -297,15 +322,7 @@ class Results:
         self._confusion_matrix = confusion_matrix
         try:
             self._results = readout_correction(self, confusion_matrix)
-            self._df = pd.DataFrame(
-                [self._results], index=['counts'], dtype='object'
-            )
-            self._df = pd.concat(
-                [self._df,
-                pd.DataFrame([self.populations], index=['probabilities'])
-                ],
-                join='inner'
-            )
+            self._rebuild_df()
         except Exception:
             self._results = copy.deepcopy(self.__raw_results)
 
