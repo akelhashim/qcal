@@ -482,9 +482,9 @@ def to_pyquil(
             rc_kwargs=rc_kwargs,
         )
         rc_configuration = _tprogram.rc_configuration
-        rc_source_unitary_phases = _tprogram.rc_source_unitary_phases
+        rc_source_phases = _tprogram.rc_source_phases
         if randomize_readout:
-            measurement_configuration = _tprogram.measurement_configuration
+            readout_configuation = _tprogram.readout_configuation
         declarations += _declarations
         tprogram += _tprogram
 
@@ -505,7 +505,7 @@ def to_pyquil(
             randomize_readout=randomize_readout
         )
         if randomize_readout:
-            measurement_configuration = _tprogram.measurement_configuration
+            readout_configuation = _tprogram.readout_configuation
             readout_source_phases = _tprogram.readout_source_phases
         declarations += _declarations
         tprogram += _tprogram
@@ -513,9 +513,9 @@ def to_pyquil(
     final_program = declarations + tprogram
     if randomized_compiling:
         final_program.rc_configuration = rc_configuration
-        final_program.rc_source_unitary_phases = rc_source_unitary_phases
+        final_program.rc_source_phases = rc_source_phases
     if randomize_readout:
-        final_program.measurement_configuration = measurement_configuration
+        final_program.readout_configuation = readout_configuation
         if not randomized_compiling:
             final_program.readout_source_phases = readout_source_phases
 
@@ -615,7 +615,7 @@ def transpile_circuit(
     readout_tracker = None
     readout_final_layer = frozenset()
     if randomize_readout:
-        measurement_configuration = _U2Randomization(
+        readout_configuation = _U2Randomization(
             qubits=qubits,
             destination_names=lambda qubit: f"measurement_unitary_q{qubit}",
             seed_names=lambda qubit: f"measurement_seed_q{qubit}",
@@ -631,7 +631,7 @@ def transpile_circuit(
         # (see RCLayerTracker.__init__), so only build a dedicated
         # tracker for it when RC is off.
         if not randomized_compiling:
-            readout_tracker = ReadoutLayerTracker(measurement_configuration)
+            readout_tracker = ReadoutLayerTracker(readout_configuation)
             readout_final_layer = final_layer_cycle_indices(circuit)
 
     cycle_defs = {}
@@ -694,16 +694,16 @@ def transpile_circuit(
     if randomized_compiling:
         with rc_configuration.open_classical_preamble() as rc_program:
             if randomize_readout:
-                rc_program += measurement_configuration.build_quil_program()
+                rc_program += readout_configuation.build_quil_program()
                 for qubit in qubits:
                     call = rc_configuration.apply_pauli_pair(
                         qubit,
                         rc_configuration._cycle_count,
                         source_unitaries=(
-                            measurement_configuration.destination_names(qubit)
+                            readout_configuation.destination_names(qubit)
                         ),
                         target_unitaries=(
-                            measurement_configuration.destination_names(qubit)
+                            readout_configuation.destination_names(qubit)
                         ),
                         unitary_offset=0,
                     )
@@ -712,19 +712,19 @@ def transpile_circuit(
 
         tprogram = rc_program + tprogram
         tprogram.rc_configuration = rc_configuration
-        tprogram.rc_source_unitary_phases = rc_tracker.source_unitary_phases
+        tprogram.rc_source_phases = rc_tracker.source_phases
         if randomize_readout:
-            tprogram.measurement_configuration = measurement_configuration
+            tprogram.readout_configuation = readout_configuation
 
     elif randomize_readout:
-        tprogram = measurement_configuration.build_quil_program() + tprogram
-        tprogram.measurement_configuration = measurement_configuration
+        tprogram = readout_configuation.build_quil_program() + tprogram
+        tprogram.readout_configuation = readout_configuation
         tprogram.readout_source_phases = readout_tracker.source_phases
 
     # if randomized_compiling:
     #     tprogram = rc_configuration.build_quil_program() + tprogram
     #     tprogram.rc_configuration = rc_configuration
-    #     tprogram.rc_source_unitary_phases = rc_tracker.source_unitary_phases
+    #     tprogram.rc_source_phases = rc_tracker.source_phases
 
     return (declarations, tprogram)
 

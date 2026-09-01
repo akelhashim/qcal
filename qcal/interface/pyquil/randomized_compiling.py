@@ -184,7 +184,7 @@ def build_rc_configuration(
 
     layers = tuple(
         cycle_to_base_cycle(cycle, qubits)
-        for cycle in circuit.cycles
+        for cycle in circuit.cycles[:-1]  # Exclude terminal measurements
         if not cycle.is_barrier and is_rc_layer(cycle)
     )
 
@@ -218,7 +218,7 @@ def build_rc_configuration(
         base_cycles=base_cycles,
         base_cycle_repetitions=base_cycle_repetitions,
         variables=rc.RandomizedCompilingVariables(
-            unitaries_prefix="source_unitary_phases"
+            unitaries_prefix="source_phases"
         ),
         **rc_kwargs,
     )
@@ -231,7 +231,7 @@ class RCLayerTracker:
     circuit/cycle walk; it calls into this tracker only for the piece
     specific to randomized compiling -- swapping a Rz/VirtualZ gate's
     literal phase for a memory-reference-parametrized one (recording the
-    original phase into `source_unitary_phases`) -- and advances to the
+    original phase into `source_phases`) -- and advances to the
     next layer once a Cycle's two-qubit gates have been emitted.
     X90/SX pulses are still emitted through the ordinary `gate_mapper`
     (see `transpile_cycle`), which additionally fences them per-qubit
@@ -259,7 +259,7 @@ class RCLayerTracker:
             configuration.base_cycle_repetitions
             * len(configuration.base_cycles) + 1
         )
-        self.source_unitary_phases: Dict[str, List[float]] = {
+        self.source_phases: Dict[str, List[float]] = {
             configuration.variables.source_unitaries(q): (
                 [0.0] * (n_layers * 3)
             ) for q in configuration.qubits_sorted
@@ -268,7 +268,7 @@ class RCLayerTracker:
     def emit_phase_gate(self, gate) -> 'Program':  # type: ignore  # noqa: F821
         """Replace a Rz/VirtualZ gate with its twirled memory reference.
 
-        Records the gate's original phase into `source_unitary_phases` at
+        Records the gate's original phase into `source_phases` at
         (layer_index, angle_index) and advances angle_index for `gate`'s
         qubit.
 
@@ -283,7 +283,7 @@ class RCLayerTracker:
         q = gate.qubits[0]
         phase = gate.properties['params']['phase']
         key = self.configuration.variables.source_unitaries(q)
-        self.source_unitary_phases[key][
+        self.source_phases[key][
             self.layer_index * 3 + self.angle_index[q]
         ] = phase / (2 * np.pi)
 
