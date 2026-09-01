@@ -17,11 +17,21 @@ from qcal.gate.gate import Gate
 logger = logging.getLogger(__name__)
 
 
-def format_gate_text(gate: Gate):
+MAX_LABELED_NODES = 2000
+"""Above this many (cycle, qubit) positions, per-gate text labels are
+omitted (rendering that many Plotly annotations is slow) and hover text
+drops the gate matrix (it dominates the hover-text JSON payload).
+"""
+
+
+def format_gate_text(gate: Gate, include_matrix: bool = True):
     """Format Gate text using the gate properties metadata.
 
     Args:
-        gate (Gate): qcal Gate object.
+        gate (Gate):           qcal Gate object.
+        include_matrix (bool): whether to include the gate's matrix in
+            the text. Defaults to True. For large circuits, this is set
+            to False to keep the hover-text payload small.
 
     Returns:
         str: text formatted for Plotly plot.
@@ -31,11 +41,14 @@ def format_gate_text(gate: Gate):
         text += f'Alias: {gate.alias}<br>'
     text += f'Qubits: {gate.qubits}<br>'
     text += f'Dim: {gate.dim}<br>'
-    text += (
-        'Matrix: <br>  '
-        + np.array_str(np.around(gate.matrix, 3)).replace("\n ", "<br>" + '   ')
-        + '<br>'
-    )
+    if include_matrix:
+        text += (
+            'Matrix: <br>  '
+            + np.array_str(
+                np.around(gate.matrix, 3)
+            ).replace("\n ", "<br>" + '   ')
+            + '<br>'
+        )
     if gate.locally_equivalent is not None:
         text += f'Locally Equivalent: {gate.locally_equivalent}<br>'
     text += f'Subspace: {gate.subspace}<br>'
@@ -62,6 +75,10 @@ def draw_circuit(circuit: Circuit, show: bool = True):
     """
     pio.templates.default = 'plotly'
 
+    label_gates = (
+        circuit.circuit_depth * len(circuit.qubits) <= MAX_LABELED_NODES
+    )
+
     # https://plotly.com/python/marker-style/
     symbol_map = defaultdict(lambda: ['square', 'square'],
         {'Meas':   ['triangle-right'],
@@ -86,6 +103,8 @@ def draw_circuit(circuit: Circuit, show: bool = True):
         }
     )
 
+    qubit_index = {q: i for i, q in enumerate(circuit.qubits)}
+
     node_x = []
     node_y = []
     node_text = []
@@ -93,6 +112,7 @@ def draw_circuit(circuit: Circuit, show: bool = True):
     gate_names = []
     marker_colors = []
     barrier_locs = []
+    mq_edge_traces = []
     qnode_text = defaultdict(lambda: False, {})
     n_barriers = 0
     for c, cycle in enumerate(circuit.cycles):
@@ -105,62 +125,77 @@ def draw_circuit(circuit: Circuit, show: bool = True):
                 if gate.is_single_qubit:
                     for q in gate.qubits:
                         node_x.append(c)
-                        node_y.append(circuit.qubits.index(q))
+                        node_y.append(qubit_index[q])
                     name = gate.name
                     if 'phase' in gate.properties['params'].keys():
                         name += str(gate.properties['params']['phase'])
                     elif name == 'Idle':
                         name += str(gate.properties['params']['duration'])
-                    text = qnode_text[
-                        f'{name}{gate.subspace}:{gate.qubits}'
-                    ]
+                    cache_key = f'{name}{gate.subspace}:{gate.qubits}'
+                    text = qnode_text[cache_key]
                     if not text:
-                        text = format_gate_text(gate)
-                        qnode_text[
-                            f'{gate.name}{gate.subspace}:{gate.qubits}'
-                        ] = text
+                        text = format_gate_text(
+                            gate, include_matrix=label_gates
+                        )
+                        qnode_text[cache_key] = text
                     node_text.extend(
                         [text] * len(gate.qubits)
                     )
                     node_symbols.extend(
                         [symbol_map[gate.name][0]] * len(gate.qubits)
                     )
-                    gate_names.append(
-                        {'x': c,
-                         'y': circuit.qubits.index(q),
-                         'text': 'M' if gate.name in ('Meas', 'MCM') else (
-                             gate.name if len(gate.name) < 3 else gate.name[:3]
-                         ),
-                         'font': {'color': 'black', 'size': 13},
-                         'showarrow': False
-                        }
-                    )
+                    if label_gates:
+                        gate_names.append(
+                            {'x': c,
+                             'y': qubit_index[q],
+                             'text': 'M' if gate.name in (
+                                 'Meas', 'MCM'
+                             ) else (
+                                 gate.name if len(gate.name) < 3
+                                 else gate.name[:3]
+                             ),
+                             'font': {'color': 'black', 'size': 13},
+                             'showarrow': False
+                            }
+                        )
                     marker_colors.extend(
                         [color_map[gate.name]] * len(gate.qubits)
                     )
                 elif gate.is_multi_qubit:
+                    edge_x_mq = []
+                    edge_y_mq = []
                     for q in gate.qubits:
                         node_x.append(c)
-                        node_y.append(circuit.qubits.index(q))
-                    text = qnode_text[
-                        f'{gate.name}{gate.subspace}:{gate.qubits}'
-                    ]
+                        node_y.append(qubit_index[q])
+                        edge_x_mq.append(c)
+                        edge_y_mq.append(qubit_index[q])
+                    mq_edge_traces.append(
+                        go.Scatter(
+                            x=edge_x_mq, y=edge_y_mq,
+                            line={'width': 2, 'color': '#888'},
+                            hoverinfo='none',
+                            mode='lines'
+                        )
+                    )
+                    cache_key = f'{gate.name}{gate.subspace}:{gate.qubits}'
+                    text = qnode_text[cache_key]
                     if not text:
-                        text = format_gate_text(gate)
-                        qnode_text[
-                            f'{gate.name}{gate.subspace}:{gate.qubits}'
-                        ] = text
+                        text = format_gate_text(
+                            gate, include_matrix=label_gates
+                        )
+                        qnode_text[cache_key] = text
                     node_text.extend([text] * 2)
                     node_symbols.extend(symbol_map[gate.name])
-                    gate_names.append(
-                        {
-                            'x': c,
-                            'y': circuit.qubits.index(q),
-                            'text': '',
-                            'font': {'color': 'black', 'size': 13},
-                            'showarrow': False
-                        },
-                    )
+                    if label_gates:
+                        gate_names.append(
+                            {
+                                'x': c,
+                                'y': qubit_index[q],
+                                'text': '',
+                                'font': {'color': 'black', 'size': 13},
+                                'showarrow': False
+                            },
+                        )
                     marker_colors.extend(['white', 'white'])
 
     # ms_scale = 200
@@ -194,27 +229,7 @@ def draw_circuit(circuit: Circuit, show: bool = True):
                 mode='lines'
         ))
 
-    n_barriers = 0
-    for c, cycle in enumerate(circuit.cycles):
-        if cycle.is_barrier:
-            n_barriers += 1
-        else:
-            c -= n_barriers
-            for gate in cycle.gates:
-                edge_x_mq = []
-                edge_y_mq = []
-                if gate.is_multi_qubit:
-                    for q in gate.qubits:
-                        edge_x_mq.append(c)
-                        edge_y_mq.append(circuit.qubits.index(q))
-                    edge_traces.append(
-                        go.Scatter(
-                        x=edge_x_mq, y=edge_y_mq,
-                        line={'width': 2, 'color': '#888'},
-                        hoverinfo='none',
-                        mode='lines'
-                        )
-                    )
+    edge_traces.extend(mq_edge_traces)
 
     gate_names.append(
         {
