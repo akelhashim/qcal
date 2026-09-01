@@ -11,7 +11,7 @@ trueq is not installed when building docs.
 from __future__ import annotations
 
 import logging
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
 from typing import Callable
 
 import matplotlib.pyplot as plt
@@ -49,6 +49,7 @@ def CB(
     n_decays:           int = 20,
     n_randomizations:   int = 30,
     decompose_to_zxzxz: bool = False,
+    targeted_decays:    Sequence[str] | None = None,
     **kwargs,
 ) -> Callable:
     """Cycle Benchmarking (CB) without mirror inversion.
@@ -98,6 +99,12 @@ def CB(
         decompose_to_zxzxz (bool): whether to decompose all single-qubit gates
             to ZXZXZ decomposition. Defaults to False. Setting to True can be
             useful when implementing CB using hardware-efficient randomization.
+        targeted_decays (Sequence[str] | None): an explicit set of Pauli
+            decay strings to prepare and measure, e.g. ['XII', 'ZZY'],
+            ordered by cycle_or_circuit.qubits. Defaults to None. If given,
+            this is used instead of randomly sampling n_decays Pauli decay
+            strings, and each string must have length equal to the number
+            of qubits in cycle_or_circuit.
 
     Returns:
         Callable: CB class instance.
@@ -114,6 +121,7 @@ def CB(
             n_decays:           int = 20,
             n_randomizations:   int = 30,
             decompose_to_zxzxz: bool = False,
+            targeted_decays:    Sequence[str] | None = None,
             **kwargs,
         ) -> None:
             self._cycle_or_circuit = cycle_or_circuit
@@ -122,6 +130,23 @@ def CB(
             self._n_randomizations = n_randomizations
             self._decompose_to_zxzxz = decompose_to_zxzxz
             self._qubits = cycle_or_circuit.qubits
+
+            if targeted_decays is not None:
+                for pauli in targeted_decays:
+                    if len(pauli) != len(self._qubits):
+                        raise ValueError(
+                            f"Pauli decay string '{pauli}' has length "
+                            f"{len(pauli)}, but cycle_or_circuit acts on "
+                            f"{len(self._qubits)} qubits."
+                        )
+                    if not set(pauli.upper()) <= {'I', 'X', 'Y', 'Z'}:
+                        raise ValueError(
+                            f"Pauli decay string '{pauli}' contains "
+                            "invalid characters; each character must be "
+                            "one of 'I', 'X', 'Y', 'Z'."
+                        )
+                targeted_decays = [p.upper() for p in targeted_decays]
+            self._targeted_decays = targeted_decays
 
             # If cycle_or_circuit^base_depth = I, then for any multiple
             # k*base_depth, cycle_or_circuit^(k*base_depth) =
@@ -175,7 +200,11 @@ def CB(
             logger.info(" Generating circuits...")
 
             # Generate the Pauli decays grouped by simultaneous measurements
-            if self._n_decays > 4**len(self._qubits) - 1:
+            if self._targeted_decays is not None:
+                sampled_paulis = [
+                    tuple(pauli) for pauli in self._targeted_decays
+                ]
+            elif self._n_decays > 4**len(self._qubits) - 1:
                 sampled_paulis = generate_n_qubit_paulis(self._qubits)
             else:
                 sampled_paulis = generate_random_n_qubit_paulis(
@@ -447,6 +476,7 @@ def CB(
         n_decays=n_decays,
         n_randomizations=n_randomizations,
         decompose_to_zxzxz=decompose_to_zxzxz,
+        targeted_decays=targeted_decays,
         **kwargs,
     )
 
