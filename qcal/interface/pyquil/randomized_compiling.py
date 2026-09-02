@@ -89,16 +89,18 @@ def cycle_to_base_cycle(
     `qubits` becomes a bare int, since ``pyquil._qpu.randomized_compiling``
     only distinguishes "edge" from "identity" for Pauli-propagation
     bookkeeping. This function is only called on RC-layer-boundary cycles
-    (see `is_rc_layer`), so any non-edge, non-measured qubit here is
-    assumed to be truly idle or running an identity-equivalent operation
-    (e.g., a dynamical-decoupling sequence during a 2-qubit gate or MCM).
-    Real single-qubit content lives in the separate ZXZXZ-template cycles
+    (see `is_rc_layer`), so any non-edge qubit here is assumed to be
+    truly idle or running an identity-equivalent operation (e.g., a
+    dynamical-decoupling sequence during a 2-qubit gate or MCM). Real
+    single-qubit content lives in the separate ZXZXZ-template cycles
     between boundaries, which are not RC layers and never reach this function;
     those angles are tracked instead via `RCLayerTracker`'s source-unitary
-    phases. A Meas/MCM gate is always single-qubit at the `Cycle` level (see
-    `transpile_cycle`, which only reads `gate.qubits[0]`), so it never
-    forms an edge and its qubit falls through to the bare-int branch
-    below like any other.
+    phases. A Meas/MCM gate is deliberately treated the same as an idle
+    qubit here (see the `gate.is_measurement` check below, which just
+    skips the edge/degree check for it): its qubit(s) fall through to
+    the bare-int branch below, so pyquil's RC engine twirls it as an
+    identity op like any other idle qubit, whether the gate spans one
+    qubit or several.
 
     Args:
         cycle (Cycle): qcal Cycle containing at least one two-qubit gate,

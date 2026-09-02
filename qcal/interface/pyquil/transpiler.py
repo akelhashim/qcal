@@ -510,7 +510,7 @@ def to_pyquil(
             rc_kwargs=rc_kwargs,
         )
         rc_configuration = _tprogram.rc_configuration
-        rc_source_phases = _tprogram.rc_source_phases
+        rc_source_phases = _tprogram.source_phases
         if randomize_readout:
             readout_configuation = _tprogram.readout_configuation
         declarations += _declarations
@@ -541,11 +541,11 @@ def to_pyquil(
     final_program = declarations + tprogram
     if randomized_compiling:
         final_program.rc_configuration = rc_configuration
-        final_program.rc_source_phases = rc_source_phases
+        final_program.source_phases = rc_source_phases
     if randomize_readout:
         final_program.readout_configuation = readout_configuation
         if not randomized_compiling:
-            final_program.readout_source_phases = readout_source_phases
+            final_program.source_phases = readout_source_phases
 
     return final_program
 
@@ -740,14 +740,14 @@ def transpile_circuit(
 
         tprogram = rc_program + tprogram
         tprogram.rc_configuration = rc_configuration
-        tprogram.rc_source_phases = rc_tracker.source_phases
+        tprogram.source_phases = rc_tracker.source_phases
         if randomize_readout:
             tprogram.readout_configuation = readout_configuation
 
     elif randomize_readout:
         tprogram = readout_configuation.build_quil_program() + tprogram
         tprogram.readout_configuation = readout_configuation
-        tprogram.readout_source_phases = readout_tracker.source_phases
+        tprogram.source_phases = readout_tracker.source_phases
 
     return (declarations, tprogram)
 
