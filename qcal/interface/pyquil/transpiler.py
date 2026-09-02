@@ -534,7 +534,7 @@ def to_pyquil(
         )
         if randomize_readout:
             readout_configuation = _tprogram.readout_configuation
-            readout_source_phases = _tprogram.readout_source_phases
+            readout_source_phases = _tprogram.source_phases
         declarations += _declarations
         tprogram += _tprogram
 
