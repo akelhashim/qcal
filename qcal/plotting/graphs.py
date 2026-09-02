@@ -214,7 +214,7 @@ def draw_circuit(circuit: Circuit, show: bool = True):
             for gate in cycle.gates:
                 edge_x_mq = []
                 edge_y_mq = []
-                if gate.is_multi_qubit:
+                if gate.is_multi_qudit:
                     for q in gate.qubits:
                         edge_x_mq.append(c)
                         edge_y_mq.append(circuit.qubits.index(q))
