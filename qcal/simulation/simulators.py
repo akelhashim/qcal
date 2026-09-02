@@ -76,6 +76,7 @@ class Simulator(ABC):
         """
         self._n_shots = n_shots
         self._circuits = None
+        self._results = None
         self._states = None
 
     @property
