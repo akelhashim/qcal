@@ -167,6 +167,9 @@ def CB(
                         "the identity for every depth in circuit_depths."
                     )
 
+            self._fit = {}
+            self._pauli_fidelities = {}
+
             qpu.__init__(self, config=config, **kwargs)
 
         def generate_circuits(self) -> None:
@@ -317,10 +320,6 @@ def CB(
             self._circuits['group_signs'] = group_signs_list
             self._circuits['twirl_strings'] = twirl_strs_list
 
-        # ------------------------------------------------------------------
-        # Analysis and plotting
-        # ------------------------------------------------------------------
-
         def analyze(self) -> None:
             """Fit per-Pauli decay curves and estimate the cycle infidelity.
 
@@ -336,7 +335,7 @@ def CB(
             offset fixed to zero (f_Q = exp(-b)). Reports the process
             infidelity:
 
-              e_F = (d^2 - 1) / d^2 * (1 - mean f_Q over sampled Paulis)
+              e_F = (d^2 - 1) / d^2 * (1 - <mean f_Q over sampled Paulis>)
 
             Results are stored in self._pauli_infidelities (keyed by Pauli
             string) and self._e_F.
@@ -344,8 +343,6 @@ def CB(
             logger.info(" Analyzing the results...")
 
             depths = np.array(self._circuit_depths, dtype=float)
-            self._pauli_infidelities = {}
-
             for group in self._pauli_groups:
                 measurement_basis = ''.join(
                     'Z' if p == 'I' else p for p in group.measurement_basis
@@ -355,27 +352,27 @@ def CB(
                     pauli = ''.join(pauli_tuple)
                     active = [i for i, p in enumerate(pauli_tuple) if p != 'I']
 
+                    # Mean EVs (per Pauli) over randomizations for each depth
                     mean_evs: list[float] = []
                     for depth in self._circuit_depths:
+                        # EVs of all randomizations for a given depth
                         evs: list[float] = []
 
                         for r in range(self._n_randomizations):
-                            sub = self._circuits.subset(
+                            subset = self._circuits.subset(
                                 measurement_basis=measurement_basis,
                                 depth=depth,
                                 randomization=r,
                             )
-                            if len(sub) == 0:
+                            if len(subset) == 0:
                                 continue
-                            result = sub.results.iloc[0]
+                            result = subset.results.iloc[0]
                             member_idx = (
-                                sub['group_paulis'].iloc[0].index(pauli)
+                                subset['group_paulis'].iloc[0].index(pauli)
                             )
-                            sign = sub['group_signs'].iloc[0][member_idx]
+                            sign = subset['group_signs'].iloc[0][member_idx]
                             evs.append(
-                                sign * result.marginalize(
-                                    tuple(active)
-                                ).ev
+                                sign * result.marginalize(tuple(active)).ev
                             )
 
                         mean_evs.append(
@@ -387,23 +384,24 @@ def CB(
 
                     A, f_P, f_err = np.nan, np.nan, np.nan
                     if valid.sum() >= 2:
-                        fitter = FitExponential()
-                        params = fitter.model.make_params(
+                        self._fit[pauli] = FitExponential()
+                        params = self._fit[pauli].model.make_params(
                             a=1.0, b=0.01, c=0
                         )
                         params['c'].vary = False
-                        fitter.fit(
+                        self._fit[pauli].fit(
                             depths[valid], evs_arr[valid],
                             params=params,
                         )
-                        if fitter.fit_success:
-                            b = fitter.fit_params['b']
-                            A = float(fitter.fit_params['a'].value)
+                        if self._fit[pauli].fit_success:
+                            b = self._fit[pauli].fit_params['b']
+                            A = float(self._fit[pauli].fit_params['a'].value)
                             f_P = float(np.exp(-b.value))
                             f_err = (
                                 float(b.stderr * f_P)
                                 if b.stderr is not None else np.nan
                             )
+                            # self._pauli_fidelities[pauli] = ufloat(f_P, f_err)
                         else:
                             logger.warning(
                                 f" Fit failed for Pauli {pauli}."
@@ -413,16 +411,9 @@ def CB(
                             f" Not enough data for Pauli {pauli}."
                         )
 
-                    self._pauli_infidelities[pauli] = {
-                        'A': A,
-                        'f': f_P,
-                        'f_err': f_err,
-                        'mean_evs': mean_evs,
-                    }
-
             d_dim = 2 ** len(self._qubits)
             fidelities = [
-                v['f'] for v in self._pauli_infidelities.values()
+                v['f'] for v in self._fit_params.values()
                 if not np.isnan(v['f'])
             ]
             if fidelities:
@@ -436,7 +427,8 @@ def CB(
                 self._e_F = np.nan
 
         def plot(self) -> None:
-            """Plot per-Pauli decay curves (mean EV vs depth) with fitted exponentials.
+            """Plot per-Pauli decay curves (mean EV vs depth) with fitted
+            exponentials.
 
             One subplot per sampled Pauli string showing:
               - Scatter: mean EV per depth
