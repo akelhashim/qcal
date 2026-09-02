@@ -11,15 +11,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- `Circuit.prepare()` method to prepend a cycle which prepares a Pauli eigenstate
+- `Circuit.prepare()` method to prepend a cycle which prepares a Pauli
+  eigenstate
+- `unitary` property for `Circuit` and `Cycle` classes
+- Native Cycle Benchmarking (CB) implementation
+- Randomized compiling (RC) support for the PyQuil transpiler, via
+  `pyquil._qpu.randomized_compiling`
+- Randomized readout: twirl the final pre-measurement single-qubit
+  gates, usable independently or alongside randomized compiling
+- `decompose_to_zxzxz` parameter for Cycle Benchmarking circuit
+  generation
+- `pauli_to_cycle` utility to convert a Pauli string into a `Circuit`,
+  with ZXZXZ decomposition and caching
+- `conjugate_pauli` utilities for efficiently tracking Pauli operator
+  transformations under conjugation by Clifford gates, cycles, and
+  circuits
 
 ### Changed
+
+- Deferred `Results` DataFrame initialization until first access, to
+  avoid unnecessary DataFrame construction for transient results
+- Optimized circuit plotting for large circuits by omitting per-gate
+  text labels and matrix hover-text details above a node-count
+  threshold
 
 ### Deprecated
 
 ### Removed
 
 ### Fixed
+
+- PyQuil transpiler internal variable name bug
 
 ### Security
 
