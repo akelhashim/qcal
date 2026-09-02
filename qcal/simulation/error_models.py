@@ -899,7 +899,7 @@ class RelaxationNoise(ErrorModel):
         sim = DensityMatrixSimulator(noise_model=noise)
 
         # qutrit: GE from single_qubit, EF from single_qutrit
-        noise = ThermalRelaxationNoise(
+        noise = RelaxationNoise(
             single_qubit=RelaxationParams(t1=50e-6, tphi=30e-6, t=20e-9),
             single_qutrit=RelaxationParams(t1=30e-6, tphi=20e-6, t=20e-9),
         )
