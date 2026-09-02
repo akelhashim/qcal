@@ -141,6 +141,20 @@ def gate_category(gate_name: str) -> Optional[str]:
 # Qutrit channel helpers (for channels quax doesn't expose with dims)
 # ---------------------------------------------------------------------------
 
+def _check_unit_interval(name: str, value: float) -> None:
+    """Raise ValueError unless *value* lies in [0, 1].
+
+    Args:
+        name (str): parameter name, used in the error message.
+        value (float): value to validate.
+
+    Raises:
+        ValueError: if *value* is outside [0, 1].
+    """
+    if not 0.0 <= value <= 1.0:
+        raise ValueError(f'{name} must be in [0, 1]; got {value}.')
+
+
 def _qutrit_bit_flip_channel(
     gamma_ge: float, gamma_ef: float
 ) -> quax.KrausMap:
@@ -160,7 +174,12 @@ def _qutrit_bit_flip_channel(
 
     Returns:
         quax.KrausMap: single-qutrit bit-flip channel.
+
+    Raises:
+        ValueError: if *gamma_ge* or *gamma_ef* is outside [0, 1].
     """
+    _check_unit_interval('gamma_ge', gamma_ge)
+    _check_unit_interval('gamma_ef', gamma_ef)
     x01 = np.array([[0, 1, 0], [1, 0, 0], [0, 0, 1]], dtype=complex)
     x12 = np.array([[1, 0, 0], [0, 0, 1], [0, 1, 0]], dtype=complex)
     eye = np.eye(3, dtype=complex)
@@ -191,7 +210,12 @@ def _qutrit_phase_flip_channel(
 
     Returns:
         quax.KrausMap: single-qutrit phase-flip channel.
+
+    Raises:
+        ValueError: if *gamma_ge* or *gamma_ef* is outside [0, 1].
     """
+    _check_unit_interval('gamma_ge', gamma_ge)
+    _check_unit_interval('gamma_ef', gamma_ef)
     z01 = np.diag([1.0, -1.0, 1.0]).astype(complex)
     z12 = np.diag([1.0, 1.0, -1.0]).astype(complex)
     eye = np.eye(3, dtype=complex)
@@ -225,7 +249,12 @@ def _qutrit_dephasing_channel(
 
     Returns:
         quax.KrausMap: single-qutrit dephasing channel.
+
+    Raises:
+        ValueError: if *gamma_ge* or *gamma_ef* is outside [0, 1].
     """
+    _check_unit_interval('gamma_ge', gamma_ge)
+    _check_unit_interval('gamma_ef', gamma_ef)
     k0 = np.diag(
         [1.0, np.sqrt(1.0 - gamma_ge), np.sqrt(1.0 - gamma_ef)]
     ).astype(complex)
@@ -680,7 +709,8 @@ class BitFlipNoise(ErrorModel):
     Qubit categories use ``quax.channels.bit_flip(rate)`` (GE flip).
     Qutrit categories use a manually-constructed Kraus map where the
     qubit rates supply γ_ge (X₀₁) and the qutrit rates supply γ_ef
-    (X₁₂). Requires γ_ge + γ_ef ≤ 1 for qutrit channels.
+    (X₁₂). γ_ge and γ_ef are independent and each must lie in
+    [0, 1]; their sum is unconstrained.
 
     Example::
 
@@ -759,7 +789,8 @@ class PhaseFlipNoise(ErrorModel):
     Qubit categories use ``quax.channels.phase_flip(rate)`` (GE
     phase flip). Qutrit categories use a manually-constructed Kraus
     map where the qubit rates supply γ_ge (Z₀₁) and the qutrit rates
-    supply γ_ef (Z₁₂). Requires γ_ge + γ_ef ≤ 1 for qutrit channels.
+    supply γ_ef (Z₁₂). γ_ge and γ_ef are independent and each must
+    lie in [0, 1]; their sum is unconstrained.
 
     Example::
 
