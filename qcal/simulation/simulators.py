@@ -487,6 +487,17 @@ class DensityMatrixSimulator(Simulator):
         Returns:
             tuple: (results dict, quax.DensityMatrix).
         """
+        if n_shots is None and any(
+            isinstance(gate, MCM)
+            for cycle in circuit if not cycle.is_barrier
+            for gate in cycle
+        ):
+            raise ValueError(
+                'n_shots must be specified when the circuit contains '
+                'MCM gates; exact probability mode is not supported '
+                'for mid-circuit measurements.'
+            )
+
         qudits = sorted(circuit.qudits)
         n_qudits = len(qudits)
         qudit_to_idx = {q: i for i, q in enumerate(qudits)}
@@ -513,8 +524,6 @@ class DensityMatrixSimulator(Simulator):
         # with MCM gates. joint_flat is the pre-instrument joint probability
         # distribution over all MCM qudits in that cycle (sorted order).
         mcm_gate_records: list = []
-        # integer qudit labels measured mid-circuit
-        mcm_qudits: set = set()
         for cycle in circuit:
             if cycle.is_barrier:
                 continue
@@ -573,7 +582,6 @@ class DensityMatrixSimulator(Simulator):
                                     subsystem=(idx,),
                                 )
                             )
-                            mcm_qudits.add(q)
                             # NOTE: Unconditional post-MCM state: average
                             # over all measurement outcomes. This gives
                             # the correct marginal state for subsequent
@@ -614,13 +622,6 @@ class DensityMatrixSimulator(Simulator):
                     rho = self._apply_channel(
                         channel, rho, subsystem
                     )
-
-        if mcm_qudits and n_shots is None:
-            raise ValueError(
-                'n_shots must be specified when the circuit contains '
-                'MCM gates; exact probability mode is not supported '
-                'for mid-circuit measurements.'
-            )
 
         # Terminal Meas qudits define circuit.results bitstring positions.
         # MCM intermediate outcomes go to circuit.mcm_results, not here.
