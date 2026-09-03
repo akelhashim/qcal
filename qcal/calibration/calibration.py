@@ -2,6 +2,7 @@
 
 """
 import logging
+from abc import ABC, abstractmethod
 from collections import defaultdict
 from typing import Any, Dict, List, Tuple
 
@@ -15,7 +16,7 @@ from qcal.plotting.utils import calculate_nrows_ncols
 logger = logging.getLogger(__name__)
 
 
-class Calibration:
+class Calibration(ABC):
     """Main calibration class.
 
     This class will handle basic calibration methods.
@@ -110,27 +111,13 @@ class Calibration:
         """
         return self._qubits
 
+    @abstractmethod
     def analyze(self) -> None:
-        """Analyze the data.
+        """Analyze the data."""
 
-        Raises:
-            NotImplementedError: this method should be handled in the child
-                class.
-        """
-        raise NotImplementedError(
-            'This method should be handled by the child class!'
-        )
-
+    @abstractmethod
     def generate_circuits(self) -> None:
-        """Generate all calibration circuits.
-
-        Raises:
-            NotImplementedError: this method should be handled in the child
-                class.
-        """
-        raise NotImplementedError(
-            'This method should be handled by the child class!'
-        )
+        """Generate all calibration circuits."""
 
     def final(self) -> None:
         """Save and load the config after changing parameters."""
