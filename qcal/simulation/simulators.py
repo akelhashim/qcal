@@ -629,6 +629,7 @@ class DensityMatrixSimulator(Simulator):
             set(meas_qudits) if meas_qudits
             else set(range(n_qudits))
         )
+        meas_idx = [qudit_to_idx[q] for q in all_meas]
 
         # Same stride/bitstring logic as StateVectorSimulator
         strides = []
@@ -668,8 +669,8 @@ class DensityMatrixSimulator(Simulator):
                 if probs[raw] == 0.0:
                     continue
                 bits = ''.join(
-                    str((raw // strides[qudit_to_idx[q]]) % all_dims[qudit_to_idx[q]])
-                    for q in all_meas
+                    str((raw // strides[m]) % all_dims[m])
+                    for m in meas_idx
                 )
                 results[bits] = (
                     results.get(bits, 0.0) + float(probs[raw])
@@ -681,11 +682,8 @@ class DensityMatrixSimulator(Simulator):
             for shot in range(n_shots):
                 raw = int(sampled[shot])
                 bits = ''.join(
-                    str(
-                        (raw // strides[qudit_to_idx[q]])
-                        % all_dims[qudit_to_idx[q]]
-                    )
-                    for q in all_meas
+                    str((raw // strides[m]) % all_dims[m])
+                    for m in meas_idx
                 )
                 results[bits] = results.get(bits, 0) + 1
 
@@ -726,7 +724,7 @@ class DensityMatrixSimulator(Simulator):
                             gate_results.get(bits, 0) + 1
                         )
                     mcm_results_list.append(gate_results)
-                circuit._mcm_results = []
+                del circuit.mcm_results
                 circuit.mcm_results = mcm_results_list
 
         return results, rho

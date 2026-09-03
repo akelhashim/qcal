@@ -678,6 +678,11 @@ class Circuit:
         elif isinstance(results, Results):
             self._mcm_results.append(results)
 
+    @mcm_results.deleter
+    def mcm_results(self):
+        """Clear all recorded mid-circuit measurement results."""
+        self._mcm_results = []
+
     @results.setter
     def results(self, results: Dict):
         """Write a dictionary of results to the circuit Results object.
