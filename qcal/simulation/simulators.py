@@ -70,9 +70,10 @@ class Simulator(ABC):
         """Initialize a Simulator.
 
         Args:
-            n_shots (int | None, optional): default number of shots per circuit.
-                If ``None``, the exact probability distribution is returned
-                instead of sampled results. Defaults to ``None``.
+            n_shots (int | None, optional): default number of shots
+                per circuit. If ``None``, the exact probability
+                distribution is returned instead of sampled results.
+                Defaults to ``None``.
         """
         self._n_shots = n_shots
         self._circuits = None
@@ -140,9 +141,9 @@ class Simulator(ABC):
     ) -> None:
         """Simulate circuits and attach Results to each circuit.
 
-        After calling this method, each circuit's ``.results`` attribute holds a
-        Results object with sampled ditstring results (or exact probabilities
-        when ``n_shots`` is ``None``).
+        After calling this method, each circuit's ``.results``
+        attribute holds a Results object with sampled ditstring
+        results (or exact probabilities when ``n_shots`` is ``None``).
 
         Args:
             circuits (Circuit | CircuitSet | List[Circuit]): circuit(s)
@@ -213,9 +214,9 @@ class StateVectorSimulator(Simulator):
         """Final state vectors from the last call to run().
 
         Returns:
-            list[quax.StateVector] | None: one ``quax.StateVector`` per circuit,
-                in the same order as ``self.circuits``, or ``None`` if ``run()``
-                has not been called.
+            list[quax.StateVector] | None: one ``quax.StateVector``
+                per circuit, in the same order as ``self.circuits``,
+                or ``None`` if ``run()`` has not been called.
         """
         return self._states
 

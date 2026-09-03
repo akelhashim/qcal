@@ -639,10 +639,12 @@ class Circuit:
         """The unitary matrix of the circuit (ordered product of cycle
         unitaries).
 
-        Barriers are skipped. Raises if any cycle contains a non-unitary gate.
+        Barriers are skipped. Raises if any cycle contains a
+        non-unitary gate.
 
         Raises:
-            ValueError: if any cycle in the circuit contains a non-unitary gate.
+            ValueError: if any cycle in the circuit contains a
+                non-unitary gate.
 
         Returns:
             NDArray: unitary matrix of the full circuit.
@@ -670,8 +672,8 @@ class Circuit:
                 self._mcm_results.extend(results)
             else:
                 raise ValueError(
-                    "All elements in the list must be either a dict or Results "
-                    "object!"
+                    "All elements in the list must be either a "
+                    "dict or Results object!"
                 )
         elif isinstance(results, dict):
             self._mcm_results.append(Results(results))

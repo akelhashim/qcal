@@ -72,6 +72,10 @@ __all__ = (
     'CustomErrorModel',
 )
 
+# Floating-point tolerance for probability-sum checks (e.g. Pauli
+# channel weights summing to ~1).
+_PROB_TOL = 1e-10
+
 # ---------------------------------------------------------------------------
 # Thermal-relaxation parameter bundle
 # ---------------------------------------------------------------------------
@@ -1210,7 +1214,7 @@ class UnitaryError(ErrorModel):
         two_qubit:      Optional[np.ndarray] = None,
         single_qutrit:  Optional[np.ndarray] = None,
         two_qutrit:     Optional[np.ndarray] = None,
-        gate_unitaries: Optional[dict[Gate, np.ndarray]] = None,
+        gate_unitaries: Optional[Dict[Gate, np.ndarray]] = None,
     ) -> None:
         super().__init__()
         self._channels: Dict[str, Optional[quax.KrausMap]] = {
@@ -1457,12 +1461,12 @@ def _pauli_noise_to_kraus(pauli_probs: dict) -> quax.KrausMap:
         )
         total_prob += prob
 
-    if total_prob > 1.0 + 1e-10:
+    if total_prob > 1.0 + _PROB_TOL:
         raise ValueError(
             f'Pauli probabilities sum to {total_prob:.6g} > 1.'
         )
     remaining = 1.0 - total_prob
-    if remaining > 1e-10:
+    if remaining > _PROB_TOL:
         kraus_ops.insert(0, np.sqrt(remaining) * np.eye(d, dtype=complex))
 
     ops = jnp.array(np.stack(kraus_ops).astype(complex))
