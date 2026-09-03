@@ -24,7 +24,7 @@ from qcal.fitting.fit import (
 )
 from qcal.fitting.utils import est_freq_fft
 from qcal.gate.single_qubit import X90, Idle, Rz, X
-from qcal.math.utils import round_to_order_error, wrap_phase
+from qcal.math.utils import wrap_phase
 from qcal.plotting.utils import calculate_nrows_ncols
 from qcal.qpu.qpu import QPU
 from qcal.settings import Settings
@@ -577,11 +577,7 @@ def Frequency(
 
                 if self._fit[q].fit_success:
                     a = self._fit[q].fit_params['a'].value
-                    newval, err = round_to_order_error(
-                        self._fit[q].fit_params['b'].value,
-                        self._fit[q].fit_params['a'].stderr,
-                        2
-                    )
+                    newval = self._fit[q].fit_params['b'].value
 
                     if a < 0:
                         logger.warning(
@@ -597,16 +593,12 @@ def Frequency(
                         self._cal_values[q] = (
                             self._config[self._params[q]] + newval
                         )
-                        self._errors[q] = err
 
         def save(self) -> None:
             """Save all circuits and data."""
             qpu.save(self)
             self._data_manager.save_to_csv(
                  pd.DataFrame([self._cal_values]), 'freq_values'
-            )
-            self._data_manager.save_to_csv(
-                 pd.DataFrame([self._errors]), 'freq_fit_errors'
             )
 
         def plot(self) -> None:

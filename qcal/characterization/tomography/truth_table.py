@@ -1,28 +1,25 @@
 """Submodule for Truth Table Tomography.
 
 """
-import qcal.settings as settings
-
-from qcal.characterization.characterize import Characterize
-from qcal.circuit import Cycle, Circuit, CircuitSet
-from qcal.config import Config
-from qcal.gate.single_qubit import Id, X90
-from qcal.managers.classification_manager import ClassificationManager
-from qcal.math.utils import (
-    uncertainty_of_sum, round_to_order_error
-)
-from qcal.qpu.qpu import QPU
-
 import itertools
 import logging
+from typing import Callable, Dict, List, Tuple
+
 import matplotlib.colors as colors
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-
 from IPython.display import clear_output
 from numpy.typing import NDArray
-from typing import Any, Callable, Dict, List, Tuple
+from uncertainties import ufloat
+
+import qcal.settings as settings
+from qcal.characterization.characterize import Characterize
+from qcal.circuit import Circuit, CircuitSet, Cycle
+from qcal.config import Config
+from qcal.gate.single_qubit import X90, Id
+from qcal.math.utils import round_to_order_error
+from qcal.qpu.qpu import QPU
 
 logger = logging.getLogger(__name__)
 
@@ -51,22 +48,22 @@ def TruthTable(
 
     class TruthTable(qpu, Characterize):
         """Truth Table tomography characterization class.
-        
+
         This class inherits a custom QPU from the TruthTable
         characterization function.
         """
 
-        def __init__(self, 
-                config:          Config,
-                circuit:         Circuit,
-                qubits:          List | Tuple = None,
-                ideal_unitary:   NDArray | None = None,
+        def __init__(self,
+                config:        Config,
+                circuit:       Circuit,
+                qubits:        List | Tuple = None,
+                ideal_unitary: NDArray | None = None,
                 **kwargs
             ) -> None:
             """Initialize the TruthTable class within the function."""
 
             qpu.__init__(self,
-                config=config, 
+                config=config,
                 **kwargs
             )
             Characterize.__init__(self, config)
@@ -79,7 +76,7 @@ def TruthTable(
             self._fidelity = None
             self._states = None
             self._truth_table = None
-        
+
         @property
         def fidelity(self) -> Dict:
             """Truth table fidelity.
@@ -90,7 +87,7 @@ def TruthTable(
                 Dict: value and error (uncertainty) of the estimated fidelity.
             """
             return self._fidelity
-        
+
         @property
         def truth_table(self) -> NDArray:
             """Truth table.
@@ -99,7 +96,7 @@ def TruthTable(
                 NDArray: truth table.
             """
             return self._truth_table
-            
+
         def generate_circuits(self):
             """Generate all amplitude calibration circuits."""
             logger.info(' Generating circuits...')
@@ -107,7 +104,7 @@ def TruthTable(
             mapper = {'0': [Id, Id], '1': [X90, X90]}
             self._states  = [
                 ''.join(i) for i in itertools.product(
-                    [str(j) for j in [0, 1]], 
+                    [str(j) for j in [0, 1]],
                     repeat=len(self._qubits)
                 )
             ]
@@ -116,19 +113,23 @@ def TruthTable(
                 circuit = self._circuit.copy()
                 circuit.prepend(
                     Cycle(
-                        {mapper[s][1](q) for s, q in zip(state, self._qubits)}
+                        {mapper[s][1](q) for s, q in zip(
+                            state, self._qubits, strict=False
+                        )}
                     )
                 )
                 circuit.prepend(
                     Cycle(
-                        {mapper[s][0](q) for s, q in zip(state, self._qubits)}
+                        {mapper[s][0](q) for s, q in zip(
+                            state, self._qubits, strict=False
+                        )}
                     )
                 )
                 circuit.measure(self._qubits)
                 self._circuits.append(circuit)
 
             self._circuits['input state'] = self._states
-                
+
         def analyze(self) -> None:
             """Analyze the data."""
             logger.info(' Analyzing the data...')
@@ -140,7 +141,7 @@ def TruthTable(
             probs = []
             for circuit in self._circuits:
                 probs.append(
-                    [circuit.results.marginalize(q_index).populations[state] 
+                    [circuit.results.marginalize(q_index).populations[state]
                      for state in self._states
                     ]
                 )
@@ -150,30 +151,29 @@ def TruthTable(
                 fidelity = np.trace(
                     np.matmul(self._truth_table.T, self._ideal_unitary)
                 ) / 2**len(self._qubits)
-                error = uncertainty_of_sum(
-                    [1 / np.sqrt(circuit.results.n_shots) 
+                error = np.linalg.norm(
+                    [1 / np.sqrt(circuit.results.n_shots)
                      for circuit in self._circuits
                     ]
                 ) / 2**len(self._qubits)
-                fidelity, error = round_to_order_error(fidelity, error)
-                self._fidelity = {
-                    'val': fidelity, 'err': error
-                }
+                self._fidelity = ufloat(*round_to_order_error(fidelity, error))
 
         def save(self):
             """Save all circuits and data."""
             clear_output(wait=True)
             self._data_manager._exp_id += (
-                f'_TruthTableTomography _Q{"".join(str(q) for q in self._qubits)}'
+              f'_TruthTableTomography _Q{"".join(str(q) for q in self._qubits)}'
             )
             if settings.Settings.save_data:
                 qpu.save(self)
                 np.save(
-                    self._data_manager._save_path + 'truth_table', 
+                    self._data_manager._save_path + 'truth_table',
                     self._truth_table
                 )
                 self._data_manager.save_to_csv(
-                    pd.DataFrame([self._fidelity]), 'fidelity'
+                    pd.DataFrame(
+                        [{'val': self._fidelity.n, 'err': self._fidelity.s}]
+                    ), 'fidelity'
                 )
 
         def plot(self):
@@ -216,19 +216,19 @@ def TruthTable(
 
             if settings.Settings.save_data:
                 fig.savefig(
-                    self._data_manager._save_path + 'parity_oscillations.png', 
+                    self._data_manager._save_path + 'parity_oscillations.png',
                     dpi=600,
-                    bbox_inches='tight', 
+                    bbox_inches='tight',
                     pad_inches=0
                 )
                 fig.savefig(
                     self._data_manager._save_path + 'parity_oscillations.pdf',
-                    bbox_inches='tight', 
+                    bbox_inches='tight',
                     pad_inches=0
                 )
                 fig.savefig(
                     self._data_manager._save_path + 'parity_oscillations.svg',
-                    bbox_inches='tight', 
+                    bbox_inches='tight',
                     pad_inches=0
                 )
             plt.show()
@@ -236,9 +236,10 @@ def TruthTable(
         def final(self):
             """Final experimental method."""
             if self._fidelity is not None:
-                fidelity = self._fidelity['val']
-                error = self._fidelity['err']
-                print(f'\nTruth table fidelity = {fidelity} ({error})')
+                print(
+                    '\nTruth table fidelity = '
+                    f'{self._fidelity.n} ({self._fidelity.s})'
+                )
 
             print(f"\nRuntime: {repr(self._runtime)[8:]}\n")
 

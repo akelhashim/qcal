@@ -10,7 +10,6 @@ from qcal.config import Config
 from qcal.fitting.fit import FitDecayingCosine, FitExponential
 from qcal.gate.single_qubit import Idle, X90, X, VirtualZ
 from qcal.managers.classification_manager import ClassificationManager
-from qcal.math.utils import reciprocal_uncertainty, round_to_order_error
 from qcal.qpu.qpu import QPU
 from qcal.units import MHz, us
 

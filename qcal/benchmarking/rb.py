@@ -33,6 +33,7 @@ from pygsti.protocols import (
     SimultaneousExperimentDesign,
 )
 from pygsti.protocols.protocol import ProtocolData
+from uncertainties import UFloat, ufloat
 
 from qcal.analysis.leakage import analyze_leakage
 from qcal.benchmarking.utils import plot_error_rates
@@ -48,79 +49,6 @@ from qcal.settings import Settings
 from qcal.utils import flatten, get_package_directory
 
 logger = logging.getLogger(__name__)
-
-
-def _build_crb_edesign_for_qubit_label(
-    ql:             int | Tuple[int, int],
-    pspec:          QPSpec,
-    compilations:   Dict[str, CCR],
-    circuit_depths: Sequence[int],
-    n_circuits:     int,
-    randomizeout:   bool,
-    citerations:    int,
-) -> CliffordRBDesign:
-    """
-    Build a CRB experiment design for a given qubit label.
-
-    Attempts to load a pre-generated design from the default_experiments
-    directory first; falls back to generating a new one if not found or if
-    loading fails.
-
-    Args:
-        ql (int | Tuple[int, int]): Qubit label (int for single-qubit RB, or
-            2-tuple of ints for two-qubit RB).
-        pspec (QPSpec): PyGSTi processor specification.
-        compilations (Dict[str, CCR]): Clifford compilation rules keyed by
-            compilation type (e.g. ``'absolute'``, ``'paulieq'``).
-        circuit_depths (Sequence[int]): Circuit depths to benchmark.
-        n_circuits (int): Number of circuits per depth.
-        randomizeout (bool): Whether to randomize output.
-        citerations (int): Number of iterations.
-
-    Returns:
-        CliffordRBDesign: CRB experiment design.
-    """
-    qubits = list(flatten([ql]))
-    d = '_'.join(str(depth) for depth in circuit_depths)
-    path = (
-        get_package_directory()
-        / 'qcal'
-        / 'default_experiments'
-        / f'CRB_Q{ql}_depths_{d}_ncircs_{n_circuits}'
-    )
-    if randomizeout:
-        path = path.with_name(path.name + '_randout')
-
-    edesign = None
-    if path.exists():
-        try:
-            logger.info(f" Loading pre-generated circuits from {path}/...")
-            protocol_data = pygsti.io.read_data_from_dir(path)
-            edesign = protocol_data.edesign
-            if randomizeout:
-                defaultfit = 'A-fixed'
-            else:
-                defaultfit = 'full'
-            edesign.add_default_protocol(RB(name='RB', defaultfit=defaultfit))
-        except Exception as e:
-            logger.warning(
-                f" Failed to load pre-generated circuits from "
-                f"{path} due to error: {e}. Regenerating..."
-            )
-
-    if edesign is None:
-        edesign = CliffordRBDesign(
-            pspec=pspec,
-            clifford_compilations=compilations,
-            depths=circuit_depths,
-            circuits_per_depth=n_circuits,
-            qubit_labels=[f'Q{q}' for q in qubits],
-            randomizeout=randomizeout,
-            citerations=citerations,
-            add_default_protocol=True,
-        )
-
-    return edesign
 
 
 def CRB(
@@ -293,10 +221,9 @@ def CRB(
             self._dataset = None
             self._results = None
 
-            self._error_rates = {}
+            self._process_infidelity: Dict[int | Tuple[int, int], UFloat] = {}
             self._fit_params = {}
             self._success_probabilities = {}
-            self._uncertainties = {}
 
         @property
         def qubit_labels(self) -> Sequence[int | Tuple[int, int]]:
@@ -353,20 +280,9 @@ def CRB(
             return self._fit_params
 
         @property
-        def process_infidelity(self) -> (
-            Dict[int | Tuple[int, int], Dict[str, float]]
-        ):
-            """Process infidelity and uncertainty keyed by qubit label.
-
-            Each value is ``{'val': <infidelity>, 'err': <uncertainty>}``.
-            """
-            process_infidelity = {}
-            for ql, error_rate in self._error_rates.items():
-                process_infidelity[ql] = {
-                    'val': error_rate,
-                    'err': self._uncertainties[ql]
-                }
-            return process_infidelity
+        def process_infidelity(self) -> Dict[int | Tuple[int, int], UFloat]:
+            """Process infidelity and uncertainty keyed by qubit label."""
+            return self._process_infidelity
 
         @property
         def success_probabilities(self) -> Dict[int | Tuple[int, int], Any]:
@@ -493,8 +409,9 @@ def CRB(
                     rA = self._results.fits['A-fixed'].estimates['r']
                     rAstd = self._results.fits['A-fixed'].stds['r']
                     if rAstd < rstd:
-                        self._error_rates[self._qubit_labels[0]] = rA
-                        self._uncertainties[self._qubit_labels[0]] = rAstd
+                        self._process_infidelity[
+                            self._qubit_labels[0]
+                        ] = ufloat(rA, rAstd)
                         self._fit_params[self._qubit_labels[0]] = {
                             'base': self._results.fits['A-fixed'].estimates['p'],
                             'a': self._results.fits['A-fixed'].estimates['b'],
@@ -503,8 +420,9 @@ def CRB(
                         }
 
                     else:
-                        self._error_rates[self._qubit_labels[0]] = r
-                        self._uncertainties[self._qubit_labels[0]] = rstd
+                        self._process_infidelity[
+                            self._qubit_labels[0]
+                        ] = ufloat(r, rstd)
                         self._fit_params[self._qubit_labels[0]] = {
                             'base': self._results.fits['full'].estimates['p'],
                             'a': self._results.fits['full'].estimates['b'],
@@ -559,8 +477,9 @@ def CRB(
                         rA = self._results[qtup].fits['A-fixed'].estimates['r']
                         rAstd = self._results[qtup].fits['A-fixed'].stds['r']
                         if rAstd < rstd:
-                            self._error_rates[self._qubit_labels[i]] = rA
-                            self._uncertainties[self._qubit_labels[i]] = rAstd
+                            self._process_infidelity[
+                                self._qubit_labels[i]
+                            ] = ufloat(rA, rAstd)
                             self._fit_params[self._qubit_labels[i]] = {
                                 'base': self._results[qtup].fits[
                                     'A-fixed'
@@ -574,8 +493,9 @@ def CRB(
                                 ].estimates['a']
                             }
                         else:
-                            self._error_rates[self._qubit_labels[i]] = r
-                            self._uncertainties[self._qubit_labels[i]] = rstd
+                            self._process_infidelity[
+                                self._qubit_labels[i]
+                            ] = ufloat(r, rstd)
                             self._fit_params[self._qubit_labels[i]] = {
                                 'base': self._results[qtup].fits[
                                     'full'
@@ -606,7 +526,10 @@ def CRB(
                     'CRB_success_probabilities'
                 )
                 self._data_manager.save_to_csv(
-                    pd.DataFrame(self.process_infidelity),
+                    pd.DataFrame({
+                        ql: {'val': uf.n, 'err': uf.s}
+                        for ql, uf in self.process_infidelity.items()
+                    }),
                     'CRB_process_infidelity'
                 )
                 self._data_manager.save_to_csv(
@@ -758,8 +681,7 @@ def CRB(
                         )
 
                         legend_key = 'legend' if k == 0 else f'legend{k + 1}'
-                        er = self._error_rates.get(ql, None)
-                        un = self._uncertainties.get(ql, None)
+                        pinf = self._process_infidelity.get(ql, None)
 
                         if ql in self._fit_params and np.any(finite_mask):
                             max_depth = float(np.max(depths_arr[finite_mask]))
@@ -773,9 +695,8 @@ def CRB(
                                 **self._fit_params[ql],
                             )
                             fit_label = (
-                                f'r={er:1.2e} ({un:1.2e})'
-                                if er is not None and un is not None
-                                else 'Fit'
+                                f'r={pinf.n:1.2e} ({pinf.s:1.2e})'
+                                if pinf is not None else 'Fit'
                             )
                             pfig.add_trace(
                                 go.Scatter(
@@ -862,10 +783,9 @@ def CRB(
                     }
                     pfig.show(config=save_properties)
 
-            if len(self._error_rates) > 0:
+            if len(self._process_infidelity) > 0:
                 plot_error_rates(
-                    self._error_rates,
-                    self._uncertainties,
+                    self._process_infidelity,
                     ylabel='Process Infidelity',
                     save_path=self.data_manager.save_path
                     if Settings.save_data else None
@@ -1134,3 +1054,76 @@ def SRB(
         include_rcal,
         **kwargs
     )
+
+
+def _build_crb_edesign_for_qubit_label(
+    ql:             int | Tuple[int, int],
+    pspec:          QPSpec,
+    compilations:   Dict[str, CCR],
+    circuit_depths: Sequence[int],
+    n_circuits:     int,
+    randomizeout:   bool,
+    citerations:    int,
+) -> CliffordRBDesign:
+    """
+    Build a CRB experiment design for a given qubit label.
+
+    Attempts to load a pre-generated design from the default_experiments
+    directory first; falls back to generating a new one if not found or if
+    loading fails.
+
+    Args:
+        ql (int | Tuple[int, int]): Qubit label (int for single-qubit RB, or
+            2-tuple of ints for two-qubit RB).
+        pspec (QPSpec): PyGSTi processor specification.
+        compilations (Dict[str, CCR]): Clifford compilation rules keyed by
+            compilation type (e.g. ``'absolute'``, ``'paulieq'``).
+        circuit_depths (Sequence[int]): Circuit depths to benchmark.
+        n_circuits (int): Number of circuits per depth.
+        randomizeout (bool): Whether to randomize output.
+        citerations (int): Number of iterations.
+
+    Returns:
+        CliffordRBDesign: CRB experiment design.
+    """
+    qubits = list(flatten([ql]))
+    d = '_'.join(str(depth) for depth in circuit_depths)
+    path = (
+        get_package_directory()
+        / 'qcal'
+        / 'default_experiments'
+        / f'CRB_Q{ql}_depths_{d}_ncircs_{n_circuits}'
+    )
+    if randomizeout:
+        path = path.with_name(path.name + '_randout')
+
+    edesign = None
+    if path.exists():
+        try:
+            logger.info(f" Loading pre-generated circuits from {path}/...")
+            protocol_data = pygsti.io.read_data_from_dir(path)
+            edesign = protocol_data.edesign
+            if randomizeout:
+                defaultfit = 'A-fixed'
+            else:
+                defaultfit = 'full'
+            edesign.add_default_protocol(RB(name='RB', defaultfit=defaultfit))
+        except Exception as e:
+            logger.warning(
+                f" Failed to load pre-generated circuits from "
+                f"{path} due to error: {e}. Regenerating..."
+            )
+
+    if edesign is None:
+        edesign = CliffordRBDesign(
+            pspec=pspec,
+            clifford_compilations=compilations,
+            depths=circuit_depths,
+            circuits_per_depth=n_circuits,
+            qubit_labels=[f'Q{q}' for q in qubits],
+            randomizeout=randomizeout,
+            citerations=citerations,
+            add_default_protocol=True,
+        )
+
+    return edesign

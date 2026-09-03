@@ -7,6 +7,7 @@ from typing import Any, Dict, List, Tuple
 
 import matplotlib.pyplot as plt
 import numpy as np
+from uncertainties import UFloat
 
 import qcal.settings as settings
 from qcal.config import Config
@@ -36,14 +37,15 @@ class Characterize:
         self._results = {}
         self._fit = {}
         self._char_values = defaultdict(lambda: False, {})
-        self._errors = {}
 
     @property
     def characterized_values(self) -> Dict:
         """Characterized values determined by the fit.
 
         Returns:
-            Dict: qubit to value map.
+            Dict: qubit to value map. A value is a plain float where no
+                uncertainty is computed, or a ``uncertainties.ufloat``
+                where one is.
         """
         return self._char_values
 
@@ -126,19 +128,21 @@ class Characterize:
     def final(self) -> None:
         """Save and load the config after changing parameters."""
         for q in self._qubits:
+            val = self._char_values[q]
+            if isinstance(val, UFloat):
+                val = val.n
             if self._fit and self._fit[q].fit_success:
-                self.set_param(self._params[q], self._char_values[q])
+                self.set_param(self._params[q], val)
             elif self._char_values[q]:
-                self.set_param(self._params[q], self._char_values[q])
+                self.set_param(self._params[q], val)
 
         if settings.Settings.save_data:
             self._config.save()
-            # self._config.load()
 
     def plot(
-            self, xlabel='Value Sweep', ylabel='Results', flabel='Fit',
-            save_path=''
-        ) -> None:
+        self, xlabel='Value Sweep', ylabel='Results', flabel='Fit',
+        save_path=''
+    ) -> None:
         """Plot the sweep and fit results.
 
         Args:
@@ -181,12 +185,13 @@ class Characterize:
                             self._param_sweep[q][-1],
                             100
                         )
+                        char_val = self._char_values[q]
                         ax.plot(
                             x, self._fit[q].predict(x),
                             '-', c='orange',
                             label=f'Fit: {flabel} = '\
-                               f'{round(self._char_values[q] / 1.e-6, 1)} '\
-                               rf'({round(self._errors[q] / 1.e-6, 2)}) $\mu$s'
+                               f'{round(char_val.n / 1.e-6, 1)} '\
+                               rf'({round(char_val.s / 1.e-6, 2)}) $\mu$s'
                         )
 
                     ax.legend(loc=0, fontsize=12)

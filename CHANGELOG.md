@@ -34,6 +34,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Optimized circuit plotting for large circuits by omitting per-gate
   text labels and matrix hover-text details above a node-count
   threshold
+- Replaced storing values and their errors in dictionaries with ufloats.
 
 ### Deprecated
 

@@ -17,6 +17,8 @@ from typing import Callable
 import matplotlib.pyplot as plt
 import numpy as np
 from IPython.display import clear_output
+from uncertainties import ufloat
+from uncertainties.umath import exp as uexp
 
 from qcal.analysis.leakage import analyze_leakage
 from qcal.benchmarking.utils import (
@@ -171,6 +173,15 @@ def CB(
             self._pauli_fidelities = {}
 
             qpu.__init__(self, config=config, **kwargs)
+
+        @property
+        def pauli_fidelities(self) -> dict[str, ufloat]:
+            """Estimated per-Pauli fidelities.
+
+            Returns:
+                dict[str, ufloat]: Pauli string to fidelity map.
+            """
+            return self._pauli_fidelities
 
         def generate_circuits(self) -> None:
             """Generate all CB circuits and store them in self._circuits.
@@ -382,7 +393,6 @@ def CB(
                     evs_arr = np.array(mean_evs)
                     valid = ~np.isnan(evs_arr)
 
-                    A, f_P, f_err = np.nan, np.nan, np.nan
                     if valid.sum() >= 2:
                         self._fit[pauli] = FitExponential()
                         params = self._fit[pauli].model.make_params(
@@ -395,13 +405,15 @@ def CB(
                         )
                         if self._fit[pauli].fit_success:
                             b = self._fit[pauli].fit_params['b']
-                            A = float(self._fit[pauli].fit_params['a'].value)
-                            f_P = float(np.exp(-b.value))
-                            f_err = (
-                                float(b.stderr * f_P)
-                                if b.stderr is not None else np.nan
-                            )
-                            # self._pauli_fidelities[pauli] = ufloat(f_P, f_err)
+                            if b.stderr is not None:
+                                self._pauli_fidelities[pauli] = uexp(
+                                    -ufloat(b.value, b.stderr)
+                                )
+                            else:
+                                logger.warning(
+                                    " Unable to estimate fit "
+                                    f"uncertainty for Pauli {pauli}."
+                                )
                         else:
                             logger.warning(
                                 f" Fit failed for Pauli {pauli}."
@@ -412,15 +424,13 @@ def CB(
                         )
 
             d_dim = 2 ** len(self._qubits)
-            fidelities = [
-                v['f'] for v in self._fit_params.values()
-                if not np.isnan(v['f'])
-            ]
+            fidelities = list(self._pauli_fidelities.values())
             if fidelities:
-                avg_f = float(np.mean(fidelities))
+                avg_f = sum(fidelities) / len(fidelities)
                 self._e_F = (d_dim**2 - 1) / d_dim**2 * (1 - avg_f)
                 print(
-                    f"\nProcess infidelity: e_F = {self._e_F:.4e}\n"
+                    f"\nProcess infidelity: e_F = {self._e_F.n:.4e} "
+                    f"({self._e_F.s:.4e})\n"
                 )
             else:
                 logger.warning(" No valid fidelity estimates.")
@@ -487,22 +497,19 @@ def compute_cycle_infidelity(
     """
     n_qubits = len(circs_D.labels)
     d = 2**n_qubits
-    F_D = 1 - circs_D.fit(analyze_dim=2)[0].e_F.val
-    F_ref = 1 - circs_ref.fit(analyze_dim=2)[0].e_F.val
-    err_D = circs_D.fit(analyze_dim=2)[0].e_F.std
-    err_ref = circs_ref.fit(analyze_dim=2)[0].e_F.std
+    fit_D = circs_D.fit(analyze_dim=2)[0].e_F
+    fit_ref = circs_ref.fit(analyze_dim=2)[0].e_F
+    F_D = 1 - ufloat(fit_D.val, fit_D.std)
+    F_ref = 1 - ufloat(fit_ref.val, fit_ref.std)
 
     f_D = (d**2 * F_D - 1) / (d**2 - 1)
     f_ref = (d**2 * F_ref - 1) / (d**2 - 1)
-    err_f_D = d**2 * err_D / (d**2 - 1)
-    err_f_ref = d**2 * err_ref / (d**2 - 1)
 
     e_C = (d**2 - 1) / d**2 * (1 - f_D / f_ref)
-    err_C = np.sqrt((err_f_D / f_D) ** 2 + (err_f_ref / f_ref) ** 2) * e_C
 
-    e_C, err_C = round_to_order_error(e_C, err_C)
+    e_C_val, e_C_err = round_to_order_error(e_C.n, e_C.s)
 
-    return (e_C, err_C)
+    return (e_C_val, e_C_err)
 
 
 def CB1(

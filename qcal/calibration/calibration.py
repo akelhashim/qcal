@@ -40,7 +40,6 @@ class Calibration:
         self._sweep_results = {}
         self._fit = {}
         self._cal_values = defaultdict(lambda: False, {})
-        self._errors = {}
 
         if self._config['readout/esp/enable']:
             logger.warning(
@@ -163,7 +162,10 @@ class Calibration:
                         if (isinstance(self._params[q], (list, tuple)) and
                             isinstance(self._cal_values[q], (list, tuple))):
                             for param, val in zip(
-                                self._params[q],self._cal_values[q], strict=False):
+                                self._params[q],
+                                self._cal_values[q],
+                                strict=False
+                            ):
                                 self.set_param(param, val)
                         elif (
                             isinstance(self._params[q], (list, tuple)) and not
@@ -180,8 +182,8 @@ class Calibration:
             # self._config.load()
 
     def plot(
-            self, xlabel='Value Sweep', ylabel='Results', save_path=''
-        ) -> None:
+        self, xlabel='Value Sweep', ylabel='Results', save_path=''
+    ) -> None:
         """Plot the sweep and fit results.
 
         Args:

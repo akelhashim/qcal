@@ -3,20 +3,18 @@
 For XRB, see:
 https://trueq.quantumbenchmark.com/guides/error_diagnostics/xrb.html
 """
-import qcal.settings as settings
-
-from qcal.analysis.leakage import analyze_leakage
-from qcal.config import Config
-from qcal.qpu.qpu import QPU
-from qcal.plotting.utils import calculate_nrows_ncols
-
 import logging
-import matplotlib.pyplot as plt
-import numpy as np
-
-from IPython.display import clear_output
 from typing import Any, Callable, List, Tuple
 
+import matplotlib.pyplot as plt
+import numpy as np
+from IPython.display import clear_output
+
+import qcal.settings as settings
+from qcal.analysis.leakage import analyze_leakage
+from qcal.config import Config
+from qcal.plotting.utils import calculate_nrows_ncols
+from qcal.qpu.qpu import QPU
 
 logger = logging.getLogger(__name__)
 
@@ -39,27 +37,27 @@ def XRB(qpu:             QPU,
     Args:
         qpu (QPU): custom QPU object.
         config (Config): qcal Config object.
-        qubit_labels (List[int | Tuple[int]]): a list specifying sets of 
-            system labels to be twirled together by Clifford gates in each 
+        qubit_labels (List[int | Tuple[int]]): a list specifying sets of
+            system labels to be twirled together by Clifford gates in each
             circuit. For example, [0, 1, (2, 3)] would perform single-qubit RB
             on 0 and 1, and two-qubit RB on (2, 3).
-        circuit_depths (List[int] | Tuple[int]): a list of positive integers 
+        circuit_depths (List[int] | Tuple[int]): a list of positive integers
             specifying how many cycles of random Clifford gates to generate for
             RB, for example, [4, 64, 256].
-        n_circuits (int, optional): the number of circuits for each circuit 
+        n_circuits (int, optional): the number of circuits for each circuit
             depth. Defaults to 30.
         tq_config (str | Any, optional): True-Q config yaml file or config
             object. Defaults to None.
-        compiled_pauli (bool, optional): whether or not to compile a random 
-            Pauli gate for each qubit in the cycle preceding a measurement 
+        compiled_pauli (bool, optional): whether or not to compile a random
+            Pauli gate for each qubit in the cycle preceding a measurement
             operation. Defaults to True. This is only used in SRB, if included.
         include_rcal (bool, optional): whether to measure RCAL circuits in the
             same circuit collection as the SRB circuit. Defaults to False. If
-            True, readout correction will be apply to the fit results 
+            True, readout correction will be apply to the fit results
             automatically.
         include_srb (bool, optional): whether to measure SRB circuits in
-            addition to XRB circuits. Defaults to True. Together, XRB and SRB 
-            can be used to estimate the fraction of the total error due to 
+            addition to XRB circuits. Defaults to True. Together, XRB and SRB
+            can be used to estimate the fraction of the total error due to
             coherent and stochastic errors in the gate set.
 
     Returns:
@@ -83,13 +81,13 @@ def XRB(qpu:             QPU,
             ) -> None:
             from qcal.interface.trueq.compiler import TrueqCompiler
             from qcal.interface.trueq.transpiler import TrueqTranspiler
-            
+
             try:
                 import trueq as tq
                 logger.info(f" True-Q version: {tq.__version__}")
             except ImportError:
                 logger.warning(' Unable to import trueq!')
-            
+
             self._qubit_labels = qubit_labels
             self._circuit_depths = circuit_depths
             self._n_circuits = n_circuits
@@ -98,17 +96,17 @@ def XRB(qpu:             QPU,
             self._include_srb = include_srb
 
             compiler = kwargs.get(
-                'compiler', 
+                'compiler',
                 TrueqCompiler(config if tq_config is None else tq_config)
             )
             kwargs.pop('compiler', None)
 
             transpiler = kwargs.get('transpiler', TrueqTranspiler())
             kwargs.pop('transpiler', None)
-                
+
             qpu.__init__(self,
-                config=config, 
-                compiler=compiler, 
+                config=config,
+                compiler=compiler,
                 transpiler=transpiler,
                 **kwargs
             )
@@ -123,7 +121,7 @@ def XRB(qpu:             QPU,
                 n_random_cycles=self._circuit_depths,
                 n_circuits=self._n_circuits
             )
-            
+
             if self._include_srb:
                 self._circuits += tq.make_srb(
                     labels=self._qubit_labels,
@@ -153,7 +151,7 @@ def XRB(qpu:             QPU,
                 f'_XRB_{"".join("Q"+str(q) for q in self._circuits.labels)}'
             )
             if settings.Settings.save_data:
-                qpu.save(self) 
+                qpu.save(self)
 
         def plot(self) -> None:
             """Plot the XRB fit results."""
@@ -164,7 +162,7 @@ def XRB(qpu:             QPU,
             fig, axes = plt.subplots(
                 nrows, ncols, figsize=figsize, layout='constrained'
             )
-            
+
             if isinstance(axes, np.ndarray):
                 self._circuits.plot.raw(axes=axes.ravel())
             else:
@@ -189,16 +187,16 @@ def XRB(qpu:             QPU,
                         ax.tick_params(
                             axis='both', which='major', labelsize=12
                         )
-                        ax.legend(prop=dict(size=12))
+                        ax.legend(prop={"size": 12})
                         ax.grid(True)
 
                     else:
                         ax.axis('off')
-                
+
             fig.set_tight_layout(True)
             if settings.Settings.save_data:
                 fig.savefig(
-                    self._data_manager._save_path + 'XRB_decays.png', 
+                    self._data_manager._save_path + 'XRB_decays.png',
                     dpi=600
                 )
                 fig.savefig(
@@ -220,13 +218,13 @@ def XRB(qpu:             QPU,
             ax.tick_params(
                 axis='both', which='major', labelsize=12
             )
-            ax.legend(prop=dict(size=12))
+            ax.legend(prop={"size": 12})
             ax.grid(True)
 
             fig.set_tight_layout(True)
             if settings.Settings.save_data:
                 fig.savefig(
-                    self._data_manager._save_path + 'XRB_infidelities.png', 
+                    self._data_manager._save_path + 'XRB_infidelities.png',
                     dpi=600
                 )
                 fig.savefig(
@@ -238,20 +236,20 @@ def XRB(qpu:             QPU,
             plt.show()
 
             if any(
-                res.dim == 3 for res in 
+                res.dim == 3 for res in
                 self._circuits.subset(protocol='XRB').results
             ):
                 analyze_leakage(
-                    self._circuits.subset(protocol='XRB'), 
+                    self._circuits.subset(protocol='XRB'),
                     filename=self._data_manager._save_path + 'XRB_'
                 )
 
             if self._include_srb and any(
-                res.dim == 3 for res in 
+                res.dim == 3 for res in
                 self._circuits.subset(protocol='SRB').results
             ):
                 analyze_leakage(
-                    self._circuits.subset(protocol='SRB'), 
+                    self._circuits.subset(protocol='SRB'),
                     filename=self._data_manager._save_path + 'SRB_'
                 )
 
@@ -264,7 +262,7 @@ def XRB(qpu:             QPU,
             self.generate_circuits()
             qpu.run(self, self._circuits, save=False)
             self.save()
-            self.analyze() 
+            self.analyze()
             self.plot()
             self.final()
 

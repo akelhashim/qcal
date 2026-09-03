@@ -2,9 +2,7 @@
 
 """
 import logging
-from math import gamma
 from typing import Any, Dict
-from unittest import result
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -12,10 +10,11 @@ import pandas as pd
 import plotly.colors as pc
 import plotly.graph_objects as go
 from lmfit import Parameters
+from uncertainties import correlated_values, ufloat
 
 import qcal.settings as settings
 from qcal.fitting.fit import FitExponential
-from qcal.math.utils import round_to_order_error, uncertainty_of_product
+from qcal.math.utils import round_to_order_error
 from qcal.results import Results
 from qcal.utils import save_to_pickle
 
@@ -30,7 +29,7 @@ def analyze_leakage(circuits: Any, filename: str | None = None) -> Dict:
 
     Args:
         circuits (Any): set of circuits.
-        filename (str | None, optional): filename where to save the results. 
+        filename (str | None, optional): filename where to save the results.
             Defaults to None.
 
     Returns:
@@ -87,27 +86,28 @@ def analyze_leakage(circuits: Any, filename: str | None = None) -> Dict:
             idx_c = fit[q].result.var_names.index('c')
 
             full_cov = fit[q].result.covar
-            vals = np.array([gamma, p_inf])
             if full_cov is not None:
                 cov = full_cov[np.ix_([idx_b, idx_c], [idx_b, idx_c])]
-                gamma_up_sigma = uncertainty_of_product(vals, cov=cov)
+                gamma_uf, p_inf_uf = correlated_values([gamma, p_inf], cov)
+                gamma_up_uf = gamma_uf * p_inf_uf
+            elif stderr_b is not None and stderr_c is not None:
+                gamma_uf = ufloat(gamma, stderr_b)
+                gamma_up_uf = gamma_uf * ufloat(p_inf, stderr_c)
             else:
-                if stderr_b is not None and stderr_c is not None:
-                    gamma_up_sigma = uncertainty_of_product(
-                        vals, stds=np.array([stderr_b, stderr_c])
-                    )
-                else:
-                    gamma_up_sigma = None
+                gamma_uf = ufloat(gamma, stderr_b or 0.)
+                gamma_up_uf = None
 
             if stderr_b is not None:
-                g_disp, g_sig_disp = round_to_order_error(gamma, stderr_b, 2)
+                g_disp, g_sig_disp = round_to_order_error(
+                    gamma_uf.n, gamma_uf.s, 2
+                )
                 gamma_str = f"Γ = {g_disp:.1e} ({g_sig_disp:.1e})"
             else:
                 gamma_str = f"Γ = {gamma:.1e} (NaN)"
 
-            if gamma_up_sigma is not None:
+            if gamma_up_uf is not None:
                 gu_disp, gu_sig_disp = round_to_order_error(
-                    gamma_up, gamma_up_sigma, 2
+                    gamma_up_uf.n, gamma_up_uf.s, 2
                 )
                 gamma_up_str = f"γ↑ = {gu_disp:.1e} ({gu_sig_disp:.1e})"
             else:

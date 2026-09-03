@@ -23,6 +23,7 @@ from plotly.subplots import make_subplots
 from pygsti.data import DataSet
 from pygsti.io import write_dataset
 from pygsti.modelpacks import smq2Q_XXYYII, smq2Q_XYICPHASE
+from uncertainties import ufloat
 
 from qcal.characterization.phase_estimation.analysis import (
     analyze_cz,
@@ -35,7 +36,7 @@ from qcal.characterization.phase_estimation.circuits import (
     make_cz_circuits,
     make_idle_circuits,
     make_x90_circuits,
-    make_zz_circuits
+    make_zz_circuits,
 )
 from qcal.config import Config
 from qcal.interface.pygsti.circuits import load_circuits
@@ -437,7 +438,7 @@ def RPE(
             clear_output(wait=True)
             logger.info(' Analyzing the results...')
 
-             # x8 for ZZ because we combine 8 twirled sequences
+            # x8 for ZZ because we combine 8 twirled sequences
             shot_noise = (
                 8 * np.sqrt(self._n_shots) if self._gate == 'ZZ'
                 else np.sqrt(self._n_shots)
@@ -458,10 +459,9 @@ def RPE(
                 for angle, estimates in self._angle_estimates[ql].items():
                     est = estimates[self._last_good_idx[ql]]
                     unc = np.pi / (2 * 2**self._last_good_idx[ql] * shot_noise)
-                    est, unc = round_to_order_error(est, unc)
-                    self._trusted_angle_est[ql][angle] = {
-                        'val': est, 'err': unc
-                    }
+                    self._trusted_angle_est[ql][angle] = ufloat(
+                        *round_to_order_error(est, unc)
+                    )
 
             for ql in self._qubit_labels:
                 if isinstance(ql, Iterable):
@@ -471,20 +471,18 @@ def RPE(
 
                 print(f'Last good depth: L = {2**self._last_good_idx[ql]}')
                 for angle, errors in self._angle_errors[ql].items():
-                    error = errors[self._last_good_idx[ql]]
-                    self._loss[ql][angle] = error
+                    raw_error = errors[self._last_good_idx[ql]]
+                    self._loss[ql][angle] = raw_error
                     unc = np.pi / (
                         2 * 2**self._last_good_idx[ql] * shot_noise
                     )
-                    error, unc = round_to_order_error(error, unc)
+                    err_uf = ufloat(*round_to_order_error(raw_error, unc))
+                    self._trusted_err_est[ql][angle] = err_uf
                     error_deg, unc_deg = round_to_order_error(
-                        error * 180 / np.pi, unc * 180 / np.pi
+                        err_uf.n * 180 / np.pi, err_uf.s * 180 / np.pi
                     )
-                    self._trusted_err_est[ql][angle] = {
-                        'val': error, 'err': unc
-                    }
                     print(
-                        f'{angle} error = {error} ({unc}) rad., '
+                        f'{angle} error = {err_uf.n} ({err_uf.s}) rad., '
                         f'{error_deg} ({unc_deg}) deg.'
                     )
 

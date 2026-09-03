@@ -1199,7 +1199,6 @@ def Frequency(
                 for q, val in self._cal_values.items():
                     self.set_param(self._params[q], val)
             self._config.save()
-            self._config.load()
 
             print(f"\nRuntime: {repr(self._runtime)[8:]}\n")
 
@@ -2624,7 +2623,6 @@ def SpectatorPhase(
             for q in self._squbits:
                 self.set_param(self._params[q], self._cal_values[q])
             self._config.save()
-            self._config.load()
             print(f"\nRuntime: {repr(self._runtime)[8:]}\n")
 
         def run(self):

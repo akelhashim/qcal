@@ -1,29 +1,28 @@
 """Submodule for cross-entropy benchmarking.
 
 """
-import qcal.settings as settings
+import logging
+from typing import Any, Callable, Dict, Iterable
 
+from IPython.display import clear_output
+
+import qcal.settings as settings
 from qcal.circuit import CircuitSet
 from qcal.config import Config
 from qcal.qpu.qpu import QPU
 
-import logging
-
-from IPython.display import clear_output
-from typing import Any, Dict, Callable, Iterable
-
-
 logger = logging.getLogger(__name__)
 
 
-def XEB(qpu:               QPU,
-        config:            Config,
-        api_key:           str,
-        interleaved_layer: Any,
-        circuit_depths:    Iterable[int],
-        n_circuits:        int = 30,
-        **kwargs
-    ) -> Callable:
+def XEB(
+    qpu:               QPU,
+    config:            Config,
+    api_key:           str,
+    interleaved_layer: Any,
+    circuit_depths:    Iterable[int],
+    n_circuits:        int = 30,
+    **kwargs
+) -> Callable:
     """Cross-Entropy Benchmarking
 
     This is a SupermarQ protocol. See:
@@ -59,7 +58,7 @@ def XEB(qpu:               QPU,
             ) -> None:
             from qcal.interface.superstaq.compiler import CirqCompiler
             from qcal.interface.superstaq.transpiler import CirqTranspiler
-            
+
             try:
                 import supermarq
                 logger.info(f" SupermarQ: {supermarq.__version__}")
@@ -71,21 +70,21 @@ def XEB(qpu:               QPU,
                 logger.info(f" cirq: {cirq.__version__}")
             except ImportError:
                 logger.warning(' Unable to import cirq!')
-            
+
             self._interleaved_layer = interleaved_layer
             self._circuit_depths = circuit_depths
             self._n_circuits = n_circuits
             self._qubits = tuple([q.x for q in interleaved_layer.qubits])
-            
+
             compiler = kwargs.get('compiler', CirqCompiler(api_key, config))
             kwargs.pop('compiler', None)
 
             transpiler = kwargs.get('transpiler', CirqTranspiler())
             kwargs.pop('transpiler', None)
-                
+
             qpu.__init__(self,
-                config=config, 
-                compiler=compiler, 
+                config=config,
+                compiler=compiler,
                 transpiler=transpiler,
                 **kwargs
             )
@@ -104,7 +103,7 @@ def XEB(qpu:               QPU,
                 Dict: results records.
             """
             return self._records
-        
+
         @property
         def results(self) -> Any:
             """QCVV results.
@@ -137,7 +136,9 @@ def XEB(qpu:               QPU,
 
             self._records = {
                 str(uuid): result for uuid, result in zip(
-                    self._circuits['uuids'], self._circuits['results']
+                    self._circuits['uuids'],
+                    self._circuits['results'],
+                    strict=False
                 )
             }
             self._results = self._xeb.results_from_records(self._records)
@@ -146,16 +147,16 @@ def XEB(qpu:               QPU,
             print('')
             try:
                 for qs in self._qubit_subsets:
-                    results = self._results[[q for q in list(qs)]]
+                    results = self._results[list(qs)]
                     qubits = [q.x for q in list(qs)]
                     results.analyze(
-                        plot_filename=self._data_manager._save_path + 
-                        f'XEB_Q{"".join(str(q) for q in qubits)}.png' 
+                        plot_filename=self._data_manager._save_path +
+                        f'XEB_Q{"".join(str(q) for q in qubits)}.png'
                         if settings.Settings.save_data else None
                     )
                     results.plot_speckle(
-                        filename=self._data_manager._save_path + 
-                        f'speckle_Q{"".join("Q"+str(q) for q in qubits)}.png' 
+                        filename=self._data_manager._save_path +
+                        f'speckle_Q{"".join("Q"+str(q) for q in qubits)}.png'
                         if settings.Settings.save_data else None
                     )
             except Exception:
@@ -168,7 +169,7 @@ def XEB(qpu:               QPU,
                 f'_XEB_{"".join("Q"+str(q) for q in self._qubits)}'
             )
             if settings.Settings.save_data:
-                qpu.save(self) 
+                qpu.save(self)
 
         def final(self) -> None:
             """Final benchmarking method."""
@@ -178,7 +179,7 @@ def XEB(qpu:               QPU,
             """Run all experimental methods and analyze results."""
             self.generate_circuits()
             qpu.run(self, self._circuits, save=False)
-            self.save() 
+            self.save()
             self.analyze()
             self.final()
 

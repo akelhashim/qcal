@@ -3,20 +3,18 @@
 For IRB, see:
 https://trueq.quantumbenchmark.com/guides/error_diagnostics/irb.html
 """
-import qcal.settings as settings
-
-from qcal.analysis.leakage import analyze_leakage
-from qcal.config import Config
-from qcal.qpu.qpu import QPU
-from qcal.plotting.utils import calculate_nrows_ncols
-
 import logging
-import matplotlib.pyplot as plt
-import numpy as np
-
-from IPython.display import clear_output
 from typing import Any, Callable, Dict, List, Tuple
 
+import matplotlib.pyplot as plt
+import numpy as np
+from IPython.display import clear_output
+
+import qcal.settings as settings
+from qcal.analysis.leakage import analyze_leakage
+from qcal.config import Config
+from qcal.plotting.utils import calculate_nrows_ncols
+from qcal.qpu.qpu import QPU
 
 logger = logging.getLogger(__name__)
 
@@ -28,7 +26,7 @@ def IRB(qpu:                  QPU,
         circuit_depths:       List[int] | Tuple[int],
         n_circuits:           int = 30,
         tq_config:            str | Any = None,
-        twirl:                str = None, 
+        twirl:                str = None,
         propogate_correction: bool = False,
         compiled_pauli:       bool = True,
         include_rcal:         bool = False,
@@ -43,30 +41,30 @@ def IRB(qpu:                  QPU,
         qpu (QPU): custom QPU object.
         config (Config): qcal Config object.
         cycle (Dict, tq.Cycle): cycle (or subcircuit) to benchmark.
-        circuit_depths (List[int] | Tuple[int]): a list of positive integers 
+        circuit_depths (List[int] | Tuple[int]): a list of positive integers
             specifying how many cycles of random Clifford gates to generate for
             IRB, for example, [4, 64, 256].
-        n_circuits (int, optional): the number of circuits for each circuit 
+        n_circuits (int, optional): the number of circuits for each circuit
             depth. Defaults to 30.
         tq_config (str | Any, optional): True-Q config yaml file or config
             object. Defaults to None.
-        twirl (tq.Twirl, str, optional): The Twirl to use in this protocol. 
-            Defaults to 'P'. You can also specify a twirling group that will be 
-            used to automatically instantiate a twirl based on the labels in 
+        twirl (tq.Twirl, str, optional): The Twirl to use in this protocol.
+            Defaults to 'P'. You can also specify a twirling group that will be
+            used to automatically instantiate a twirl based on the labels in
             the given cycles.
-        propagate_correction (bool, optional): whether to propagate correction 
-            gates to the end of the circuit or compile them into neighbouring 
-            cycles. Defaults to False. Warning: this can result in arbitrary 
+        propagate_correction (bool, optional): whether to propagate correction
+            gates to the end of the circuit or compile them into neighbouring
+            cycles. Defaults to False. Warning: this can result in arbitrary
             multi-qubit gates at the end of the circuit!
-        compiled_pauli (bool, optional): whether or not to compile a random 
-            Pauli gate for each qubit in the cycle preceding a measurement 
+        compiled_pauli (bool, optional): whether or not to compile a random
+            Pauli gate for each qubit in the cycle preceding a measurement
             operation. Defaults to True.
         include_rcal (bool, optional): whether to measure RCAL circuits in the
             same circuit collection as the SRB circuit. Defaults to False. If
-            True, readout correction will be apply to the fit results 
+            True, readout correction will be apply to the fit results
             automatically.
         include_srb (bool, optional): whether to measure SRB circuits in
-            addition to IRB circuits. Defaults to True. Together, IRB and SRB 
+            addition to IRB circuits. Defaults to True. Together, IRB and SRB
             can be used to estimate interleaved gate error.
 
     Returns:
@@ -83,7 +81,7 @@ def IRB(qpu:                  QPU,
                 n_circuits:           int = 30,
                 tq_config:            str | Any = None,
                 twirl:                str = None,
-                qubit_labels:         List[int | Tuple[int]] = None, 
+                qubit_labels:         List[int | Tuple[int]] = None,
                 propogate_correction: bool = False,
                 compiled_pauli:       bool = True,
                 include_rcal:         bool = False,
@@ -92,7 +90,7 @@ def IRB(qpu:                  QPU,
             ) -> None:
             from qcal.interface.trueq.compiler import TrueqCompiler
             from qcal.interface.trueq.transpiler import TrueqTranspiler
-            
+
             try:
                 import trueq as tq
                 logger.info(f" True-Q version: {tq.__version__}")
@@ -103,7 +101,7 @@ def IRB(qpu:                  QPU,
                 raise ValueError(
                     "qubit_labels must be specified if include_srb!"
                 )
-            
+
             self._cycle = cycle
             self._circuit_depths = circuit_depths
             self._n_circuits = n_circuits
@@ -115,17 +113,17 @@ def IRB(qpu:                  QPU,
             self._include_srb = include_srb
 
             compiler = kwargs.get(
-                'compiler', 
+                'compiler',
                 TrueqCompiler(config if tq_config is None else tq_config)
             )
             kwargs.pop('compiler', None)
 
             transpiler = kwargs.get('transpiler', TrueqTranspiler())
             kwargs.pop('transpiler', None)
-                
+
             qpu.__init__(self,
-                config=config, 
-                compiler=compiler, 
+                config=config,
+                compiler=compiler,
                 transpiler=transpiler,
                 **kwargs
             )
@@ -143,7 +141,7 @@ def IRB(qpu:                  QPU,
                 propagate_correction=self._propogate_correction,
                 compiled_pauli=self._compiled_pauli
             )
-            
+
             if self._include_srb:
                 self._circuits += tq.make_srb(
                     labels=self._qubit_labels,
@@ -173,7 +171,7 @@ def IRB(qpu:                  QPU,
                 f'_IRB_{"".join("Q" + str(q) for q in self._circuits.labels)}'
             )
             if settings.Settings.save_data:
-                qpu.save(self) 
+                qpu.save(self)
 
         def plot(self) -> None:
             """Plot the IRB fit results."""
@@ -184,7 +182,7 @@ def IRB(qpu:                  QPU,
             fig, axes = plt.subplots(
                 nrows, ncols, figsize=figsize, layout='constrained'
             )
-            
+
             if isinstance(axes, np.ndarray):
                 self._circuits.plot.raw(axes=axes.ravel())
             else:
@@ -209,16 +207,16 @@ def IRB(qpu:                  QPU,
                         ax.tick_params(
                             axis='both', which='major', labelsize=12
                         )
-                        ax.legend(prop=dict(size=12))
+                        ax.legend(prop={"size": 12})
                         ax.grid(True)
 
                     else:
                         ax.axis('off')
-                
+
             fig.set_tight_layout(True)
             if settings.Settings.save_data:
                 fig.savefig(
-                    self._data_manager._save_path + 'IRB_decays.png', 
+                    self._data_manager._save_path + 'IRB_decays.png',
                     dpi=600
                 )
                 fig.savefig(
@@ -240,13 +238,13 @@ def IRB(qpu:                  QPU,
             ax.tick_params(
                 axis='both', which='major', labelsize=12
             )
-            ax.legend(prop=dict(size=12))
+            ax.legend(prop={"size": 12})
             ax.grid(True)
 
             fig.set_tight_layout(True)
             if settings.Settings.save_data:
                 fig.savefig(
-                    self._data_manager._save_path + 'IRB_summary.png', 
+                    self._data_manager._save_path + 'IRB_summary.png',
                     dpi=600
                 )
                 fig.savefig(
@@ -258,20 +256,20 @@ def IRB(qpu:                  QPU,
             plt.show()
 
             if any(
-                res.dim == 3 for res in 
+                res.dim == 3 for res in
                 self._circuits.subset(protocol='IRB').results
             ):
                 analyze_leakage(
-                    self._circuits.subset(protocol='IRB'), 
+                    self._circuits.subset(protocol='IRB'),
                     filename=self._data_manager._save_path + 'IRB_'
                 )
 
             if self._include_srb and any(
-                res.dim == 3 for res in 
+                res.dim == 3 for res in
                 self._circuits.subset(protocol='SRB').results
             ):
                 analyze_leakage(
-                    self._circuits.subset(protocol='SRB'), 
+                    self._circuits.subset(protocol='SRB'),
                     filename=self._data_manager._save_path + 'SRB_'
                 )
 
@@ -284,7 +282,7 @@ def IRB(qpu:                  QPU,
             self.generate_circuits()
             qpu.run(self, self._circuits, save=False)
             self.save()
-            self.analyze() 
+            self.analyze()
             self.plot()
             self.final()
 
