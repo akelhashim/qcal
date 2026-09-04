@@ -26,3 +26,11 @@ quantum_calibration.egg-info/
 .vscode/
 
 .claude/
+
+.coverage
+
+.coverage.*
+
+htmlcov/
+
+.pytest_cache/
