@@ -15,6 +15,7 @@ import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 from pandas import DataFrame
+from uncertainties import ufloat
 
 from qcal.math.entropy import shannon_entropy
 from qcal.math.probability import total_variation_distance
@@ -389,13 +390,13 @@ class Results:
 
         fig.show(config=save_properties)
 
-    def tvd(self, results: Results) -> float:
+    def tvd(self, results: Results) -> ufloat:
         """Total Variation Distance
 
         Args:
             results (Results): other results.
 
         Returns:
-            float: tvd.
+            ufloat: tvd, with propagated shot-noise uncertainty.
         """
         return total_variation_distance(self, results)
