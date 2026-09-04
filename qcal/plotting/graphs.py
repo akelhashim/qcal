@@ -12,7 +12,7 @@ from plotly.graph_objs.scatter import Marker
 
 from qcal.circuit import Circuit
 from qcal.config import Config
-from qcal.gate.gate import Gate
+from qcal.gates.gate import Gate
 
 logger = logging.getLogger(__name__)
 
@@ -31,11 +31,22 @@ def format_gate_text(gate: Gate):
         text += f'Alias: {gate.alias}<br>'
     text += f'Qubits: {gate.qubits}<br>'
     text += f'Dim: {gate.dim}<br>'
-    text += (
-        'Matrix: <br>  '
-        + np.array_str(np.around(gate.matrix, 3)).replace("\n ", "<br>" + '   ')
-        + '<br>'
-    )
+    if gate.unitary is not None:
+        text += (
+            'Unitary: <br>  '
+            + np.array_str(np.around(gate.unitary, 3)).replace(
+                "\n ", "<br>" + '   '
+            )
+            + '<br>'
+        )
+    else:
+        text += (
+            'Matrix: <br>  '
+            + np.array_str(np.around(gate.matrix, 3)).replace(
+                "\n ", "<br>" + '   '
+            )
+            + '<br>'
+        )
     if gate.locally_equivalent is not None:
         text += f'Locally Equivalent: {gate.locally_equivalent}<br>'
     text += f'Subspace: {gate.subspace}<br>'
@@ -102,7 +113,7 @@ def draw_circuit(circuit: Circuit, show: bool = True):
         else:
             c -= n_barriers
             for gate in cycle.gates:
-                if gate.is_single_qubit:
+                if gate.is_single_qudit:
                     for q in gate.qubits:
                         node_x.append(c)
                         node_y.append(circuit.qubits.index(q))
@@ -138,7 +149,7 @@ def draw_circuit(circuit: Circuit, show: bool = True):
                     marker_colors.extend(
                         [color_map[gate.name]] * len(gate.qubits)
                     )
-                elif gate.is_multi_qubit:
+                elif gate.is_multi_qudit:
                     for q in gate.qubits:
                         node_x.append(c)
                         node_y.append(circuit.qubits.index(q))
@@ -203,7 +214,7 @@ def draw_circuit(circuit: Circuit, show: bool = True):
             for gate in cycle.gates:
                 edge_x_mq = []
                 edge_y_mq = []
-                if gate.is_multi_qubit:
+                if gate.is_multi_qudit:
                     for q in gate.qubits:
                         edge_x_mq.append(c)
                         edge_y_mq.append(circuit.qubits.index(q))

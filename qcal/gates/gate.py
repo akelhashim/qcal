@@ -10,7 +10,7 @@ from sympy import Matrix
 
 class Gate:
 
-    __slots__ = ['_matrix', '_properties']
+    __slots__ = ['_matrix', '_properties', '_unitary']
 
     def __init__(self,
         matrix: NDArray,
@@ -23,6 +23,7 @@ class Gate:
             qubits (int | tuple): qubit label(s).
         """
         self._matrix = matrix
+        self._unitary = matrix
         self._properties = {
             'alias':  None,
             'dim':    self._matrix.shape[0],
@@ -148,28 +149,40 @@ class Gate:
         return self._properties['dim']
 
     @property
-    def is_single_qubit(self) -> bool: # TODO: make compatible with qutrits
+    def is_single_qubit(self) -> bool:
         """Whether or not the gate acts on a single qubit.
 
         Returns:
             bool: single-qubit gate or not.
         """
-        if len(self.qubits) == 1:
-            return True
-        else:
-            return False
+        return len(self.qubits) == 1 and self.dim == 2
 
     @property
-    def is_multi_qubit(self) -> bool: # TODO: make compatible with qutrits
+    def is_single_qudit(self) -> bool:
+        """Whether or not the gate acts on a single qudit.
+
+        Returns:
+            bool: single-qudit gate or not.
+        """
+        return len(self.qudits) == 1
+
+    @property
+    def is_multi_qubit(self) -> bool:
         """Whether or not the gate acts on multiple qubits.
 
         Returns:
             bool: multi-qubit gate or not.
         """
-        if len(self.qubits) > 1:
-            return True
-        else:
-            return False
+        return len(self.qubits) > 1 and self.dim == 2 ** len(self.qubits)
+
+    @property
+    def is_multi_qudit(self) -> bool:
+        """Whether or not the gate acts on multiple qudits.
+
+        Returns:
+            bool: multi-qudit gate or not.
+        """
+        return len(self.qudits) > 1
 
     @property
     def is_measurement(self) -> bool:
@@ -197,6 +210,34 @@ class Gate:
             NDArray: numpy array of the matrix.
         """
         return self._matrix
+
+    @property
+    def unitary(self) -> NDArray:
+        """The unitary matrix of the gate in the full qudit space.
+
+        For 2×2 gates with ``subspace='EF'``, the matrix is embedded
+        into the |1⟩–|2⟩ block of a 3×3 qutrit space. All other
+        gates are returned as-is.
+
+        Returns:
+            NDArray: numpy array of the unitary matrix, or None for
+                non-unitary operations (measurements, reset).
+        """
+        if (self._properties['subspace'] == 'EF'
+                and self._unitary.shape[0] == 2):
+            U = np.eye(3, dtype=complex)
+            U[1:3, 1:3] = self._unitary
+            return U
+        return self._unitary
+
+    @unitary.setter
+    def unitary(self, matrix: NDArray) -> None:
+        """Set a measured (potentially imperfect) unitary matrix.
+
+        Args:
+            matrix (NDArray): numpy array of the measured unitary.
+        """
+        self._unitary = matrix
 
     @property
     def name(self) -> str:
@@ -233,3 +274,12 @@ class Gate:
             tuple: qubit label(s).
         """
         return self._properties['qubits']
+
+    @property
+    def qudits(self) -> tuple:
+        """The qudit(s) that the gate acts on.
+
+        Returns:
+            tuple: qudit label(s).
+        """
+        return self.qubits

@@ -8,7 +8,7 @@ from qcal.circuit import Barrier, Cycle, Circuit, CircuitSet
 from qcal.compilation.compiler import Compiler
 from qcal.config import Config
 from qcal.fitting.fit import FitDecayingCosine, FitExponential
-from qcal.gate.single_qubit import Idle, X90, X, VirtualZ
+from qcal.gates.single_qubit import Idle, X90, X, VirtualZ
 from qcal.managers.classification_manager import ClassificationManager
 from qcal.math.utils import reciprocal_uncertainty, round_to_order_error
 from qcal.qpu.qpu import QPU

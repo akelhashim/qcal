@@ -17,8 +17,8 @@ from qcal.backend.qubic.utils import generate_pulse_env
 from qcal.calibration.utils import find_pulse_index
 from qcal.circuit import Circuit, CircuitSet, Cycle
 from qcal.config import Config
-from qcal.gate.gate import Gate
-from qcal.gate.single_qubit import (
+from qcal.gates.gate import Gate
+from qcal.gates.single_qubit import (
     MCM, X90, Id, Idle, Meas, Reset, Rz, VirtualZ, X, Z
 )
 from qcal.sequence.dynamical_decoupling import DD_SEQUENCES
@@ -1185,7 +1185,7 @@ class Transpiler:
                 }
             )
             for gate in config.native_gates['set']:
-                if gate in qcal.gate.single_qubit.__all__:
+                if gate in qcal.gates.single_qubit.__all__:
                     self._gate_mapper[gate] = add_single_qubit_gate
                 else:
                     self._gate_mapper[gate] = add_multi_qubit_gate

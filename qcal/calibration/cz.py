@@ -20,8 +20,8 @@ from qcal.circuit import Barrier, Circuit, CircuitSet, Cycle
 from qcal.config import Config
 from qcal.fitting.fit import FitCosine, FitParabola
 from qcal.fitting.utils import est_freq_fft
-from qcal.gate.single_qubit import X90, Rz
-from qcal.gate.two_qubit import CZ
+from qcal.gates.single_qubit import X90, Rz
+from qcal.gates.two_qubit import CZ
 from qcal.math.utils import wrap_phase
 from qcal.plotting.utils import calculate_nrows_ncols
 from qcal.qpu.qpu import QPU

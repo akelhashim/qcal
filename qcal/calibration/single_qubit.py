@@ -23,7 +23,7 @@ from qcal.fitting.fit import (
     FitParabola,
 )
 from qcal.fitting.utils import est_freq_fft
-from qcal.gate.single_qubit import X90, Idle, Rz, X
+from qcal.gates.single_qubit import X90, Idle, Rz, X
 from qcal.math.utils import round_to_order_error, wrap_phase
 from qcal.plotting.utils import calculate_nrows_ncols
 from qcal.qpu.qpu import QPU

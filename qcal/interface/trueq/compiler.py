@@ -13,7 +13,7 @@ import numpy as np
 from scipy.linalg import block_diag
 
 from qcal.config import Config
-from qcal.gate.two_qubit import TWO_QUBIT_GATES
+from qcal.gates.two_qubit import TWO_QUBIT_GATES
 
 logger = logging.getLogger(__name__)
 
