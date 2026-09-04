@@ -16,7 +16,10 @@ from typing import Callable
 
 import matplotlib.pyplot as plt
 import numpy as np
+import plotly.graph_objects as go
 from IPython.display import clear_output
+from plotly.colors import qualitative
+from plotly.subplots import make_subplots
 from uncertainties import ufloat
 from uncertainties.umath import exp as uexp
 
@@ -34,6 +37,7 @@ from qcal.compilation.utils import composes_to_identity
 from qcal.config import Config
 from qcal.fitting.fit import FitExponential
 from qcal.math.utils import round_to_order_error
+from qcal.plotting.utils import calculate_nrows_ncols
 from qcal.qpu.qpu import QPU
 from qcal.settings import Settings
 
@@ -171,6 +175,7 @@ def CB(
 
             self._fit = {}
             self._pauli_fidelities = {}
+            self._decay_curves = {}
 
             qpu.__init__(self, config=config, **kwargs)
 
@@ -392,6 +397,9 @@ def CB(
 
                     evs_arr = np.array(mean_evs)
                     valid = ~np.isnan(evs_arr)
+                    self._decay_curves[pauli] = (
+                        depths[valid], evs_arr[valid]
+                    )
 
                     if valid.sum() >= 2:
                         self._fit[pauli] = FitExponential()
@@ -437,17 +445,207 @@ def CB(
                 self._e_F = np.nan
 
         def plot(self) -> None:
-            """Plot per-Pauli decay curves (mean EV vs depth) with fitted
-            exponentials.
+            """Plot per-Pauli decay curves and Pauli infidelities.
 
-            One subplot per sampled Pauli string showing:
-              - Scatter: mean EV per depth
-              - Line: fitted A * f_P^depth
-              - Legend entry with f_P ± uncertainty
+            Generates two figures:
+              1. Raw decays: one subplot per sampled Pauli string,
+                 showing the mean EV per depth (markers) and the fitted
+                 A * f_P^depth curve (line), with f_P ± uncertainty in
+                 the legend.
+              2. Pauli infidelities: a bar plot of 1 - f_P per Pauli
+                 string, with the process infidelity e_F drawn as a
+                 horizontal line.
 
-            TODO: implement after analyze() is complete.
+            Plotly figures are shown for interactive use; matplotlib
+            equivalents are saved to disk when Settings.save_data is
+            True.
             """
-            raise NotImplementedError
+            paulis = sorted(self._decay_curves.keys())
+            colors = qualitative.Plotly
+
+            # ---- Plot 1: raw decays ------------------------------
+            if paulis:
+                nrows, ncols = calculate_nrows_ncols(len(paulis))
+
+                pfig = make_subplots(
+                    rows=nrows, cols=ncols, subplot_titles=paulis
+                )
+                pfig.update_annotations(font_size=12)
+
+                if Settings.save_data:
+                    mfig, maxes = plt.subplots(
+                        nrows, ncols,
+                        figsize=(4 * ncols, 3.5 * nrows),
+                        layout='constrained',
+                        squeeze=False,
+                    )
+
+                for k, pauli in enumerate(paulis):
+                    row, col = (k // ncols) + 1, (k % ncols) + 1
+                    color = colors[k % len(colors)]
+                    depths, evs = self._decay_curves[pauli]
+
+                    pfig.add_trace(
+                        go.Scatter(
+                            x=depths, y=evs, mode='markers',
+                            marker={'size': 8, 'color': color},
+                            showlegend=False,
+                        ),
+                        row=row, col=col,
+                    )
+                    if Settings.save_data:
+                        ax = maxes[row - 1][col - 1]
+                        ax.plot(
+                            depths, evs, 'o', color=color, markersize=6
+                        )
+
+                    fit = self._fit.get(pauli)
+                    f_p = self._pauli_fidelities.get(pauli)
+                    if fit is not None and fit.fit_success and depths.size:
+                        xfit = np.linspace(depths.min(), depths.max(), 200)
+                        yfit = fit.predict(xfit)
+                        label = (
+                            f'f={f_p.n:.4f} ({f_p.s:.4f})'
+                            if f_p is not None else 'Fit'
+                        )
+                        pfig.add_trace(
+                            go.Scatter(
+                                x=xfit, y=yfit, mode='lines',
+                                line={'color': color, 'width': 2},
+                                name=label, showlegend=True,
+                                legend=f'legend{k + 1}' if k else 'legend',
+                            ),
+                            row=row, col=col,
+                        )
+                        if Settings.save_data:
+                            ax.plot(xfit, yfit, '-', color=color)
+                            ax.legend([label], fontsize=8)
+
+                    pfig.update_xaxes(
+                        title_text='Cycle Depth' if row == nrows else '',
+                        showgrid=True, row=row, col=col,
+                    )
+                    pfig.update_yaxes(
+                        title_text='Expectation Value' if col == 1 else '',
+                        showgrid=True, row=row, col=col,
+                    )
+                    if Settings.save_data:
+                        if row == nrows:
+                            ax.set_xlabel('Cycle Depth')
+                        if col == 1:
+                            ax.set_ylabel('Expectation Value')
+                        ax.grid(True)
+
+                pfig.update_layout(
+                    height=300 * nrows,
+                    width=300 * ncols + 50,
+                    template='plotly_white',
+                    paper_bgcolor='white',
+                    plot_bgcolor='#fbfbfd',
+                    title_text='Pauli Decays',
+                )
+                pfig.update_xaxes(
+                    showline=True, mirror=True, linecolor='#c7c7c7',
+                    linewidth=1, gridcolor='#e5e7eb', zeroline=False,
+                    ticks='outside',
+                )
+                pfig.update_yaxes(
+                    showline=True, mirror=True, linecolor='#c7c7c7',
+                    linewidth=1, gridcolor='#e5e7eb', zeroline=False,
+                    ticks='outside',
+                )
+                pfig.show()
+
+                if Settings.save_data:
+                    for idx in range(len(paulis), nrows * ncols):
+                        maxes[idx // ncols][idx % ncols].axis('off')
+                    mfig.suptitle('Pauli Decays')
+                    mfig.savefig(
+                        self._data_manager._save_path + 'CB_decays.png',
+                        dpi=300,
+                    )
+                    plt.close(mfig)
+
+            # ---- Plot 2: Pauli infidelities ----------------------
+            if self._pauli_fidelities:
+                pauli_labels = sorted(self._pauli_fidelities.keys())
+                infidelities = [
+                    1 - self._pauli_fidelities[p] for p in pauli_labels
+                ]
+                y = [inf.n for inf in infidelities]
+                yerr = [inf.s for inf in infidelities]
+                e_F_label = f'e_F = {self._e_F.n:.2e} ({self._e_F.s:.2e})'
+
+                pfig2 = go.Figure()
+                pfig2.add_trace(
+                    go.Bar(
+                        x=pauli_labels, y=y,
+                        error_y={
+                            'type': 'data', 'array': yerr, 'visible': True
+                        },
+                        marker_color='#1f77b4',
+                        name='Pauli infidelity',
+                        showlegend=False,
+                    )
+                )
+                pfig2.add_hline(
+                    y=self._e_F.n,
+                    line={'color': 'red', 'dash': 'dash'},
+                    annotation_text=e_F_label,
+                    annotation_position='top left',
+                )
+                pfig2.update_layout(
+                    height=450,
+                    width=min(80 * len(pauli_labels) + 200, 1200),
+                    template='plotly_white',
+                    paper_bgcolor='white',
+                    plot_bgcolor='#fbfbfd',
+                    title_text='Pauli Infidelities',
+                )
+                pfig2.update_xaxes(
+                    title_text='Pauli Decay Term', type='category',
+                    showgrid=True, showline=True, mirror=True,
+                    linecolor='#c7c7c7', linewidth=1,
+                    gridcolor='#e5e7eb', zeroline=False, ticks='outside',
+                )
+                pfig2.update_yaxes(
+                    title_text='Infidelity', showgrid=True,
+                    showline=True, mirror=True, linecolor='#c7c7c7',
+                    linewidth=1, gridcolor='#e5e7eb', zeroline=False,
+                    ticks='outside',
+                )
+                pfig2.show()
+
+                if Settings.save_data:
+                    mfig2 = plt.figure(
+                        figsize=(min(0.6 * len(pauli_labels) + 3, 12), 5)
+                    )
+                    x = np.arange(len(pauli_labels))
+                    plt.bar(x, y, yerr=yerr, color='#1f77b4', capsize=3)
+                    plt.axhline(
+                        self._e_F.n, color='red', linestyle='--',
+                        label=e_F_label,
+                    )
+                    plt.xticks(x, pauli_labels, rotation=45, ha='right')
+                    plt.xlabel('Pauli Decay Term', fontsize=15)
+                    plt.ylabel('Infidelity', fontsize=15)
+                    plt.legend(fontsize=12)
+                    plt.grid(True)
+                    mfig2.set_tight_layout(True)
+                    mfig2.savefig(
+                        self._data_manager._save_path
+                        + 'CB_infidelities.png',
+                        dpi=600,
+                    )
+                    mfig2.savefig(
+                        self._data_manager._save_path
+                        + 'CB_infidelities.pdf'
+                    )
+                    mfig2.savefig(
+                        self._data_manager._save_path
+                        + 'CB_infidelities.svg'
+                    )
+                    plt.close(mfig2)
 
         def save(self) -> None:
             """Save all circuits and data."""
