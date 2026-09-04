@@ -1,9 +1,23 @@
 """Shared fixtures for the qcal test suite."""
+from pathlib import Path
+
 import pytest
 
 from qcal.circuit import Circuit, Cycle
+from qcal.config import Config
 from qcal.gates.single_qubit import H, X, Y
 from qcal.gates.two_qubit import CNOT
+
+EXAMPLE_CONFIG_PATH = str(
+    Path(__file__).resolve().parents[1] / 'examples' / 'config' /
+    'config.yaml'
+)
+
+
+@pytest.fixture
+def config():
+    """A fresh Config loaded from the example config.yaml."""
+    return Config(EXAMPLE_CONFIG_PATH)
 
 
 @pytest.fixture

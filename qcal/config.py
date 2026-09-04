@@ -131,7 +131,7 @@ class Config:
             dict: copy of the config dictionary.
         """
         if deep_copy is True:
-            return copy.deepycopy(self._parameters)
+            return copy.deepcopy(self._parameters)
         else:
             return self._parameters.copy()
 
