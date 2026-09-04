@@ -19,7 +19,7 @@ import numpy as np
 import plotly.graph_objects as go
 from IPython.display import clear_output
 from plotly.colors import qualitative
-from uncertainties import ufloat
+from uncertainties import ufloat, unumpy
 from uncertainties.umath import exp as uexp
 
 from qcal.analysis.leakage import analyze_leakage
@@ -43,6 +43,59 @@ logger = logging.getLogger(__name__)
 
 
 __all__ = ['CB', 'CB1', 'SC']
+
+
+def compute_cycle_infidelity(
+    f_D: ufloat, f_ref: ufloat, n_qubits: int
+) -> ufloat:
+    """Estimate the bare infidelity of an interleaved cycle.
+
+    Divides out the average Pauli fidelity of the reference (empty)
+    cycle from that of the interleaved (dressed) cycle, isolating the
+    infidelity contributed by cycle_or_circuit itself from that of the
+    random Pauli twirling gates.
+
+    Args:
+        f_D (ufloat): average Pauli fidelity of the interleaved
+            (dressed) cycle.
+        f_ref (ufloat): average Pauli fidelity of the reference (empty)
+            cycle.
+        n_qubits (int): number of qubits the cycle acts on.
+
+    Returns:
+        ufloat: estimated bare process infidelity of cycle_or_circuit.
+    """
+    d = 2 ** n_qubits
+    return (d**2 - 1) / d**2 * (1 - f_D / f_ref)
+
+
+def compute_cycle_infidelity1(
+    circs_D: trueq.CircuitCollection, circs_ref: trueq.CircuitCollection  # noqa: F821 # type: ignore
+) -> tuple:
+    """Compute the infidelity of the interleaved Cycle.
+
+    Args:
+        circs_D (trueq.CircuitCollection): dressed circuits
+        circs_ref (trueq.CircuitCollection): reference circuits
+
+    Returns:
+        tuple: (cycle infidelity, error)
+    """
+    n_qubits = len(circs_D.labels)
+    d = 2**n_qubits
+    fit_D = circs_D.fit(analyze_dim=2)[0].e_F
+    fit_ref = circs_ref.fit(analyze_dim=2)[0].e_F
+    F_D = 1 - ufloat(fit_D.val, fit_D.std)
+    F_ref = 1 - ufloat(fit_ref.val, fit_ref.std)
+
+    f_D = (d**2 * F_D - 1) / (d**2 - 1)
+    f_ref = (d**2 * F_ref - 1) / (d**2 - 1)
+
+    e_C = (d**2 - 1) / d**2 * (1 - f_D / f_ref)
+
+    e_C_val, e_C_err = round_to_order_error(e_C.n, e_C.s)
+
+    return (e_C_val, e_C_err)
 
 
 def CB(
@@ -191,12 +244,26 @@ def CB(
             self._pauli_fidelities = {
                 experiment: {} for experiment in self._experiments
             }
-            self._decay_curves = {
+            self._pauli_decays = {
                 experiment: {} for experiment in self._experiments
             }
             self._process_infidelities = {}
 
             qpu.__init__(self, config=config, **kwargs)
+
+        @property
+        def pauli_decays(self) -> dict[str, dict[str, np.ndarray]]:
+            """Estimated per-Pauli decays.
+
+            Returns:
+                dict[str, dict[str, np.ndarray]]: experiment ('interleaved'
+                    or 'reference') to (Pauli string to decay array) map.
+                    Each decay array is a 1D np.ndarray of ufloats (mean EV
+                    ± SEM over randomizations), one per entry of
+                    self._circuit_depths, in the same order; a missing
+                    (depth, pauli) pair is stored as ufloat(nan, nan).
+            """
+            return self._pauli_decays
 
         @property
         def pauli_fidelities(self) -> dict[str, dict[str, ufloat]]:
@@ -220,7 +287,7 @@ def CB(
                 ufloat | float: process fidelity e_F, or NaN if no valid
                 fidelity estimates were obtained.
             """
-            return 1 - self._e_F
+            return 1 - self.process_infidelity
 
         @property
         def process_infidelity(self) -> ufloat | float:
@@ -437,8 +504,11 @@ def CB(
             infidelity.
 
             Results are stored in self._pauli_fidelities and
-            self._decay_curves (each keyed by experiment, then Pauli
-            string), and self._e_F.
+            self._pauli_decays (each keyed by experiment, then Pauli
+            string), and self._e_F. self._pauli_decays[experiment][pauli]
+            is an array of ufloats (mean EV ± SEM over randomizations),
+            one per entry of self._circuit_depths, in the same order;
+            a missing (depth, pauli) pair is stored as ufloat(nan, nan).
             """
             logger.info(" Analyzing the results...")
 
@@ -459,9 +529,10 @@ def CB(
                             if p != 'I'
                         ]
 
-                        # Mean EVs (per Pauli) over randomizations for
-                        # each depth
-                        mean_evs: list[float] = []
+                        # EV (per Pauli) at each depth, as a ufloat
+                        # of the mean ± SEM over randomizations, in
+                        # self._circuit_depths order.
+                        pauli_evs: list[ufloat] = []
                         for depth in self._circuit_depths:
                             # EVs of all randomizations for a given depth
                             evs: list[float] = []
@@ -475,7 +546,7 @@ def CB(
                                 )
                                 if len(subset) == 0:
                                     continue
-                                result = subset.results.iloc[0]
+                                results = subset.circuit.iloc[0].results
                                 member_idx = (
                                     subset['group_paulis'].iloc[0].index(
                                         pauli
@@ -488,18 +559,25 @@ def CB(
                                 )
                                 evs.append(
                                     sign
-                                    * result.marginalize(tuple(active)).ev
+                                    * results.marginalize(tuple(active)).ev
                                 )
 
-                            mean_evs.append(
-                                float(np.mean(evs)) if evs else np.nan
-                            )
+                            if evs:
+                                mean = float(np.mean(evs))
+                                sem = (
+                                    float(np.std(evs, ddof=1))
+                                    / np.sqrt(len(evs))
+                                    if len(evs) > 1 else 0.0
+                                )
+                            else:
+                                mean, sem = np.nan, np.nan
+                            pauli_evs.append(ufloat(mean, sem))
 
-                        evs_arr = np.array(mean_evs)
-                        valid = ~np.isnan(evs_arr)
-                        self._decay_curves[experiment][pauli] = (
-                            depths[valid], evs_arr[valid]
+                        self._pauli_decays[experiment][pauli] = np.array(
+                            pauli_evs
                         )
+                        evs_arr = unumpy.nominal_values(pauli_evs)
+                        valid = ~np.isnan(evs_arr)
 
                         if valid.sum() >= 2:
                             fit = FitExponential()
@@ -535,6 +613,15 @@ def CB(
                                 f"({experiment})."
                             )
 
+                # The interleaved experiment's process infidelity is the
+                # dressed infidelity of cycle_or_circuit (it still
+                # includes the decay contributed by the random Pauli
+                # twirls), as opposed to the bare infidelity self._e_F
+                # computed below when include_ref_cycle is True.
+                infidelity_key = (
+                    'dressed' if experiment == 'interleaved' else experiment
+                )
+
                 d_dim = 2 ** len(self._qubits)
                 fidelities = list(
                     self._pauli_fidelities[experiment].values()
@@ -543,16 +630,17 @@ def CB(
                     avg_f = sum(fidelities) / len(fidelities)
                     avg_fidelities[experiment] = avg_f
                     e_F = (d_dim**2 - 1) / d_dim**2 * (1 - avg_f)
-                    self._process_infidelities[experiment] = e_F
+                    self._process_infidelities[infidelity_key] = e_F
+                    e_F_val, e_F_err = round_to_order_error(e_F.n, e_F.s)
                     print(
                         f"\n[{experiment}] Process infidelity: "
-                        f"e_F = {e_F.n:.4e} ({e_F.s:.4e})\n"
+                        f"e_F = {e_F_val} ({e_F_err})"
                     )
                 else:
                     logger.warning(
                         f" No valid fidelity estimates ({experiment})."
                     )
-                    self._process_infidelities[experiment] = np.nan
+                    self._process_infidelities[infidelity_key] = np.nan
 
             if self._include_ref_cycle:
                 f_D = avg_fidelities.get('interleaved')
@@ -561,9 +649,12 @@ def CB(
                     self._e_F = compute_cycle_infidelity(
                         f_D, f_ref, len(self._qubits)
                     )
+                    e_C_val, e_C_err = round_to_order_error(
+                        self._e_F.n, self._e_F.s
+                    )
                     print(
                         "\nEstimated bare cycle infidelity: "
-                        f"e_C = {self._e_F.n:.4e} ({self._e_F.s:.4e})\n"
+                        f"e_C = {e_C_val} ({e_C_err})"
                     )
                 else:
                     logger.warning(
@@ -572,7 +663,7 @@ def CB(
                     self._e_F = np.nan
             else:
                 self._e_F = self._process_infidelities.get(
-                    'interleaved', np.nan
+                    'dressed', np.nan
                 )
 
         def plot(self) -> None:
@@ -599,18 +690,24 @@ def CB(
             True.
             """
             colors = qualitative.Plotly
+            all_depths = np.array(self._circuit_depths, dtype=float)
 
             for experiment in self._experiments:
-                decay_curves = self._decay_curves[experiment]
+                pauli_decays = self._pauli_decays[experiment]
                 fits = self._fit[experiment]
                 pauli_fidelities = self._pauli_fidelities[experiment]
-                e_F = self._process_infidelities.get(experiment, np.nan)
+                infidelity_key = (
+                    'dressed' if experiment == 'interleaved' else experiment
+                )
+                e_F = self._process_infidelities.get(
+                    infidelity_key, np.nan
+                )
                 title_prefix = experiment.capitalize()
                 file_suffix = (
                     '' if experiment == 'interleaved'
                     else f'_{experiment}'
                 )
-                paulis = sorted(decay_curves.keys())
+                paulis = sorted(pauli_decays.keys())
 
                 # ---- Plot 1: raw decays --------------------------
                 if paulis:
@@ -623,7 +720,14 @@ def CB(
 
                     for k, pauli in enumerate(paulis):
                         color = colors[k % len(colors)]
-                        depths, evs = decay_curves[pauli]
+                        nominal = unumpy.nominal_values(
+                            pauli_decays[pauli]
+                        )
+                        all_errs = unumpy.std_devs(pauli_decays[pauli])
+                        valid = ~np.isnan(nominal)
+                        depths = all_depths[valid]
+                        evs = nominal[valid]
+                        errs = all_errs[valid]
 
                         fit = fits.get(pauli)
                         f_p = pauli_fidelities.get(pauli)
@@ -641,14 +745,18 @@ def CB(
                             go.Scatter(
                                 x=depths, y=evs, mode='markers',
                                 marker={'size': 8, 'color': color},
+                                error_y={
+                                    'type': 'data', 'array': errs,
+                                    'visible': True,
+                                },
                                 name=label, legendgroup=pauli,
                                 showlegend=not has_fit,
                             ),
                         )
                         if Settings.save_data:
-                            ax.plot(
-                                depths, evs, 'o', color=color,
-                                markersize=6,
+                            ax.errorbar(
+                                depths, evs, yerr=errs, fmt='o',
+                                color=color, markersize=6, capsize=3,
                                 label=None if has_fit else label,
                             )
 
@@ -735,15 +843,24 @@ def CB(
                             showlegend=False,
                         )
                     )
+                    pfig2.add_hrect(
+                        y0=e_F.n - e_F.s, y1=e_F.n + e_F.s,
+                        fillcolor='red', opacity=0.3, line_width=0,
+                    )
                     pfig2.add_hline(
-                        y=e_F.n,
-                        line={'color': 'red', 'dash': 'dash'},
-                        annotation_text=e_F_label,
-                        annotation_position='top left',
+                        y=e_F.n, line={'color': 'red', 'dash': 'dash'},
+                    )
+                    pfig2.add_annotation(
+                        text=e_F_label,
+                        xref='paper', yref='paper',
+                        x=0.02, y=0.98,
+                        xanchor='left', yanchor='top',
+                        showarrow=False,
+                        font={'color': 'red'},
                     )
                     pfig2.update_layout(
                         height=450,
-                        width=min(80 * len(pauli_labels) + 200, 1200),
+                        width=min(150 * len(pauli_labels) + 100, 1000),
                         template='plotly_white',
                         paper_bgcolor='white',
                         plot_bgcolor='#fbfbfd',
@@ -770,14 +887,20 @@ def CB(
                         )
                         x = np.arange(len(pauli_labels))
                         plt.bar(x, y, yerr=yerr, color='#1f77b4', capsize=3)
-                        plt.axhline(
-                            e_F.n, color='red', linestyle='--',
-                            label=e_F_label,
+                        plt.axhspan(
+                            e_F.n - e_F.s, e_F.n + e_F.s,
+                            color='red', alpha=0.3,
+                        )
+                        plt.axhline(e_F.n, color='red', linestyle='--')
+                        plt.text(
+                            0.02, 0.98, e_F_label,
+                            transform=plt.gca().transAxes,
+                            ha='left', va='top',
+                            color='red', fontsize=12,
                         )
                         plt.xticks(x, pauli_labels, rotation=45, ha='right')
                         plt.xlabel('Pauli Decay Term', fontsize=15)
                         plt.ylabel('Infidelity', fontsize=15)
-                        plt.legend(fontsize=12)
                         plt.grid(True)
                         mfig2.set_tight_layout(True)
                         mfig2.savefig(
@@ -828,62 +951,6 @@ def CB(
         targeted_decays=targeted_decays,
         **kwargs,
     )
-
-
-def compute_cycle_infidelity(
-    f_D: ufloat, f_ref: ufloat, n_qubits: int
-) -> ufloat:
-    """Estimate the bare infidelity of an interleaved cycle.
-
-    Divides out the average Pauli fidelity of the reference (empty)
-    cycle from that of the interleaved (dressed) cycle, isolating the
-    infidelity contributed by cycle_or_circuit itself from that of the
-    random Pauli twirling gates. Unlike compute_cycle_infidelity1, this
-    takes the average per-Pauli fidelities directly (as estimated by
-    qcal-native CB), rather than deriving them from a full process
-    infidelity.
-
-    Args:
-        f_D (ufloat): average Pauli fidelity of the interleaved
-            (dressed) cycle.
-        f_ref (ufloat): average Pauli fidelity of the reference (empty)
-            cycle.
-        n_qubits (int): number of qubits the cycle acts on.
-
-    Returns:
-        ufloat: estimated bare process infidelity of cycle_or_circuit.
-    """
-    d = 2 ** n_qubits
-    return (d**2 - 1) / d**2 * (1 - f_D / f_ref)
-
-
-def compute_cycle_infidelity1(
-    circs_D: trueq.CircuitCollection, circs_ref: trueq.CircuitCollection  # noqa: F821 # type: ignore
-) -> tuple:
-    """Compute the infidelity of the interleaved Cycle.
-
-    Args:
-        circs_D (trueq.CircuitCollection): dressed circuits
-        circs_ref (trueq.CircuitCollection): reference circuits
-
-    Returns:
-        tuple: (cycle infidelity, error)
-    """
-    n_qubits = len(circs_D.labels)
-    d = 2**n_qubits
-    fit_D = circs_D.fit(analyze_dim=2)[0].e_F
-    fit_ref = circs_ref.fit(analyze_dim=2)[0].e_F
-    F_D = 1 - ufloat(fit_D.val, fit_D.std)
-    F_ref = 1 - ufloat(fit_ref.val, fit_ref.std)
-
-    f_D = (d**2 * F_D - 1) / (d**2 - 1)
-    f_ref = (d**2 * F_ref - 1) / (d**2 - 1)
-
-    e_C = (d**2 - 1) / d**2 * (1 - f_D / f_ref)
-
-    e_C_val, e_C_err = round_to_order_error(e_C.n, e_C.s)
-
-    return (e_C_val, e_C_err)
 
 
 def CB1(
@@ -1063,7 +1130,7 @@ def CB1(
                         cycle_subset, ref_subset
                     )
                     print(
-                        f"Interleaved cycle infidelity: e_C = {e_C} ({err})\n"
+                        f"Bare cycle infidelity: e_C = {e_C} ({err})\n"
                     )
                 except Exception:
                     logger.warning(" Unable to fit the estimate collection!")
