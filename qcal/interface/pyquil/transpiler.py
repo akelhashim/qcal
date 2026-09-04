@@ -720,23 +720,23 @@ def transpile_circuit(
                     rc_tracker.close_layer()
 
     if randomized_compiling:
-        with rc_configuration.open_classical_preamble() as rc_program:
-            if randomize_readout:
-                rc_program += readout_configuation.build_quil_program()
-                for qubit in qubits:
-                    call = rc_configuration.apply_pauli_pair(
-                        qubit,
-                        rc_configuration._cycle_count,
-                        source_unitaries=(
-                            readout_configuation.destination_names(qubit)
-                        ),
-                        target_unitaries=(
-                            readout_configuation.destination_names(qubit)
-                        ),
-                        unitary_offset=0,
-                    )
-                    if call is not None:
-                        rc_program += call
+        rc_program = rc_configuration.build_quil_program()
+        if randomize_readout:
+            rc_program += readout_configuation.build_quil_program()
+            for qubit in qubits:
+                call = rc_configuration.apply_pauli_pair(
+                    qubit,
+                    rc_configuration.cycle_count,
+                    source_unitaries=(
+                        readout_configuation.destination_names(qubit)
+                    ),
+                    target_unitaries=(
+                        readout_configuation.destination_names(qubit)
+                    ),
+                    unitary_offset=0,
+                )
+                if call is not None:
+                    rc_program += call
 
         tprogram = rc_program + tprogram
         tprogram.rc_configuration = rc_configuration
