@@ -9,6 +9,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Breaking
 
+### Added
+
+### Changed
+
+### Deprecated
+
+### Removed
+
+### Fixed
+
+### Security
+
+## [4.0.0] - 2026-09-04
+
+### Breaking
+
 - Added rigetti-quax as a dependency
 - Rename `qcal.gate module` to `qcal.gates`
 - Rename `Examples` to `examples` and `Tutorials` to `tutorials`
@@ -26,16 +42,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - gate.unitary embeds a subspace unitary in qutrit dimension if subspace='EF'
 
-### Deprecated
-
-### Removed
-
 ### Fixed
 
 - `circuit.draw()` didn't correctly draw qudit gates
 - `plot_mock_sequence` not handling qudits correctly
-
-### Security
 
 ## [3.2.0] - 2026-08-17
 
@@ -277,7 +287,8 @@ post-processing
 - Single- and two-qubit benchmarking methods
 - Advanced compilation tools
 
-[Unreleased]: https://github.com/akelhashim/qcal/compare/v3.2.0...HEAD
+[Unreleased]: https://github.com/akelhashim/qcal/compare/v4.0.0...HEAD
+[4.0.0]: https://github.com/akelhashim/qcal/releases/tag/v4.0.0
 [3.2.0]: https://github.com/akelhashim/qcal/releases/tag/v3.2.0
 [3.1.1]: https://github.com/akelhashim/qcal/releases/tag/v3.1.1
 [3.1.0]: https://github.com/akelhashim/qcal/releases/tag/v3.1.0
