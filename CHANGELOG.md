@@ -46,6 +46,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
+## [4.0.0] - 2026-09-04
+
+### Breaking
+
+- Added rigetti-quax as a dependency
+- Rename `qcal.gate module` to `qcal.gates`
+- Rename `Examples` to `examples` and `Tutorials` to `tutorials`
+
+### Added
+
+- `StateVectorSimulator` for simulating ideal circuit outputs
+- `DensityMatrixSimulator` for simulating noisy circuits
+- Error models module for building error models for simulation
+- Single- and two-qutrit gates
+- Emulator backend for emulating experiments
+- Simulation and Emulation example notebooks
+
+### Changed
+
+- gate.unitary embeds a subspace unitary in qutrit dimension if subspace='EF'
+
+### Fixed
+
+- `circuit.draw()` didn't correctly draw qudit gates
+- `plot_mock_sequence` not handling qudits correctly
+
+## [3.2.0] - 2026-08-17
+
+### Added
+
+- `barrier_between_cycles` flag on the QubiC transpilation path
+  (`to_qubic()`, `Transpiler`, `QubicQPU`). Defaults to True (unchanged
+  behavior). When False, no automatic barriers are inserted between
+  cycles: only explicit Barrier objects synchronize qubits, enabling
+  desynchronized per-qubit execution (e.g. concurrent measurements with
+  per-qubit randomized delays)
+
 ## [3.1.1] - 2026-06-15
 
 ### Fixed
@@ -243,7 +280,7 @@ jupyter notebooks).
 - save_raw_data will save all classified reads in circuits dataframe for qubic
 post-processing
 - Save GST results object as a pkl file
-- Examples: config and Tutorials
+- examples: config and tutorials
 
 ### Changed
 
@@ -275,7 +312,9 @@ post-processing
 - Single- and two-qubit benchmarking methods
 - Advanced compilation tools
 
-[Unreleased]: https://github.com/akelhashim/qcal/compare/v3.1.1...HEAD
+[Unreleased]: https://github.com/akelhashim/qcal/compare/v4.0.0...HEAD
+[4.0.0]: https://github.com/akelhashim/qcal/releases/tag/v4.0.0
+[3.2.0]: https://github.com/akelhashim/qcal/releases/tag/v3.2.0
 [3.1.1]: https://github.com/akelhashim/qcal/releases/tag/v3.1.1
 [3.1.0]: https://github.com/akelhashim/qcal/releases/tag/v3.1.0
 [3.0.0]: https://github.com/akelhashim/qcal/releases/tag/v3.0.0

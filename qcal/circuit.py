@@ -29,8 +29,8 @@ import pandas as pd
 import plotly.io as pio
 from numpy.typing import NDArray
 
-from qcal.gate.gate import Gate
-from qcal.gate.single_qubit import Meas, basis_rotation, prep_rotation
+from qcal.gates.gate import Gate
+from qcal.gates.single_qubit import Meas, basis_rotation
 from qcal.plotting.sequence import plot_mock_sequence
 from qcal.results import Results
 
@@ -112,7 +112,16 @@ class Barrier:
 
     @property
     def qubits(self) -> Tuple:
-        """Empty tuple of qubit labels.
+        """(Empty) tuple of qubit labels.
+
+        Returns:
+            Tuple: empty tuple.
+        """
+        return self._qubits
+
+    @property
+    def qudits(self) -> Tuple:
+        """(Empty) tuple of qudit labels.
 
         Returns:
             Tuple: empty tuple.
@@ -256,6 +265,15 @@ class Cycle:
         return len(self.qubits)
 
     @property
+    def n_qudits(self) -> int:
+        """The number of qudits in the cycle/layer.
+
+        Returns:
+            int: number of qudits.
+        """
+        return len(self.qudits)
+
+    @property
     def gates(self) -> List:
         """The gates in the cycle/layer.
 
@@ -274,6 +292,15 @@ class Cycle:
         return tuple(sorted(set(self._qubits)))
 
     @property
+    def qudits(self) -> Tuple:
+        """The qudit labels for the cycle/layer.
+
+        Returns:
+            Tuple: qudit labels.
+        """
+        return self._qubits
+
+    @property
     def unitary(self) -> NDArray:
         """The unitary matrix of the cycle (tensor product of gate unitaries).
 
@@ -285,12 +312,16 @@ class Cycle:
         Returns:
             NDArray: tensor-product unitary of all gates in the cycle.
         """
+        if not self.gates:
+            return np.eye(2 ** self.n_qubits)
+
         for gate in self.gates:
             if gate.unitary is None:
                 raise ValueError(
                     f"Gate '{gate.name}' on qubits {gate.qubits} is "
                     "non-unitary."
                 )
+
         return reduce(np.kron, [gate.unitary for gate in self.gates])
 
     def append(self, gate_or_gates: Gate | Iterable[Gate]) -> None:
@@ -543,6 +574,15 @@ class Circuit:
         return len(self.qubits)
 
     @property
+    def n_qudits(self) -> int:
+        """The number of qudits in the circuit.
+
+        Returns:
+            int: number of qudits.
+        """
+        return len(self.qudits)
+
+    @property
     def partitions(self) -> List:
         """Repeated circuit partitions.
 
@@ -586,19 +626,33 @@ class Circuit:
         return tuple(sorted(self._qubits))
 
     @property
+    def qudits(self) -> Tuple[int]:
+        """The qudits in the circuit.
+
+        Returns:
+            Tuple: qudit labels.
+        """
+        return self._qubits
+
+    @property
     def unitary(self) -> NDArray:
         """The unitary matrix of the circuit (ordered product of cycle
         unitaries).
 
-        Barriers are skipped. Raises if any cycle contains a non-unitary gate.
+        Barriers are skipped. Raises if any cycle contains a
+        non-unitary gate.
 
         Raises:
-            ValueError: if any cycle in the circuit contains a non-unitary gate.
+            ValueError: if any cycle in the circuit contains a
+                non-unitary gate.
 
         Returns:
             NDArray: unitary matrix of the full circuit.
         """
         cycles = [c for c in self._cycles if not c.is_barrier]
+        if not cycles:
+            return np.eye(2 ** self.n_qubits)
+
         return reduce(np.matmul, [cycle.unitary for cycle in cycles])
 
     @mcm_results.setter
@@ -618,13 +672,18 @@ class Circuit:
                 self._mcm_results.extend(results)
             else:
                 raise ValueError(
-                    "All elements in the list must be either a dict or Results "
-                    "object!"
+                    "All elements in the list must be either a "
+                    "dict or Results object!"
                 )
         elif isinstance(results, dict):
             self._mcm_results.append(Results(results))
         elif isinstance(results, Results):
             self._mcm_results.append(results)
+
+    @mcm_results.deleter
+    def mcm_results(self):
+        """Clear all recorded mid-circuit measurement results."""
+        self._mcm_results = []
 
     @results.setter
     def results(self, results: Dict):

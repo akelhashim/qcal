@@ -10,8 +10,8 @@ import numpy as np
 import scipy
 from numpy.typing import ArrayLike, NDArray
 
-from qcal.gate.gate import Gate
-from qcal.gate.single_qubit import id, x, y, z
+from qcal.gates.gate import Gate
+from qcal.gates.single_qubit import id, x, y, z
 
 __all__ = (
     'AGate',

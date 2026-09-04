@@ -10,8 +10,8 @@ from typing import Dict
 import numpy as np
 
 from qcal.circuit import Barrier, Circuit, CircuitSet, Cycle
-from qcal.gate.single_qubit import SINGLE_QUBIT_GATES
-from qcal.gate.two_qubit import TWO_QUBIT_GATES
+from qcal.gates.single_qubit import SINGLE_QUBIT_GATES
+from qcal.gates.two_qubit import TWO_QUBIT_GATES
 from qcal.transpilation.transpiler import Transpiler
 from qcal.transpilation.utils import GateMapper
 

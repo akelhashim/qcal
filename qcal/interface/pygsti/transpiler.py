@@ -11,8 +11,8 @@ from pygsti.baseobjs.label import LabelTupTup
 from pygsti.io import read_circuit_list
 
 from qcal.circuit import Barrier, Circuit, CircuitSet, Layer
-from qcal.gate.single_qubit import SINGLE_QUBIT_GATES, X90, Y90, Idle, Rz
-from qcal.gate.two_qubit import TWO_QUBIT_GATES
+from qcal.gates.single_qubit import SINGLE_QUBIT_GATES, X90, Y90, Idle, Rz
+from qcal.gates.two_qubit import TWO_QUBIT_GATES
 from qcal.transpilation.transpiler import Transpiler
 from qcal.transpilation.utils import GateMapper
 from qcal.units import ns

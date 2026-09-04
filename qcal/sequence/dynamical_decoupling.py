@@ -67,7 +67,7 @@ from collections import defaultdict
 from collections.abc import Callable, Mapping, Sequence
 
 from qcal.circuit import Barrier, Circuit, Cycle
-from qcal.gate.single_qubit import X90, Y90, Idle
+from qcal.gates.single_qubit import X90, Y90, Idle
 
 # from typing import Any, List
 

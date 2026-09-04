@@ -27,7 +27,7 @@ from pygsti.protocols.protocol import ProtocolData
 
 from qcal.circuit import CircuitSet
 from qcal.config import Config
-from qcal.gate.two_qubit import TWO_QUBIT_GATES
+from qcal.gates.two_qubit import TWO_QUBIT_GATES
 from qcal.interface.pygsti.datasets import generate_pygsti_dataset
 from qcal.interface.pygsti.processor_spec import pygsti_pspec
 from qcal.interface.pygsti.transpiler import PyGSTiTranspiler

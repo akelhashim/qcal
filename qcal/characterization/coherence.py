@@ -23,7 +23,7 @@ from qcal.fitting.fit import (
     FitDecayingCosineExponential,
     FitExponential,
 )
-from qcal.gate.single_qubit import X90, Idle, Rz, X, Z
+from qcal.gates.single_qubit import X90, Idle, Rz, X, Z
 from qcal.math.utils import round_to_order_error
 from qcal.qpu.qpu import QPU
 from qcal.sequence.dynamical_decoupling import DD_SEQUENCES

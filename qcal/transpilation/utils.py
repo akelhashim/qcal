@@ -5,7 +5,7 @@ import logging
 from collections.abc import Iterable, Iterator
 
 from qcal.circuit import Circuit, Cycle
-from qcal.gate.gate import Gate
+from qcal.gates.gate import Gate
 
 logger = logging.getLogger(__name__)
 

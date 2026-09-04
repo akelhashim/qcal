@@ -17,8 +17,8 @@ from qcal.backend.qubic.utils import generate_pulse_env
 from qcal.calibration.utils import find_pulse_index
 from qcal.circuit import Circuit, CircuitSet, Cycle
 from qcal.config import Config
-from qcal.gate.gate import Gate
-from qcal.gate.single_qubit import (
+from qcal.gates.gate import Gate
+from qcal.gates.single_qubit import (
     MCM, X90, Id, Idle, Meas, Reset, Rz, VirtualZ, X, Z
 )
 from qcal.sequence.dynamical_decoupling import DD_SEQUENCES
@@ -910,6 +910,7 @@ def to_qubic(
         pulses:             defaultdict,
         hardware_vz_qubits: List[str] = [],  # noqa: B006
         circuit_for_loop:   bool = False,
+        barrier_between_cycles: bool = True,
     ) -> List:
     """Compile a qcal circuit to a qubic circuit.
 
@@ -926,6 +927,14 @@ def to_qubic(
             'Q3']```.
         circuit_for_loop (bool, optional): loops over circuit partitions for
             circuits with repeated structures. Defaults to False.
+        barrier_between_cycles (bool, optional): insert a global barrier
+            before every cycle. Defaults to True (historical behavior).
+            When False, only explicit Barrier objects in the circuit
+            synchronize qubits, so each qubit's timeline runs
+            independently (e.g. desynchronized delays followed by
+            immediate per-qubit readout). Per-qubit ordering is still
+            guaranteed by the scoped barriers emitted by add_measurement
+            and multi-qubit gates.
 
     Returns:
         List: transpiled qubic circuit.
@@ -989,11 +998,12 @@ def to_qubic(
             if n_reps == 1:
                 for cycle in sub_circuit:
                     if not cycle.is_barrier:
-                        qubic_circuit.append(
-                            {'name': 'barrier',
-                            #  'qubit': [f'Q{q}' for q in circuit.qubits]
-                            }
-                        )
+                        if barrier_between_cycles:
+                            qubic_circuit.append(
+                                {'name': 'barrier',
+                                #  'qubit': [f'Q{q}' for q in circuit.qubits]
+                                }
+                            )
                         for gate in cycle:
                             name = gate.name
                             if 'phase' in gate.properties['params'].keys():
@@ -1028,11 +1038,12 @@ def to_qubic(
                 loop_circuit = []
                 for cycle in sub_circuit:
                     if not cycle.is_barrier:
-                        loop_circuit.append(
-                            {'name': 'barrier',
-                             'qubit': [f'Q{q}' for q in circuit.qubits]
-                            }
-                        )
+                        if barrier_between_cycles:
+                            loop_circuit.append(
+                                {'name': 'barrier',
+                                 'qubit': [f'Q{q}' for q in circuit.qubits]
+                                }
+                            )
                         for gate in cycle:
                             name = gate.name
                             if 'phase' in gate.properties['params'].keys():
@@ -1083,11 +1094,12 @@ def to_qubic(
         for cycle in circuit.cycles:
 
             if not cycle.is_barrier:
-                qubic_circuit.append(
-                    {'name': 'barrier',
-                    #  'qubit': [f'Q{q}' for q in circuit.qubits]
-                    }
-                )
+                if barrier_between_cycles:
+                    qubic_circuit.append(
+                        {'name': 'barrier',
+                        #  'qubit': [f'Q{q}' for q in circuit.qubits]
+                        }
+                    )
                 for gate in cycle:
 
                     name = gate.name
@@ -1127,6 +1139,7 @@ class Transpiler:
             hardware_vz_qubits: List[str] = [],  # noqa: B006
             circuit_for_loop:   bool = False,
             reload_pulse:       bool = True,
+            barrier_between_cycles: bool = True,
         ) -> None:
         """Initialize with a qcal Config object.
 
@@ -1144,6 +1157,10 @@ class Transpiler:
                 circuits with repeated structures. Defaults to False.
             reload_pulse (bool, optional): reloads the stored pulses when
                 compiling each circuit. Defaults to True.
+            barrier_between_cycles (bool, optional): insert a global
+                barrier before every cycle. Defaults to True (historical
+                behavior). When False, only explicit Barrier objects
+                synchronize qubits; see to_qubic() for details.
         """
         self._config = config
 
@@ -1168,7 +1185,7 @@ class Transpiler:
                 }
             )
             for gate in config.native_gates['set']:
-                if gate in qcal.gate.single_qubit.__all__:
+                if gate in qcal.gates.single_qubit.__all__:
                     self._gate_mapper[gate] = add_single_qubit_gate
                 else:
                     self._gate_mapper[gate] = add_multi_qubit_gate
@@ -1178,6 +1195,7 @@ class Transpiler:
         self._hardware_vz_qubits = hardware_vz_qubits
         self._circuit_for_loop = circuit_for_loop
         self._reload_pulse = reload_pulse
+        self._barrier_between_cycles = barrier_between_cycles
         self._pulses = defaultdict(lambda: False, {})
 
     @property
@@ -1232,7 +1250,8 @@ class Transpiler:
                     gate_mapper=self._gate_mapper,
                     pulses=self._pulses,
                     hardware_vz_qubits=self._hardware_vz_qubits,
-                    circuit_for_loop=self._circuit_for_loop
+                    circuit_for_loop=self._circuit_for_loop,
+                    barrier_between_cycles=self._barrier_between_cycles
                 )
             )
 

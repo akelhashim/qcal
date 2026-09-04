@@ -12,7 +12,7 @@ from plotly.graph_objs.scatter import Marker
 
 from qcal.circuit import Circuit
 from qcal.config import Config
-from qcal.gate.gate import Gate
+from qcal.gates.gate import Gate
 
 logger = logging.getLogger(__name__)
 
@@ -41,12 +41,20 @@ def format_gate_text(gate: Gate, include_matrix: bool = True):
         text += f'Alias: {gate.alias}<br>'
     text += f'Qubits: {gate.qubits}<br>'
     text += f'Dim: {gate.dim}<br>'
-    if include_matrix:
+    if gate.unitary is not None:
+        text += (
+            'Unitary: <br>  '
+            + np.array_str(np.around(gate.unitary, 3)).replace(
+                "\n ", "<br>" + '   '
+            )
+            + '<br>'
+        )
+    else:
         text += (
             'Matrix: <br>  '
-            + np.array_str(
-                np.around(gate.matrix, 3)
-            ).replace("\n ", "<br>" + '   ')
+            + np.array_str(np.around(gate.matrix, 3)).replace(
+                "\n ", "<br>" + '   '
+            )
             + '<br>'
         )
     if gate.locally_equivalent is not None:
@@ -122,7 +130,7 @@ def draw_circuit(circuit: Circuit, show: bool = True):
         else:
             c -= n_barriers
             for gate in cycle.gates:
-                if gate.is_single_qubit:
+                if gate.is_single_qudit:
                     for q in gate.qubits:
                         node_x.append(c)
                         node_y.append(qubit_index[q])
@@ -161,9 +169,7 @@ def draw_circuit(circuit: Circuit, show: bool = True):
                     marker_colors.extend(
                         [color_map[gate.name]] * len(gate.qubits)
                     )
-                elif gate.is_multi_qubit:
-                    edge_x_mq = []
-                    edge_y_mq = []
+                elif gate.is_multi_qudit:
                     for q in gate.qubits:
                         node_x.append(c)
                         node_y.append(qubit_index[q])
@@ -229,7 +235,27 @@ def draw_circuit(circuit: Circuit, show: bool = True):
                 mode='lines'
         ))
 
-    edge_traces.extend(mq_edge_traces)
+    n_barriers = 0
+    for c, cycle in enumerate(circuit.cycles):
+        if cycle.is_barrier:
+            n_barriers += 1
+        else:
+            c -= n_barriers
+            for gate in cycle.gates:
+                edge_x_mq = []
+                edge_y_mq = []
+                if gate.is_multi_qudit:
+                    for q in gate.qubits:
+                        edge_x_mq.append(c)
+                        edge_y_mq.append(circuit.qubits.index(q))
+                    edge_traces.append(
+                        go.Scatter(
+                        x=edge_x_mq, y=edge_y_mq,
+                        line={'width': 2, 'color': '#888'},
+                        hoverinfo='none',
+                        mode='lines'
+                        )
+                    )
 
     gate_names.append(
         {

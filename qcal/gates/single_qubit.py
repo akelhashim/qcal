@@ -12,7 +12,9 @@ from typing import TYPE_CHECKING, Dict, List, Tuple, Union
 import numpy as np
 from numpy.typing import NDArray
 
-from qcal.gate.gate import Gate
+if TYPE_CHECKING:
+    from qcal.circuit import Circuit, Cycle
+from qcal.gates.gate import Gate
 from qcal.units import ns
 
 if TYPE_CHECKING:

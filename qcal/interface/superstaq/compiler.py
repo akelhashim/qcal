@@ -6,7 +6,7 @@ from typing import Any, Dict, List
 
 from qcal.circuit import CircuitSet
 from qcal.config import Config
-from qcal.gate.two_qubit import TWO_QUBIT_GATES
+from qcal.gates.two_qubit import TWO_QUBIT_GATES
 
 logger = logging.getLogger(__name__)
 

@@ -11,8 +11,8 @@ from bqskit.ir.gates import ConstantUnitaryGate as UGate
 from bqskit.ir.gates import MeasurementPlaceholder as bqMeas
 
 from qcal.circuit import Barrier, Circuit, CircuitSet, Cycle
-from qcal.gate.single_qubit import X90, Meas, Rz, X
-from qcal.gate.two_qubit import CX, CZ, iSWAP
+from qcal.gates.single_qubit import X90, Meas, Rz, X
+from qcal.gates.two_qubit import CX, CZ, iSWAP
 from qcal.transpilation.transpiler import Transpiler
 from qcal.transpilation.utils import GateMapper
 

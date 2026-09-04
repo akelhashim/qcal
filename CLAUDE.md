@@ -10,6 +10,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 - Limit code lines to **79 characters** and docstring/comment lines to
   **79 characters**, per PEP 8.
+- Use **Google style** docstring formatting.
 
 ## Commands
 
@@ -36,7 +37,7 @@ The core data model lives in [qcal/circuit.py](qcal/circuit.py):
 
 ### Gate Hierarchy
 
-Gates are in [qcal/gate/](qcal/gate/). The base `Gate` class ([qcal/gate/gate.py](qcal/gate/gate.py)) holds a numpy unitary matrix and qubit labels. Single-qubit gates ([qcal/gate/single_qubit.py](qcal/gate/single_qubit.py)) include `H`, `X`, `Y`, `Z`, `RX`/`RY`/`RZ`, `X90`/`Y90`, and `Meas`. Two-qubit gates ([qcal/gate/two_qubit.py](qcal/gate/two_qubit.py)) include `CNOT`/`CX`, `CZ`, and `iSWAP`.
+Gates are in [qcal/gates/](qcal/gates/). The base `Gate` class ([qcal/gates/gate.py](qcal/gates/gate.py)) holds a numpy unitary matrix and qubit labels. Single-qubit gates ([qcal/gates/single_qubit.py](qcal/gates/single_qubit.py)) include `H`, `X`, `Y`, `Z`, `RX`/`RY`/`RZ`, `X90`/`Y90`, and `Meas`. Two-qubit gates ([qcal/gates/two_qubit.py](qcal/gates/two_qubit.py)) include `CNOT`/`CX`, `CZ`, and `iSWAP`.
 
 Gates support subspace specification (`'GE'` for ground-excited, `'EF'` for including leakage states), which flows through compilation and hardware execution.
 
