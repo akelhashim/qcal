@@ -5,7 +5,7 @@ Pauli labels 'I', 'X', 'Y', 'Z', one per qubit U acts on), conjugation
 U P U† is always proportional to another Pauli Q of the same weight, with a
 real ±1 sign: U P U† = sign * Q. TWO_QUBIT_PAULI_CONJUGATION_TABLE and
 SINGLE_QUBIT_PAULI_CONJUGATION_TABLE hardcode this P -> (Q, sign) map for
-every gate class in qcal.gate.two_qubit / qcal.gate.single_qubit,
+every gate class in qcal.gates.two_qubit / qcal.gates.single_qubit,
 respectively, that is Clifford at its default parameters, so callers can
 look the result up directly instead of doing the matrix conjugation and
 Pauli-string identification every time.
@@ -31,8 +31,8 @@ from functools import lru_cache
 import numpy as np
 
 from qcal.circuit import Circuit, Cycle
-from qcal.gate.gate import Gate
-from qcal.gate.single_qubit import SINGLE_QUBIT_PAULIS
+from qcal.gates.gate import Gate
+from qcal.gates.single_qubit import SINGLE_QUBIT_PAULIS
 
 __all__ = (
     'ONE_QUBIT_PAULIS',

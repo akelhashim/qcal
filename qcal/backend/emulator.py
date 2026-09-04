@@ -211,7 +211,7 @@ class Emulator(QPU):
 
         - A ``'results'`` column is added (one results dict per
           circuit).
-        - A ``'states'`` column is added (one
+        - A ``'state'`` column is added (one
           ``state.pretty_print()`` string per circuit).
         - For qcal :class:`~qcal.circuit.Circuit` objects the results
           dict is also written to the circuit's ``.results``
@@ -233,7 +233,7 @@ class Emulator(QPU):
             ):
                 continue
             circuit_set['results'] = all_results
-            circuit_set['states'] = all_states
+            circuit_set['state'] = all_states
             for circuit, results in zip(
                 circuit_set, all_results, strict=True
             ):

@@ -17,7 +17,7 @@ import qcal.settings as settings
 from qcal.characterization.characterize import Characterize
 from qcal.circuit import Circuit, CircuitSet, Cycle
 from qcal.config import Config
-from qcal.gate.single_qubit import X90, Id
+from qcal.gates.single_qubit import X90, Id
 from qcal.math.utils import round_to_order_error
 from qcal.qpu.qpu import QPU
 

@@ -21,7 +21,7 @@ import numpy as np
 from numpy.typing import NDArray
 
 from qcal.circuit import Circuit, Cycle
-from qcal.gate.single_qubit import (
+from qcal.gates.single_qubit import (
     SX,
     SY,
     X90,
