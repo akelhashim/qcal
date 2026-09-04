@@ -19,7 +19,6 @@ import numpy as np
 import plotly.graph_objects as go
 from IPython.display import clear_output
 from plotly.colors import qualitative
-from plotly.subplots import make_subplots
 from uncertainties import ufloat
 from uncertainties.umath import exp as uexp
 
@@ -37,7 +36,6 @@ from qcal.compilation.utils import composes_to_identity
 from qcal.config import Config
 from qcal.fitting.fit import FitExponential
 from qcal.math.utils import round_to_order_error
-from qcal.plotting.utils import calculate_nrows_ncols
 from qcal.qpu.qpu import QPU
 from qcal.settings import Settings
 
@@ -55,6 +53,7 @@ def CB(
     n_decays:           int = 20,
     n_randomizations:   int = 30,
     decompose_to_zxzxz: bool = False,
+    include_ref_cycle:  bool = False,
     targeted_decays:    Sequence[str] | None = None,
     **kwargs,
 ) -> Callable:
@@ -105,6 +104,15 @@ def CB(
         decompose_to_zxzxz (bool): whether to decompose all single-qubit gates
             to ZXZXZ decomposition. Defaults to False. Setting to True can be
             useful when implementing CB using hardware-efficient randomization.
+        include_ref_cycle (bool): whether to additionally benchmark the
+            empty (all-identity) cycle on the same qubits. Defaults to
+            False. The reference circuits are identical to the
+            interleaved ones except that cycle_or_circuit is never
+            inserted, so they measure the decay due to the random Pauli
+            twirls alone. When True, self._e_F reports the estimated
+            bare infidelity of cycle_or_circuit (the interleaved decay
+            with the reference decay divided out); when False, self._e_F
+            reports the dressed infidelity, as before.
         targeted_decays (Sequence[str] | None): an explicit set of Pauli
             decay strings to prepare and measure, e.g. ['XII', 'ZZY'],
             ordered by cycle_or_circuit.qubits. Defaults to None. If given,
@@ -127,6 +135,7 @@ def CB(
             n_decays:           int = 20,
             n_randomizations:   int = 30,
             decompose_to_zxzxz: bool = False,
+            include_ref_cycle:  bool = False,
             targeted_decays:    Sequence[str] | None = None,
             **kwargs,
         ) -> None:
@@ -136,6 +145,7 @@ def CB(
             self._n_randomizations = n_randomizations
             self._decompose_to_zxzxz = decompose_to_zxzxz
             self._qubits = cycle_or_circuit.qubits
+            self._include_ref_cycle = include_ref_cycle
 
             if targeted_decays is not None:
                 for pauli in targeted_decays:
@@ -173,20 +183,58 @@ def CB(
                         "the identity for every depth in circuit_depths."
                     )
 
-            self._fit = {}
-            self._pauli_fidelities = {}
-            self._decay_curves = {}
+            self._experiments = (
+                ['interleaved', 'reference']
+                if self._include_ref_cycle else ['interleaved']
+            )
+            self._fit = {experiment: {} for experiment in self._experiments}
+            self._pauli_fidelities = {
+                experiment: {} for experiment in self._experiments
+            }
+            self._decay_curves = {
+                experiment: {} for experiment in self._experiments
+            }
+            self._process_infidelities = {}
 
             qpu.__init__(self, config=config, **kwargs)
 
         @property
-        def pauli_fidelities(self) -> dict[str, ufloat]:
+        def pauli_fidelities(self) -> dict[str, dict[str, ufloat]]:
             """Estimated per-Pauli fidelities.
 
             Returns:
-                dict[str, ufloat]: Pauli string to fidelity map.
+                dict[str, dict[str, ufloat]]: experiment ('interleaved'
+                    or 'reference') to (Pauli string to fidelity) map.
             """
             return self._pauli_fidelities
+
+        @property
+        def process_fidelity(self) -> ufloat | float:
+            """Estimated process fidelity of the cycle_or_circuit.
+
+            This is the bare (interleaved-cycle-only) fidelity if
+            include_ref_cycle was True, or the dressed fidelity
+            otherwise.
+
+            Returns:
+                ufloat | float: process fidelity e_F, or NaN if no valid
+                fidelity estimates were obtained.
+            """
+            return 1 - self._e_F
+
+        @property
+        def process_infidelity(self) -> ufloat | float:
+            """Estimated process infidelity of the cycle_or_circuit.
+
+            This is the bare (interleaved-cycle-only) infidelity if
+            include_ref_cycle was True, or the dressed infidelity
+            otherwise.
+
+            Returns:
+                ufloat | float: process infidelity e_F, or NaN if no valid
+                fidelity estimates were obtained.
+            """
+            return self._e_F
 
         def generate_circuits(self) -> None:
             """Generate all CB circuits and store them in self._circuits.
@@ -203,6 +251,14 @@ def CB(
               prepare(basis) | twirl | barrier | [cycle_or_circuit | twirl
                              | barrier]^d | measure(basis)
 
+            If include_ref_cycle is True, this is repeated for a
+            'reference' experiment in which cycle_or_circuit is never
+            inserted, so the circuit reduces to d+1 random Pauli twirl
+            layers with no interleaved gate:
+
+              prepare(basis) | twirl | barrier | [twirl
+                             | barrier]^d | measure(basis)
+
             CircuitSet metadata columns:
               'measurement_basis' — joined basis string, e.g. 'XZI'
               'depth'             — number of cycle_or_circuit instances
@@ -215,6 +271,7 @@ def CB(
               'twirl_strings'     — list of d+1 joined twirl strings
                                     applied during the circuit, kept for
                                     reference
+              'experiment'        — 'interleaved' or 'reference'
             """
             logger.info(" Generating circuits...")
 
@@ -243,90 +300,107 @@ def CB(
             group_paulis_list: list[list[str]] = []
             group_signs_list: list[list[int]] = []
             twirl_strs_list: list[list[str]] = []
+            experiment_labels: list[str] = []
 
-            for group in self._pauli_groups:
-                # Positions where every Pauli in the group is 'I' are
-                # unconstrained; measure/prepare them in Z (marginalized
-                # away later, so the choice is arbitrary).
-                basis = tuple(
-                    'Z' if p == 'I' else p for p in group.measurement_basis
+            for experiment in self._experiments:
+                insert_cycle = experiment == 'interleaved'
+                # For sign propagation, the reference experiment's
+                # interleaved gate is the identity: an empty Cycle
+                # conjugates every decay Pauli to itself.
+                interleaved_op = (
+                    self._cycle_or_circuit if insert_cycle else Cycle()
                 )
-                measurement_basis = ''.join(basis)
 
-                for depth in self._circuit_depths:
-                    for r in range(self._n_randomizations):
-                        # Sample d+1 random Pauli twirl strings, shared by
-                        # every Pauli in the group for this circuit.
-                        twirl_strings = generate_random_n_qubit_paulis(
-                            self._qubits, n_random_paulis=depth + 1
-                        )
-                        signs = [
-                            _propagate_sign(
-                                pauli,
-                                twirl_strings,
-                                self._cycle_or_circuit,
-                                depth
+                for group in self._pauli_groups:
+                    # Positions where every Pauli in the group is 'I' are
+                    # unconstrained; measure/prepare them in Z
+                    # (marginalized away later, so the choice is
+                    # arbitrary).
+                    basis = tuple(
+                        'Z' if p == 'I' else p
+                        for p in group.measurement_basis
+                    )
+                    measurement_basis = ''.join(basis)
+
+                    for depth in self._circuit_depths:
+                        for r in range(self._n_randomizations):
+                            # Sample d+1 random Pauli twirl strings,
+                            # shared by every Pauli in the group for
+                            # this circuit.
+                            twirl_strings = generate_random_n_qubit_paulis(
+                                self._qubits, n_random_paulis=depth + 1
                             )
-                            for pauli in group.paulis
-                        ]
+                            signs = [
+                                _propagate_sign(
+                                    pauli,
+                                    twirl_strings,
+                                    interleaved_op,
+                                    depth
+                                )
+                                for pauli in group.paulis
+                            ]
 
-                        circuit = Circuit()
-                        # State prep: +1 eigenstate of the group's shared
-                        # basis, which is simultaneously a +1 eigenstate
-                        # of every Pauli in the group.
-                        circuit.prepare(
-                            measurement_basis,
-                            qubits=list(self._qubits),
-                        )
-                        circuit.append(Barrier(self._qubits))
-
-                        # Initial twirl
-                        circuit.extend(
-                            pauli_to_cycle(
-                                twirl_strings[0],
-                                self._qubits,
-                                self._decompose_to_zxzxz
+                            circuit = Circuit()
+                            # State prep: +1 eigenstate of the group's
+                            # shared basis, which is simultaneously a +1
+                            # eigenstate of every Pauli in the group.
+                            circuit.prepare(
+                                measurement_basis,
+                                qubits=list(self._qubits),
                             )
-                        )
-                        circuit.append(Barrier(self._qubits))
+                            circuit.append(Barrier(self._qubits))
 
-                        for i in range(depth):
-                            # Interleaved gate cycle
-                            if isinstance(self._cycle_or_circuit, Cycle):
-                                circuit.append(
-                                    self._cycle_or_circuit
-                                )
-                            else:
-                                circuit.extend(
-                                    self._cycle_or_circuit
-                                )
-
-                            # Twirling layer
+                            # Initial twirl
                             circuit.extend(
                                 pauli_to_cycle(
-                                    twirl_strings[i + 1],
+                                    twirl_strings[0],
                                     self._qubits,
                                     self._decompose_to_zxzxz
                                 )
                             )
                             circuit.append(Barrier(self._qubits))
 
-                        circuit.measure(
-                            qubits=list(self._qubits),
-                            basis=list(basis),
-                        )
+                            for i in range(depth):
+                                # Interleaved gate cycle
+                                if insert_cycle:
+                                    if isinstance(
+                                        self._cycle_or_circuit, Cycle
+                                    ):
+                                        circuit.append(
+                                            self._cycle_or_circuit
+                                        )
+                                    else:
+                                        circuit.extend(
+                                            self._cycle_or_circuit
+                                        )
 
-                        circuits.append(circuit)
-                        basis_labels.append(measurement_basis)
-                        depths.append(depth)
-                        randomizations.append(r)
-                        group_paulis_list.append(
-                            [''.join(p) for p in group.paulis]
-                        )
-                        group_signs_list.append(signs)
-                        twirl_strs_list.append(
-                            [''.join(ts) for ts in twirl_strings]
-                        )
+                                # Twirling layer
+                                circuit.extend(
+                                    pauli_to_cycle(
+                                        twirl_strings[i + 1],
+                                        self._qubits,
+                                        self._decompose_to_zxzxz
+                                    )
+                                )
+                                circuit.append(Barrier(self._qubits))
+
+                            circuit.measure(
+                                qubits=list(self._qubits),
+                                basis=list(basis),
+                            )
+
+                            circuits.append(circuit)
+                            basis_labels.append(measurement_basis)
+                            depths.append(depth)
+                            randomizations.append(r)
+                            group_paulis_list.append(
+                                [''.join(p) for p in group.paulis]
+                            )
+                            group_signs_list.append(signs)
+                            twirl_strs_list.append(
+                                [''.join(ts) for ts in twirl_strings]
+                            )
+                            experiment_labels.append(experiment)
 
             self._circuits = CircuitSet(circuits)
             self._circuits['measurement_basis'] = basis_labels
@@ -335,317 +409,391 @@ def CB(
             self._circuits['group_paulis'] = group_paulis_list
             self._circuits['group_signs'] = group_signs_list
             self._circuits['twirl_strings'] = twirl_strs_list
+            self._circuits['experiment'] = experiment_labels
 
         def analyze(self) -> None:
             """Fit per-Pauli decay curves and estimate the cycle infidelity.
 
-            For each Pauli Q in a QWC group and each depth d, collects
-            the parity expectation value from every circuit sharing Q's
-            group (a single measurement in the group's basis yields Q's
-            expectation value via marginalization), and averages over
-            randomizations:
+            For each experiment ('interleaved', and 'reference' if
+            include_ref_cycle), each Pauli Q in a QWC group, and each
+            depth d, collects the parity expectation value from every
+            circuit sharing Q's group (a single measurement in the
+            group's basis yields Q's expectation value via
+            marginalization), and averages over randomizations:
 
               EV(Q, d) = mean_r [ sign(r) * marginalized_ev(result, Q) ]
 
             Fits EV(Q, d) = A * f_Q^d per Pauli using FitExponential with
             offset fixed to zero (f_Q = exp(-b)). Reports the process
-            infidelity:
+            infidelity of each experiment:
 
               e_F = (d^2 - 1) / d^2 * (1 - <mean f_Q over sampled Paulis>)
 
-            Results are stored in self._pauli_infidelities (keyed by Pauli
-            string) and self._e_F.
+            If include_ref_cycle is True, the estimated bare infidelity
+            of cycle_or_circuit is additionally computed from the
+            interleaved and reference average Pauli fidelities (see
+            compute_cycle_infidelity), and reported as self._e_F;
+            otherwise self._e_F is the interleaved (dressed) process
+            infidelity.
+
+            Results are stored in self._pauli_fidelities and
+            self._decay_curves (each keyed by experiment, then Pauli
+            string), and self._e_F.
             """
             logger.info(" Analyzing the results...")
 
             depths = np.array(self._circuit_depths, dtype=float)
-            for group in self._pauli_groups:
-                measurement_basis = ''.join(
-                    'Z' if p == 'I' else p for p in group.measurement_basis
-                )
+            avg_fidelities: dict[str, ufloat] = {}
 
-                for pauli_tuple in group.paulis:
-                    pauli = ''.join(pauli_tuple)
-                    active = [i for i, p in enumerate(pauli_tuple) if p != 'I']
-
-                    # Mean EVs (per Pauli) over randomizations for each depth
-                    mean_evs: list[float] = []
-                    for depth in self._circuit_depths:
-                        # EVs of all randomizations for a given depth
-                        evs: list[float] = []
-
-                        for r in range(self._n_randomizations):
-                            subset = self._circuits.subset(
-                                measurement_basis=measurement_basis,
-                                depth=depth,
-                                randomization=r,
-                            )
-                            if len(subset) == 0:
-                                continue
-                            result = subset.results.iloc[0]
-                            member_idx = (
-                                subset['group_paulis'].iloc[0].index(pauli)
-                            )
-                            sign = subset['group_signs'].iloc[0][member_idx]
-                            evs.append(
-                                sign * result.marginalize(tuple(active)).ev
-                            )
-
-                        mean_evs.append(
-                            float(np.mean(evs)) if evs else np.nan
-                        )
-
-                    evs_arr = np.array(mean_evs)
-                    valid = ~np.isnan(evs_arr)
-                    self._decay_curves[pauli] = (
-                        depths[valid], evs_arr[valid]
+            for experiment in self._experiments:
+                for group in self._pauli_groups:
+                    measurement_basis = ''.join(
+                        'Z' if p == 'I' else p
+                        for p in group.measurement_basis
                     )
 
-                    if valid.sum() >= 2:
-                        self._fit[pauli] = FitExponential()
-                        params = self._fit[pauli].model.make_params(
-                            a=1.0, b=0.01, c=0
-                        )
-                        params['c'].vary = False
-                        self._fit[pauli].fit(
-                            depths[valid], evs_arr[valid],
-                            params=params,
-                        )
-                        if self._fit[pauli].fit_success:
-                            b = self._fit[pauli].fit_params['b']
-                            if b.stderr is not None:
-                                self._pauli_fidelities[pauli] = uexp(
-                                    -ufloat(b.value, b.stderr)
+                    for pauli_tuple in group.paulis:
+                        pauli = ''.join(pauli_tuple)
+                        active = [
+                            i for i, p in enumerate(pauli_tuple)
+                            if p != 'I'
+                        ]
+
+                        # Mean EVs (per Pauli) over randomizations for
+                        # each depth
+                        mean_evs: list[float] = []
+                        for depth in self._circuit_depths:
+                            # EVs of all randomizations for a given depth
+                            evs: list[float] = []
+
+                            for r in range(self._n_randomizations):
+                                subset = self._circuits.subset(
+                                    experiment=experiment,
+                                    measurement_basis=measurement_basis,
+                                    depth=depth,
+                                    randomization=r,
                                 )
+                                if len(subset) == 0:
+                                    continue
+                                result = subset.results.iloc[0]
+                                member_idx = (
+                                    subset['group_paulis'].iloc[0].index(
+                                        pauli
+                                    )
+                                )
+                                sign = (
+                                    subset['group_signs'].iloc[0][
+                                        member_idx
+                                    ]
+                                )
+                                evs.append(
+                                    sign
+                                    * result.marginalize(tuple(active)).ev
+                                )
+
+                            mean_evs.append(
+                                float(np.mean(evs)) if evs else np.nan
+                            )
+
+                        evs_arr = np.array(mean_evs)
+                        valid = ~np.isnan(evs_arr)
+                        self._decay_curves[experiment][pauli] = (
+                            depths[valid], evs_arr[valid]
+                        )
+
+                        if valid.sum() >= 2:
+                            fit = FitExponential()
+                            params = fit.model.make_params(
+                                a=1.0, b=0.01, c=0
+                            )
+                            params['c'].vary = False
+                            fit.fit(
+                                depths[valid], evs_arr[valid],
+                                params=params,
+                            )
+                            self._fit[experiment][pauli] = fit
+                            if fit.fit_success:
+                                b = fit.fit_params['b']
+                                if b.stderr is not None:
+                                    self._pauli_fidelities[experiment][
+                                        pauli
+                                    ] = uexp(-ufloat(b.value, b.stderr))
+                                else:
+                                    logger.warning(
+                                        " Unable to estimate fit "
+                                        f"uncertainty for Pauli {pauli} "
+                                        f"({experiment})."
+                                    )
                             else:
                                 logger.warning(
-                                    " Unable to estimate fit "
-                                    f"uncertainty for Pauli {pauli}."
+                                    f" Fit failed for Pauli {pauli} "
+                                    f"({experiment})."
                                 )
                         else:
                             logger.warning(
-                                f" Fit failed for Pauli {pauli}."
+                                f" Not enough data for Pauli {pauli} "
+                                f"({experiment})."
                             )
-                    else:
-                        logger.warning(
-                            f" Not enough data for Pauli {pauli}."
-                        )
 
-            d_dim = 2 ** len(self._qubits)
-            fidelities = list(self._pauli_fidelities.values())
-            if fidelities:
-                avg_f = sum(fidelities) / len(fidelities)
-                self._e_F = (d_dim**2 - 1) / d_dim**2 * (1 - avg_f)
-                print(
-                    f"\nProcess infidelity: e_F = {self._e_F.n:.4e} "
-                    f"({self._e_F.s:.4e})\n"
+                d_dim = 2 ** len(self._qubits)
+                fidelities = list(
+                    self._pauli_fidelities[experiment].values()
                 )
+                if fidelities:
+                    avg_f = sum(fidelities) / len(fidelities)
+                    avg_fidelities[experiment] = avg_f
+                    e_F = (d_dim**2 - 1) / d_dim**2 * (1 - avg_f)
+                    self._process_infidelities[experiment] = e_F
+                    print(
+                        f"\n[{experiment}] Process infidelity: "
+                        f"e_F = {e_F.n:.4e} ({e_F.s:.4e})\n"
+                    )
+                else:
+                    logger.warning(
+                        f" No valid fidelity estimates ({experiment})."
+                    )
+                    self._process_infidelities[experiment] = np.nan
+
+            if self._include_ref_cycle:
+                f_D = avg_fidelities.get('interleaved')
+                f_ref = avg_fidelities.get('reference')
+                if f_D is not None and f_ref is not None:
+                    self._e_F = compute_cycle_infidelity(
+                        f_D, f_ref, len(self._qubits)
+                    )
+                    print(
+                        "\nEstimated bare cycle infidelity: "
+                        f"e_C = {self._e_F.n:.4e} ({self._e_F.s:.4e})\n"
+                    )
+                else:
+                    logger.warning(
+                        " Unable to estimate the bare cycle infidelity."
+                    )
+                    self._e_F = np.nan
             else:
-                logger.warning(" No valid fidelity estimates.")
-                self._e_F = np.nan
+                self._e_F = self._process_infidelities.get(
+                    'interleaved', np.nan
+                )
 
         def plot(self) -> None:
             """Plot per-Pauli decay curves and Pauli infidelities.
 
-            Generates two figures:
+            Generates two figures per experiment ('interleaved', and
+            'reference' if include_ref_cycle):
               1. Raw decays: one subplot per sampled Pauli string,
                  showing the mean EV per depth (markers) and the fitted
                  A * f_P^depth curve (line), with f_P ± uncertainty in
                  the legend.
               2. Pauli infidelities: a bar plot of 1 - f_P per Pauli
-                 string, with the process infidelity e_F drawn as a
-                 horizontal line.
+                 string, with that experiment's process infidelity
+                 drawn as a horizontal line.
+
+            If include_ref_cycle is True, the estimated bare cycle
+            infidelity self._e_F (computed from both experiments, and
+            already printed by analyze()) is not drawn on either
+            experiment's own plot, since it is not a per-Pauli quantity
+            of either curve alone.
 
             Plotly figures are shown for interactive use; matplotlib
             equivalents are saved to disk when Settings.save_data is
             True.
             """
-            paulis = sorted(self._decay_curves.keys())
             colors = qualitative.Plotly
 
-            # ---- Plot 1: raw decays ------------------------------
-            if paulis:
-                nrows, ncols = calculate_nrows_ncols(len(paulis))
-
-                pfig = make_subplots(
-                    rows=nrows, cols=ncols, subplot_titles=paulis
+            for experiment in self._experiments:
+                decay_curves = self._decay_curves[experiment]
+                fits = self._fit[experiment]
+                pauli_fidelities = self._pauli_fidelities[experiment]
+                e_F = self._process_infidelities.get(experiment, np.nan)
+                title_prefix = experiment.capitalize()
+                file_suffix = (
+                    '' if experiment == 'interleaved'
+                    else f'_{experiment}'
                 )
-                pfig.update_annotations(font_size=12)
+                paulis = sorted(decay_curves.keys())
 
-                if Settings.save_data:
-                    mfig, maxes = plt.subplots(
-                        nrows, ncols,
-                        figsize=(4 * ncols, 3.5 * nrows),
-                        layout='constrained',
-                        squeeze=False,
-                    )
+                # ---- Plot 1: raw decays --------------------------
+                if paulis:
+                    pfig = go.Figure()
 
-                for k, pauli in enumerate(paulis):
-                    row, col = (k // ncols) + 1, (k % ncols) + 1
-                    color = colors[k % len(colors)]
-                    depths, evs = self._decay_curves[pauli]
-
-                    pfig.add_trace(
-                        go.Scatter(
-                            x=depths, y=evs, mode='markers',
-                            marker={'size': 8, 'color': color},
-                            showlegend=False,
-                        ),
-                        row=row, col=col,
-                    )
                     if Settings.save_data:
-                        ax = maxes[row - 1][col - 1]
-                        ax.plot(
-                            depths, evs, 'o', color=color, markersize=6
+                        mfig, ax = plt.subplots(
+                            figsize=(6, 5), layout='constrained'
                         )
 
-                    fit = self._fit.get(pauli)
-                    f_p = self._pauli_fidelities.get(pauli)
-                    if fit is not None and fit.fit_success and depths.size:
-                        xfit = np.linspace(depths.min(), depths.max(), 200)
-                        yfit = fit.predict(xfit)
-                        label = (
-                            f'f={f_p.n:.4f} ({f_p.s:.4f})'
-                            if f_p is not None else 'Fit'
+                    for k, pauli in enumerate(paulis):
+                        color = colors[k % len(colors)]
+                        depths, evs = decay_curves[pauli]
+
+                        fit = fits.get(pauli)
+                        f_p = pauli_fidelities.get(pauli)
+                        has_fit = (
+                            fit is not None and fit.fit_success
+                            and depths.size
                         )
+                        label = (
+                            f'{pauli}: f={f_p.n:.4f} ({f_p.s:.4f})'
+                            if has_fit and f_p is not None
+                            else f'{pauli}: Fit' if has_fit else pauli
+                        )
+
                         pfig.add_trace(
                             go.Scatter(
-                                x=xfit, y=yfit, mode='lines',
-                                line={'color': color, 'width': 2},
-                                name=label, showlegend=True,
-                                legend=f'legend{k + 1}' if k else 'legend',
+                                x=depths, y=evs, mode='markers',
+                                marker={'size': 8, 'color': color},
+                                name=label, legendgroup=pauli,
+                                showlegend=not has_fit,
                             ),
-                            row=row, col=col,
                         )
                         if Settings.save_data:
-                            ax.plot(xfit, yfit, '-', color=color)
-                            ax.legend([label], fontsize=8)
+                            ax.plot(
+                                depths, evs, 'o', color=color,
+                                markersize=6,
+                                label=None if has_fit else label,
+                            )
+
+                        if has_fit:
+                            xfit = np.linspace(
+                                depths.min(), depths.max(), 200
+                            )
+                            yfit = fit.predict(xfit)
+                            pfig.add_trace(
+                                go.Scatter(
+                                    x=xfit, y=yfit, mode='lines',
+                                    line={'color': color, 'width': 2},
+                                    name=label, legendgroup=pauli,
+                                    showlegend=True,
+                                ),
+                            )
+                            if Settings.save_data:
+                                ax.plot(
+                                    xfit, yfit, '-', color=color,
+                                    label=label,
+                                )
 
                     pfig.update_xaxes(
-                        title_text='Cycle Depth' if row == nrows else '',
-                        showgrid=True, row=row, col=col,
+                        title_text='Cycle Depth', showgrid=True,
                     )
                     pfig.update_yaxes(
-                        title_text='Expectation Value' if col == 1 else '',
-                        showgrid=True, row=row, col=col,
+                        title_text='Expectation Value', showgrid=True,
                     )
+                    pfig.update_layout(
+                        height=500,
+                        width=750,
+                        template='plotly_white',
+                        paper_bgcolor='white',
+                        plot_bgcolor='#fbfbfd',
+                        title_text=f'{title_prefix} Pauli Decays',
+                    )
+                    pfig.update_xaxes(
+                        showline=True, mirror=True, linecolor='#c7c7c7',
+                        linewidth=1, gridcolor='#e5e7eb', zeroline=False,
+                        ticks='outside',
+                    )
+                    pfig.update_yaxes(
+                        showline=True, mirror=True, linecolor='#c7c7c7',
+                        linewidth=1, gridcolor='#e5e7eb', zeroline=False,
+                        ticks='outside',
+                    )
+                    pfig.show()
+
                     if Settings.save_data:
-                        if row == nrows:
-                            ax.set_xlabel('Cycle Depth')
-                        if col == 1:
-                            ax.set_ylabel('Expectation Value')
+                        ax.set_xlabel('Cycle Depth')
+                        ax.set_ylabel('Expectation Value')
                         ax.grid(True)
+                        ax.legend(fontsize=8)
+                        mfig.suptitle(f'{title_prefix} Pauli Decays')
+                        mfig.savefig(
+                            self._data_manager._save_path
+                            + f'CB_decays{file_suffix}.png',
+                            dpi=300,
+                        )
+                        plt.close(mfig)
 
-                pfig.update_layout(
-                    height=300 * nrows,
-                    width=300 * ncols + 50,
-                    template='plotly_white',
-                    paper_bgcolor='white',
-                    plot_bgcolor='#fbfbfd',
-                    title_text='Pauli Decays',
-                )
-                pfig.update_xaxes(
-                    showline=True, mirror=True, linecolor='#c7c7c7',
-                    linewidth=1, gridcolor='#e5e7eb', zeroline=False,
-                    ticks='outside',
-                )
-                pfig.update_yaxes(
-                    showline=True, mirror=True, linecolor='#c7c7c7',
-                    linewidth=1, gridcolor='#e5e7eb', zeroline=False,
-                    ticks='outside',
-                )
-                pfig.show()
+                # ---- Plot 2: Pauli infidelities ------------------
+                if pauli_fidelities and not (
+                    isinstance(e_F, float) and np.isnan(e_F)
+                ):
+                    pauli_labels = sorted(pauli_fidelities.keys())
+                    infidelities = [
+                        1 - pauli_fidelities[p] for p in pauli_labels
+                    ]
+                    y = [inf.n for inf in infidelities]
+                    yerr = [inf.s for inf in infidelities]
+                    e_F_label = f'e_F = {e_F.n:.2e} ({e_F.s:.2e})'
 
-                if Settings.save_data:
-                    for idx in range(len(paulis), nrows * ncols):
-                        maxes[idx // ncols][idx % ncols].axis('off')
-                    mfig.suptitle('Pauli Decays')
-                    mfig.savefig(
-                        self._data_manager._save_path + 'CB_decays.png',
-                        dpi=300,
+                    pfig2 = go.Figure()
+                    pfig2.add_trace(
+                        go.Bar(
+                            x=pauli_labels, y=y,
+                            error_y={
+                                'type': 'data', 'array': yerr,
+                                'visible': True
+                            },
+                            marker_color='#1f77b4',
+                            name='Pauli infidelity',
+                            showlegend=False,
+                        )
                     )
-                    plt.close(mfig)
+                    pfig2.add_hline(
+                        y=e_F.n,
+                        line={'color': 'red', 'dash': 'dash'},
+                        annotation_text=e_F_label,
+                        annotation_position='top left',
+                    )
+                    pfig2.update_layout(
+                        height=450,
+                        width=min(80 * len(pauli_labels) + 200, 1200),
+                        template='plotly_white',
+                        paper_bgcolor='white',
+                        plot_bgcolor='#fbfbfd',
+                        title_text=f'{title_prefix} Pauli Infidelities',
+                    )
+                    pfig2.update_xaxes(
+                        title_text='Pauli Decay Term', type='category',
+                        showgrid=True, showline=True, mirror=True,
+                        linecolor='#c7c7c7', linewidth=1,
+                        gridcolor='#e5e7eb', zeroline=False,
+                        ticks='outside',
+                    )
+                    pfig2.update_yaxes(
+                        title_text='Infidelity', showgrid=True,
+                        showline=True, mirror=True, linecolor='#c7c7c7',
+                        linewidth=1, gridcolor='#e5e7eb', zeroline=False,
+                        ticks='outside',
+                    )
+                    pfig2.show()
 
-            # ---- Plot 2: Pauli infidelities ----------------------
-            if self._pauli_fidelities:
-                pauli_labels = sorted(self._pauli_fidelities.keys())
-                infidelities = [
-                    1 - self._pauli_fidelities[p] for p in pauli_labels
-                ]
-                y = [inf.n for inf in infidelities]
-                yerr = [inf.s for inf in infidelities]
-                e_F_label = f'e_F = {self._e_F.n:.2e} ({self._e_F.s:.2e})'
-
-                pfig2 = go.Figure()
-                pfig2.add_trace(
-                    go.Bar(
-                        x=pauli_labels, y=y,
-                        error_y={
-                            'type': 'data', 'array': yerr, 'visible': True
-                        },
-                        marker_color='#1f77b4',
-                        name='Pauli infidelity',
-                        showlegend=False,
-                    )
-                )
-                pfig2.add_hline(
-                    y=self._e_F.n,
-                    line={'color': 'red', 'dash': 'dash'},
-                    annotation_text=e_F_label,
-                    annotation_position='top left',
-                )
-                pfig2.update_layout(
-                    height=450,
-                    width=min(80 * len(pauli_labels) + 200, 1200),
-                    template='plotly_white',
-                    paper_bgcolor='white',
-                    plot_bgcolor='#fbfbfd',
-                    title_text='Pauli Infidelities',
-                )
-                pfig2.update_xaxes(
-                    title_text='Pauli Decay Term', type='category',
-                    showgrid=True, showline=True, mirror=True,
-                    linecolor='#c7c7c7', linewidth=1,
-                    gridcolor='#e5e7eb', zeroline=False, ticks='outside',
-                )
-                pfig2.update_yaxes(
-                    title_text='Infidelity', showgrid=True,
-                    showline=True, mirror=True, linecolor='#c7c7c7',
-                    linewidth=1, gridcolor='#e5e7eb', zeroline=False,
-                    ticks='outside',
-                )
-                pfig2.show()
-
-                if Settings.save_data:
-                    mfig2 = plt.figure(
-                        figsize=(min(0.6 * len(pauli_labels) + 3, 12), 5)
-                    )
-                    x = np.arange(len(pauli_labels))
-                    plt.bar(x, y, yerr=yerr, color='#1f77b4', capsize=3)
-                    plt.axhline(
-                        self._e_F.n, color='red', linestyle='--',
-                        label=e_F_label,
-                    )
-                    plt.xticks(x, pauli_labels, rotation=45, ha='right')
-                    plt.xlabel('Pauli Decay Term', fontsize=15)
-                    plt.ylabel('Infidelity', fontsize=15)
-                    plt.legend(fontsize=12)
-                    plt.grid(True)
-                    mfig2.set_tight_layout(True)
-                    mfig2.savefig(
-                        self._data_manager._save_path
-                        + 'CB_infidelities.png',
-                        dpi=600,
-                    )
-                    mfig2.savefig(
-                        self._data_manager._save_path
-                        + 'CB_infidelities.pdf'
-                    )
-                    mfig2.savefig(
-                        self._data_manager._save_path
-                        + 'CB_infidelities.svg'
-                    )
-                    plt.close(mfig2)
+                    if Settings.save_data:
+                        mfig2 = plt.figure(
+                            figsize=(min(0.6 * len(pauli_labels) + 3, 12), 5)
+                        )
+                        x = np.arange(len(pauli_labels))
+                        plt.bar(x, y, yerr=yerr, color='#1f77b4', capsize=3)
+                        plt.axhline(
+                            e_F.n, color='red', linestyle='--',
+                            label=e_F_label,
+                        )
+                        plt.xticks(x, pauli_labels, rotation=45, ha='right')
+                        plt.xlabel('Pauli Decay Term', fontsize=15)
+                        plt.ylabel('Infidelity', fontsize=15)
+                        plt.legend(fontsize=12)
+                        plt.grid(True)
+                        mfig2.set_tight_layout(True)
+                        mfig2.savefig(
+                            self._data_manager._save_path
+                            + f'CB_infidelities{file_suffix}.png',
+                            dpi=600,
+                        )
+                        mfig2.savefig(
+                            self._data_manager._save_path
+                            + f'CB_infidelities{file_suffix}.pdf'
+                        )
+                        mfig2.savefig(
+                            self._data_manager._save_path
+                            + f'CB_infidelities{file_suffix}.svg'
+                        )
+                        plt.close(mfig2)
 
         def save(self) -> None:
             """Save all circuits and data."""
@@ -676,12 +824,40 @@ def CB(
         n_decays=n_decays,
         n_randomizations=n_randomizations,
         decompose_to_zxzxz=decompose_to_zxzxz,
+        include_ref_cycle=include_ref_cycle,
         targeted_decays=targeted_decays,
         **kwargs,
     )
 
 
 def compute_cycle_infidelity(
+    f_D: ufloat, f_ref: ufloat, n_qubits: int
+) -> ufloat:
+    """Estimate the bare infidelity of an interleaved cycle.
+
+    Divides out the average Pauli fidelity of the reference (empty)
+    cycle from that of the interleaved (dressed) cycle, isolating the
+    infidelity contributed by cycle_or_circuit itself from that of the
+    random Pauli twirling gates. Unlike compute_cycle_infidelity1, this
+    takes the average per-Pauli fidelities directly (as estimated by
+    qcal-native CB), rather than deriving them from a full process
+    infidelity.
+
+    Args:
+        f_D (ufloat): average Pauli fidelity of the interleaved
+            (dressed) cycle.
+        f_ref (ufloat): average Pauli fidelity of the reference (empty)
+            cycle.
+        n_qubits (int): number of qubits the cycle acts on.
+
+    Returns:
+        ufloat: estimated bare process infidelity of cycle_or_circuit.
+    """
+    d = 2 ** n_qubits
+    return (d**2 - 1) / d**2 * (1 - f_D / f_ref)
+
+
+def compute_cycle_infidelity1(
     circs_D: trueq.CircuitCollection, circs_ref: trueq.CircuitCollection  # noqa: F821 # type: ignore
 ) -> tuple:
     """Compute the infidelity of the interleaved Cycle.
@@ -883,7 +1059,7 @@ def CB1(
                 try:
                     print(cycle_subset.fit(analyze_dim=2))
                     print(ref_subset.fit(analyze_dim=2))
-                    e_C, err = compute_cycle_infidelity(
+                    e_C, err = compute_cycle_infidelity1(
                         cycle_subset, ref_subset
                     )
                     print(
