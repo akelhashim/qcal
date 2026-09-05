@@ -135,7 +135,7 @@ class TestTVD:
     def test_tvd_requires_matching_dimension(self):
         a = Results({'0': 10, '1': 10})
         b = Results({'00': 5, '11': 5})
-        with pytest.raises(AssertionError):
+        with pytest.raises(ValueError):
             a.tvd(b)
 
 
@@ -153,7 +153,7 @@ class TestFidelity:
     def test_fidelity_requires_matching_dimension(self):
         a = Results({'0': 10, '1': 10})
         b = Results({'00': 5, '11': 5})
-        with pytest.raises(AssertionError):
+        with pytest.raises(ValueError):
             a.fidelity(b)
 
 
