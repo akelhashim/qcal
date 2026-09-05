@@ -18,7 +18,7 @@ from pandas import DataFrame
 from uncertainties import ufloat
 
 from qcal.math.entropy import shannon_entropy
-from qcal.math.probability import total_variation_distance
+from qcal.math.probability import hellinger_fidelity, total_variation_distance
 
 logger = logging.getLogger(__name__)
 
@@ -94,7 +94,6 @@ def readout_correction(results: Results, confusion_matrix: DataFrame) -> Dict:
     return corrected_results
 
 
-# TODO: add fidelity and TVD
 class Results:
     """Results class.
 
@@ -389,6 +388,17 @@ class Results:
         }
 
         fig.show(config=save_properties)
+
+    def fidelity(self, results: Results) -> ufloat:
+        """Classical (Hellinger) fidelity with another distribution.
+
+        Args:
+            results (Results): other results.
+
+        Returns:
+            ufloat: fidelity, with propagated shot-noise uncertainty.
+        """
+        return hellinger_fidelity(self, results)
 
     def tvd(self, results: Results) -> ufloat:
         """Total Variation Distance

@@ -139,6 +139,24 @@ class TestTVD:
             a.tvd(b)
 
 
+class TestFidelity:
+
+    def test_fidelity_of_identical_distributions_is_one(self):
+        results = Results({'0': 50, '1': 50})
+        assert results.fidelity(results).nominal_value == pytest.approx(1.)
+
+    def test_fidelity_of_disjoint_distributions_is_zero(self):
+        a = Results({'0': 100})
+        b = Results({'1': 100})
+        assert a.fidelity(b).nominal_value == pytest.approx(0.)
+
+    def test_fidelity_requires_matching_dimension(self):
+        a = Results({'0': 10, '1': 10})
+        b = Results({'00': 5, '11': 5})
+        with pytest.raises(AssertionError):
+            a.fidelity(b)
+
+
 class TestReadoutCorrection:
 
     def test_apply_readout_correction_recovers_prepared_state(self):
