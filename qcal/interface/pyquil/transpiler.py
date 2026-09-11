@@ -19,7 +19,9 @@ from qcal.interface.pyquil.randomized_compiling import (
     ReadoutLayerTracker,
     _U2Randomization,
     build_rc_configuration,
+    effective_layer_period,
     final_layer_cycle_indices,
+    has_trailing_single_qubit_layer,
     is_rc_layer,
 )
 from qcal.transpilation.transpiler import Transpiler
@@ -429,8 +431,8 @@ def to_pyquil(
         rc_kwargs (Dict | None, optional): keyword arguments forwarded to
             `RandomizedCompilingConfiguration` when `randomized_compiling`
             is ``True`` (e.g. `invert_random_paulis`,
-            `shots_per_randomization`, `base_cycle_repetitions`). Defaults
-            to ``None``.
+            `shots_per_randomization`, `base_cycle_repetitions`,
+            `layer_period`). Defaults to ``None``.
 
     Returns:
         Program: PyQuil Program.
@@ -594,8 +596,8 @@ def transpile_circuit(
         rc_kwargs (Dict | None, optional): keyword arguments forwarded to
             `RandomizedCompilingConfiguration` when `randomized_compiling`
             is ``True`` (e.g. `invert_random_paulis`,
-            `shots_per_randomization`, `base_cycle_repetitions`). Defaults
-            to ``None``.
+            `shots_per_randomization`, `base_cycle_repetitions`,
+            `layer_period`). Defaults to ``None``.
 
     Returns:
         Program: PyQuil Program.
@@ -633,12 +635,21 @@ def transpile_circuit(
             for q in circuit.qubits
         }
 
+    layer_period = effective_layer_period(
+        circuit, (rc_kwargs or {}).get('layer_period')
+    )
+
     rc_tracker = None
     if randomized_compiling:
         rc_configuration = build_rc_configuration(
             circuit, qubits, **(rc_kwargs or {})
         )
-        rc_tracker = RCLayerTracker(rc_configuration)
+        rc_tracker = RCLayerTracker(
+            rc_configuration,
+            reserve_final_layer=has_trailing_single_qubit_layer(
+                circuit, layer_period
+            ),
+        )
 
     readout_tracker = None
     readout_final_layer = frozenset()
@@ -662,6 +673,7 @@ def transpile_circuit(
             readout_tracker = ReadoutLayerTracker(readout_configuation)
             readout_final_layer = final_layer_cycle_indices(circuit)
 
+    non_barrier_idx = 0
     cycle_defs = {}
     for i, cycle in enumerate(circuit):
         if fence_between_cycles:
@@ -716,8 +728,11 @@ def transpile_circuit(
                         else None
                     ),
                 )
-                if rc_tracker is not None and is_rc_layer(cycle):
+                if rc_tracker is not None and is_rc_layer(
+                    cycle, non_barrier_idx, layer_period
+                ):
                     rc_tracker.close_layer()
+                non_barrier_idx += 1
 
     if randomized_compiling:
         rc_program = rc_configuration.build_quil_program()
@@ -726,7 +741,8 @@ def transpile_circuit(
             for qubit in qubits:
                 call = rc_configuration.apply_pauli_pair(
                     qubit,
-                    rc_configuration.cycle_count,
+                    # rc_configuration.cycle_count,  # TODO: switch
+                    rc_configuration._cycle_count,
                     source_unitaries=(
                         readout_configuation.destination_names(qubit)
                     ),
@@ -896,8 +912,8 @@ class PyQuilTranspiler(Transpiler):
                 `RandomizedCompilingConfiguration` when
                 `randomized_compiling` is ``True`` (e.g.
                 `invert_random_paulis`, `shots_per_randomization`,
-                `base_cycle_repetitions`). Defaults to ``None``, in which
-                case `invert_random_paulis=True` and
+                `base_cycle_repetitions`, `layer_period`). Defaults to
+                ``None``, in which case `invert_random_paulis=True` and
                 `shots_per_randomization=None` are used.
         """
         try:
@@ -923,6 +939,7 @@ class PyQuilTranspiler(Transpiler):
             # randomization.
             'shots_per_randomization': None,
             'base_cycle_repetitions': None,
+            'layer_period': 5
         }
 
         super().__init__(gate_mapper=gate_mapper)

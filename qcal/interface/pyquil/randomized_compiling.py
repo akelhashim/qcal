@@ -42,8 +42,10 @@ __all__ = (
     'PHASE_GATES',
     'PULSE_GATES',
     'is_rc_layer',
+    'effective_layer_period',
     'cycle_to_base_cycle',
     'build_rc_configuration',
+    'has_trailing_single_qubit_layer',
     'RCLayerTracker',
     'final_layer_cycle_indices',
     'ReadoutLayerTracker',
@@ -55,7 +57,11 @@ PULSE_GATES = ('X90', 'SX')
 _ANGLES_PER_UNITARY = 3  # ZXZXZ decomposition
 
 
-def is_rc_layer(cycle: Cycle) -> bool:
+def is_rc_layer(
+    cycle: Cycle,
+    index: int | None = None,
+    layer_period: int | None = None,
+) -> bool:
     """Whether a Cycle is a randomized-compiling layer boundary.
 
     A Cycle advances the RC layer index if it contains a two-qubit gate
@@ -68,16 +74,80 @@ def is_rc_layer(cycle: Cycle) -> bool:
     `qcal.interface.pyquil.transpiler.transpile_circuit`; both call
     sites must agree.
 
+    `index`/`layer_period` add a purely positional fallback boundary,
+    for circuits with no two-qubit gates or measurements to key off of
+    (e.g. a run of single-qubit ZXZXZ templates with no natural RC
+    layer boundary between them). `index` counts non-barrier cycles
+    from the start of the circuit; every `layer_period`-th such cycle
+    is treated as a boundary, as if a `base_cycle` of identities sat
+    there, without requiring any change to the circuit itself. Both
+    call sites must pass the same `index` numbering (non-barrier
+    cycles only) and `layer_period` for this to stay consistent with
+    `base_cycles`.
+
     Args:
         cycle (Cycle): qcal Cycle.
+        index (int | None, optional): position of `cycle` among the
+            circuit's non-barrier cycles. Defaults to `None`, which
+            disables the positional fallback.
+        layer_period (int | None, optional): close a layer every this
+            many non-barrier cycles, regardless of content. Defaults
+            to `None`, which disables the positional fallback.
 
     Returns:
         bool: True if `cycle` should count as an RC layer.
     """
-    return any(
+    if any(
         len(gate.qubits) == 2 or gate.is_measurement
         for gate in cycle.gates
+    ):
+        return True
+    return (
+        layer_period is not None
+        and index is not None
+        and (index + 1) % layer_period == 0
     )
+
+
+def effective_layer_period(
+    circuit: Circuit, layer_period: int | None
+) -> int | None:
+    """Resolve `layer_period` to `None` when it isn't actually needed.
+
+    `layer_period` (see `is_rc_layer`) is a purely positional fallback
+    for circuits with no two-qubit gates or measurements to key off
+    of. It is unsafe to combine with real content-based boundaries:
+    the period is tuned for an uninterrupted run of same-length
+    ZXZXZ templates, so once a two-qubit gate or measurement shows up
+    anywhere in the circuit, the same period can land mid-template
+    elsewhere (e.g. on an `X90` cycle), splitting a single unitary's
+    phase tracking across two layer indices instead of leaving it
+    alone. Resolving here lets a caller leave a single default (e.g.
+    always passing `layer_period=5`) in place across every circuit it
+    transpiles, regardless of whether that particular circuit has
+    real two-qubit content -- `build_rc_configuration`, `has_
+    trailing_single_qubit_layer`, and `qcal.interface.pyquil.
+    transpiler.transpile_circuit` all call this once per circuit so
+    they agree on the same resolved value.
+
+    Args:
+        circuit (Circuit): compiled qcal circuit to twirl.
+        layer_period (int | None): caller-supplied value, as passed to
+            `build_rc_configuration`.
+
+    Returns:
+        int | None: `layer_period` unchanged if `circuit`'s
+            non-barrier interior has no content-based RC-layer
+            boundary (see `is_rc_layer`); `None` otherwise.
+    """
+    if layer_period is None:
+        return None
+    has_content_boundary = any(
+        is_rc_layer(cycle)
+        for cycle in circuit.cycles[:-1]  # Exclude terminal measurements
+        if not cycle.is_barrier
+    )
+    return None if has_content_boundary else layer_period
 
 
 def cycle_to_base_cycle(
@@ -142,6 +212,7 @@ def build_rc_configuration(
     circuit: Circuit,
     qubits:  Sequence[int],
     base_cycle_repetitions: int | None = None,
+    layer_period: int | None = None,
     **rc_kwargs,
 ) -> pyquil._qpu.randomized_compiling.RandomizedCompilingConfiguration: # type: ignore  # noqa: F821
     """Build a RandomizedCompilingConfiguration from a compiled Circuit.
@@ -166,6 +237,12 @@ def build_rc_configuration(
             (see `_minimal_period`). Pass an explicit value to require
             a specific repeat count instead -- a mismatch raises
             `ValueError`.
+        layer_period (int | None, optional): forwarded to `is_rc_layer`
+            as a positional fallback boundary, for circuits with no
+            two-qubit gates or measurements to key off of (e.g. a run
+            of single-qubit ZXZXZ templates). Defaults to `None`,
+            which disables the fallback and relies solely on content
+            (two-qubit gates/measurements) to detect layer boundaries.
         **rc_kwargs: forwarded to `RandomizedCompilingConfiguration`
             (e.g. `invert_random_paulis`, `shots_per_randomization`).
 
@@ -184,10 +261,16 @@ def build_rc_configuration(
         logger.warning(' Unable to import pyquil!')
         return
 
+    layer_period = effective_layer_period(circuit, layer_period)
+    non_barrier_cycles = [
+        cycle
+        for cycle in circuit.cycles[:-1]  # Exclude terminal measurements
+        if not cycle.is_barrier
+    ]
     layers = tuple(
         cycle_to_base_cycle(cycle, qubits)
-        for cycle in circuit.cycles[:-1]  # Exclude terminal measurements
-        if not cycle.is_barrier and is_rc_layer(cycle)
+        for idx, cycle in enumerate(non_barrier_cycles)
+        if is_rc_layer(cycle, idx, layer_period)
     )
 
     if base_cycle_repetitions is None:
@@ -226,6 +309,48 @@ def build_rc_configuration(
     )
 
 
+def has_trailing_single_qubit_layer(
+    circuit: Circuit,
+    layer_period: int | None = None,
+) -> bool:
+    """Whether a single-qubit layer follows the last RC-layer boundary.
+
+    `RCLayerTracker` reserves one extra layer (see its `n_layers`) for
+    the ZXZXZ template that ordinarily sits between the last RC-layer
+    boundary (see `is_rc_layer`) and the circuit's terminal
+    measurement -- e.g. the final single-qubit layer right before
+    measurement in a normal two-qubit-gate circuit. That reservation
+    is only actually exercised when such trailing content exists: if
+    the last boundary instead falls on the very last non-barrier
+    interior cycle (e.g. the last cycle of the last base-cycle
+    repetition when using `layer_period` -- see `build_rc_
+    configuration`), the reserved layer is never written to and stays
+    at its `0.0` initialization.
+
+    Args:
+        circuit (Circuit): compiled qcal circuit to twirl.
+        layer_period (int | None, optional): forwarded to
+            `is_rc_layer`, matching the value passed to
+            `build_rc_configuration`. Defaults to `None`.
+
+    Returns:
+        bool: True if at least one non-boundary cycle follows the last
+            RC-layer boundary (or there are no boundaries at all, in
+            which case the whole interior is one trailing layer).
+    """
+    layer_period = effective_layer_period(circuit, layer_period)
+    non_barrier_cycles = [
+        cycle
+        for cycle in circuit.cycles[:-1]  # Exclude terminal measurements
+        if not cycle.is_barrier
+    ]
+    last_boundary = -1
+    for idx, cycle in enumerate(non_barrier_cycles):
+        if is_rc_layer(cycle, idx, layer_period):
+            last_boundary = idx
+    return last_boundary < len(non_barrier_cycles) - 1
+
+
 class RCLayerTracker:
     """Tracks (layer_index, angle_index) state for randomized compiling.
 
@@ -244,12 +369,25 @@ class RCLayerTracker:
     `close_layer` is called.
     """
 
-    def __init__(self, configuration) -> None:
+    def __init__(
+        self, configuration, reserve_final_layer: bool = True
+    ) -> None:
         """Initialize the tracker from an RC configuration.
 
         Args:
             configuration (RandomizedCompilingConfiguration): from
                 `build_rc_configuration`.
+            reserve_final_layer (bool, optional): whether to allocate
+                an extra layer beyond `base_cycle_repetitions *
+                len(base_cycles)` for a trailing single-qubit template
+                between the last RC-layer boundary and the terminal
+                measurement. Defaults to `True` (the historical
+                behavior). Pass `has_trailing_single_qubit_layer(
+                circuit, layer_period)` when that trailing content is
+                not guaranteed to exist (e.g. a `layer_period`-tiled
+                circuit whose last boundary falls on the circuit's
+                last interior cycle), to avoid reserving a layer that
+                is never written to.
         """
         self.configuration = configuration
         self.layer_index = 0
@@ -259,7 +397,8 @@ class RCLayerTracker:
 
         n_layers = (
             configuration.base_cycle_repetitions
-            * len(configuration.base_cycles) + 1
+            * len(configuration.base_cycles)
+            + (1 if reserve_final_layer else 0)
         )
         self.source_phases: Dict[str, List[float]] = {
             configuration.variables.source_unitaries(q): (
