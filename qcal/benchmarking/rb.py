@@ -1,7 +1,7 @@
 """Submodule for RB routines.
 
 For CRB, see:
-https://github.com/sandialabs/pyGSTi/blob/master/jupyter_notebooks/Tutorials/algorithms/RB-CliffordRB.ipynb
+https://github.com/sandialabs/pyGSTi/blob/master/docs/markdown/rb/CliffordRB.md
 
 For SRB, see:
 https://trueq.quantumbenchmark.com/guides/error_diagnostics/srb.html
@@ -60,6 +60,7 @@ def CRB(
     pspec:          QPSpec | Dict[int | Tuple[int, int], QPSpec] | None = None,
     randomizeout:   bool = True,
     citerations:    int = 5,
+    seed:           int | None = None,
     **kwargs
 ) -> Callable:
     """Clifford Randomized Benchmarking.
@@ -102,6 +103,8 @@ def CRB(
             linear in `citerations * (CRB length + 2)`. Lower-depth / lower
             2-qubit gate count compilations of the Cliffords are important in
             order to successfully implement CRB on more qubits.
+        seed (int | None, optional): random seed for reproducibility in circuit
+            generation. Defaults to None.
 
     Returns:
         Callable: CRB class instance.
@@ -122,6 +125,7 @@ def CRB(
             ) = None,
             randomizeout:   bool = True,
             citerations:    int = 5,
+            seed:           int | None = None,
             **kwargs
         ) -> None:
             logger.info(f" pyGSTi version: {pygsti.__version__}\n")
@@ -131,7 +135,7 @@ def CRB(
             self._n_circuits = n_circuits
             self._randomizeout = randomizeout
             self._citerations = citerations
-
+            self._seed = seed
             if circuit_depths is None:
                 circuit_depths = (
                     [2, 4, 8, 32, 64]
@@ -348,6 +352,7 @@ def CRB(
                         qubit_labels=[f'Q{q}' for q in self._qubits],
                         randomizeout=self._randomizeout,
                         citerations=self._citerations,
+                        seed=self._seed
                     )
 
             elif self._sim_RB:
@@ -365,6 +370,7 @@ def CRB(
                             self._n_circuits,
                             self._randomizeout,
                             self._citerations,
+                            self._seed
                         )
                         for ql in self._qubit_labels
                     ]
@@ -826,6 +832,7 @@ def CRB(
         pspec=pspec,
         randomizeout=randomizeout,
         citerations=citerations,
+        seed=seed,
         **kwargs
     )
 
@@ -1071,6 +1078,7 @@ def _build_crb_edesign_for_qubit_label(
     n_circuits:     int,
     randomizeout:   bool,
     citerations:    int,
+    seed:           int | None = None,
 ) -> CliffordRBDesign:
     """
     Build a CRB experiment design for a given qubit label.
@@ -1089,6 +1097,8 @@ def _build_crb_edesign_for_qubit_label(
         n_circuits (int): Number of circuits per depth.
         randomizeout (bool): Whether to randomize output.
         citerations (int): Number of iterations.
+        seed (int | None, optional): Random seed for reproducibility in circuit
+            generation. Defaults to None.
 
     Returns:
         CliffordRBDesign: CRB experiment design.
@@ -1131,6 +1141,7 @@ def _build_crb_edesign_for_qubit_label(
             randomizeout=randomizeout,
             citerations=citerations,
             add_default_protocol=True,
+            seed=seed,
         )
 
     return edesign
