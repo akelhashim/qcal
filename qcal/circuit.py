@@ -34,7 +34,9 @@ from qcal.gates.single_qubit import Meas, basis_rotation
 from qcal.plotting.sequence import plot_mock_sequence
 from qcal.results import Results
 
-pio.renderers.default = 'colab'  # TODO: replace with settings
+# NOTE: Plotly's own auto-detected renderer is used by default; set
+# qcal.settings.Settings.plot_renderer to override it (e.g. in Colab,
+# or to force a static renderer in a headless environment).
 
 
 __all__ = [
