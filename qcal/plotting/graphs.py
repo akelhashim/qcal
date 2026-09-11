@@ -170,6 +170,8 @@ def draw_circuit(circuit: Circuit, show: bool = True):
                         [color_map[gate.name]] * len(gate.qubits)
                     )
                 elif gate.is_multi_qudit:
+                    edge_x_mq = []
+                    edge_y_mq = []
                     for q in gate.qubits:
                         node_x.append(c)
                         node_y.append(qubit_index[q])
