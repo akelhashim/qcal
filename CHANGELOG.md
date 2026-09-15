@@ -19,6 +19,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- RPE analysis raising a KeyError when encountering zero counts
+
 ### Security
 
 ## [4.0.0] - 2026-09-04
