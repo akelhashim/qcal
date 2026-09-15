@@ -640,8 +640,13 @@ class DensityMatrixSimulator(Simulator):
                 s *= all_dims[j]
             strides.append(s)
 
-        # Diagonal of ρ gives computational-basis probabilities
+        # Diagonal of ρ gives computational-basis probabilities. JAX
+        # runs in float32 by default, so after many composed gates a
+        # basis state with ~0 population can round to a small negative
+        # value; clip before normalizing so downstream sampling never
+        # sees a negative probability.
         probs = np.asarray(quax.probabilities(rho), dtype=float)
+        probs = np.clip(probs, 0.0, None)
         probs /= probs.sum()
 
         # Classical per-qudit readout smearing for terminal Meas gates
