@@ -128,6 +128,30 @@ def _is_connected_subset(
     return visited == subset
 
 
+def _pad_pauli(
+    local_pattern: PauliString,
+    positions:     Sequence[int],
+    n_qubits:      int,
+) -> PauliString:
+    """Embed a local Pauli pattern into a full-length 'I'-padded string.
+
+    Args:
+        local_pattern (PauliString): the Pauli characters for a
+            subsystem, ordered the same way as `positions`.
+        positions (Sequence[int]): the subsystem's qubit positions
+            within the full n-qubit register.
+        n_qubits (int): total number of qubits in the register.
+
+    Returns:
+        PauliString: a length-n_qubits tuple that is `local_pattern` at
+            `positions` and 'I' everywhere else.
+    """
+    padded = ['I'] * n_qubits
+    for pos, val in zip(positions, local_pattern, strict=True):
+        padded[pos] = val
+    return tuple(padded)
+
+
 def _qwc_compatible(p1: PauliString, p2: PauliString) -> bool:
     """Checks if two Pauli strings are qubit-wise commuting.
 
