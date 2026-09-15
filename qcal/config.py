@@ -187,7 +187,7 @@ class Config:
         Returns:
             pd.DataFrame: DataFrame of coherences times.
         """
-        df = pd.DataFrame(columns=['Qubit', 'Coherence Time', 'Coherence Type'])
+        dfs = []
         for c in ['T1', 'T2*', 'T2e', 'T2DD']:
             coh = []
             qs = []
@@ -206,17 +206,22 @@ class Config:
                     qs.append(q)
                     label.append(c + ' EF')
 
-            df = pd.concat([
-                df,
-                pd.DataFrame(
-                    {'Qubit': qs,
-                     'Coherence Time': coh,
-                     'Coherence Type': label
-                    }
+            if coh:
+                dfs.append(
+                    pd.DataFrame(
+                        {'Qubit': qs,
+                         'Coherence Time': coh,
+                         'Coherence Type': label
+                        }
+                    )
                 )
-            ])
 
-        return df
+        if not dfs:
+            return pd.DataFrame(
+                columns=['Qubit', 'Coherence Time', 'Coherence Type']
+            )
+
+        return pd.concat(dfs, ignore_index=True)
 
     @property
     def filename(self) -> str:

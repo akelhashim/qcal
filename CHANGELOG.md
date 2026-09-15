@@ -44,6 +44,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - PyQuil transpiler internal variable name bug
 - `DensityMatrixSimulator` returning negative probabilities
+- DataFrame concat warning for `config.coherence_times`
 
 ### Security
 
