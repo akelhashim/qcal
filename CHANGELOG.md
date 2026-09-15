@@ -26,6 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `conjugate_pauli` utilities for efficiently tracking Pauli operator
   transformations under conjugation by Clifford gates, cycles, and
   circuits
+- `draw_qpu_heatmap` for plotting variable lattice-based values
 
 ### Changed
 

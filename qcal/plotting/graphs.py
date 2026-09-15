@@ -2,10 +2,11 @@
 """
 import logging
 from collections import defaultdict
-from typing import Dict
+from typing import Dict, Tuple, Union
 
 import networkx as nx
 import numpy as np
+import plotly.colors as pc
 import plotly.graph_objects as go
 import plotly.io as pio
 from plotly.graph_objs.scatter import Marker
@@ -623,3 +624,214 @@ def draw_qpu(config: Config):
     }
 
     fig.show(config=save_properties)
+
+
+def draw_qpu_heatmap(
+    config:     Config,
+    values:     Dict[Union[int, Tuple[int, ...]], float],
+    label:      str = 'QPU',
+    cbar_label: str = 'Value',
+    *,
+    colorscale:    str = 'Tealgrn',
+    missing_color: str = "#FFFFFF",
+    plot_full_qpu: bool = False,
+    show:          bool = True
+):
+    """Draw a QPU connectivity graph colored by arbitrary values.
+
+    Nodes (qubits) and edges (qubit pairs) are colored according to a
+    shared colorscale based on the values passed in. This can be used,
+    e.g., to visualize per-qubit T1/T2 times, per-pair gate infidelities, etc.,
+    all on the same processor layout.
+
+    Args:
+        config (Config):  qcal Config.
+        values (Dict[int | Tuple[int, ...], float]): mapping from qubit
+            label (int) to a node value, or from qubit pair (tuple of
+            ints) to an edge value. Qubits/pairs not present in this
+            dict are drawn using `missing_color`.
+        label (str): colorbar title describing what `values`
+            represents (e.g. 'T1 (us)' or 'Gate Infidelity'). Defaults
+            to 'Value'.
+        colorscale (str): Plotly colorscale name. Defaults to
+            'Tealgrn'.
+        missing_color (str): color used for qubits/pairs that are not
+            present in `values`. Defaults to '#CCCCCC'.
+        plot_full_qpu (bool): if True, plot the full QPU lattice from
+            `config.qubit_pairs`, filling in any qubits/pairs missing
+            from `values` with `missing_color`. If False (default),
+            only plot the qubits present in `values` (plus any qubits
+            only referenced via an edge key), along with any edges
+            between those qubits from `config.qubit_pairs` — edges
+            without a passed value are drawn in `missing_color`.
+        show (bool): whether to plot the figure. Defaults to True. If
+            False, the figure object is returned instead.
+    """
+    node_values = {}
+    edge_values = {}
+    for key, val in values.items():
+        if isinstance(key, (tuple, list)):
+            edge_values[tuple(key)] = val
+        else:
+            node_values[key] = val
+
+    G = nx.Graph()
+    if plot_full_qpu:
+        G.add_edges_from(config.qubit_pairs)
+        G.add_nodes_from(node_values.keys())
+    else:
+        G.add_edges_from(edge_values.keys())
+        G.add_nodes_from(node_values.keys())
+        plotted_nodes = set(G.nodes())
+        G.add_edges_from(
+            pair for pair in config.qubit_pairs
+            if set(pair).issubset(plotted_nodes)
+        )
+    pos = nx.kamada_kawai_layout(G)
+
+    all_values = list(node_values.values()) + list(edge_values.values())
+    if not all_values:
+        raise ValueError("`values` must contain at least one entry.")
+    vmin, vmax = min(all_values), max(all_values)
+    if vmin == vmax:
+        vmin, vmax = vmin - 0.5, vmax + 0.5
+
+    def to_color(val):
+        if val is None:
+            return missing_color
+        frac = (val - vmin) / (vmax - vmin)
+        frac = min(max(frac, 0.0), 1.0)
+        return pc.sample_colorscale(colorscale, frac)[0]
+
+    node_x, node_y, node_color, node_text = [], [], [], []
+    for node in sorted(G.nodes()):
+        x, y = pos[node]
+        node_x.append(x)
+        node_y.append(y)
+        val = node_values.get(node)
+        node_color.append(to_color(val))
+        node_text.append(
+            f'Q{node}<br>{label}: '
+            + (f'{val}<br>' if val is not None else 'N/A<br>')
+        )
+
+    node_trace = go.Scatter(
+        x=node_x, y=node_y,
+        mode='markers',
+        hoverinfo='text',
+        text=node_text,
+        marker={
+            'color': node_color,
+            'opacity': 0.85,
+            'size': 30,
+            'line_width': 2,
+            'line_color': 'black'
+        }
+    )
+
+    qubit_labels = go.Scatter(
+        x=node_x, y=node_y,
+        text=[f'Q{q}' for q in sorted(G.nodes())],
+        mode='text',
+        hoverinfo='text',
+        marker={'color': '#5D69B1', 'size': 0.01}
+    )
+
+    edge_traces = []
+    middle_node_x, middle_node_y, middle_node_text = [], [], []
+    for edge in G.edges():
+        x0, y0 = pos[edge[0]]
+        x1, y1 = pos[edge[1]]
+        val = edge_values.get(
+            edge, edge_values.get((edge[1], edge[0]))
+        )
+        edge_traces.append(
+            go.Scatter(
+                x=[x0, x1], y=[y0, y1],
+                line={'width': 5, 'color': to_color(val)},
+                hoverinfo='none',
+                mode='lines'
+            )
+        )
+        middle_node_x.append((x0 + x1) / 2)
+        middle_node_y.append((y0 + y1) / 2)
+        middle_node_text.append(
+            f'{edge}<br>{cbar_label}: '
+            + (f'{val}<br>' if val is not None else 'N/A<br>')
+        )
+
+    middle_node_trace = go.Scatter(
+        x=middle_node_x,
+        y=middle_node_y,
+        text=middle_node_text,
+        mode='markers',
+        hoverinfo='text',
+        marker=Marker(opacity=0)
+    )
+
+    # Invisible trace used solely to render a shared colorbar for both
+    # the node and edge colors.
+    colorbar_trace = go.Scatter(
+        x=[None], y=[None],
+        mode='markers',
+        hoverinfo='none',
+        showlegend=False,
+        marker={
+            'colorscale': colorscale,
+            'showscale': True,
+            'cmin': vmin,
+            'cmax': vmax,
+            'color': [vmin],
+            'colorbar': {
+                'thickness': 15,
+                'title': {
+                    'text': cbar_label,
+                    'side': 'right',
+                    'font': {'size': 20}
+                },
+                'tickfont': {'size': 15},
+                'xanchor': 'left',
+            }
+        }
+    )
+
+    fig = go.Figure(
+        data=(
+            edge_traces
+            + [node_trace, qubit_labels, middle_node_trace, colorbar_trace]
+        ),
+        layout=go.Layout(
+            title={'font': {'size': 16}},
+            showlegend=False,
+            hovermode='closest',
+            margin={'b': 20, 'l': 5, 'r': 5, 't': 40},
+            annotations=[{
+                'text': label,
+                'showarrow': False,
+                'xref': "paper", 'yref': "paper",
+                'x': 0.005, 'y': -0.002,
+                'font': {'size': 25}
+            }],
+            xaxis={
+                'showgrid': False, 'zeroline': False,
+                'showticklabels': False
+            },
+            yaxis={
+                'showgrid': False, 'zeroline': False,
+                'showticklabels': False
+            }
+        )
+    )
+
+    save_properties = {
+        'toImageButtonOptions': {
+            'format': 'png',  # one of png, svg, jpeg, webp
+            'filename': 'qpu_heatmap',
+            'scale': 10  # Multiply title/legend/axis/canvas sizes
+        }
+    }
+
+    if show:
+        fig.show(config=save_properties)
+    else:
+        return fig
