@@ -633,41 +633,6 @@ def get_pauli_conjugation(
     return None
 
 
-def _parse_two_qubit_pauli(pauli: str | tuple) -> PauliString:
-    """Parse a 2-qubit Pauli given as a 2-char string or a 2-tuple.
-
-    Args:
-        pauli (str | tuple): e.g. 'XZ' or ('X', 'Z').
-
-    Returns:
-        PauliString: canonical 2-tuple, e.g. ('X', 'Z').
-    """
-    pauli = tuple(pauli)
-    if len(pauli) != 2 or any(p not in _PAULI_LABELS for p in pauli):
-        raise ValueError(
-            f"'{pauli}' is not a valid 2-qubit Pauli string; expected two "
-            "labels from {'I', 'X', 'Y', 'Z'}."
-        )
-    return pauli
-
-
-def _parse_single_qubit_pauli(pauli: str | tuple) -> str:
-    """Parse a 1-qubit Pauli given as a 1-char string or a 1-tuple.
-
-    Args:
-        pauli (str | tuple): e.g. 'X' or ('X',).
-
-    Returns:
-        str: canonical Pauli label, e.g. 'X'.
-    """
-    if len(pauli) != 1 or pauli[0] not in _PAULI_LABELS:
-        raise ValueError(
-            f"'{pauli}' is not a valid single-qubit Pauli; expected one "
-            "label from {'I', 'X', 'Y', 'Z'}."
-        )
-    return pauli[0]
-
-
 @lru_cache(maxsize=1024)
 def pauli_str_to_matrix(pauli: NQubitPauliString) -> np.ndarray:
     """Build the n-qubit Pauli matrix for a PauliString.
@@ -707,48 +672,6 @@ def identify_pauli_str(M: np.ndarray, n: int) -> NQubitPauliString:
             M, e.g. ('X', 'Z', 'I').
     """
     return _identify_pauli_str_cached(M.tobytes(), M.dtype.str, M.shape, n)
-
-
-@lru_cache(maxsize=1024)
-def _identify_pauli_str_cached(
-    data: bytes, dtype: str, shape: tuple, n: int
-) -> NQubitPauliString:
-    """Cached (bounded) implementation of `identify_pauli_str`.
-
-    Uses recursive block decomposition: for σ_k ⊗ rest, the 2x2 block
-    structure of M in the first qubit's index uniquely identifies σ_k.
-    Keyed on the matrix's raw content rather than gate identity, so this
-    is shared across e.g. multiple gates of the same type that only
-    differ by which qubits they act on.
-
-    Args:
-        data (bytes): raw bytes of M (`M.tobytes()`).
-        dtype (str): dtype string of M (`M.dtype.str`).
-        shape (tuple): shape of M.
-        n (int): number of qubits.
-
-    Returns:
-        NQubitPauliString: tuple of single-qubit Pauli labels identifying
-            M, e.g. ('X', 'Z', 'I').
-    """
-    if n == 0:
-        return ()
-    M = np.frombuffer(data, dtype=dtype).reshape(shape)
-    half = M.shape[0] // 2
-    M00, M01 = M[:half, :half], M[:half, half:]
-    M10, M11 = M[half:, :half], M[half:, half:]
-
-    if np.allclose(M01, 0) and np.allclose(M10, 0):
-        if np.allclose(M00, M11):
-            label, rest = 'I', M00
-        else:
-            label, rest = 'Z', M00
-    elif np.allclose(M01, M10):
-        label, rest = 'X', M01
-    else:
-        label, rest = 'Y', -1j * M10
-
-    return (label,) + identify_pauli_str(rest, n - 1)
 
 
 def conjugate_pauli_by_unitary(
@@ -907,3 +830,80 @@ def conjugate_pauli(
         pauli, cycle_sign = conjugate_pauli_by_cycle(pauli, qubits, cycle)
         sign *= cycle_sign
     return pauli, sign
+
+
+def _parse_two_qubit_pauli(pauli: str | tuple) -> PauliString:
+    """Parse a 2-qubit Pauli given as a 2-char string or a 2-tuple.
+
+    Args:
+        pauli (str | tuple): e.g. 'XZ' or ('X', 'Z').
+
+    Returns:
+        PauliString: canonical 2-tuple, e.g. ('X', 'Z').
+    """
+    pauli = tuple(pauli)
+    if len(pauli) != 2 or any(p not in _PAULI_LABELS for p in pauli):
+        raise ValueError(
+            f"'{pauli}' is not a valid 2-qubit Pauli string; expected two "
+            "labels from {'I', 'X', 'Y', 'Z'}."
+        )
+    return pauli
+
+
+def _parse_single_qubit_pauli(pauli: str | tuple) -> str:
+    """Parse a 1-qubit Pauli given as a 1-char string or a 1-tuple.
+
+    Args:
+        pauli (str | tuple): e.g. 'X' or ('X',).
+
+    Returns:
+        str: canonical Pauli label, e.g. 'X'.
+    """
+    if len(pauli) != 1 or pauli[0] not in _PAULI_LABELS:
+        raise ValueError(
+            f"'{pauli}' is not a valid single-qubit Pauli; expected one "
+            "label from {'I', 'X', 'Y', 'Z'}."
+        )
+    return pauli[0]
+
+
+@lru_cache(maxsize=1024)
+def _identify_pauli_str_cached(
+    data: bytes, dtype: str, shape: tuple, n: int
+) -> NQubitPauliString:
+    """Cached (bounded) implementation of `identify_pauli_str`.
+
+    Uses recursive block decomposition: for σ_k ⊗ rest, the 2x2 block
+    structure of M in the first qubit's index uniquely identifies σ_k.
+    Keyed on the matrix's raw content rather than gate identity, so this
+    is shared across e.g. multiple gates of the same type that only
+    differ by which qubits they act on.
+
+    Args:
+        data (bytes): raw bytes of M (`M.tobytes()`).
+        dtype (str): dtype string of M (`M.dtype.str`).
+        shape (tuple): shape of M.
+        n (int): number of qubits.
+
+    Returns:
+        NQubitPauliString: tuple of single-qubit Pauli labels identifying
+            M, e.g. ('X', 'Z', 'I').
+    """
+    if n == 0:
+        return ()
+    M = np.frombuffer(data, dtype=dtype).reshape(shape)
+    half = M.shape[0] // 2
+    M00, M01 = M[:half, :half], M[:half, half:]
+    M10, M11 = M[half:, :half], M[half:, half:]
+
+    if np.allclose(M01, 0) and np.allclose(M10, 0):
+        if np.allclose(M00, M11):
+            label, rest = 'I', M00
+        else:
+            label, rest = 'Z', M00
+    elif np.allclose(M01, M10):
+        label, rest = 'X', M01
+    else:
+        label, rest = 'Y', -1j * M10
+
+    return (label,) + identify_pauli_str(rest, n - 1)
