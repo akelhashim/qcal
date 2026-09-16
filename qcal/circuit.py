@@ -649,7 +649,7 @@ class Circuit:
         Returns:
             NDArray: unitary matrix of the full circuit.
         """
-        cycles = [c for c in self._cycles if not c.is_barrier]
+        cycles = [c for c in reversed(self._cycles) if not c.is_barrier]
         if not cycles:
             return np.eye(2 ** self.n_qubits)
 
