@@ -1513,7 +1513,7 @@ def CB(
                 )
                 pfig2.update_layout(
                     height=450,
-                    width=min(150 * len(pauli_labels) + 100, 1000),
+                    width=min(150 * len(pauli_labels) + 150, 1000),
                     template='plotly_white',
                     paper_bgcolor='white',
                     plot_bgcolor='#fbfbfd',
