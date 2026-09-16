@@ -32,11 +32,13 @@ from qcal.benchmarking.utils import (
     generate_random_n_qubit_paulis,
 )
 from qcal.circuit import Barrier, Circuit, CircuitSet, Cycle
-from qcal.compilation.decompositions import pauli_to_cycle
+from qcal.compilation.decompositions import decompose_cycle, pauli_to_cycle
+from qcal.compilation.merge import merge_cycles
 from qcal.compilation.pauli_conjugation import conjugate_pauli
 from qcal.compilation.utils import composes_to_identity
 from qcal.config import Config
 from qcal.fitting.fit import FitExponential
+from qcal.gates.single_qubit import Meas, basis_rotation, prep_rotation
 from qcal.math.utils import round_to_order_error
 from qcal.plotting.graphs import draw_qpu_heatmap
 from qcal.qpu.qpu import QPU
@@ -620,6 +622,7 @@ def CB(
                     self._qubits, n_random_paulis=self._n_decays
                 )
 
+            # Drop the all-identity Pauli from the sampled set
             if ('I',) * len(self._qubits) in sampled_paulis:
                 sampled_paulis.remove(('I',) * len(self._qubits))
             self._pauli_groups = generate_n_qubit_pauli_measurement_groups(
@@ -646,13 +649,9 @@ def CB(
 
                 for group in self._pauli_groups:
                     # Positions where every Pauli in the group is 'I' are
-                    # unconstrained; measure/prepare them in Z
-                    # (marginalized away later, so the choice is
-                    # arbitrary).
-                    basis = tuple(
-                        'Z' if p == 'I' else p
-                        for p in group.measurement_basis
-                    )
+                    # unconstrained (marginalized away later), and are
+                    # prepared/measured as identities.
+                    basis = group.measurement_basis
                     measurement_basis = ''.join(basis)
 
                     for depth in self._circuit_depths:
@@ -674,24 +673,48 @@ def CB(
                             ]
 
                             circuit = Circuit()
-                            # State prep: +1 eigenstate of the group's
-                            # shared basis, which is simultaneously a +1
-                            # eigenstate of every Pauli in the group.
-                            circuit.prepare(
-                                measurement_basis,
-                                qubits=list(self._qubits),
-                            )
-                            circuit.append(Barrier(self._qubits))
+                            if self._decompose_to_zxzxz:
+                                # State prep: +1 eigenstate of the group's
+                                # shared basis, which is simultaneously a +1
+                                # eigenstate of every Pauli in the group.
+                                prep_cycle = Cycle(
+                                    prep_rotation(q, b) for q, b in zip(
+                                        self._qubits, basis, strict=True
+                                    )
+                                )
 
-                            # Initial twirl
-                            circuit.extend(
-                                pauli_to_cycle(
+                                # Initial twirl
+                                initial_twirl = pauli_to_cycle(
                                     twirl_strings[0],
                                     self._qubits,
-                                    self._decompose_to_zxzxz
+                                    False
                                 )
-                            )
-                            circuit.append(Barrier(self._qubits))
+
+                                # Combine prep + initial twirl layer into zxzxz
+                                circuit.extend(
+                                    decompose_cycle(
+                                        merge_cycles(
+                                            prep_cycle,
+                                            initial_twirl.cycles[0]
+                                        )
+                                    )
+                                )
+
+                            else:
+                                circuit.prepare(
+                                    measurement_basis,
+                                    qubits=list(self._qubits),
+                                )
+                                circuit.append(Barrier(self._qubits))
+
+                                circuit.extend(
+                                    pauli_to_cycle(
+                                        twirl_strings[0],
+                                        self._qubits,
+                                        self._decompose_to_zxzxz
+                                    )
+                                )
+                                circuit.append(Barrier(self._qubits))
 
                             for i in range(depth):
                                 # Interleaved gate cycle
@@ -708,19 +731,50 @@ def CB(
                                         )
 
                                 # Twirling layer
-                                circuit.extend(
-                                    pauli_to_cycle(
+                                if (
+                                    self._decompose_to_zxzxz
+                                    and i == depth - 1
+                                ):
+                                    # Combine the final twirl with the
+                                    # final basis-change rotation into
+                                    # zxzxz before appending it.
+                                    final_twirl = pauli_to_cycle(
                                         twirl_strings[i + 1],
                                         self._qubits,
-                                        self._decompose_to_zxzxz
+                                        False
+                                    ).cycles[0]
+                                else:
+                                    circuit.extend(
+                                        pauli_to_cycle(
+                                            twirl_strings[i + 1],
+                                            self._qubits,
+                                            self._decompose_to_zxzxz
+                                        )
+                                    )
+                                    circuit.append(Barrier(self._qubits))
+
+                            # Combine final twirl with final basis-change
+                            # rotation into zxzxz before appending
+                            if self._decompose_to_zxzxz:
+                                basis_cycle = Cycle({
+                                    basis_rotation(Meas(q, b))
+                                    for q, b in zip(
+                                        self._qubits, basis, strict=True
+                                    )
+                                })
+                                circuit.extend(
+                                    decompose_cycle(
+                                        merge_cycles(
+                                            final_twirl, basis_cycle
+                                        )
                                     )
                                 )
-                                circuit.append(Barrier(self._qubits))
-
-                            circuit.measure(
-                                qubits=list(self._qubits),
-                                basis=list(basis),
-                            )
+                                circuit.measure()
+                            else:
+                                circuit.measure(
+                                    qubits=list(self._qubits),
+                                    basis=list(basis),
+                                )
 
                             circuits.append(circuit)
                             basis_labels.append(measurement_basis)
@@ -850,10 +904,7 @@ def CB(
                 )
 
                 for group in self._pauli_groups:
-                    measurement_basis = ''.join(
-                        'Z' if p == 'I' else p
-                        for p in group.measurement_basis
-                    )
+                    measurement_basis = ''.join(group.measurement_basis)
 
                     for pauli_tuple in group.paulis:
                         pauli = ''.join(pauli_tuple)
