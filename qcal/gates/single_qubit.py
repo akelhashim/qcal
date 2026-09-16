@@ -115,6 +115,7 @@ def basis_rotation(meas):
         Gate: gate object.
     """
     basis_map = {
+        'I': Id(meas.qubits[0]),
         'X': Ry(meas.qubits[0], -np.pi/2),
         'Y': Rx(meas.qubits[0], np.pi/2),
         'Z': Id(meas.qubits[0])
