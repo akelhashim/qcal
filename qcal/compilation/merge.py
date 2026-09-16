@@ -21,9 +21,8 @@ def merge_gates(first: Gate, second: Gate) -> Gate:
     """Merge two gates acting on the same qubits into a single gate.
 
     Computes the unitary of applying `first` then `second`:
-    `first.unitary @ second.unitary`, matching the ordering convention
-    used by `Cycle.unitary`/`Circuit.unitary` (the earlier-applied factor
-    is the left factor).
+    `second.unitary @ first.unitary` (standard operator composition on a
+    ket — the later-applied factor is the left factor).
 
     Note: the returned Gate is a generic `Gate(matrix, qubits)`, so its
     `name` is always 'Gate', and its `==`/hash (which only consider name,
@@ -37,8 +36,8 @@ def merge_gates(first: Gate, second: Gate) -> Gate:
             `first`.
 
     Returns:
-        Gate: a generic gate whose unitary is `first.unitary @
-            second.unitary`.
+        Gate: a generic gate whose unitary is `second.unitary @
+            first.unitary`.
 
     Raises:
         ValueError: if `first` and `second` do not act on the same
@@ -49,7 +48,7 @@ def merge_gates(first: Gate, second: Gate) -> Gate:
             f"Cannot merge gates on different qubits: {first.qubits} "
             f"!= {second.qubits}."
         )
-    return Gate(first.unitary @ second.unitary, first.qubits)
+    return Gate(second.unitary @ first.unitary, first.qubits)
 
 
 @lru_cache(maxsize=None)
