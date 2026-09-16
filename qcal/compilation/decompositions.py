@@ -133,7 +133,6 @@ def _decomp(matrix: NDArray):
     return _factory
 
 
-@lru_cache(maxsize=1024)
 def decompose_cycle(cycle: Cycle) -> Circuit:
     """Decompose a cycle of single-qubit gates into a ZXZXZ circuit.
 
@@ -141,6 +140,15 @@ def decompose_cycle(cycle: Cycle) -> Circuit:
     looked up by name, so this works for any single-qubit gate,
     including ones not in `ZXZXZ_DECOMPOSITIONS` (e.g. a gate produced
     by merging two other gates, such as `merge_gates`/`merge_cycles`).
+
+    Not cached (unlike `decompose_to_zxzxz`): a gate returned by
+    `merge_gates`/`merge_cycles` is a generic `Gate(matrix, qubits)`
+    whose `==`/hash only see its name/qubits/subspace, not its actual
+    matrix, so two `Cycle`s built from different merges (e.g. different
+    Pauli twirls merged with the same prep/basis-change cycle) can
+    compare equal and hash the same despite implementing different
+    unitaries. Caching on `cycle` would then silently return one
+    merge's decomposition for another's.
 
     Transposing across qubits and appending one shared Cycle per step
     gives the same result as decomposing and `.join()`-ing each qubit's
