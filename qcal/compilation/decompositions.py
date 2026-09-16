@@ -79,7 +79,8 @@ from qcal.gates.single_qubit import (
 )
 
 __all__ = (
-    'ZXZXZ_DECOMPOSITIONS', 'unitary_to_zxzxz', 'pauli_to_cycle'
+    'ZXZXZ_DECOMPOSITIONS', 'unitary_to_zxzxz', 'decompose_cycle',
+    'pauli_to_cycle'
 )
 
 PauliString = tuple[str, ...]
@@ -130,6 +131,37 @@ def _decomp(matrix: NDArray):
         ]
 
     return _factory
+
+
+@lru_cache(maxsize=1024)
+def decompose_cycle(cycle: Cycle) -> Circuit:
+    """Decompose a cycle of single-qubit gates into a ZXZXZ circuit.
+
+    Each gate is decomposed from its own unitary (via `_decomp`), not
+    looked up by name, so this works for any single-qubit gate,
+    including ones not in `ZXZXZ_DECOMPOSITIONS` (e.g. a gate produced
+    by merging two other gates, such as `merge_gates`/`merge_cycles`).
+
+    Transposing across qubits and appending one shared Cycle per step
+    gives the same result as decomposing and `.join()`-ing each qubit's
+    sub-circuit in one at a time, without `.join()`'s per-call rebuild
+    of every existing Cycle (mirrors `pauli_to_cycle`'s zxzxz branch).
+
+    Args:
+        cycle (Cycle): cycle of single-qubit gates to decompose.
+
+    Returns:
+        Circuit: 5-cycle circuit of Rz/X90 gates implementing `cycle`,
+            up to global phase (per qubit).
+    """
+    gate_lists = [
+        _decomp(gate.unitary)(q)
+        for gate, q in zip(cycle, cycle.qubits, strict=True)
+    ]
+    circuit = Circuit()
+    for gates_at_step in zip(*gate_lists, strict=True):
+        circuit.append(Cycle(gates_at_step))
+    return circuit
 
 
 @lru_cache(maxsize=None)
