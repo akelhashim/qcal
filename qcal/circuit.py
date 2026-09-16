@@ -902,8 +902,8 @@ class Circuit:
             {Meas(q, b) for q, b in zip(qubits, basis, strict=False)}
         )
         if all(
-            meas.properties['params']['basis'].upper() == 'Z' for meas in
-            meas_cycle
+            meas.properties['params']['basis'].upper() in ('I', 'Z') for
+            meas in meas_cycle
         ):
             # self.append(Barrier(self.qubits))
             self.append(meas_cycle)
