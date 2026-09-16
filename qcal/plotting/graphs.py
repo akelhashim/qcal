@@ -519,7 +519,7 @@ def draw_qpu(config: Config):
             #'Hot' | 'Blackbody' | 'Earth' | 'Electric' | 'Viridis' |
             'colorscale': 'Tealgrn',
             'reversescale': False,
-            'opacity': 0.65,
+            'opacity': 1.0,
             'color': [],
             'size': 30,
             'colorbar': {

@@ -38,6 +38,7 @@ from qcal.compilation.utils import composes_to_identity
 from qcal.config import Config
 from qcal.fitting.fit import FitExponential
 from qcal.math.utils import round_to_order_error
+from qcal.plotting.graphs import draw_qpu_heatmap
 from qcal.qpu.qpu import QPU
 from qcal.results import Results
 from qcal.settings import Settings
@@ -292,8 +293,14 @@ def CB(
             # since it's already covered directly by the main per-Pauli
             # fit above.
             self._subsystems: list[tuple] = [self._qubits]
+            whole_cycle_name = (
+                cycle_or_circuit.gates[0].name
+                if isinstance(cycle_or_circuit, Cycle)
+                and cycle_or_circuit.n_gates == 1
+                else 'Cycle'
+            )
             self._subsystem_gate_names: dict[tuple, str] = {
-                self._qubits: 'Cycle'
+                self._qubits: whole_cycle_name
             }
             self._subsystem_positions: dict[tuple, list[int]] = {
                 self._qubits: list(range(len(self._qubits)))
@@ -938,10 +945,14 @@ def CB(
                     )
                     self._process_infidelities[infidelity_key] = np.nan
 
-                if self._analyze_subsystems:
-                    self._compute_subsystem_infidelities(
-                        experiment, subsystem_polarizations
-                    )
+                # Always run, even when analyze_subsystems is False:
+                # self._subsystems still holds the whole-cycle entry,
+                # and this is what populates its dressed infidelity
+                # (and, via subsystem_polarizations, its bare
+                # infidelity below) for the summary table.
+                self._compute_subsystem_infidelities(
+                    experiment, subsystem_polarizations
+                )
 
             # Compute the bare cycle infidelity from the interleaved
             # and reference polarizations
@@ -1096,8 +1107,7 @@ def CB(
             mixed (see self._subsystem_pauli_fidelities).
             """
             for s in self._subsystems:
-                positions_s = self._subsystem_positions[s]
-                if len(positions_s) == len(self._qubits):
+                if len(self._subsystem_positions[s]) == len(self._qubits):
                     local_fidelities = list(
                         self._pauli_fidelities[experiment].values()
                     )
@@ -1181,6 +1191,7 @@ def CB(
             self._subsystem_summary = pd.DataFrame(rows)
             print("\nCB Process Infidelity Summary:")
             display(self._subsystem_summary)
+            print("\n")
 
         def plot(self) -> None:
             """Plot per-Pauli decay curves and Pauli infidelities.
@@ -1204,13 +1215,52 @@ def CB(
             experiment's own plot, since it is not a per-Pauli quantity
             of either curve alone.
 
+            If analyze_subsystems is True, a QPU heatmap of the
+            marginalized per-subsystem infidelities (self.
+            subsystem_infidelities) is drawn first, before the raw
+            per-subsystem plots described above.
+
             Plotly figures are shown for interactive use; matplotlib
             equivalents are saved to disk when Settings.save_data is
             True.
             """
+            if self._analyze_subsystems:
+                self._plot_subsystem_heatmap()
+
             for experiment in self._experiments:
                 for s in self._subsystems:
                     self._plot_subsystem(experiment, s)
+
+        def _plot_subsystem_heatmap(self) -> None:
+            """Plot a QPU heatmap of the marginalized subsystem
+            infidelities.
+
+            Draws self.subsystem_infidelities (dressed infidelity by
+            default, or bare/reference-corrected infidelity if
+            include_ref_cycle was True) over the gate-body subsystems
+            only, i.e. self._subsystems excluding the whole-cycle
+            entry, since the latter isn't a single qubit/pair node or
+            edge on the QPU graph.
+            """
+            values = {}
+            for s in self._subsystems[1:]:
+                e_F = self.subsystem_infidelities.get(s)
+                if e_F is None:
+                    continue
+                values[s[0] if len(s) == 1 else s] = e_F.n
+
+            if not values:
+                return
+
+            draw_qpu_heatmap(
+                self.config,
+                values,
+                label='Cycle Benchmarking',
+                cbar_label=(
+                    'Bare Gate Infidelity' if self._include_ref_cycle else
+                    'Dressed Gate Infidelity'
+                ),
+            )
 
         def _plot_subsystem(self, experiment: str, s: tuple) -> None:
             """Plot one subsystem's raw decays and Pauli infidelities
@@ -1237,14 +1287,14 @@ def CB(
                 fits = self._subsystem_fit[experiment].get(s, {})
             e_F = self._subsystem_infidelities[experiment].get(s, np.nan)
 
-            gate_name = self._subsystem_gate_names[s]
+            gate_n = self._subsystem_gate_names[s]
             qubit_str = ', '.join(str(q) for q in s)
-            title_prefix = f"{experiment.capitalize()} {gate_name} ({qubit_str})"
+            title_prefix = f"{experiment.capitalize()} {gate_n} ({qubit_str})"
             qubit_suffix = '_'.join(str(q) for q in s)
             file_suffix = (
-                f'_{gate_name}_{qubit_suffix}'
+                f'_{gate_n}_{qubit_suffix}'
                 if experiment == 'interleaved'
-                else f'_{experiment}_{gate_name}_{qubit_suffix}'
+                else f'_{experiment}_{gate_n}_{qubit_suffix}'
             )
             paulis = sorted(pauli_decays.keys())
 
@@ -1301,7 +1351,7 @@ def CB(
 
                     if has_fit:
                         xfit = np.linspace(
-                            depths.min(), depths.max(), 200
+                            0, 1.1 * depths.max(), 200
                         )
                         yfit = fit.predict(xfit)
                         pfig.add_trace(
@@ -1331,6 +1381,7 @@ def CB(
                     paper_bgcolor='white',
                     plot_bgcolor='#fbfbfd',
                     title_text=f'{title_prefix} Pauli Decays',
+                    margin={'t': 50},
                 )
                 pfig.update_xaxes(
                     showline=True, mirror=True, linecolor='#c7c7c7',
@@ -1354,6 +1405,14 @@ def CB(
                         self._data_manager._save_path
                         + f'CB_decays{file_suffix}.png',
                         dpi=300,
+                    )
+                    mfig.savefig(
+                        self._data_manager._save_path
+                        + f'CB_decays{file_suffix}.pdf'
+                    )
+                    mfig.savefig(
+                        self._data_manager._save_path
+                        + f'CB_decays{file_suffix}.svg'
                     )
                     plt.close(mfig)
 
@@ -1408,6 +1467,7 @@ def CB(
                     paper_bgcolor='white',
                     plot_bgcolor='#fbfbfd',
                     title_text=f'{title_prefix} Pauli Infidelities',
+                    margin={'t': 50},
                 )
                 pfig2.update_xaxes(
                     title_text='Pauli Decay Term', type='category',
