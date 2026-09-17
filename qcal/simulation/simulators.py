@@ -48,6 +48,10 @@ from typing import List
 import jax.numpy as jnp
 import numpy as np
 import quax
+from quax import (
+    instrument_from_confusion_and_transition,
+    targeted_apply_instrument_to_density_matrix,
+)
 
 from qcal.circuit import Circuit, CircuitSet
 from qcal.gates.single_qubit import MCM
@@ -604,14 +608,14 @@ class DensityMatrixSimulator(Simulator):
                             )
                             if instrument is None:
                                 instrument = (
-                                    quax.instrument_from_confusion_and_transition(
+                                    instrument_from_confusion_and_transition(
                                         jnp.eye(d, dtype=float),
                                         jnp.eye(d, dtype=float),
                                         dims=(d,),
                                     )
                                 )
                             rho_outs, _ = (
-                                quax.targeted_apply_instrument_to_density_matrix(
+                                targeted_apply_instrument_to_density_matrix(
                                     instrument, rho,
                                     subsystem=(idx,),
                                 )

@@ -406,9 +406,15 @@ class ErrorModel(ABC):
     ) -> Optional['quax.QuantumInstrument']:
         """Build a noisy ``QuantumInstrument`` from a stored confusion matrix.
 
-        Uses ``quax.instrument_from_confusion_and_transition`` with an
-        identity transition matrix (post-measurement state = actual
-        pre-measurement state; classical bit-flip model only).
+        Uses ``quax.instrument_from_confusion_and_transition`` with the
+        confusion matrix as the transition matrix too, so a misreported
+        outcome carries real backaction: the physical post-measurement
+        population is redistributed with the same statistics as the
+        reported outcome, not just the classical label. This matters
+        for a mid-circuit measurement (the only place this instrument
+        is used), since the qudit continues to evolve afterward — a
+        backaction-free (identity-transition) instrument would leave
+        readout error with no effect on anything measured later.
 
         Args:
             qudit (str): qudit label, e.g. ``'Q0'``.
@@ -422,10 +428,9 @@ class ErrorModel(ABC):
         arr = self._confusion_matrices.get(qudit)
         if arr is None:
             return None
-        transition = np.eye(d, dtype=float)
         return quax.instrument_from_confusion_and_transition(
             jnp.array(arr),
-            jnp.array(transition),
+            jnp.array(arr),
             dims=(d,),
         )
 
@@ -1574,6 +1579,9 @@ class CustomErrorModel(ErrorModel):
 
         Uses :meth:`confusion_matrix_for` (own dict + sub-model fall-through)
         so that sub-model confusion matrices are picked up automatically.
+        As in the base class, the confusion matrix also serves as the
+        transition matrix, so the instrument carries real backaction
+        (see :meth:`ErrorModel.instrument_for`).
 
         Args:
             qudit (str): qudit label, e.g. ``'Q0'``.
@@ -1586,9 +1594,8 @@ class CustomErrorModel(ErrorModel):
         arr = self.confusion_matrix_for(qudit)
         if arr is None:
             return None
-        transition = np.eye(d, dtype=float)
         return quax.instrument_from_confusion_and_transition(
-            jnp.array(arr), jnp.array(transition), dims=(d,),
+            jnp.array(arr), jnp.array(arr), dims=(d,),
         )
 
     def channel_for_gate(
