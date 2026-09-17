@@ -233,6 +233,24 @@ def CB(
             self._qubits = cycle_or_circuit.qubits
             self._include_ref_cycle = include_ref_cycle
 
+            # Qubits undergoing a mid-circuit measurement (Meas/MCM)
+            # within cycle_or_circuit. Their decay-Pauli sampling is
+            # restricted to {I, Z} below (the only physically
+            # meaningful eigenstates to prepare/interrogate on a
+            # computational-basis measurement); twirl-layer sampling
+            # stays unrestricted over {I, X, Y, Z}.
+            cycles = (
+                [cycle_or_circuit] if isinstance(cycle_or_circuit, Cycle)
+                else [c for c in cycle_or_circuit.cycles if not c.is_barrier]
+            )
+            self._measured_qubits = frozenset(
+                q
+                for cycle in cycles
+                for gate in cycle.gates
+                if gate.is_measurement
+                for q in gate.qubits
+            )
+
             if targeted_decays is not None:
                 for pauli in targeted_decays:
                     if len(pauli) != len(self._qubits):
@@ -616,10 +634,14 @@ def CB(
                     tuple(pauli) for pauli in self._targeted_decays
                 ]
             elif self._n_decays > 4**len(self._qubits) - 1:
-                sampled_paulis = generate_n_qubit_paulis(self._qubits)
+                sampled_paulis = generate_n_qubit_paulis(
+                    self._qubits, measured_qubits=self._measured_qubits
+                )
             else:
                 sampled_paulis = generate_random_n_qubit_paulis(
-                    self._qubits, n_random_paulis=self._n_decays
+                    self._qubits,
+                    measured_qubits=self._measured_qubits,
+                    n_random_paulis=self._n_decays,
                 )
 
             # Drop the all-identity Pauli from the sampled set
