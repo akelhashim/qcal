@@ -9,8 +9,12 @@ of the suite and are correspondingly slower.
 SRB is not tested here since it requires the (closed-source) True-Q
 package, which is not part of the default installation.
 """
+import pytest
+
 from qcal.backend.emulator import Emulator
 from qcal.benchmarking.rb import CRB
+from qcal.simulation.error_models import DepolarizingNoise
+from qcal.simulation.simulators import DensityMatrixSimulator
 
 
 class TestCRBDefaults:
@@ -62,3 +66,38 @@ class TestCRBRun:
             sorted(crb.success_probabilities[(0, 1)].keys())
             == crb.circuit_depths
         )
+
+
+class TestCRBWithCustomNoiseModel:
+    """Pin CRB's fit against a known, hand-computed noise model.
+
+    Unlike TestCRBRun (which only checks the fit lands in a broad
+    plausible range under the Emulator's default noise), these values
+    are specific expected process infidelities for a fixed
+    depolarizing rate, confirmed by direct measurement.
+    """
+
+    def test_single_qubit_crb_process_infidelity(self, config):
+        noise = DepolarizingNoise(single_qubit=0.001)
+        sim = DensityMatrixSimulator(noise_model=noise)
+
+        crb = CRB(
+            qpu=Emulator, config=config, qubit_labels=[0], simulator=sim
+        )
+        crb.run()
+
+        infidelity = crb.process_infidelity[0]['val']
+        assert infidelity == pytest.approx(4.50e-3, abs=2e-4)
+
+    def test_two_qubit_crb_process_infidelity(self, config):
+        noise = DepolarizingNoise(single_qubit=0.001)
+        sim = DensityMatrixSimulator(noise_model=noise)
+
+        crb = CRB(
+            qpu=Emulator, config=config, qubit_labels=[(0, 1)],
+            simulator=sim,
+        )
+        crb.run()
+
+        infidelity = crb.process_infidelity[(0, 1)]['val']
+        assert infidelity == pytest.approx(2.82e-2, abs=1e-3)

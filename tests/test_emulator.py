@@ -45,7 +45,9 @@ class TestDefaultConstruction:
     def test_default_two_qubit_depolarizing_rate(self):
         emu = Emulator()
         channel = emu.simulator.noise_model.channel_for('CZ')
-        expected = quax.channels.depolarizing(0.005, dims=(2,))
+        # Joint two-qubit noise acts on the full two-qubit Hilbert
+        # space (16x16 superoperator), not a single-qubit-sized one.
+        expected = quax.channels.depolarizing(0.005, dims=(2, 2))
         assert np.allclose(channel.matrix, expected.matrix)
 
     def test_default_readout_confusion_matrix_per_qubit(self, config):
