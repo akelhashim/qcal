@@ -736,6 +736,16 @@ def conjugate_pauli_by_gate(
         ValueError: if U P U† is not proportional to a Pauli operator with
             real sign ±1, i.e. U is not a Clifford unitary.
     """
+    if gate.is_measurement:
+        # An ideal, no-reset (QND) measurement leaves the qubit in
+        # whatever computational-basis state it was already in, so for
+        # CB's Heisenberg-propagation bookkeeping it's the identity
+        # element of the conjugation representation: every Pauli
+        # (including X/Y, which are never physically prepared/measured
+        # on a measured qubit, but can still appear as twirl layers)
+        # conjugates through unchanged, with sign +1.
+        return pauli, 1
+
     computed = get_pauli_conjugation(gate, pauli)
     if computed is not None:
         conjugate_pauli, sign = computed
