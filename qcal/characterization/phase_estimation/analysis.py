@@ -86,7 +86,6 @@ def analyze_x90(
     qubits:         Sequence[int],
     circuit_depths: Sequence[int],
     gate_layer:     GateLayer = None,
-    estimator_type: str = 'linearized',
 ) -> Tuple:
     """Analyze RPE dataset for the X90 gate.
 
@@ -96,7 +95,6 @@ def analyze_x90(
         circuit_depths (Sequence[int]): circuit depths.
         gate_layer (GateLayer, optional): custom gate layer for the gate of
             interest. Defaults to None.
-        estimator_type (str): type of estimator. Defaults to 'linearized'.
 
     Returns:
         Tuple: angle estimates, angle errors, and index of last good depth
@@ -166,14 +164,25 @@ def analyze_x90(
     ])
     interleaved_last_good_idx = analysis.check_unif_local(historical=True)
 
-    if estimator_type == 'linearized':
-        epsilon_estimates = direct_angle_estimates / (np.pi/2) - 1
-        theta_estimates = np.array([
-            np.sin(interleaved_angle_estimates[i]/2) /
-            (2 * np.cos(np.pi * epsilon_estimates[i]/2))
-            # (2 * np.cos(np.pi * epsilon_estimates[direct_last_good_idx]/2))
-            for i in range(len(direct_angle_estimates))
-        ])
+    epsilon_estimates = direct_angle_estimates / (np.pi/2) - 1
+    # NOTE: this is the exact inversion of Kimmel, Low & Yoder's Eq.
+    # (III.9) [PRA 92, 062315 (2015)], obtained via the substitution
+    # u = sin(theta)*cos(pi*eps/2), so that
+    # sin(Phi/2) = 2u*sqrt(1-u^2) = sin(2*arcsin(u)), giving
+    # Phi/4 = arcsin(u). Their Eq. (III.11) (commented out below) is the
+    # small-theta linearization of this (sin(Phi/2)/2 ~= theta*cos(pi
+    # eps/2)) and systematically underestimates |theta| as theta grows
+    # (e.g. ~2.6% low at theta = 0.2 rad, ~10% low at theta = 0.4 rad).
+    theta_estimates = np.arcsin(np.clip(
+        np.sin(interleaved_angle_estimates / 4) /
+        np.cos(np.pi * epsilon_estimates / 2),
+        -1, 1
+    ))
+    # theta_estimates = np.array([
+    #     np.sin(interleaved_angle_estimates[i]/2) /
+    #     (2 * np.cos(np.pi * epsilon_estimates[i]/2))
+    #     for i in range(len(direct_angle_estimates))
+    # ])
 
     # angle_estimates = {
     #     'rotation': target_x*(1+epsilon_estimates),
