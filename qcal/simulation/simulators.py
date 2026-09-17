@@ -59,6 +59,28 @@ logger = logging.getLogger(__name__)
 __all__ = ('Simulator', 'StateVectorSimulator', 'DensityMatrixSimulator')
 
 
+def _smear_confusion(
+    joint: np.ndarray, axis: int, cmat: np.ndarray
+) -> np.ndarray:
+    """Smear a joint-probability tensor along one axis by a confusion matrix.
+
+    ``cmat[i, j]`` is P(report i | true j). Contracts *axis* (indexed
+    by the true state) against the confusion matrix and puts the
+    resulting (reported-outcome) axis back in the same position.
+
+    Args:
+        joint (np.ndarray): joint probability tensor.
+        axis (int): axis of *joint* to smear.
+        cmat (np.ndarray): column-stochastic confusion matrix.
+
+    Returns:
+        np.ndarray: smeared joint probability tensor, same shape.
+    """
+    return np.moveaxis(
+        np.tensordot(cmat, joint, axes=([1], [axis])), 0, axis
+    )
+
+
 class Simulator(ABC):
     """Abstract base class for quantum circuit simulators.
 
@@ -550,6 +572,17 @@ class DensityMatrixSimulator(Simulator):
                     probs_nd.sum(axis=non_mcm_axes)
                     if non_mcm_axes else probs_nd
                 )
+                # Smear the ideal joint distribution through each
+                # qudit's readout confusion matrix (the same classical
+                # relabeling applied to terminal Meas outcomes below)
+                # so sampled MCM outcomes reflect readout noise.
+                if isinstance(self._noise_model, ErrorModel):
+                    for axis, q in enumerate(cycle_mcm_qudits):
+                        cmat = self._noise_model.confusion_matrix_for(
+                            f'Q{q}'
+                        )
+                        if cmat is not None:
+                            joint = _smear_confusion(joint, axis, cmat)
                 joint_flat = joint.flatten()
                 joint_flat /= joint_flat.sum()
                 mcm_gate_records.append((cycle_mcm_qudits, joint_flat))
