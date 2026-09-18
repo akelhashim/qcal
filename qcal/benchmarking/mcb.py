@@ -10,6 +10,7 @@ from concurrent.futures import ThreadPoolExecutor
 from typing import Callable
 
 import numpy as np
+import pandas as pd
 import plotly.graph_objects as go
 import pygsti
 from IPython.display import clear_output
@@ -39,124 +40,6 @@ logger = logging.getLogger(__name__)
 
 ESTIMATED_QUBIT_ERROR_RATE = 0.005
 TARGET_POLARIZATION = 0.01
-
-
-def _build_mcb_edesigns_for_qubit_subset(
-    qs: tuple,
-    depths: list,
-    pspec: QubitProcessorSpec,
-    compilations: dict,
-    n_circuits: int,
-    two_qubit_gate_density: float,
-) -> dict:
-    """Build RMCS and PMCS experiment designs for a single qubit subset.
-
-    Args:
-        qs (tuple): qubit subset.
-        depths (list): circuit depths for this subset.
-        pspec (QubitProcessorSpec): pyGSTi processor spec.
-        compilations (dict): Clifford compilation rules.
-        n_circuits (int): number of circuits per depth.
-        two_qubit_gate_density (float): density of two-qubit gates.
-
-    Returns:
-        dict: mapping of (qs, circuit_type) to experiment design.
-    """
-    qubit_labels = tuple(f'Q{q}' for q in qs)
-
-    rmcs = MirrorRBDesign(
-        pspec=pspec,
-        depths=depths,
-        circuits_per_depth=n_circuits,
-        clifford_compilations=compilations,
-        qubit_labels=qubit_labels,
-        sampler='edgegrab',
-        samplerargs=[2 * two_qubit_gate_density],
-    )
-    rmcs_density = np.mean(
-        [
-            [
-                (2 * c.two_q_gate_count() / c.size) if c.size > 0 else 0
-                for c in cl
-            ] for cl in rmcs.circuit_lists
-        ][1:]
-    )
-    logger.info(f' Interacting qubit density for {qs} RMCs: {rmcs_density:.3f}')
-
-    pmcs = PeriodicMirrorCircuitDesign(
-        pspec=pspec,
-        depths=depths,
-        circuits_per_depth=n_circuits,
-        clifford_compilations=compilations,
-        qubit_labels=qubit_labels,
-        sampler='edgegrab',
-        samplerargs=[two_qubit_gate_density],
-    )
-    pmcs_density = np.mean(
-        [
-            [
-                (2 * c.two_q_gate_count() / c.size) if c.size > 0 else 0
-                for c in cl
-            ] for cl in pmcs.circuit_lists
-        ][1:]
-    )
-    logger.info(f' Interacting qubit density for {qs} PMCs: {pmcs_density:.3f}')
-
-    return {(qs, 'RMCS'): rmcs, (qs, 'PMCS'): pmcs}
-
-
-def _trim_depths(
-    depths: list,
-    width: int,
-    estimated_qubit_error_rate: float = ESTIMATED_QUBIT_ERROR_RATE,
-    target_polarization: float = TARGET_POLARIZATION,
-) -> list:
-    """Heuristic function for automatically removing depths that are too long.
-
-    This function can be used to trim MCB circuit depths so that they are not
-    too long. If the circuit depths are too long, you will not get useful data
-    and the runtime will be unnecessarily long.
-
-    Args:
-        depths (List): list of circuit depths to trim
-        width (int): circuit width
-        estimated_qubit_error_rate (float): estimated per-qubit error rate.
-            Defaults to ESTIMATED_QUBIT_ERROR_RATE.
-        target_polarization (float): target polarization at which to cut off
-            depths. Defaults to TARGET_POLARIZATION.
-
-    Returns:
-        list: trimmed circuit depths
-    """
-    max_depth = np.log(target_polarization) / (
-            width * np.log(1 - estimated_qubit_error_rate)
-        )
-    trimmed_depths = [d for d in depths if d < max_depth]
-    n_depths = len(trimmed_depths)
-    if n_depths < len(depths) and trimmed_depths[-1] < max_depth:
-        trimmed_depths.append(depths[n_depths])
-
-    return trimmed_depths
-
-
-def _vb_to_heatmap_data(vb_data) -> tuple[list, list, np.ndarray]:
-    """Convert a pyGSTi VBData dict to (widths, depths, z-matrix) for Plotly."""
-    items = {}
-    for (w, d), v in vb_data.items():
-        try:
-            fv = float(v)
-            if not np.isnan(fv):
-                items[(w, d)] = fv
-        except (TypeError, ValueError):
-            pass
-    if not items:
-        return [], [], np.array([[]])
-    widths = sorted({w for w, _ in items})
-    depths = sorted({d for _, d in items})
-    matrix = np.full((len(widths), len(depths)), np.nan)
-    for (w, d), val in items.items():
-        matrix[widths.index(w), depths.index(d)] = val
-    return widths, depths, matrix
 
 
 def MCB(
@@ -361,6 +244,11 @@ def MCB(
             return self._results
 
         @property
+        def summary(self) -> pd.DataFrame | None:
+            """Summary statistics as a DataFrame."""
+            return self._summary
+
+        @property
         def qubits(self) -> list:
             """Qubits to benchmark."""
             return self._qubits
@@ -537,125 +425,273 @@ def MCB(
                     self._data_manager._save_path + 'frontier.svg'
                 )
 
-            # Plotly: capability region (binary heatmap)
-            # _THRESHOLD = 0.1
-            # pfig_cap = make_subplots(
-            #     rows=1, cols=2,
-            #     subplot_titles=['PMC', 'RMC'],
-            #     shared_yaxes=True,
-            #     horizontal_spacing=0.1,
-            # )
-            # widths = []
-            # for col, ct in enumerate(('PMC', 'RMC'), 1):
-            #     widths, depths, matrix = _vb_to_heatmap_data(vb_min[ct])
-            #     capable = np.where(
-            #         np.isnan(matrix), np.nan,
-            #         (matrix > _THRESHOLD).astype(float),
-            #     )
-            #     pfig_cap.add_trace(
-            #         go.Heatmap(
-            #             x=[str(d) for d in depths],
-            #             y=widths,
-            #             z=capable,
-            #             colorscale=[[0, '#d62728'], [1, '#2ca02c']],
-            #             zmin=0,
-            #             zmax=1,
-            #             showscale=False,
-            #             customdata=matrix,
-            #             hovertemplate=(
-            #                 'Width: %{y}<br>Depth: %{x}'
-            #                 '<br>Polarization: %{customdata:.3f}<extra></extra>'
-            #             ),
-            #         ),
-            #         row=1, col=col,
-            #     )
-            # pfig_cap.update_xaxes(title_text='Depth', type='category')
-            # pfig_cap.update_yaxes(title_text='Width', dtick=1, row=1, col=1)
-            # pfig_cap.update_layout(
-            #     title=f'Capability Region (threshold = {_THRESHOLD})',
-            #     template='plotly_white',
-            #     height=max(400, 80 * (len(widths) + 2)),
-            #     width=750,
-            # )
-            # pfig_cap.show()
-            # if Settings.save_data:
-            #     pfig_cap.write_html(
-            #         self._data_manager._save_path + 'capability_regions.html'
-            #     )
+            # Plotly: capability region -- discrete success /
+            # indeterminate / fail squares, matching pyGSTi's own
+            # capability_region_plot colors and Fig. 3 of
+            # arXiv:2008.11294.
+            _CAP_THRESHOLD = 1 / np.e
+            _CAP_STYLE = {
+                2: ('#33a02c', 'All circuits succeed'),
+                1: ('#fdbf6f', 'Some circuits succeed'),
+                0: ('#ffffff', 'No circuits succeed'),
+            }
+            pfig_cap = make_subplots(
+                rows=1, cols=2,
+                subplot_titles=['PMC', 'RMC'],
+                shared_yaxes=True,
+                horizontal_spacing=0.15,
+            )
+            cap_widths = []
+            for col, ct in enumerate(('PMC', 'RMC'), 1):
+                vbdf1 = vbdf.select_column_value('CircuitType', ct)
+                cap_depths, cap_widths = vbdf1.x_values, vbdf1.y_values
+                creg = vbdf1.capability_regions(
+                    metric='polarization',
+                    threshold=_CAP_THRESHOLD,
+                    significance=0.05,
+                    monotonic=True,
+                )
+                for level in (2, 1, 0):
+                    color, label = _CAP_STYLE[level]
+                    xs, ys, text = [], [], []
+                    for (d, w), val in creg.items():
+                        if val == level:
+                            xs.append(cap_depths.index(d))
+                            ys.append(cap_widths.index(w))
+                            text.append(f'Width: {w}<br>Depth: {d}')
+                    pfig_cap.add_trace(
+                        go.Scatter(
+                            x=xs, y=ys,
+                            mode='markers',
+                            marker={
+                                'symbol': 'square',
+                                'size': 26,
+                                'color': color,
+                                'line': {'color': 'black', 'width': 1},
+                            },
+                            name=label,
+                            legendgroup=str(level),
+                            showlegend=(col == 1),
+                            text=text,
+                            hovertemplate='%{text}<extra></extra>',
+                        ),
+                        row=1, col=col,
+                    )
+                _set_volumetric_axes(
+                    pfig_cap, cap_depths, cap_widths, row=1, col=col
+                )
+            pfig_cap.update_layout(
+                title=(
+                    'Capability Region '
+                    f'(threshold = 1/e = {_CAP_THRESHOLD:.3f})'
+                ),
+                template='plotly_white',
+                height=max(260, 55 * len(cap_widths) + 230),
+                width=800,
+                margin={'b': 90},
+                legend={
+                    'orientation': 'h',
+                    'yanchor': 'top',
+                    'y': -0.18,
+                    'xanchor': 'left',
+                    'x': 0,
+                },
+            )
+            pfig_cap.show()
+            if Settings.save_data:
+                pfig_cap.write_html(
+                    self._data_manager._save_path
+                    + 'capability_regions.html'
+                )
 
-            # # Plotly: volumetric polarization (continuous heatmap)
-            # pfig_vol = make_subplots(
-            #     rows=1, cols=2,
-            #     subplot_titles=['PMC', 'RMC'],
-            #     shared_yaxes=True,
-            #     horizontal_spacing=0.1,
-            # )
-            # for col, ct in enumerate(('PMC', 'RMC'), 1):
-            #     widths, depths, matrix = _vb_to_heatmap_data(vb_min[ct])
-            #     pfig_vol.add_trace(
-            #         go.Heatmap(
-            #             x=[str(d) for d in depths],
-            #             y=widths,
-            #             z=matrix,
-            #             colorscale='RdYlGn',
-            #             zmin=0,
-            #             zmax=1,
-            #             colorbar={
-            #                 'title': 'Polarization', 'thickness': 15,
-            #                 'len': 0.9, 'x': 1.02,
-            #             },
-            #             showscale=(col == 2),
-            #             hovertemplate=(
-            #                 'Width: %{y}<br>Depth: %{x}'
-            #                 '<br>Polarization: %{z:.3f}<extra></extra>'
-            #             ),
-            #         ),
-            #         row=1, col=col,
-            #     )
-            # pfig_vol.update_xaxes(title_text='Depth', type='category')
-            # pfig_vol.update_yaxes(title_text='Width', dtick=1, row=1, col=1)
-            # pfig_vol.update_layout(
-            #     title='Volumetric Polarization',
-            #     template='plotly_white',
-            #     height=max(400, 80 * (len(widths) + 2)),
-            #     width=750,
-            # )
-            # pfig_vol.show()
-            # if Settings.save_data:
-            #     pfig_vol.write_html(
-            #         self._data_manager._save_path + 'polarization.html'
-            #     )
+            # Plotly: volumetric polarization -- continuous squares
+            # colored on the same 'Spectral' scale pyGSTi uses for
+            # this plot (see the matplotlib volumetric_plot() calls
+            # above), matching Fig. 2a of arXiv:2008.11294.
+            pfig_vol = make_subplots(
+                rows=1, cols=2,
+                subplot_titles=['PMC', 'RMC'],
+                shared_yaxes=True,
+                horizontal_spacing=0.15,
+            )
+            vol_widths = []
+            for col, ct in enumerate(('PMC', 'RMC'), 1):
+                vbdf1 = vbdf.select_column_value('CircuitType', ct)
+                vol_depths, vol_widths = vbdf1.x_values, vbdf1.y_values
+                xs, ys, zs, text = [], [], [], []
+                for (d, w), v in vb_min[ct].items():
+                    if not np.isnan(v):
+                        xs.append(vol_depths.index(d))
+                        ys.append(vol_widths.index(w))
+                        zs.append(v)
+                        text.append(f'Width: {w}<br>Depth: {d}')
+                pfig_vol.add_trace(
+                    go.Scatter(
+                        x=xs, y=ys,
+                        mode='markers',
+                        marker={
+                            'symbol': 'square',
+                            'size': 26,
+                            'color': zs,
+                            'colorscale': 'Spectral',
+                            'cmin': 0, 'cmax': 1,
+                            'showscale': (col == 2),
+                            'colorbar': (
+                                {'title': 'Polarization'}
+                                if col == 2 else None
+                            ),
+                            'line': {'color': 'black', 'width': 1},
+                        },
+                        text=text,
+                        hovertemplate=(
+                            '%{text}<br>Polarization: '
+                            '%{marker.color:.3f}<extra></extra>'
+                        ),
+                        showlegend=False,
+                    ),
+                    row=1, col=col,
+                )
+                _set_volumetric_axes(
+                    pfig_vol, vol_depths, vol_widths, row=1, col=col
+                )
+            pfig_vol.update_layout(
+                title='Volumetric Polarization',
+                template='plotly_white',
+                height=max(260, 55 * len(vol_widths) + 170),
+                width=800,
+            )
+            pfig_vol.show()
+            if Settings.save_data:
+                pfig_vol.write_html(
+                    self._data_manager._save_path + 'polarization.html'
+                )
 
-            # # Plotly: RMC frontier (polarization vs depth per width)
-            # if vb_min['RMC']:
-            #     rmc_widths = sorted({w for w, _ in vb_min['RMC']})
-            #     pfig_front = go.Figure()
-            #     for w in rmc_widths:
-            #         wd_pairs = sorted(
-            #             (d, v) for (wi, d), v in vb_min['RMC'].items() if wi == w
-            #         )
-            #         if wd_pairs:
-            #             ds = [d for d, _ in wd_pairs]
-            #             ps = [p for _, p in wd_pairs]
-            #             pfig_front.add_trace(go.Scatter(
-            #                 x=[str(d) for d in ds],
-            #                 y=ps,
-            #                 mode='lines+markers',
-            #                 name=f'Width {w}',
-            #             ))
-            #     pfig_front.update_layout(
-            #         title='RMC Polarization Frontier',
-            #         xaxis_title='Depth',
-            #         yaxis_title='Polarization',
-            #         template='plotly_white',
-            #         height=450,
-            #         width=600,
-            #     )
-            #     pfig_front.show()
-            #     if Settings.save_data:
-            #         pfig_front.write_html(
-            #             self._data_manager._save_path + 'frontier.html'
-            #         )
+            # Plotly: RMC volumetric distribution plot, reproducing
+            # Fig. 1d of arXiv:2008.11294 (and pyGSTi's own
+            # volumetric_distribution_plot). Nested squares show the
+            # min/mean/max polarization at each (depth, width), and
+            # stepped boundary lines mark where each statistic
+            # crosses the success threshold (1/e): green = max
+            # (best-case capable), black = mean, red = min
+            # (worst-case capable).
+            _FRONTIER_THRESHOLD = 1 / np.e
+            rmc_depths = vbdf2.x_values
+            rmc_widths = vbdf2.y_values
+
+            if rmc_depths and rmc_widths:
+                vb_stat = {
+                    stat: vbdf2.vb_data(
+                        metric='polarization', statistic=stat,
+                        no_data_action='discard',
+                    ) for stat in ('min', 'mean', 'max')
+                }
+                capability = vbdf2.capability_regions(
+                    metric='polarization',
+                    threshold=_FRONTIER_THRESHOLD,
+                    significance=0.05,
+                    monotonic=True,
+                )
+
+                pfig_front = go.Figure()
+
+                # Nested squares: min (outer/largest) -> mean ->
+                # max (inner/smallest), each colored by polarization
+                # on pyGSTi's default 'Blues' scale for this plot
+                # (volumetric_distribution_plot's cmap=None).
+                square_sizes = {'min': 34, 'mean': 20, 'max': 8}
+                for stat in ('min', 'mean', 'max'):
+                    xs, ys, zs, text = [], [], [], []
+                    for (d, w), v in vb_stat[stat].items():
+                        xs.append(rmc_depths.index(d))
+                        ys.append(rmc_widths.index(w))
+                        zs.append(v)
+                        text.append(f'Width: {w}<br>Depth: {d}')
+                    pfig_front.add_trace(go.Scatter(
+                        x=xs, y=ys,
+                        mode='markers',
+                        marker={
+                            'symbol': 'square',
+                            'size': square_sizes[stat],
+                            'color': zs,
+                            'colorscale': 'Blues',
+                            'cmin': 0, 'cmax': 1,
+                            'showscale': (stat == 'min'),
+                            'colorbar': (
+                                {'title': 'Polarization'}
+                                if stat == 'min' else None
+                            ),
+                            'line': {'color': 'black', 'width': 0.5},
+                        },
+                        name=stat,
+                        text=text,
+                        hovertemplate=(
+                            '%{text}<br>' + stat.capitalize()
+                            + ' polarization: %{marker.color:.3f}'
+                            '<extra></extra>'
+                        ),
+                        showlegend=False,
+                    ))
+
+                # Boundary lines, using the paper's own naming (see
+                # Fig. 1 of arXiv:2008.11294): green = Best Circuit
+                # (max), black = Average Circuit (mean), red = Worst
+                # Circuit (min) -- the same three statistics as the
+                # nested squares above. Drawn with 'Average Circuit'
+                # (solid, opaque) first so it sits behind the dashed/
+                # dotted lines: when boundaries coincide (as they
+                # often do on clean/low-shot data), the dash gaps
+                # still let every color show through, rather than the
+                # last trace fully occluding the others. `legendrank`
+                # reorders the legend independently of this draw
+                # order, so it can still read Best/Average/Worst.
+                boundary_specs = [
+                    ('Average Circuit', vb_stat['mean'],
+                     _FRONTIER_THRESHOLD, '#000000', False, 6,
+                     'solid', 2),
+                    ('Best Circuit', capability, 0.99, '#2ecc71',
+                     True, 5, 'dash', 1),
+                    ('Worst Circuit', capability, 1.99, '#e74c3c',
+                     True, 3, 'dot', 3),
+                ]
+                for label, data, thr, color, monotonic, lw, dash, rank in (
+                    boundary_specs
+                ):
+                    xvals, yvals = _volumetric_boundary_steps(
+                        data, rmc_depths, rmc_widths, thr,
+                        monotonic=monotonic,
+                    )
+                    pfig_front.add_trace(go.Scatter(
+                        x=xvals, y=yvals,
+                        mode='lines',
+                        line={'color': color, 'width': lw, 'dash': dash},
+                        name=label,
+                        legendrank=rank,
+                        hoverinfo='skip',
+                    ))
+
+                _set_volumetric_axes(pfig_front, rmc_depths, rmc_widths)
+                pfig_front.update_layout(
+                    title=(
+                        'RMC Volumetric Distribution '
+                        f'(threshold = 1/e = {_FRONTIER_THRESHOLD:.3f})'
+                    ),
+                    template='plotly_white',
+                    height=max(260, 55 * len(rmc_widths) + 230),
+                    width=750,
+                    margin={'b': 90},
+                    legend={
+                        'orientation': 'h',
+                        'yanchor': 'top',
+                        'y': -0.18,
+                        'xanchor': 'left',
+                        'x': 0,
+                    },
+                )
+                pfig_front.show()
+                if Settings.save_data:
+                    pfig_front.write_html(
+                        self._data_manager._save_path + 'frontier.html'
+                    )
 
         def final(self) -> None:
             """Final benchmarking method."""
@@ -683,3 +719,221 @@ def MCB(
         pspec=pspec,
         **kwargs
     )
+
+
+def _build_mcb_edesigns_for_qubit_subset(
+    qs: tuple,
+    depths: list,
+    pspec: QubitProcessorSpec,
+    compilations: dict,
+    n_circuits: int,
+    two_qubit_gate_density: float,
+) -> dict:
+    """Build RMCS and PMCS experiment designs for a single qubit subset.
+
+    Args:
+        qs (tuple): qubit subset.
+        depths (list): circuit depths for this subset.
+        pspec (QubitProcessorSpec): pyGSTi processor spec.
+        compilations (dict): Clifford compilation rules.
+        n_circuits (int): number of circuits per depth.
+        two_qubit_gate_density (float): density of two-qubit gates.
+
+    Returns:
+        dict: mapping of (qs, circuit_type) to experiment design.
+    """
+    qubit_labels = tuple(f'Q{q}' for q in qs)
+
+    rmcs = MirrorRBDesign(
+        pspec=pspec,
+        depths=depths,
+        circuits_per_depth=n_circuits,
+        clifford_compilations=compilations,
+        qubit_labels=qubit_labels,
+        sampler='edgegrab',
+        samplerargs=[2 * two_qubit_gate_density],
+    )
+    rmcs_density = np.mean(
+        [
+            [
+                (2 * c.two_q_gate_count() / c.size) if c.size > 0 else 0
+                for c in cl
+            ] for cl in rmcs.circuit_lists
+        ][1:]
+    )
+    logger.info(f' Interacting qubit density for {qs} RMCs: {rmcs_density:.3f}')
+
+    pmcs = PeriodicMirrorCircuitDesign(
+        pspec=pspec,
+        depths=depths,
+        circuits_per_depth=n_circuits,
+        clifford_compilations=compilations,
+        qubit_labels=qubit_labels,
+        sampler='edgegrab',
+        samplerargs=[two_qubit_gate_density],
+    )
+    pmcs_density = np.mean(
+        [
+            [
+                (2 * c.two_q_gate_count() / c.size) if c.size > 0 else 0
+                for c in cl
+            ] for cl in pmcs.circuit_lists
+        ][1:]
+    )
+    logger.info(f' Interacting qubit density for {qs} PMCs: {pmcs_density:.3f}')
+
+    return {(qs, 'RMCS'): rmcs, (qs, 'PMCS'): pmcs}
+
+
+def _trim_depths(
+    depths: list,
+    width: int,
+    estimated_qubit_error_rate: float = ESTIMATED_QUBIT_ERROR_RATE,
+    target_polarization: float = TARGET_POLARIZATION,
+) -> list:
+    """Heuristic function for automatically removing depths that are too long.
+
+    This function can be used to trim MCB circuit depths so that they are not
+    too long. If the circuit depths are too long, you will not get useful data
+    and the runtime will be unnecessarily long.
+
+    Args:
+        depths (List): list of circuit depths to trim
+        width (int): circuit width
+        estimated_qubit_error_rate (float): estimated per-qubit error rate.
+            Defaults to ESTIMATED_QUBIT_ERROR_RATE.
+        target_polarization (float): target polarization at which to cut off
+            depths. Defaults to TARGET_POLARIZATION.
+
+    Returns:
+        list: trimmed circuit depths
+    """
+    max_depth = np.log(target_polarization) / (
+            width * np.log(1 - estimated_qubit_error_rate)
+        )
+    trimmed_depths = [d for d in depths if d < max_depth]
+    n_depths = len(trimmed_depths)
+    if n_depths < len(depths) and trimmed_depths[-1] < max_depth:
+        trimmed_depths.append(depths[n_depths])
+
+    return trimmed_depths
+
+
+def _set_volumetric_axes(
+    fig: go.Figure,
+    depths: list,
+    widths: list,
+    row: int | None = None,
+    col: int | None = None,
+) -> None:
+    """Style a Plotly figure's axes to match pyGSTi's VB plot grid.
+
+    pyGSTi's volumetric-benchmarking plots position every
+    (depth, width) square by *index* into the sorted depth/width
+    lists, not by raw value. This applies that same convention to a
+    Plotly figure (or one subplot of it) so index-positioned square
+    markers and boundary lines line up correctly. Marker squares are
+    sized in fixed pixels (not data units), so no data-unit aspect
+    locking is needed for them to render as literal squares -- doing
+    so would instead waste vertical space padding a plot with few
+    widths but many depths.
+
+    Args:
+        fig (go.Figure): the figure (or subplot grid) to style.
+        depths (list): sorted depths for the x-axis.
+        widths (list): sorted widths for the y-axis.
+        row (int | None, optional): subplot row, if ``fig`` was built
+            with ``make_subplots``. Defaults to None.
+        col (int | None, optional): subplot column, if ``fig`` was
+            built with ``make_subplots``. Defaults to None.
+    """
+    target = {} if row is None else {'row': row, 'col': col}
+    fig.update_xaxes(
+        title_text='Depth',
+        tickmode='array',
+        tickvals=list(range(len(depths))),
+        ticktext=[str(d) for d in depths],
+        range=[-0.5, len(depths) - 0.5],
+        **target,
+    )
+    fig.update_yaxes(
+        title_text='Width',
+        tickmode='array',
+        tickvals=list(range(len(widths))),
+        ticktext=[str(w) for w in widths],
+        range=[-0.5, len(widths) - 0.5],
+        **target,
+    )
+
+def _volumetric_boundary_steps(
+    data: dict,
+    x_values: list,
+    y_values: list,
+    threshold: float,
+    monotonic: bool = True,
+) -> tuple[list, list]:
+    """Index-based staircase boundary for a volumetric-style dataset.
+
+    A direct, non-matplotlib port of the ``missing_data_action=
+    'hedge'`` branch of ``pygsti.report.volumetric_boundary_plot``
+    (see arXiv:2008.11294, Fig. 1), which pyGSTi's own
+    ``volumetric_distribution_plot`` uses internally. It reproduces
+    the same statistics/hedging, only returning coordinates instead
+    of drawing them, so this can be plotted with Plotly.
+
+    Args:
+        data (dict): mapping of (depth, width) to a scalar metric or
+            classification, as returned by ``VBDataFrame.vb_data()``
+            or ``VBDataFrame.capability_regions()``.
+        x_values (list): sorted depths (the VBDataFrame's x-axis).
+        y_values (list): sorted widths (the VBDataFrame's y-axis).
+        threshold (float): the value ``data`` must meet or exceed to
+            count as "capable" at a given (depth, width).
+        monotonic (bool, optional): enforce a non-increasing boundary
+            as depth increases. Defaults to True.
+
+    Returns:
+        tuple[list, list]: index-based (xvals, yvals) for a staircase
+            line, in depth-index and width-index units (offset by 0.5
+            so the line sits on the cell edges of an index-positioned
+            grid of (depth, width) squares).
+    """
+    def _widest_capable_index(d: object) -> int:
+        return max(
+            [-1] + [
+                y_values.index(w) for w in y_values
+                if (d, w) in data and data[d, w] >= threshold
+            ]
+        )
+
+    boundaries = [_widest_capable_index(x_values[0])]
+    hedged = set()
+    for d in x_values[1:]:
+        max_width_at_d = max(
+            [-1] + [w for w in y_values if (d, w) in data]
+        )
+        if max_width_at_d < boundaries[-1]:
+            boundaries.append(boundaries[-1])
+            hedged.add(d)
+        else:
+            boundaries.append(_widest_capable_index(d))
+
+    xvals, yvals = [], []
+    last_x = -0.5
+    for i, d in enumerate(x_values):
+        if d in hedged:
+            if not all(dd in hedged for dd in x_values[i:]):
+                xvals += [last_x, i]
+                yvals += [boundaries[i] + 0.5, boundaries[i] + 0.5]
+        else:
+            xvals += [last_x, i + 0.5]
+            yvals += [boundaries[i] + 0.5, boundaries[i] + 0.5]
+        last_x = xvals[-1]
+
+    if monotonic and yvals:
+        mono = [yvals[0]]
+        for y in yvals[1:]:
+            mono.append(mono[-1] if y > mono[-1] else y)
+        yvals = mono
+
+    return xvals, yvals
