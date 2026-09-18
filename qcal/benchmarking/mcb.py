@@ -359,7 +359,6 @@ def MCB(
             fig, ax = pygsti.report.capability_region_plot(
                 vbdf, figsize=(6, 8), scale=2
             )
-            fig.show()
             if Settings.save_data:
                 fig.savefig(
                     self._data_manager._save_path + 'capability_regions.png',
@@ -498,11 +497,6 @@ def MCB(
                 },
             )
             pfig_cap.show()
-            if Settings.save_data:
-                pfig_cap.write_html(
-                    self._data_manager._save_path
-                    + 'capability_regions.html'
-                )
 
             # Plotly: volumetric polarization -- continuous squares
             # colored on the same 'Spectral' scale pyGSTi uses for
@@ -561,10 +555,6 @@ def MCB(
                 width=800,
             )
             pfig_vol.show()
-            if Settings.save_data:
-                pfig_vol.write_html(
-                    self._data_manager._save_path + 'polarization.html'
-                )
 
             # Plotly: RMC volumetric distribution plot, reproducing
             # Fig. 1d of arXiv:2008.11294 (and pyGSTi's own
@@ -688,10 +678,6 @@ def MCB(
                     },
                 )
                 pfig_front.show()
-                if Settings.save_data:
-                    pfig_front.write_html(
-                        self._data_manager._save_path + 'frontier.html'
-                    )
 
         def final(self) -> None:
             """Final benchmarking method."""
