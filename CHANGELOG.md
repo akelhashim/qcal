@@ -19,9 +19,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- RPE analysis raising a KeyError when encountering zero counts
-
 ### Security
+
+## [4.0.1] - 2026-09-18
+
+### Fixed
+
+- RPE analysis raising a KeyError when encountering zero counts
 
 ## [4.0.0] - 2026-09-04
 
@@ -289,7 +293,8 @@ post-processing
 - Single- and two-qubit benchmarking methods
 - Advanced compilation tools
 
-[Unreleased]: https://github.com/akelhashim/qcal/compare/v4.0.0...HEAD
+[Unreleased]: https://github.com/akelhashim/qcal/compare/v4.0.1...HEAD
+[4.0.1]: https://github.com/akelhashim/qcal/releases/tag/v4.0.1
 [4.0.0]: https://github.com/akelhashim/qcal/releases/tag/v4.0.0
 [3.2.0]: https://github.com/akelhashim/qcal/releases/tag/v3.2.0
 [3.1.1]: https://github.com/akelhashim/qcal/releases/tag/v3.1.1
