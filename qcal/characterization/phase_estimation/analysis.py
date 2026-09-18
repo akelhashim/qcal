@@ -19,7 +19,7 @@ from qcal.characterization.phase_estimation.circuits import (
     make_X90_icos_circ,
     make_X90_isin_circ,
     make_x90_sin_circ,
-    make_zz_circuits
+    # make_zz_circuits,
 )
 
 logger = logging.getLogger(__name__)
@@ -52,24 +52,22 @@ def analyze_idle(
         for d in circuit_depths
     }
 
+    eps = 1e-8  # Small additive factor to ensure we do not divide by zero
+
     signal = {'ramsey': []}
     # Angle estimate
     experiment = Q()
     for d in circuit_depths:
         cos_counts = dataset[cos_circs[d]].counts
         sin_counts = dataset[sin_circs[d]].counts
-        experiment.process_cos(d,
-            (int(cos_counts['0']), int(cos_counts['1']))
-        )
-        experiment.process_sin(d,
-            (int(sin_counts['1']), int(sin_counts['0']))
-        )
-        p_I = int(cos_counts['0']) / (
-            int(cos_counts['0']) + int(cos_counts['1'])
-        )
-        p_Q = int(sin_counts['1']) / (
-            int(sin_counts['0']) + int(sin_counts['1'])
-        )
+        n_cos_0 = int(cos_counts.get('0', 0))
+        n_cos_1 = int(cos_counts.get('1', 0))
+        n_sin_0 = int(sin_counts.get('0', 0))
+        n_sin_1 = int(sin_counts.get('1', 0))
+        experiment.process_cos(d, (n_cos_0, n_cos_1))
+        experiment.process_sin(d, (n_sin_1, n_sin_0))
+        p_I = n_cos_0 / (n_cos_0 + n_cos_1 + eps)
+        p_Q = n_sin_1 / (n_sin_0 + n_sin_1 + eps)
         signal['ramsey'].append(1 - 2 * p_I + 1j - 2j * p_Q)
 
     analysis = RobustPhaseEstimation(experiment)
@@ -88,7 +86,6 @@ def analyze_x90(
     qubits:         Sequence[int],
     circuit_depths: Sequence[int],
     gate_layer:     GateLayer = None,
-    estimator_type: str = 'linearized',
 ) -> Tuple:
     """Analyze RPE dataset for the X90 gate.
 
@@ -98,7 +95,6 @@ def analyze_x90(
         circuit_depths (Sequence[int]): circuit depths.
         gate_layer (GateLayer, optional): custom gate layer for the gate of
             interest. Defaults to None.
-        estimator_type (str): type of estimator. Defaults to 'linearized'.
 
     Returns:
         Tuple: angle estimates, angle errors, and index of last good depth
@@ -130,18 +126,14 @@ def analyze_x90(
     for d in circuit_depths:
         direct_cos_counts = dataset[direct_cos_circs[d]].counts
         direct_sin_counts = dataset[direct_sin_circs[d]].counts
-        experiment.process_cos(d,
-            (int(direct_cos_counts['0']), int(direct_cos_counts['1']))
-        )
-        experiment.process_sin(d,
-            (int(direct_sin_counts['1']), int(direct_sin_counts['0']))
-        )
-        p_I = int(direct_cos_counts['0']) / (
-            int(direct_cos_counts['0']) + int(direct_cos_counts['1']) + eps
-        )
-        p_Q = int(direct_sin_counts['1']) / (
-            int(direct_sin_counts['0']) + int(direct_sin_counts['1']) + eps
-        )
+        n_cos_0 = int(direct_cos_counts.get('0', 0))
+        n_cos_1 = int(direct_cos_counts.get('1', 0))
+        n_sin_0 = int(direct_sin_counts.get('0', 0))
+        n_sin_1 = int(direct_sin_counts.get('1', 0))
+        experiment.process_cos(d, (n_cos_0, n_cos_1))
+        experiment.process_sin(d, (n_sin_1, n_sin_0))
+        p_I = n_cos_0 / (n_cos_0 + n_cos_1 + eps)
+        p_Q = n_sin_1 / (n_sin_0 + n_sin_1 + eps)
         signal['direct'].append(1 - 2 * p_I + 1j - 2j * p_Q)
     analysis = RobustPhaseEstimation(experiment)
     direct_angle_estimates = analysis.angle_estimates
@@ -155,22 +147,14 @@ def analyze_x90(
     for d in circuit_depths:  #interleaved_circuit_depths(circuit_depths):
         interleaved_cos_counts = dataset[interleaved_cos_circs[d]].counts
         interleaved_sin_counts = dataset[interleaved_sin_circs[d]].counts
-        experiment.process_cos(d,
-            (int(interleaved_cos_counts['0']),
-             int(interleaved_cos_counts['1'])
-            )
-        )
-        experiment.process_sin(d,
-            (int(interleaved_sin_counts['1']),
-             int(interleaved_sin_counts['0'])
-            )
-        )
-        p_I = int(interleaved_cos_counts['0']) / (
-            int(interleaved_cos_counts['0']) + int(interleaved_cos_counts['1'])
-        )
-        p_Q = int(interleaved_sin_counts['1']) / (
-            int(interleaved_sin_counts['0']) + int(interleaved_sin_counts['1'])
-        )
+        n_cos_0 = int(interleaved_cos_counts.get('0', 0))
+        n_cos_1 = int(interleaved_cos_counts.get('1', 0))
+        n_sin_0 = int(interleaved_sin_counts.get('0', 0))
+        n_sin_1 = int(interleaved_sin_counts.get('1', 0))
+        experiment.process_cos(d, (n_cos_0, n_cos_1))
+        experiment.process_sin(d, (n_sin_1, n_sin_0))
+        p_I = n_cos_0 / (n_cos_0 + n_cos_1 + eps)
+        p_Q = n_sin_1 / (n_sin_0 + n_sin_1 + eps)
         signal['interleaved'].append(1 - 2 * p_I + 1j - 2j * p_Q)
 
     analysis = RobustPhaseEstimation(experiment)
@@ -180,14 +164,25 @@ def analyze_x90(
     ])
     interleaved_last_good_idx = analysis.check_unif_local(historical=True)
 
-    if estimator_type == 'linearized':
-        epsilon_estimates = direct_angle_estimates / (np.pi/2) - 1
-        theta_estimates = np.array([
-            np.sin(interleaved_angle_estimates[i]/2) /
-            (2 * np.cos(np.pi * epsilon_estimates[i]/2))
-            # (2 * np.cos(np.pi * epsilon_estimates[direct_last_good_idx]/2))
-            for i in range(len(direct_angle_estimates))
-        ])
+    epsilon_estimates = direct_angle_estimates / (np.pi/2) - 1
+    # NOTE: this is the exact inversion of Kimmel, Low & Yoder's Eq.
+    # (III.9) [PRA 92, 062315 (2015)], obtained via the substitution
+    # u = sin(theta)*cos(pi*eps/2), so that
+    # sin(Phi/2) = 2u*sqrt(1-u^2) = sin(2*arcsin(u)), giving
+    # Phi/4 = arcsin(u). Their Eq. (III.11) (commented out below) is the
+    # small-theta linearization of this (sin(Phi/2)/2 ~= theta*cos(pi
+    # eps/2)) and systematically underestimates |theta| as theta grows
+    # (e.g. ~2.6% low at theta = 0.2 rad, ~10% low at theta = 0.4 rad).
+    theta_estimates = np.arcsin(np.clip(
+        np.sin(interleaved_angle_estimates / 4) /
+        np.cos(np.pi * epsilon_estimates / 2),
+        -1, 1
+    ))
+    # theta_estimates = np.array([
+    #     np.sin(interleaved_angle_estimates[i]/2) /
+    #     (2 * np.cos(np.pi * epsilon_estimates[i]/2))
+    #     for i in range(len(direct_angle_estimates))
+    # ])
 
     # angle_estimates = {
     #     'rotation': target_x*(1+epsilon_estimates),
@@ -282,24 +277,20 @@ def analyze_cz(
         sin_plus = state_pair_lookup[state_pair]['sin','+']
         sin_minus = state_pair_lookup[state_pair]['sin','-']
         for d in circuit_depths:
-            experiments[state_pair].process_cos(d,
-                (int(dataset[cos_dict[state_pair][d]][cos_plus]),
-                 int(dataset[cos_dict[state_pair][d]][cos_minus])
-                )
+            cos_row = dataset[cos_dict[state_pair][d]]
+            sin_row = dataset[sin_dict[state_pair][d]]
+            n_cos_plus = int(cos_row.get(cos_plus, 0))
+            n_cos_minus = int(cos_row.get(cos_minus, 0))
+            n_sin_plus = int(sin_row.get(sin_plus, 0))
+            n_sin_minus = int(sin_row.get(sin_minus, 0))
+            experiments[state_pair].process_cos(
+                d, (n_cos_plus, n_cos_minus)
             )
-            experiments[state_pair].process_sin(d,
-                (int(dataset[sin_dict[state_pair][d]][sin_plus]),
-                 int(dataset[sin_dict[state_pair][d]][sin_minus])
-                )
+            experiments[state_pair].process_sin(
+                d, (n_sin_plus, n_sin_minus)
             )
-            p_I = int(dataset[cos_dict[state_pair][d]][cos_plus]) / (
-                int(dataset[cos_dict[state_pair][d]][cos_plus]) +
-                int(dataset[cos_dict[state_pair][d]][cos_minus]) + eps
-            )
-            p_Q = int(dataset[sin_dict[state_pair][d]][sin_plus]) / (
-                int(dataset[sin_dict[state_pair][d]][sin_plus]) +
-                int(dataset[sin_dict[state_pair][d]][sin_minus]) + eps
-            )
+            p_I = n_cos_plus / (n_cos_plus + n_cos_minus + eps)
+            p_Q = n_sin_plus / (n_sin_plus + n_sin_minus + eps)
             signal[state_pair].append(1 - 2 * p_I + 1j - 2j * p_Q)
 
     analyses = {}
