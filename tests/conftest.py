@@ -1,6 +1,7 @@
 """Shared fixtures for the qcal test suite."""
 from pathlib import Path
 
+import matplotlib
 import pytest
 
 import qcal.settings as settings
@@ -27,10 +28,22 @@ def _no_plot_popups():
     it just serializes the figure, so it can't open anything or
     require an extra dependency.
     """
-    original = settings.Settings.plot_renderer
+    original_renderer = settings.Settings.plot_renderer
     settings.Settings.plot_renderer = 'json'
+
+    # Some protocols (e.g. RB, CB, IRB) plot with matplotlib directly,
+    # which is a separate risk from plotly: on macOS the default backend is
+    # the interactive 'macosx' one, so fig.show() would pop open a
+    # real native window per plot. 'Agg' is non-interactive -- show()
+    # becomes a harmless no-op. Switching after matplotlib.pyplot may
+    # already be imported (e.g. by qcal.benchmarking.rb) still works.
+    original_backend = matplotlib.get_backend()
+    matplotlib.use('Agg')
+
     yield
-    settings.Settings.plot_renderer = original
+
+    settings.Settings.plot_renderer = original_renderer
+    matplotlib.use(original_backend)
 
 
 @pytest.fixture
