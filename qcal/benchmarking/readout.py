@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Sequence
-from typing import Callable, List, Tuple
+from typing import Callable
 
 import pandas as pd
 from IPython.display import clear_output

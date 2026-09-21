@@ -50,6 +50,15 @@ _EXAMPLE_CONFIG = (
     / 'examples' / 'config' / 'config.yaml'
 )
 
+# Default noise model. p0, p1 are the readout confusion matrix's
+# diagonal in qcal's row-stochastic convention: C[prep, meas] =
+# P(measure meas | prepared prep), i.e. diag(p0, p1) =>
+# C = [[p0, 1-p0], [1-p1, p1]].
+DEFAULT_SINGLE_QUBIT_DEPOLARIZING = 0.0005
+DEFAULT_TWO_QUBIT_DEPOLARIZING = 0.005
+DEFAULT_READOUT_P0 = 0.995
+DEFAULT_READOUT_P1 = 0.98
+
 
 class Emulator(QPU):
     """Emulator QPU backed by a quantum circuit simulator.
@@ -132,14 +141,11 @@ class Emulator(QPU):
             self._simulator = simulator
         else:
             noise = DepolarizingNoise(
-                single_qubit=0.0005,
-                two_qubit=0.005,
+                single_qubit=DEFAULT_SINGLE_QUBIT_DEPOLARIZING,
+                two_qubit=DEFAULT_TWO_QUBIT_DEPOLARIZING,
             )
 
-            # Confusion matrix in qcal's row-stochastic convention:
-            # C[prep, meas] = P(measure meas | prepared prep).
-            # diag(p0, p1) => C = [[p0, 1-p0], [1-p1, p1]]
-            p0, p1 = (0.995, 0.98)
+            p0, p1 = DEFAULT_READOUT_P0, DEFAULT_READOUT_P1
             cmat = np.array([
                 [p0,       1.0 - p0],
                 [1.0 - p1, p1      ],
@@ -239,4 +245,3 @@ class Emulator(QPU):
             ):
                 if isinstance(circuit, Circuit):
                     circuit.results = results
-

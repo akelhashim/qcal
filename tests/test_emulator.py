@@ -8,7 +8,13 @@ underlying simulators, which are exercised elsewhere.
 import numpy as np
 import quax
 
-from qcal.backend.emulator import Emulator
+from qcal.backend.emulator import (
+    DEFAULT_READOUT_P0,
+    DEFAULT_READOUT_P1,
+    DEFAULT_SINGLE_QUBIT_DEPOLARIZING,
+    DEFAULT_TWO_QUBIT_DEPOLARIZING,
+    Emulator,
+)
 from qcal.circuit import Circuit, CircuitSet, Cycle
 from qcal.gates.single_qubit import Meas, X
 from qcal.results import Results
@@ -39,7 +45,9 @@ class TestDefaultConstruction:
     def test_default_single_qubit_depolarizing_rate(self):
         emu = Emulator()
         channel = emu.simulator.noise_model.channel_for('X')
-        expected = quax.channels.depolarizing(0.0005, dims=(2,))
+        expected = quax.channels.depolarizing(
+            DEFAULT_SINGLE_QUBIT_DEPOLARIZING, dims=(2,)
+        )
         assert np.allclose(channel.matrix, expected.matrix)
 
     def test_default_two_qubit_depolarizing_rate(self):
@@ -47,12 +55,17 @@ class TestDefaultConstruction:
         channel = emu.simulator.noise_model.channel_for('CZ')
         # Joint two-qubit noise acts on the full two-qubit Hilbert
         # space (16x16 superoperator), not a single-qubit-sized one.
-        expected = quax.channels.depolarizing(0.005, dims=(2, 2))
+        expected = quax.channels.depolarizing(
+            DEFAULT_TWO_QUBIT_DEPOLARIZING, dims=(2, 2)
+        )
         assert np.allclose(channel.matrix, expected.matrix)
 
     def test_default_readout_confusion_matrix_per_qubit(self, config):
         emu = Emulator(config=config)
-        expected = np.array([[0.995, 0.02], [0.005, 0.98]])
+        # quax stores the column-stochastic transpose of qcal's
+        # row-stochastic C[prep, meas] convention.
+        p0, p1 = DEFAULT_READOUT_P0, DEFAULT_READOUT_P1
+        expected = np.array([[p0, 1 - p1], [1 - p0, p1]])
         for q in config.qubits:
             cmat = emu.simulator.noise_model.confusion_matrix_for(f'Q{q}')
             assert np.allclose(cmat, expected)
