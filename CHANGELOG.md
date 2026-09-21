@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Default plotting in MCB to plotly
+- Moved `plot_error_rates` to `qcal/plotting/error_rates.py`
 
 ### Deprecated
 

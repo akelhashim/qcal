@@ -35,13 +35,13 @@ from pygsti.protocols import (
 from pygsti.protocols.protocol import ProtocolData
 
 from qcal.analysis.leakage import analyze_leakage
-from qcal.benchmarking.utils import plot_error_rates
 from qcal.circuit import CircuitSet
 from qcal.config import Config
 from qcal.fitting.fit_functions import base_exponential
 from qcal.interface.pygsti.datasets import generate_pygsti_dataset
 from qcal.interface.pygsti.processor_spec import pygsti_pspec
 from qcal.interface.pygsti.transpiler import PyGSTiTranspiler
+from qcal.plotting.error_rates import plot_error_rates
 from qcal.plotting.utils import calculate_nrows_ncols
 from qcal.qpu.qpu import QPU
 from qcal.settings import Settings
