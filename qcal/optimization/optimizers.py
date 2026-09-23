@@ -14,22 +14,24 @@ __all__ = (
     'Adam',
     'CMA',
     'LQG',
-    'LQR'
+    'LQR',
+    'OptunaHub'
 )
 
 
 class Adam:
 
-    def __init__(self,
-            x0:        float | NDArray,
-            lr:        float = 0.01,
-            beta_1:    float = 0.9,
-            beta_2:    float = 0.999,
-            eps:       float = 1e-8,
-            tol:       float = 1e-4,
-            loss:      float | NDArray = 0.,
-            grad_func: Any | None = None
-        ) -> None:
+    def __init__(
+        self,
+        x0:        float | NDArray,
+        lr:        float = 0.01,
+        beta_1:    float = 0.9,
+        beta_2:    float = 0.999,
+        eps:       float = 1e-8,
+        tol:       float = 1e-4,
+        loss:      float | NDArray = 0.,
+        grad_func: Any | None = None
+    ) -> None:
         """Based on ADAM, a momentum-based stochastic optimizer.
 
         See: https://arxiv.org/abs/1412.6980
@@ -154,12 +156,13 @@ class Adam:
 
 class CMA:
 
-    def __init__(self,
-            x0:     float | ArrayLike,
-            sigma0: float = 0.15,
-            # opts:   Dict = None,
-            **kwargs
-        ) -> None:
+    def __init__(
+        self,
+        x0:     float | ArrayLike,
+        sigma0: float = 0.15,
+        # opts:   Dict = None,
+        **kwargs
+    ) -> None:
         """CMA-ES (Covariance Matrix Adaptation Evolution Strategy).
 
         See:
@@ -233,22 +236,198 @@ class CMA:
         return self._es.stop()
 
 
+class OptunaHub:
+
+    def __init__(
+        self,
+        x0:             float | ArrayLike,
+        sampler:        str | Any = 'samplers/auto_sampler',
+        sampler_kwargs: dict | None = None,
+        sampler_class:  str | None = None,
+        lbounds:        float | ArrayLike = 0.,
+        ubounds:        float | ArrayLike = 1.,
+        direction:      str = 'minimize',
+    ) -> None:
+        """Generic wrapper around an OptunaHub sampler.
+
+        This class lets any sampler published on OptunaHub
+        (https://hub.optuna.org/) be driven through qcal's `ask`/`tell`
+        optimizer interface (`step`/`tell`), for use with the `Optimize`
+        class.
+
+        See:
+        - https://optuna.github.io/optunahub/
+        - https://hub.optuna.org/
+
+        Args:
+            x0 (float | ArrayLike): initial parameter values. Only used to
+                infer the number of parameters being optimized.
+            sampler (str | Any, optional): name of an OptunaHub package to
+                load (e.g., 'samplers/auto_sampler', 'samplers/cmaes'), or an
+                already-instantiated `optuna.samplers.BaseSampler`. Defaults
+                to 'samplers/auto_sampler'.
+            sampler_kwargs (dict | None, optional): kwargs passed to the
+                sampler class constructor when `sampler` is a package name.
+                Defaults to None.
+            sampler_class (str | None, optional): name of the sampler class
+                to instantiate from the loaded OptunaHub module. If None,
+                the module is searched for a single class which subclasses
+                `optuna.samplers.BaseSampler`. Defaults to None.
+            lbounds (float | ArrayLike, optional): lower bound(s) on the
+                parameter values, broadcast across all parameters if a
+                single float is given. Defaults to 0.
+            ubounds (float | ArrayLike, optional): upper bound(s) on the
+                parameter values, broadcast across all parameters if a
+                single float is given. Defaults to 1.
+            direction (str, optional): 'minimize' or 'maximize'. Defaults to
+                'minimize'.
+        """
+        try:
+            import optuna
+            import optunahub
+            logger.info(f" optuna version:    {optuna.__version__}")
+            logger.info(f" optunahub version: {optunahub.__version__}")
+        except ImportError:
+            logger.warning(' Unable to import optuna/optunahub!')
+
+        optuna.logging.set_verbosity(optuna.logging.WARNING)
+
+        x0 = np.atleast_1d(np.asarray(x0, dtype=float)).flatten()
+        self._n_params = x0.size
+        self._param_names = [f'x{i}' for i in range(self._n_params)]
+        self._direction = direction
+
+        self._lbounds = np.broadcast_to(
+            np.asarray(lbounds, dtype=float), (self._n_params,)
+        )
+        self._ubounds = np.broadcast_to(
+            np.asarray(ubounds, dtype=float), (self._n_params,)
+        )
+
+        if isinstance(sampler, str):
+            module = optunahub.load_module(package=sampler)
+            sampler_kwargs = sampler_kwargs if sampler_kwargs else {}
+            if sampler_class is None:
+                candidates = [
+                    getattr(module, name) for name in dir(module) if (
+                        isinstance(getattr(module, name), type) and
+                        issubclass(
+                            getattr(module, name), optuna.samplers.BaseSampler
+                        )
+                    )
+                ]
+                if len(candidates) != 1:
+                    raise ValueError(
+                        " Could not uniquely determine the sampler class "
+                        f"from package '{sampler}'; found "
+                        f"{[c.__name__ for c in candidates]}. Please "
+                        "specify `sampler_class`."
+                    )
+                sampler_cls = candidates[0]
+            else:
+                sampler_cls = getattr(module, sampler_class)
+            self._sampler = sampler_cls(**sampler_kwargs)
+        else:
+            self._sampler = sampler
+
+        self._study = optuna.create_study(
+            sampler=self._sampler, direction=direction
+        )
+        self._trial = None
+
+        self._opt_x = x0.copy()
+        self._opt_loss = np.inf if direction == 'minimize' else -np.inf
+
+    @property
+    def opt_x(self) -> NDArray:
+        """Optimal parameter values.
+
+        Returns:
+            NDArray: optimal parameters.
+        """
+        return self._opt_x
+
+    @property
+    def opt_loss(self) -> float:
+        """Loss correstponding to the optimal parameter values.
+
+        Returns:
+            float: loss.
+        """
+        return self._opt_loss
+
+    @property
+    def study(self) -> Any:
+        """Underlying Optuna study.
+
+        Returns:
+            Any: `optuna.study.Study` object.
+        """
+        return self._study
+
+    def step(self) -> NDArray:
+        """Ask the sampler for a new candidate solution.
+
+        Returns:
+            NDArray: array of shape (1, n_params) containing the new
+                candidate solution.
+        """
+        self._trial = self._study.ask()
+        x = np.array([
+            self._trial.suggest_float(
+                name, self._lbounds[i], self._ubounds[i]
+            ) for i, name in enumerate(self._param_names)
+        ])
+
+        return x.reshape(1, -1)
+
+    def tell(self, x: ArrayLike, loss: ArrayLike) -> None:
+        """Report the loss for the most recent candidate solution.
+
+        Args:
+            x (ArrayLike): candidate solution returned by `step()`.
+            loss (ArrayLike): loss value(s) corresponding to `x`.
+        """
+        value = float(np.atleast_1d(loss).flatten()[0])
+        self._study.tell(self._trial, value)
+
+        is_better = (
+            value < self._opt_loss if self._direction == 'minimize'
+            else value > self._opt_loss
+        )
+        if is_better:
+            self._opt_loss = value
+            self._opt_x = np.atleast_2d(x)[0].copy()
+
+    def stop(self) -> bool:
+        """Whether to stop the optimization if convergence has been reached.
+
+        OptunaHub samplers do not define a native convergence criterion, so
+        this always returns False.
+
+        Returns:
+            bool: False.
+        """
+        return False
+
+
 class LQG:
 
-    def __init__(self,
-            x0:   float | NDArray,
-            loss: float | NDArray,
-            P0:   float | NDArray,
-            A:    NDArray,
-            B:    NDArray,
-            Q:    NDArray,
-            R:    NDArray,
-            Q_kf: NDArray,
-            R_kf: NDArray,
-            C:    NDArray = None,
-            G:    NDArray = None,
-            tol:  float = 1e-6,
-        ) -> None:
+    def __init__(
+        self,
+        x0:   float | NDArray,
+        loss: float | NDArray,
+        P0:   float | NDArray,
+        A:    NDArray,
+        B:    NDArray,
+        Q:    NDArray,
+        R:    NDArray,
+        Q_kf: NDArray,
+        R_kf: NDArray,
+        C:    NDArray = None,
+        G:    NDArray = None,
+        tol:  float = 1e-6,
+    ) -> None:
         """Linear Quadratic Gaussian controller (LQR + Kalman Filter).
 
         Args:
@@ -435,14 +614,15 @@ class LQG:
 
 class LQR:
 
-    def __init__(self,
-            x0:  float | NDArray,
-            A:   NDArray,
-            B:   NDArray,
-            Q:   NDArray,
-            R:   NDArray,
-            tol: float = 1e-6,
-        ) -> None:
+    def __init__(
+        self,
+        x0:  float | NDArray,
+        A:   NDArray,
+        B:   NDArray,
+        Q:   NDArray,
+        R:   NDArray,
+        tol: float = 1e-6,
+    ) -> None:
         """Linear Quadratic Regulator.
 
         See:

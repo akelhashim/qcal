@@ -287,18 +287,19 @@ class LinearResponse:
 
 class Optimize:
 
-    def __init__(self,
-            config:     Config,
-            params:     Dict[int | tuple[int], str | list[str]],
-            optimizer:  Callable,
-            cost_func:  Any,
-            opt_kwargs: Dict[int | tuple[int], Dict] | None = None,
-            lbounds:    Dict[float | tuple, list] | None = None,
-            ubounds:    Dict[float | tuple, list] | None = None,
-            delta:      float | Dict[int | tuple, float] | None = None,
-            n_iters:    int = 10,
-            tol:        float = 0.1
-        ) -> None:
+    def __init__(
+        self,
+        config:     Config,
+        params:     Dict[int | tuple[int], str | list[str]],
+        optimizer:  Callable,
+        cost_func:  Any,
+        opt_kwargs: Dict[int | tuple[int], Dict] | None = None,
+        lbounds:    Dict[float | tuple, list] | None = None,
+        ubounds:    Dict[float | tuple, list] | None = None,
+        delta:      float | Dict[int | tuple, float] | None = None,
+        n_iters:    int = 10,
+        tol:        float = 0.1
+    ) -> None:
         """Generalized optimization class.
 
         Args:
