@@ -5,9 +5,13 @@ import logging
 from typing import Any
 
 import numpy as np
+import optuna
+import optunahub
 from numpy.typing import ArrayLike, NDArray
 
 logger = logging.getLogger(__name__)
+logger.info(f" optuna version:    {optuna.__version__}")
+logger.info(f" optunahub version: {optunahub.__version__}")
 
 
 __all__ = (
@@ -123,7 +127,7 @@ class Adam:
         self._prev_loss = self._loss
         self._loss = loss
 
-    def step(self, grad: float | NDArray  = None) -> float | NDArray:
+    def ask(self, grad: float | NDArray  = None) -> float | NDArray:
         """Compute the new parameters values based on the gradient for each.
 
         Args:
@@ -219,7 +223,7 @@ class CMA:
         """
         self._es.tell(x, loss, copy=True)
 
-    def step(self) -> ArrayLike:
+    def ask(self) -> ArrayLike:
         """Ask for new candidate solutions.
 
         Returns:
@@ -252,8 +256,7 @@ class OptunaHub:
 
         This class lets any sampler published on OptunaHub
         (https://hub.optuna.org/) be driven through qcal's `ask`/`tell`
-        optimizer interface (`step`/`tell`), for use with the `Optimize`
-        class.
+        optimizer interface, for use with the `Optimize` class.
 
         See:
         - https://optuna.github.io/optunahub/
@@ -282,14 +285,6 @@ class OptunaHub:
             direction (str, optional): 'minimize' or 'maximize'. Defaults to
                 'minimize'.
         """
-        try:
-            import optuna
-            import optunahub
-            logger.info(f" optuna version:    {optuna.__version__}")
-            logger.info(f" optunahub version: {optunahub.__version__}")
-        except ImportError:
-            logger.warning(' Unable to import optuna/optunahub!')
-
         optuna.logging.set_verbosity(optuna.logging.WARNING)
 
         x0 = np.atleast_1d(np.asarray(x0, dtype=float)).flatten()
@@ -365,7 +360,7 @@ class OptunaHub:
         """
         return self._study
 
-    def step(self) -> NDArray:
+    def ask(self) -> NDArray:
         """Ask the sampler for a new candidate solution.
 
         Returns:
@@ -385,7 +380,7 @@ class OptunaHub:
         """Report the loss for the most recent candidate solution.
 
         Args:
-            x (ArrayLike): candidate solution returned by `step()`.
+            x (ArrayLike): candidate solution returned by `ask()`.
             loss (ArrayLike): loss value(s) corresponding to `x`.
         """
         value = float(np.atleast_1d(loss).flatten()[0])
@@ -594,7 +589,7 @@ class LQG:
         self._x_est = self._x_t.copy()
         self._P_est = self._P.copy()
 
-    def step(self) -> float | NDArray:
+    def ask(self) -> float | NDArray:
         """Compute the new parameter values based on the control.
 
         Returns:
@@ -708,7 +703,7 @@ class LQR:
 
         self._u = -scaling * self._lqr_gain @ loss.copy()  # Control
 
-    def step(self) -> float | NDArray:
+    def ask(self) -> float | NDArray:
         """Compute the new parameters values based on the control.
 
         Returns:

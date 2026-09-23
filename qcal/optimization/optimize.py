@@ -298,7 +298,8 @@ class Optimize:
         ubounds:    Dict[float | tuple, list] | None = None,
         delta:      float | Dict[int | tuple, float] | None = None,
         n_iters:    int = 10,
-        tol:        float = 0.1
+        tol:        float = 0.1,
+        global_min: bool = False
     ) -> None:
         """Generalized optimization class.
 
@@ -324,6 +325,16 @@ class Optimize:
             n_iters (int, optional): number of iterations. Defaults to 10.
             tol (float, optional): tolerance, i.e., convergence threshold.
                 Defaults to 0.1.
+            global_min (bool, optional): determines how the optimal
+                parameters are selected once optimization is complete.
+                Defaults to False. If False, the optimal parameters for each
+                qubit label are chosen independently, based on that qubit
+                label's own best (minimum) loss over the course of the
+                optimization (as tracked by its optimizer). If True, the
+                optimal parameters for all qubit labels are instead chosen
+                jointly, using the single iteration whose combined loss
+                (the norm of the losses of all qubit labels at that
+                iteration) was smallest.
         """
         self._config = config
         self._params = params.copy()
@@ -332,6 +343,7 @@ class Optimize:
         self._ubounds = ubounds
         self._n_iters = n_iters
         self._tol = tol
+        self._global_min = global_min
 
         self._qubit_labels = list(params.keys())
         for ql, val in self._params.items():
@@ -386,6 +398,10 @@ class Optimize:
         self._params_history = {ql: [] for ql in self._qubit_labels}
         self._opt_params = {}
         self._opt_loss = {}
+
+        self._opt_loss_global = np.inf
+        self._global_opt_params = {}
+        self._global_opt_loss = {}
 
     @property
     def config(self) -> Config:
@@ -451,6 +467,18 @@ class Optimize:
         return self._n_iters
 
     @property
+    def global_min(self) -> bool:
+        """Whether the optimal parameters are chosen using a global minimum.
+
+        Returns:
+            bool: if True, the optimal parameters for all qubit labels are
+                chosen jointly from the iteration with the smallest combined
+                loss. If False, the optimal parameters for each qubit label
+                are chosen independently.
+        """
+        return self._global_min
+
+    @property
     def opt_loss(self) -> Dict:
         """Optimized loss values for each qubit label.
 
@@ -458,6 +486,18 @@ class Optimize:
             Dict: optimized loss values.
         """
         return self._opt_loss
+
+    @property
+    def opt_loss_global(self) -> float:
+        """Smallest combined loss found across all qubit labels.
+
+        This is the norm of the losses of all qubit labels at the iteration
+        used to select the optimal parameters when `global_min` is True.
+
+        Returns:
+            float: smallest combined loss.
+        """
+        return self._opt_loss_global
 
     @property
     def opt_params(self) -> Dict:
@@ -555,6 +595,34 @@ class Optimize:
             ) for ql in self._qubit_labels
         }
 
+    def update_global_best(
+            self, x: Dict[float | tuple, NDArray], loss: Dict
+        ) -> None:
+        """Update the jointly-optimal parameters/loss across qubit labels.
+
+        The combined loss for a given candidate is the norm of the losses
+        of all qubit labels at that candidate. If this is smaller than the
+        smallest combined loss seen so far, the candidate's parameters and
+        per-qubit-label losses are stored as the new global optimum.
+
+        Args:
+            x (Dict[float | tuple, NDArray]): parameter values for each
+                qubit label at this candidate.
+            loss (Dict): loss value for each qubit label at this candidate.
+        """
+        combined_loss = np.linalg.norm(
+            [loss[ql] for ql in self._qubit_labels]
+        )
+        if combined_loss < self._opt_loss_global:
+            self._opt_loss_global = combined_loss
+            self._global_opt_params = {
+                ql: np.asarray(x[ql]).reshape(-1).copy()
+                for ql in self._qubit_labels
+            }
+            self._global_opt_loss = {
+                ql: loss[ql] for ql in self._qubit_labels
+            }
+
     def set_params(self, values: Dict[float | tuple, NDArray]) -> None:
         """Set the parameters in the config before measuring the cost.
 
@@ -596,12 +664,13 @@ class Optimize:
 
             self._cost_func.run()
             self.compute_loss()
+            self.update_global_best(self._x, self._loss)
             for ql in self._qubit_labels:
                 self._optimizer[ql].tell(self._x[ql], self._loss[ql])
 
         for i in range(self._n_iters):  # TODO: add stop()?
             self._x = {
-                ql: self._optimizer[ql].step() for ql in self._qubit_labels
+                ql: self._optimizer[ql].ask() for ql in self._qubit_labels
             }
 
             losses = {ql: [] for ql in self._qubit_labels}
@@ -613,6 +682,10 @@ class Optimize:
                 )
                 self._cost_func.run()
                 self.compute_loss()
+                self.update_global_best(
+                    {ql: vals[j] for ql, vals in self._x.items()},
+                    self._loss
+                )
                 for ql in self._qubit_labels:
                     losses[ql].append(self._loss[ql])
 
@@ -624,18 +697,27 @@ class Optimize:
 
             self.plot()
 
-        self._opt_params = {
-            ql: self._optimizer[ql].opt_x for ql in self._qubit_labels
-        }
-        self._opt_loss = {
-            ql: self._optimizer[ql].opt_loss
-            for ql in self._qubit_labels
-        }
+        if self._global_min:
+            self._opt_params = {
+                ql: self._global_opt_params[ql] for ql in self._qubit_labels
+            }
+            self._opt_loss = {
+                ql: self._global_opt_loss[ql] for ql in self._qubit_labels
+            }
+        else:
+            self._opt_params = {
+                ql: self._optimizer[ql].opt_x for ql in self._qubit_labels
+            }
+            self._opt_loss = {
+                ql: self._optimizer[ql].opt_loss
+                for ql in self._qubit_labels
+            }
 
         logger.info(' Optimization complete!')
         logger.info(' Optimized parameters:')
         self.set_params(self._opt_params)
-        self._config.save()
+        if settings.Settings.save_data:
+            self._config.save()
 
     def plot(self) -> None:
         """Plot the optimization results."""
@@ -660,14 +742,18 @@ class Optimize:
                 if k < len(self._qubit_labels):
                     ql = self._qubit_labels[k]
 
-                    ax.plot(np.abs(self._loss_history[ql]), 'o', alpha=0.2)
-                    ax.errorbar(
-                        np.arange(len(self._loss_history[ql])),
-                        np.mean(np.abs(self._loss_history[ql]), 1),
-                        yerr=np.std(np.abs(self._loss_history[ql]), 1),
-                        color='black', ecolor='blueviolet',
-                        elinewidth=3, capsize=0, label='Mean'
+                    has_multiple_points = (
+                        np.shape(self._loss_history[ql])[1] > 1
                     )
+                    ax.plot(np.abs(self._loss_history[ql]), 'o', alpha=0.2)
+                    if has_multiple_points:
+                        ax.errorbar(
+                            np.arange(len(self._loss_history[ql])),
+                            np.mean(np.abs(self._loss_history[ql]), 1),
+                            yerr=np.std(np.abs(self._loss_history[ql]), 1),
+                            color='black', ecolor='blueviolet',
+                            elinewidth=3, capsize=0, label='Mean'
+                        )
 
                     ax.text(
                             0.05, 0.95, f'Q{ql}', size=12,
@@ -678,7 +764,8 @@ class Optimize:
                     ax.tick_params(axis='both', which='major', labelsize=12)
                     ax.grid(True)
                     ax.set_yscale('log')
-                    ax.legend(loc=1, fontsize=12)
+                    if has_multiple_points:
+                        ax.legend(loc=1, fontsize=12)
 
                 else:
                     ax.axis('off')
