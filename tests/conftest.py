@@ -15,6 +15,21 @@ EXAMPLE_CONFIG_PATH = str(
     'config.yaml'
 )
 
+# Force the non-interactive 'Agg' backend as early as possible: at
+# conftest.py *import* time, not inside a fixture. pytest always
+# imports a directory's conftest.py before collecting the test modules
+# in it, but an autouse fixture only runs when the first test's setup
+# phase begins -- i.e. after every test module has already been
+# collected (imported). If any of those modules creates a matplotlib
+# Figure at import time (or a prior fixture-based switch happens too
+# late), that figure is permanently stuck on whatever interactive
+# backend was active when it was created: matplotlib.use() does not
+# retroactively convert already-created figures, only ones created
+# after the switch. Setting it here, before any test module can be
+# imported, closes that gap.
+_ORIGINAL_MPL_BACKEND = matplotlib.get_backend()
+matplotlib.use('Agg')
+
 
 @pytest.fixture(autouse=True, scope='session')
 def _no_plot_popups():
@@ -31,19 +46,10 @@ def _no_plot_popups():
     original_renderer = settings.Settings.plot_renderer
     settings.Settings.plot_renderer = 'json'
 
-    # Some protocols (e.g. RB, CB, IRB) plot with matplotlib directly,
-    # which is a separate risk from plotly: on macOS the default backend is
-    # the interactive 'macosx' one, so fig.show() would pop open a
-    # real native window per plot. 'Agg' is non-interactive -- show()
-    # becomes a harmless no-op. Switching after matplotlib.pyplot may
-    # already be imported (e.g. by qcal.benchmarking.rb) still works.
-    original_backend = matplotlib.get_backend()
-    matplotlib.use('Agg')
-
     yield
 
     settings.Settings.plot_renderer = original_renderer
-    matplotlib.use(original_backend)
+    matplotlib.use(_ORIGINAL_MPL_BACKEND)
 
 
 @pytest.fixture

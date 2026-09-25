@@ -427,9 +427,8 @@ def Frequency(
             self._qubits = qubits
             self._detunings = detunings
 
-            assert subspace in ('GE', 'EF'), (
-                "'subspace' must be one of 'GE' or 'EF'!"
-            )
+            if subspace not in ('GE', 'EF'):
+                raise ValueError("'subspace' must be one of 'GE' or 'EF'!")
             self._subspace = subspace
 
             self._times = {
