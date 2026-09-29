@@ -812,14 +812,12 @@ def Phase(
 
             self._qubits = qubits
 
-            assert gate in ('X90', 'X'), (
-                "'gate' must be one of 'X90' or 'X'!"
-            )
+            if gate not in ('X90', 'X'):
+                raise ValueError("'gate' must be one of 'X90' or 'X'!")
             self._gate = gate
 
-            assert subspace in ('GE', 'EF'), (
-                "'subspace' must be one of 'GE' or 'EF'!"
-            )
+            if subspace not in ('GE', 'EF'):
+                raise ValueError("'subspace' must be one of 'GE' or 'EF'!")
             self._subspace = subspace
 
             if not isinstance(phases, dict):
