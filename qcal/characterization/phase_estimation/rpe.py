@@ -16,7 +16,7 @@ import pandas as pd
 import plotly.graph_objects as go
 import pygsti
 import scipy
-from IPython.display import clear_output
+from IPython.display import clear_output, display
 from matplotlib.lines import Line2D
 from numpy.typing import ArrayLike, NDArray
 from plotly.subplots import make_subplots
@@ -254,6 +254,7 @@ def RPE(
             self._loss = {ql: {} for ql in qubit_labels}
             self._trusted_angle_est = {ql: {} for ql in qubit_labels}
             self._trusted_err_est = {ql: {} for ql in qubit_labels}
+            self._summary = pd.DataFrame()
 
             transpiler = kwargs.get('transpiler', PyGSTiTranspiler())
             kwargs.pop('transpiler', None)
@@ -340,6 +341,17 @@ def RPE(
                 loss[ql] = vals
 
             return loss
+
+        @property
+        def summary(self) -> pd.DataFrame:
+            """Summary of the RPE results for each qubit/qubit pair.
+
+            Returns:
+                pd.DataFrame: dataframe with columns 'Qubit Label',
+                    'Last Trusted Depth', and an angle error column in
+                    both radians and degrees for each angle.
+            """
+            return self._summary
 
         @property
         def signal(self) -> Dict:
@@ -463,13 +475,12 @@ def RPE(
                         *round_to_order_error(est, unc)
                     )
 
+            rows = []
             for ql in self._qubit_labels:
-                if isinstance(ql, Iterable):
-                    print(f'\nQubit pair: {ql}')
-                else:
-                    print(f'\nQubit: {ql}')
-
-                print(f'Last good depth: L = {2**self._last_good_idx[ql]}')
+                row = {
+                    'Qubit Label': ql,
+                    'Last Trusted Depth': 2**self._last_good_idx[ql]
+                }
                 for angle, errors in self._angle_errors[ql].items():
                     raw_error = errors[self._last_good_idx[ql]]
                     self._loss[ql][angle] = raw_error
@@ -481,10 +492,17 @@ def RPE(
                     error_deg, unc_deg = round_to_order_error(
                         err_uf.n * 180 / np.pi, err_uf.s * 180 / np.pi
                     )
-                    print(
-                        f'{angle} error = {err_uf.n} ({err_uf.s}) rad., '
-                        f'{error_deg} ({unc_deg}) deg.'
+                    self._trusted_err_est[ql][angle] = {
+                        'val': error, 'err': unc
+                    }
+                    row[f'{angle} Error (rad.)'] = f'{error} ({unc})'
+                    row[f'{angle} Error (deg.)'] = (
+                        f'{error_deg} ({unc_deg})'
                     )
+                rows.append(row)
+
+            self._summary = pd.DataFrame(rows)
+            display(self._summary)
 
         def plot(self) -> None:
             """Plot the RPE results."""
@@ -586,13 +604,13 @@ def RPE(
                                 last_good_depth,
                                 ls='--',
                                 c='k',
-                                label='Last good depth',
+                                label='Last trusted depth',
                             )
                         pfig.add_vline(
                             x=last_good_depth,
                             line_dash='dash',
                             line_color='black',
-                            name='Last good depth',
+                            name='Last trusted depth',
                             showlegend=(k == 0),
                             row=i + 1,
                             col=j + 1,
@@ -763,6 +781,7 @@ def RPE(
                 self._data_manager.save_to_csv(
                     pd.DataFrame([self._last_good_idx]), 'last_good_idx'
                 )
+                self._data_manager.save_to_csv(self._summary, 'summary')
 
             print(f"\nRuntime: {repr(self._runtime)[8:]}\n")
 
