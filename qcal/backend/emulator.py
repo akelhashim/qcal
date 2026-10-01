@@ -148,7 +148,7 @@ class Emulator(QPU):
                 noise.add_readout_noise(q, cmat)
 
             self._simulator = DensityMatrixSimulator(
-                noise_model=noise,
+                error_model=noise,
                 n_shots=n_shots,
             )
 

@@ -21,7 +21,7 @@ Three classes are provided:
     Noisy density-matrix simulation. Evolves an initial
     |0...0⟩⟨0...0| state and, after each gate, applies an optional
     noise channel (``quax.KrausMap`` or ``quax.SuperOp``) specified
-    by a *noise_model* dict keyed on gate-class name.
+    by an *error_model* dict keyed on gate-class name.
 
 Both qubits (d=2) and qutrits (d=3) are supported; the simulator
 detects the required per-qudit dimension from gate unitaries
@@ -365,11 +365,11 @@ class DensityMatrixSimulator(Simulator):
 
     Each circuit is evolved from |0...0⟩⟨0...0| by applying the
     ideal unitary of every non-measurement gate. After each gate,
-    an optional noise channel from *noise_model* is applied to the
+    an optional noise channel from *error_model* is applied to the
     same subsystem. Measurement outcomes are sampled from the
     diagonal of the resulting density matrix.
 
-    The *noise_model* may be either:
+    The *error_model* may be either:
 
     * A :class:`~qcal.simulation.error_models.ErrorModel` instance
       (e.g. :class:`~qcal.simulation.error_models.DepolarizingNoise`)
@@ -378,18 +378,18 @@ class DensityMatrixSimulator(Simulator):
 
           from qcal.simulation.error_models import DepolarizingNoise
           noise = DepolarizingNoise(single_qubit=0.001, two_qubit=0.01)
-          sim = DensityMatrixSimulator(noise_model=noise)
+          sim = DensityMatrixSimulator(error_model=noise)
           sim.run(circuit)
 
     * A plain ``dict`` mapping gate-class names to ``quax.KrausMap``
       or ``quax.SuperOp`` channels for fine-grained control::
 
           import quax
-          noise_model = {
+          error_model = {
               'X':  quax.channels.depolarizing(0.01),
               'CZ': quax.channels.depolarizing(0.05),
           }
-          sim = DensityMatrixSimulator(noise_model=noise_model)
+          sim = DensityMatrixSimulator(error_model=error_model)
           sim.run(circuit)
 
     Mid-circuit measurement (MCM) note:
@@ -404,13 +404,13 @@ class DensityMatrixSimulator(Simulator):
 
     def __init__(
         self,
-        noise_model: ErrorModel | dict | None = None,
+        error_model: ErrorModel | dict | None = None,
         n_shots:     int | None = None,
     ) -> None:
         """Initialize a DensityMatrixSimulator.
 
         Args:
-            noise_model (ErrorModel | dict | None, optional): either a
+            error_model (ErrorModel | dict | None, optional): either a
                 :class:`~qcal.simulation.error_models.ErrorModel`
                 instance (category-based) or a ``dict`` mapping
                 gate-class names to ``quax.KrausMap`` / ``quax.SuperOp``
@@ -421,10 +421,10 @@ class DensityMatrixSimulator(Simulator):
                 Defaults to ``None``.
         """
         super().__init__(n_shots)
-        self._noise_model = noise_model if noise_model is not None else {}
+        self._error_model = error_model if error_model is not None else {}
 
     @property
-    def noise_model(self) -> ErrorModel | dict:
+    def error_model(self) -> ErrorModel | dict:
         """The active noise model.
 
         Returns:
@@ -432,7 +432,7 @@ class DensityMatrixSimulator(Simulator):
                 :class:`~qcal.simulation.error_models.ErrorModel`
                 instance or a gate-name → channel dict.
         """
-        return self._noise_model
+        return self._error_model
 
     @property
     def states(self) -> list[quax.DensityMatrix] | None:
@@ -580,9 +580,9 @@ class DensityMatrixSimulator(Simulator):
                 # qudit's readout confusion matrix (the same classical
                 # relabeling applied to terminal Meas outcomes below)
                 # so sampled MCM outcomes reflect readout noise.
-                if isinstance(self._noise_model, ErrorModel):
+                if isinstance(self._error_model, ErrorModel):
                     for axis, q in enumerate(cycle_mcm_qudits):
-                        cmat = self._noise_model.confusion_matrix_for(
+                        cmat = self._error_model.confusion_matrix_for(
                             f'Q{q}'
                         )
                         if cmat is not None:
@@ -598,11 +598,11 @@ class DensityMatrixSimulator(Simulator):
                             idx = qudit_to_idx[q]
                             d = qudit_dim[q]
                             instrument = (
-                                self._noise_model.instrument_for(
+                                self._error_model.instrument_for(
                                     f'Q{q}', d,
                                 )
                                 if isinstance(
-                                    self._noise_model, ErrorModel
+                                    self._error_model, ErrorModel
                                 )
                                 else None
                             )
@@ -648,14 +648,14 @@ class DensityMatrixSimulator(Simulator):
                     U, rho, subsystem
                 )
                 gate_name = type(gate).__name__
-                if isinstance(self._noise_model, ErrorModel):
-                    channel = self._noise_model.channel_for_gate(gate)
+                if isinstance(self._error_model, ErrorModel):
+                    channel = self._error_model.channel_for_gate(gate)
                     if channel is None:
-                        channel = self._noise_model.channel_for(
+                        channel = self._error_model.channel_for(
                             gate_name
                         )
                 else:
-                    channel = self._noise_model.get(gate_name)
+                    channel = self._error_model.get(gate_name)
                 if channel is not None:
                     rho = self._apply_channel(
                         channel, rho, subsystem
@@ -687,9 +687,9 @@ class DensityMatrixSimulator(Simulator):
         probs /= probs.sum()
 
         # Classical per-qudit readout smearing for terminal Meas gates
-        if isinstance(self._noise_model, ErrorModel):
+        if isinstance(self._error_model, ErrorModel):
             for q in sorted(set(meas_qudits)):
-                cmat = self._noise_model.confusion_matrix_for(f'Q{q}')
+                cmat = self._error_model.confusion_matrix_for(f'Q{q}')
                 if cmat is None:
                     continue
                 m = qudit_to_idx[q]
