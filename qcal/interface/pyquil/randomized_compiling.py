@@ -513,7 +513,7 @@ class ReadoutLayerTracker:
 
         Args:
             configuration (_U2Randomization): built in
-                `transpile_circuit` when `randomize_readout` is True.
+                `transpile_circuit` when `randomized_readout` is True.
         """
         self.configuration = configuration
         self.angle_index: Dict[int, int] = dict.fromkeys(
@@ -651,7 +651,7 @@ class _U2Randomization:
         return memory_map
 
     def generate_indices(
-            self, shot_count: int, seeds: Mapping[int, int]
+            self, shot_count: int, seeds: Mapping[int, int] # Qubit index to seed value
     ) -> NDArray[np.int8]:
         from qcs_sdk.qpu.experimental.random import (
             PrngSeedValue,

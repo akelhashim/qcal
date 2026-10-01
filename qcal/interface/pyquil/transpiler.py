@@ -406,7 +406,7 @@ def to_pyquil(
     cycles_to_defcircuits: bool = False,
     fence_between_cycles:  bool = True,
     randomized_compiling:  bool = False,
-    randomize_readout:     bool = False,
+    randomized_readout:    bool = False,
     rc_kwargs:             Dict | None = None,
 ) -> Program:  # type: ignore # noqa: F821
     """Transpile a qcal circuit to a PyQuil Program.
@@ -426,7 +426,7 @@ def to_pyquil(
             between every cycle. Defaults to ``True``.
         randomized_compiling (bool, optional): whether to randomly compile
             the circuit. Defaults to ``False``.
-        randomize_readout (bool, optional): whether to randomize the readout.
+        randomized_readout (bool, optional): whether to randomize the readout.
             Defaults to ``False``.
         rc_kwargs (Dict | None, optional): keyword arguments forwarded to
             `RandomizedCompilingConfiguration` when `randomized_compiling`
@@ -451,7 +451,7 @@ def to_pyquil(
         for q in circuit.qubits
     }
     if circuit_for_loop and not randomized_compiling:
-        if randomize_readout:
+        if randomized_readout:
             logger.warning(
                 'Randomized readout is not compatible with repeated '
                 'sub-circuits!'
@@ -466,7 +466,7 @@ def to_pyquil(
                         qubit_to_cref=qubit_to_cref,
                         cycles_to_defcircuits=cycles_to_defcircuits,
                         fence_between_cycles=fence_between_cycles,
-                        randomize_readout=randomize_readout
+                        randomized_readout=randomized_readout
                 )
                 declarations += _declarations
                 tprogram += _tprogram
@@ -483,7 +483,7 @@ def to_pyquil(
                     qubit_to_cref=qubit_to_cref,
                     cycles_to_defcircuits=cycles_to_defcircuits,
                     fence_between_cycles=fence_between_cycles,
-                    # randomize_readout=randomize_readout
+                    # randomized_readout=randomized_readout
                 )
                 declarations += _declarations
 
@@ -508,12 +508,12 @@ def to_pyquil(
             cycles_to_defcircuits=cycles_to_defcircuits,
             fence_between_cycles=fence_between_cycles,
             randomized_compiling=randomized_compiling,
-            randomize_readout=randomize_readout,
+            randomized_readout=randomized_readout,
             rc_kwargs=rc_kwargs,
         )
         rc_configuration = _tprogram.rc_configuration
         rc_source_phases = _tprogram.source_phases
-        if randomize_readout:
+        if randomized_readout:
             readout_configuation = _tprogram.readout_configuation
         declarations += _declarations
         tprogram += _tprogram
@@ -532,9 +532,9 @@ def to_pyquil(
             qubit_to_cref=qubit_to_cref,
             cycles_to_defcircuits=cycles_to_defcircuits,
             fence_between_cycles=fence_between_cycles,
-            randomize_readout=randomize_readout
+            randomized_readout=randomized_readout
         )
-        if randomize_readout:
+        if randomized_readout:
             readout_configuation = _tprogram.readout_configuation
             readout_source_phases = _tprogram.source_phases
         declarations += _declarations
@@ -544,7 +544,7 @@ def to_pyquil(
     if randomized_compiling:
         final_program.rc_configuration = rc_configuration
         final_program.source_phases = rc_source_phases
-    if randomize_readout:
+    if randomized_readout:
         final_program.readout_configuation = readout_configuation
         if not randomized_compiling:
             final_program.source_phases = readout_source_phases
@@ -563,7 +563,7 @@ def transpile_circuit(
     cycles_to_defcircuits: bool = False,
     fence_between_cycles:  bool = True,
     randomized_compiling:  bool = False,
-    randomize_readout:     bool = False,
+    randomized_readout:    bool = False,
     rc_kwargs:             Dict | None = None,
 ):
     """Transpile a qcal circuit to a PyQuil Program.
@@ -591,7 +591,7 @@ def transpile_circuit(
             between every cycle. Defaults to ``True``.
         randomized_compiling (bool, optional): whether to randomly compile
             the circuit. Defaults to ``False``.
-        randomize_readout (bool, optional): whether to randomize the readout.
+        randomized_readout (bool, optional): whether to randomize the readout.
             Defaults to ``False``.
         rc_kwargs (Dict | None, optional): keyword arguments forwarded to
             `RandomizedCompilingConfiguration` when `randomized_compiling`
@@ -606,7 +606,7 @@ def transpile_circuit(
         from pyquil.gates import FENCE
         from pyquil.quil import Program
         from pyquil.quilatom import FormalArgument
-        from pyquil.quilbase import DefCircuit
+        from pyquil.quilbase import Declare, DefCircuit
     except ImportError:
         logger.warning(' Unable to import pyquil!')
         return
@@ -618,7 +618,7 @@ def transpile_circuit(
             'combined with cycle_replacement/cycles_to_defcircuits.'
         )
 
-    if randomize_readout and (cycle_replacement or cycles_to_defcircuits):
+    if randomized_readout and (cycle_replacement or cycles_to_defcircuits):
         raise ValueError(
             'Randomized readout requires literal gates in the final '
             'pre-measurement cycle, so cannot be combined with '
@@ -650,21 +650,34 @@ def transpile_circuit(
                 circuit, layer_period
             ),
         )
+        # RandomizedCompilingConfiguration.build_quil_program() only
+        # declares its twirled destination registers (`unitaries_q{n}`);
+        # the separate source-angle registers this tracker writes into
+        # (`source_phases_q{n}`, since build_rc_configuration overrides
+        # unitaries_prefix) are never declared elsewhere, so declare them
+        # here, sized to what the tracker already fixed at construction.
+        for key, values in rc_tracker.source_phases.items():
+            declarations += Declare(key, 'REAL', len(values))
 
     readout_tracker = None
     readout_final_layer = frozenset()
-    if randomize_readout:
+    if randomized_readout:
         readout_configuation = _U2Randomization(
             qubits=qubits,
             destination_names=lambda qubit: f"measurement_unitary_q{qubit}",
             seed_names=lambda qubit: f"measurement_seed_q{qubit}",
             source_name="measurement_unitaries",
+            # Flat, per `_U2Randomization.source_unitary_phases: list[float]` --
+            # `source_unitary_count`, the Declare size in `build_quil_program`,
+            # and the raw values in `build_memory_map` all assume a flat
+            # length-12 list (4 unitaries x 3 ZXZXZ angles each), not this
+            # matrix's (4, 3) shape.
             source_unitary_phases=np.array(
                 [[ 0.  ,  0.5 ,  0.5 ], # I
                  [-0.25,  0.  , -0.25], # X
                  [ 0.5 ,  0.  ,  0.  ], # Y
                  [ 0.25,  0.5 , -0.25]] # Z
-            )
+            ).flatten().tolist()
         )
         # RC's own RCLayerTracker already tracks this same final layer
         # (see RCLayerTracker.__init__), so only build a dedicated
@@ -736,13 +749,13 @@ def transpile_circuit(
 
     if randomized_compiling:
         rc_program = rc_configuration.build_quil_program()
-        if randomize_readout:
+        if randomized_readout:
             rc_program += readout_configuation.build_quil_program()
             for qubit in qubits:
                 call = rc_configuration.apply_pauli_pair(
                     qubit,
-                    # rc_configuration.cycle_count,  # TODO: switch
-                    rc_configuration._cycle_count,
+                    rc_configuration.cycle_count,  # TODO: switch
+                    # rc_configuration._cycle_count,
                     source_unitaries=(
                         readout_configuation.destination_names(qubit)
                     ),
@@ -757,10 +770,10 @@ def transpile_circuit(
         tprogram = rc_program + tprogram
         tprogram.rc_configuration = rc_configuration
         tprogram.source_phases = rc_tracker.source_phases
-        if randomize_readout:
+        if randomized_readout:
             tprogram.readout_configuation = readout_configuation
 
-    elif randomize_readout:
+    elif randomized_readout:
         tprogram = readout_configuation.build_quil_program() + tprogram
         tprogram.readout_configuation = readout_configuation
         tprogram.source_phases = readout_tracker.source_phases
@@ -886,7 +899,7 @@ class PyQuilTranspiler(Transpiler):
         cycles_to_defcircuits: bool = False,
         fence_between_cycles:  bool = True,
         randomized_compiling:  bool = False,
-        randomize_readout:     bool = False,
+        randomized_readout:    bool = False,
         rc_kwargs:             Dict | None = None,
     ) -> None:
         """Initialize with a GateMapper.
@@ -906,7 +919,7 @@ class PyQuilTranspiler(Transpiler):
                 between every cycle. Defaults to ``True``.
             randomized_compiling (bool, optional): whether to randomly
                 compile the circuit. Defaults to ``False``.
-            randomize_readout (bool, optional): whether to randomize the
+            randomized_readout (bool, optional): whether to randomize the
                 readout. Defaults to ``False``.
             rc_kwargs (Dict | None, optional): keyword arguments forwarded to
                 `RandomizedCompilingConfiguration` when
@@ -932,7 +945,7 @@ class PyQuilTranspiler(Transpiler):
         self._cycles_to_defcircuits = cycles_to_defcircuits
         self._fence_between_cycles = fence_between_cycles
         self._randomized_compiling = randomized_compiling
-        self._randomize_readout = randomize_readout
+        self._randomized_readout = randomized_readout
         self._rc_kwargs = rc_kwargs if rc_kwargs is not None else {
             'invert_random_paulis': True,
             # Defaults to 1 if None, but can be set to > 1 for more shots per
@@ -969,7 +982,7 @@ class PyQuilTranspiler(Transpiler):
                     cycles_to_defcircuits=self._cycles_to_defcircuits,
                     fence_between_cycles=self._fence_between_cycles,
                     randomized_compiling=self._randomized_compiling,
-                    randomize_readout=self._randomize_readout,
+                    randomized_readout=self._randomized_readout,
                     rc_kwargs=self._rc_kwargs,
                 )
             )
