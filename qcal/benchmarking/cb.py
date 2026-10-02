@@ -1262,7 +1262,6 @@ def CB(
                 rows.append(row)
 
             self._subsystem_summary = pd.DataFrame(rows)
-            print("\nCB Process Infidelity Summary:")
             display(self._subsystem_summary)
             print("\n")
 
@@ -1442,10 +1441,14 @@ def CB(
                             )
 
                 pfig.update_xaxes(
-                    title_text='Cycle Depth', showgrid=True,
+                    title_text='Cycle Depth',
+                    showgrid=True,
+                    title_font={'size': 20},
                 )
                 pfig.update_yaxes(
-                    title_text='Expectation Value', showgrid=True,
+                    title_text='Expectation Value',
+                    showgrid=True,
+                    title_font={'size': 20},
                 )
                 pfig.update_layout(
                     height=500,
@@ -1455,18 +1458,31 @@ def CB(
                     plot_bgcolor='#fbfbfd',
                     title_text=f'{title_prefix} Pauli Decays',
                     margin={'t': 50},
+                    legend={
+                        'font': {'size': 12},
+                        'tracegroupgap': 5
+                    },
                 )
                 pfig.update_xaxes(
                     showline=True, mirror=True, linecolor='#c7c7c7',
                     linewidth=1, gridcolor='#e5e7eb', zeroline=False,
-                    ticks='outside',
+                    ticks='outside', tickfont={'size': 15},
                 )
                 pfig.update_yaxes(
                     showline=True, mirror=True, linecolor='#c7c7c7',
                     linewidth=1, gridcolor='#e5e7eb', zeroline=False,
-                    ticks='outside',
+                    ticks='outside', tickfont={'size': 15},
                 )
-                pfig.show()
+                save_properties = {
+                    'toImageButtonOptions': {
+                        'format': 'png', # one of png, svg, jpeg, webp
+                        'filename': 'cb_decays',
+                        'height': 500,
+                        'width': 750,
+                        'scale': 10
+                    }
+                }
+                pfig.show(config=save_properties)
 
                 if Settings.save_data:
                     ax.set_xlabel('Cycle Depth')
@@ -1527,14 +1543,14 @@ def CB(
                     x=0.02, y=0.98,
                     xanchor='left', yanchor='top',
                     showarrow=False,
-                    font={'color': '#F26C8C'},
+                    font={'color': '#F26C8C', 'size': 15},
                     bgcolor='white',
                     bordercolor='#F26C8C',
                     borderwidth=1,
                     borderpad=4,
                 )
                 pfig2.update_layout(
-                    height=450,
+                    height=500,
                     width=min(150 * len(pauli_labels) + 150, 1000),
                     template='plotly_white',
                     paper_bgcolor='white',
@@ -1548,14 +1564,25 @@ def CB(
                     linecolor='#c7c7c7', linewidth=1,
                     gridcolor='#e5e7eb', zeroline=False,
                     ticks='outside', tickangle=-45,
+                    title_font={'size': 20}, tickfont={'size': 15},
                 )
                 pfig2.update_yaxes(
                     title_text='Infidelity', showgrid=True,
                     showline=True, mirror=True, linecolor='#c7c7c7',
                     linewidth=1, gridcolor='#e5e7eb', zeroline=False,
-                    ticks='outside',
+                    ticks='outside', title_font={'size': 20},
+                    tickfont={'size': 15},
                 )
-                pfig2.show()
+                save_properties = {
+                    'toImageButtonOptions': {
+                        'format': 'png', # one of png, svg, jpeg, webp
+                        'filename': 'pauli_infidelities',
+                        'height': 500,
+                        'width': min(150 * len(pauli_labels) + 150, 1000),
+                        'scale': 10
+                    }
+                }
+                pfig2.show(config=save_properties)
 
                 if Settings.save_data:
                     mfig2 = plt.figure(
