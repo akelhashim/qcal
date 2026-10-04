@@ -1,33 +1,33 @@
 """Submodule for calibrating leakage parameters, such as DRAG.
 
 """
-import qcal.settings as settings
+import logging
+from collections.abc import Iterable
+from typing import Callable, Dict
 
-from .calibration import Calibration
+import numpy as np
+import pandas as pd
+from IPython.display import clear_output
+
+import qcal.settings as settings
 from qcal.circuit import Circuit, CircuitSet
 from qcal.config import Config
 from qcal.qpu.qpu import QPU
 
-import logging
-import numpy as np
-import pandas as pd
-
-from collections.abc import Iterable
-from IPython.display import clear_output
-from typing import Callable, Dict
+from .calibration import Calibration
 
 logger = logging.getLogger(__name__)
 
 
 def Leakage(
-        qpu:         QPU,
-        config:      Config,
-        circuit:     Circuit,
-        params:      Dict,
-        param_sweep: Dict,
-        maximize:    bool = False,
-        **kwargs
-    ) -> Callable:
+    qpu:         QPU,
+    config:      Config,
+    circuit:     Circuit,
+    params:      Dict,
+    param_sweep: Dict,
+    maximize:    bool = False,
+    **kwargs
+) -> Callable:
     """Leakage calibration.
 
     This calibration finds the param value for which the leakage on
@@ -38,10 +38,10 @@ def Leakage(
     # Amplify the leakage in an X90 gate
     circuit = Circuit([Cycle({X90(0)}) for _ in range(102)])
     circuit.measure()
-    
+
     cal = Leakage(
-        CustomQPU, 
-        config, 
+        CustomQPU,
+        config,
         circuit=circuit,
         params={0: 'single_qubit/0/GE/X90/pulse/1/kwargs/alpha'},
         param_sweep={0: np.linspace(0.5, 1.5, 21)}
@@ -56,9 +56,9 @@ def Leakage(
         leakage_qubit (int): qubit on which leakage should be minimized.
         params (Dict): dictionary mapping the qubits on which leakage occurs to
             the config parameter which is causing the leakage.
-        param_sweep (Dict): dictionary mapping the qubits on which leakage 
+        param_sweep (Dict): dictionary mapping the qubits on which leakage
             occurs to sweep values for the parameter to be optimized.
-        maximize (bool, optional): whether to select the parameter that 
+        maximize (bool, optional): whether to select the parameter that
             maximizes leakage, instead of minimze. Defaults to False. This can
             be used to find gate parameters that amplify leakage, such that one
             can better tune other parameters to cancel leakage.
@@ -69,19 +69,20 @@ def Leakage(
 
     class Leakage(qpu, Calibration):
         """Leakage calibration class.
-        
+
         This class inherits a custom QPU from the Leakage calibration
         function.
         """
 
-        def __init__(self, 
-                config:      Config,
-                circuit:     Circuit,
-                params:      Dict,
-                param_sweep: Dict,
-                maximize:    bool = False,
-                **kwargs
-            ) -> None:
+        def __init__(
+            self,
+            config:      Config,
+            circuit:     Circuit,
+            params:      Dict,
+            param_sweep: Dict,
+            maximize:    bool = False,
+            **kwargs
+        ) -> None:
             """Initialize the Leakage class within the function."""
             qpu.__init__(self, config=config, **kwargs)
             Calibration.__init__(self, config)
@@ -102,7 +103,7 @@ def Leakage(
                 Circuit: circuit.
             """
             return self._circuit
-        
+
         @property
         def params(self) -> Dict:
             """Parameters which are optimized to reducing leakage.
@@ -111,7 +112,7 @@ def Leakage(
                 Dict: dictionary mapping leakage qubits to parameters.
             """
             return self._params
-        
+
         @property
         def param_sweep(self) -> Dict:
             """Value sweeps for the parameters to be optimized.
@@ -120,7 +121,7 @@ def Leakage(
                 Dict: dictionary mapping leakage qubits to parameter sweeps.
             """
             return self._param_sweep
-    
+
         @property
         def loss(self) -> Dict:
             """Loss for each qubit in terms of the |2> state population.
@@ -131,14 +132,14 @@ def Leakage(
                 Dict: loss for each qubit.
             """
             return self._loss
-        
+
         def generate_circuits(self):
             """Generate a CircuitSet that sweeps over all param values."""
             logger.info(' Generating circuits...')
 
             self._circuits = CircuitSet(
                 circuits=[
-                    self._circuit.copy() for _ in 
+                    self._circuit.copy() for _ in
                     range(len(list(self._param_sweep.values())[0]))
                 ]
             )
@@ -153,7 +154,7 @@ def Leakage(
                     self._circuits[
                             f'param: {param}'
                         ] = self._param_sweep[q]
-            
+
         def analyze(self) -> None:
             """Analyze the data."""
             logger.info(' Analyzing the data...')
@@ -175,7 +176,7 @@ def Leakage(
                         # pop0.append(val0)
                         # pop1.append(val1)
                         pop2.append(val2)
-                        
+
                 else:
                     i = self._circuit.qubits.index(ql)
                     for circ in self._circuits:
@@ -188,7 +189,7 @@ def Leakage(
                         pop2.append(
                             circ.results.marginalize(i).populations['2']
                         )
-                
+
                 self._sweep_results[ql] = pop2
                 # self._sweep_results[ql] = {
                 #     'Prob(0)': pop0,
@@ -204,7 +205,7 @@ def Leakage(
                     self._cal_values[ql] = float(
                         self._param_sweep[ql][np.array(pop2).argmin()]
                     )
-                
+
                 self._loss[ql] = np.array([np.array(pop2).min()])
 
         def save(self) -> None:
@@ -239,7 +240,8 @@ def Leakage(
                             self.set_param(p, val)
                     else:
                         self.set_param(self._params[q], val)
-            self._config.save()
+            if settings.Settings.save_data:
+                self._config.save()
 
             print(f"\nRuntime: {repr(self._runtime)[8:]}\n")
 
