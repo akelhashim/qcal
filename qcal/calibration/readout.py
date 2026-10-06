@@ -36,16 +36,16 @@ _classifiers = {
 
 
 def ReadoutCalibration(
-        qpu:        QPU,
-        config:     Config,
-        qubits:     List | Tuple,
-        method:     str = 'pi_pulse',
-        gate:       str = 'X90',
-        model:      str = 'gmm',
-        classifier: ClassificationManager = None,
-        n_levels:   int = 2,
-        **kwargs
-    ) -> Callable:
+    qpu:        QPU,
+    config:     Config,
+    qubits:     List | Tuple,
+    method:     str = 'pi_pulse',
+    gate:       str = 'X90',
+    model:      str = 'gmm',
+    classifier: ClassificationManager = None,
+    n_levels:   int = 2,
+    **kwargs
+) -> Callable:
     """Readout calibration
 
     Basic example useage for initial calibration:
@@ -82,16 +82,17 @@ def ReadoutCalibration(
         This class inherits a custom QPU from the ReadoutCalibration function.
         """
 
-        def __init__(self,
-                config:     Config,
-                qubits:     List | Tuple,
-                method:     str = 'pi_pulse',
-                gate:       str = 'X90',
-                model:      str = 'gmm',
-                classifier: ClassificationManager = None,
-                n_levels:   int = 2,
-                **kwargs
-            ) -> None:
+        def __init__(
+            self,
+            config:     Config,
+            qubits:     List | Tuple,
+            method:     str = 'pi_pulse',
+            gate:       str = 'X90',
+            model:      str = 'gmm',
+            classifier: ClassificationManager = None,
+            n_levels:   int = 2,
+            **kwargs
+        ) -> None:
             """Initialize the readout calibration class within the function.
             """
             qpu_args = list(inspect.signature(qpu).parameters)
@@ -121,14 +122,14 @@ def ReadoutCalibration(
 
             self._qubits = qubits
 
-            assert method in ('pi_pulse', 'rabi'), (
-                "'method' must be one of 'pi_pulse' or 'rabi'!"
-            )
+            if method not in ('pi_pulse', 'rabi'):
+                raise ValueError(
+                    "'method' must be one of 'pi_pulse' or 'rabi'!"
+                )
             self._method = method
 
-            assert gate in ('X90', 'X'), (
-                "'gate' must be one of 'X90' or 'X'!"
-            )
+            if gate not in ('X90', 'X'):
+                raise ValueError("'gate' must be one of 'X90' or 'X'!")
             self._gate = gate
 
             if classifier:
@@ -471,15 +472,15 @@ def ReadoutCalibration(
 
 
 def Fidelity(
-        qpu:         QPU,
-        config:      Config,
-        qubits:      List | Tuple,
-        params:      Dict[int, str],
-        param_sweep: ArrayLike | Dict[int, ArrayLike],
-        gate:        str = 'X90',
-        n_levels:    int = 2,
-        **kwargs
-    ) -> Callable:
+    qpu:         QPU,
+    config:      Config,
+    qubits:      List | Tuple,
+    params:      Dict[int, str],
+    param_sweep: ArrayLike | Dict[int, ArrayLike],
+    gate:        str = 'X90',
+    n_levels:    int = 2,
+    **kwargs
+) -> Callable:
     """Fidelity calibration.
 
     Basic example useage:
@@ -524,15 +525,16 @@ def Fidelity(
         This class inherits a custom QPU from the Fidelity function.
         """
 
-        def __init__(self,
-                config:      Config,
-                qubits:      List | Tuple,
-                params:      Dict[int, str],
-                param_sweep: ArrayLike | Dict[int, ArrayLike],
-                gate:        str = 'X90',
-                n_levels:    int = 2,
-                **kwargs
-            ) -> None:
+        def __init__(
+            self,
+            config:      Config,
+            qubits:      List | Tuple,
+            params:      Dict[int, str],
+            param_sweep: ArrayLike | Dict[int, ArrayLike],
+            gate:        str = 'X90',
+            n_levels:    int = 2,
+            **kwargs
+        ) -> None:
             """Initialize the Fidelity calibration class within the function.
             """
             self._rcal = ReadoutFidelity(
@@ -693,17 +695,17 @@ def Fidelity(
 
 
 def Separation(
-        qpu:         QPU,
-        config:      Config,
-        qubits:      List | Tuple,
-        params:      Dict[int, str],
-        param_sweep: ArrayLike | Dict[int, ArrayLike],
-        method:      str = 'pi_pulse',
-        gate:        str = 'X90',
-        model:       str = 'gmm',
-        n_levels:    int = 2,
-        **kwargs
-    ) -> Callable:
+    qpu:         QPU,
+    config:      Config,
+    qubits:      List | Tuple,
+    params:      Dict[int, str],
+    param_sweep: ArrayLike | Dict[int, ArrayLike],
+    method:      str = 'pi_pulse',
+    gate:        str = 'X90',
+    model:       str = 'gmm',
+    n_levels:    int = 2,
+    **kwargs
+) -> Callable:
     """Separation calibration.
 
     Basic example useage:
@@ -753,17 +755,18 @@ def Separation(
         This class inherits a custom QPU from the Separation function.
         """
 
-        def __init__(self,
-                config:      Config,
-                qubits:      List | Tuple,
-                params:      Dict[int, str],
-                param_sweep: ArrayLike | Dict[int, ArrayLike],
-                method:      str = 'pi_pulse',
-                gate:        str = 'X90',
-                model:       str = 'gmm',
-                n_levels:    int = 2,
-                **kwargs
-            ) -> None:
+        def __init__(
+            self,
+            config:      Config,
+            qubits:      List | Tuple,
+            params:      Dict[int, str],
+            param_sweep: ArrayLike | Dict[int, ArrayLike],
+            method:      str = 'pi_pulse',
+            gate:        str = 'X90',
+            model:       str = 'gmm',
+            n_levels:    int = 2,
+            **kwargs
+        ) -> None:
             """Initialize the Amplitude calibration class within the function.
             """
             self._rcal = ReadoutCalibration(
