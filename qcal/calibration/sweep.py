@@ -20,16 +20,16 @@ logger = logging.getLogger(__name__)
 
 
 def ParamSweep(
-        qpu:         QPU,
-        config:      Config,
-        circuit:     Circuit,
-        params:      Dict,
-        param_sweep: Dict,
-        maximize:    List[str] = None,
-        minimize:    List[str] = None,
-        xlabel:      str = 'Value Sweep',
-        **kwargs
-    ) -> Callable:
+    qpu:         QPU,
+    config:      Config,
+    circuit:     Circuit,
+    params:      Dict,
+    param_sweep: Dict,
+    maximize:    List[str] = None,
+    minimize:    List[str] = None,
+    xlabel:      str = 'Value Sweep',
+    **kwargs
+) -> Callable:
     """Parameter sweep calibration.
 
     This calibration finds the param value for which the leakage on
@@ -189,10 +189,12 @@ def ParamSweep(
                         int(self._circuits.n_circuits / 2)
                     ].results.marginalize(qindx).states
                 )
-                for state in self._minimize:
-                    states.add(state)
-                for state in self._maximize:
-                    states.add(state)
+                if self._minimize:
+                    for state in self._minimize:
+                        states.add(state)
+                if self._maximize:
+                    for state in self._maximize:
+                        states.add(state)
 
                 self._populations[ql] = {
                     state: [] for state in sorted(states)
@@ -254,7 +256,8 @@ def ParamSweep(
                             self.set_param(p, val)
                     else:
                         self.set_param(self._params[q], val)
-            self._config.save()
+            if settings.Settings.save_data:
+                self._config.save()
 
             print(f"\nRuntime: {repr(self._runtime)[8:]}\n")
 
