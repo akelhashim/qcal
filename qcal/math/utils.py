@@ -53,7 +53,9 @@ def round_to_order_error(
     Returns:
         Tuple[float]: rounded value, rounded error
     """
-    if abs(err) >= abs(val):
+    if err == 0:
+        return float(val), 0.0
+    elif abs(err) >= abs(val):
         logger.warning(" Uncertainty greater than value!")
         val_precision = 0
     else:

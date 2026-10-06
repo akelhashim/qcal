@@ -34,3 +34,5 @@ quantum_calibration.egg-info/
 htmlcov/
 
 .pytest_cache/
+
+stderr.log

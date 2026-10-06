@@ -289,18 +289,18 @@ def make_JAZZ_circuits(
 
 
 def JAZZ(
-        qpu:               QPU,
-        config:            Config,
-        qubit_pairs:       List[Tuple[int, int]],
-        t_max:             float = 5 * us,
-        detuning:          float = 1 * MHz,
-        conditional_phase: str = '11',
-        n_elements:        int = 50,
-        mq_gate:           Gate | None = None,
-        mq_gate_params:    Dict[Tuple[int, int], str] | str | None = None,
-        params:            Dict[Tuple[int, int], str] | str | None = None,
-        **kwargs
-    ) -> Callable:
+    qpu:               QPU,
+    config:            Config,
+    qubit_pairs:       List[Tuple[int, int]],
+    t_max:             float = 5 * us,
+    detuning:          float = 1 * MHz,
+    conditional_phase: str = '11',
+    n_elements:        int = 50,
+    mq_gate:           Gate | None = None,
+    mq_gate_params:    Dict[Tuple[int, int], str] | str | None = None,
+    params:            Dict[Tuple[int, int], str] | str | None = None,
+    **kwargs
+) -> Callable:
     """Joint Amplification of ZZ (JAZZ).
 
     This characterization measures the ZZ rotation angle/phase between qubits.
