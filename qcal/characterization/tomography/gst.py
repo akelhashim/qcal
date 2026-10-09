@@ -310,7 +310,9 @@ def GST(
             return diamondnorm
 
         @cached_property
-        def eigenvalue_entanglement_infidelity(self) -> Dict[str, Dict[str, float]]:
+        def eigenvalue_entanglement_infidelity(self) -> (
+            Dict[str, Dict[str, float]]
+        ):
             """Eigenvalue entanglement infidelity for the gates in the gate set.
 
             Returns:
@@ -356,8 +358,8 @@ def GST(
                                 effect.to_dense() for effect in effects.values()
                             ),
                             sum(
-                                self.target_model.instruments[instr][p].to_dense()
-                                for p in effects.keys()
+                              self.target_model.instruments[instr][p].to_dense()
+                              for p in effects.keys()
                             ),
                             'pp'
                         )
