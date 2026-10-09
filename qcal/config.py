@@ -12,6 +12,7 @@ import ast
 import copy
 import io
 import logging
+import pathlib
 from collections import defaultdict
 from typing import Any, Dict, List, Tuple
 
@@ -26,7 +27,14 @@ from qcal.math.utils import round_sig_figures
 logger = logging.getLogger(__name__)
 
 
-__all__ = ['Config']
+__all__ = ('EXAMPLE_CONFIG_PATH', 'Config')
+
+
+# Path to the example config shipped with the repository
+EXAMPLE_CONFIG_PATH = (
+    pathlib.Path(__file__).parent.parent.parent
+    / 'examples' / 'config' / 'config.yaml'
+)
 
 
 def nested_index(dictionary: Dict, n_levels: int = 2) -> List[List]:

@@ -27,12 +27,11 @@ Or load the bundled example config automatically::
     qpu.run(circuits)
 """
 import logging
-import pathlib
 
 import numpy as np
 
 from qcal.circuit import Circuit, CircuitSet
-from qcal.config import Config
+from qcal.config import EXAMPLE_CONFIG_PATH, Config
 from qcal.qpu.qpu import QPU
 from qcal.simulation.error_models import DepolarizingNoise
 from qcal.simulation.simulators import (
@@ -43,12 +42,6 @@ from qcal.simulation.simulators import (
 logger = logging.getLogger(__name__)
 
 __all__ = ('Emulator',)
-
-# Path to the example config shipped with the repository
-_EXAMPLE_CONFIG = (
-    pathlib.Path(__file__).parent.parent.parent
-    / 'examples' / 'config' / 'config.yaml'
-)
 
 
 class Emulator(QPU):
@@ -115,7 +108,7 @@ class Emulator(QPU):
                 Defaults to ``None``.
         """
         if config is None:
-            config = Config(str(_EXAMPLE_CONFIG))
+            config = Config(str(EXAMPLE_CONFIG_PATH))
 
         QPU.__init__(
             self,
