@@ -1,44 +1,41 @@
 """Submodule for qubit spectroscopy.
 
 """
-import qcal.settings as settings
-
-from qcal.characterization.characterize import Characterize
-from qcal.circuit import Cycle, Circuit, CircuitSet
-from qcal.config import Config
-from qcal.fitting.fit import FitLinear
-from qcal.gates.single_qubit import Meas, X90
-from qcal.qpu.qpu import QPU
-from qcal.characterization.spectroscopy.utils import find_inflection_points
-from qcal.units import GHz
-
 import logging
+from collections.abc import Iterable
+from typing import Callable, Dict
+
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
-
-from collections.abc import Iterable
 from IPython.display import clear_output
 from numpy.typing import NDArray
 from plotly.subplots import make_subplots
-from typing import Callable, Dict
 from scipy.ndimage import gaussian_filter1d
 from scipy.signal import find_peaks
+
+import qcal.settings as settings
+from qcal.characterization.characterize import Characterize
+from qcal.circuit import Circuit, CircuitSet, Cycle
+from qcal.config import Config
+from qcal.fitting.fit import FitLinear
+from qcal.gates.single_qubit import X90, Meas
+from qcal.qpu.qpu import QPU
 
 logger = logging.getLogger(__name__)
 
 
-def TwoTone(             
-        qpu:     QPU,
-        config:  Config,
-        qubits:  Iterable[int],
-        freqs:   NDArray | Dict[int, NDArray],
-        n_gates: int = 10,
-        params:  Dict | None = None,
-        **kwargs
-    ) -> Callable:
+def TwoTone(
+    qpu:     QPU,
+    config:  Config,
+    qubits:  Iterable[int],
+    freqs:   NDArray | Dict[int, NDArray],
+    n_gates: int = 10,
+    params:  Dict | None = None,
+    **kwargs
+) -> Callable:
     """Two-Tone Spectroscopy.
 
     Args:
@@ -55,17 +52,18 @@ def TwoTone(
     Returns:
         Callable: TwoTone
     """
-    
+
     class TwoTone(qpu, Characterize):
 
-        def __init__(self, 
-                config:  Config,
-                qubits:  Iterable[int],
-                freqs:   NDArray | Dict[int, NDArray],
-                n_gates: int = 10,
-                params:  Dict | None = None,
-                **kwargs
-            ) -> None:
+        def __init__(
+            self,
+            config:  Config,
+            qubits:  Iterable[int],
+            freqs:   NDArray | Dict[int, NDArray],
+            n_gates: int = 10,
+            params:  Dict | None = None,
+            **kwargs
+        ) -> None:
             """
             Instantiate the TwoTone spectroscopy class within the function.
             """
@@ -76,7 +74,7 @@ def TwoTone(
             self._n_gates = n_gates
 
             if not isinstance(freqs, dict):
-                self._freqs = {q: freqs for q in qubits}
+                self._freqs = dict.fromkeys(qubits, freqs)
             else:
                 self._freqs = freqs
             self._param_sweep = self._freqs
@@ -99,7 +97,7 @@ def TwoTone(
                 Dict: frequency sweep for each qubit.
             """
             return self._freqs
-        
+
         @property
         def iq(self) -> Dict:
             """IQ data.
@@ -108,7 +106,7 @@ def TwoTone(
                 Dict: IQ data for each qubit.
             """
             return self._iq
-        
+
         @property
         def mag(self) -> Dict:
             """Magnitude data.
@@ -117,7 +115,7 @@ def TwoTone(
                 Dict: magnitude data for each qubit.
             """
             return self._mag
-        
+
         @property
         def phase(self) -> Dict:
             """Phase data.
@@ -154,7 +152,7 @@ def TwoTone(
                 self._iq[q] = np.squeeze(iq.mean(axis=1))
                 self._mag[q] = np.abs(self._iq[q])
                 self._phase[q] = np.unwrap(np.angle(self._iq[q]))
-                
+
                 # Fit the first 1/3 of the unwrapped phase to extract the slope
                 n_elements = self._freqs[q].shape[0]
                 self._linear_fit[q].fit(
@@ -181,7 +179,7 @@ def TwoTone(
                     else:
                         raise Exception("Fitting error! Too many peaks.")
 
-                    # sigma = 10 
+                    # sigma = 10
                     # inflection_idxs = find_inflection_points(
                     #     self._freqs[q], self._phase[q], sigma=sigma
                     # )
@@ -193,7 +191,7 @@ def TwoTone(
                     #     if sigma == 50:
                     #         raise Exception("Fitting error!")
                     # self._char_values[q] = self._freqs[q][inflection_idxs][0]
-                
+
                 except Exception as e:
                     self._char_values[q] = None
                     logger.warning(
@@ -214,18 +212,18 @@ def TwoTone(
 
         def plot(self, interactive=False) -> None:
             """Plot the results.
-            
+
             Args:
                 interactive (bool, optional): whether to plot the spectroscopy
-                    results using interactive plotting with Plotly. Defaults to 
+                    results using interactive plotting with Plotly. Defaults to
                     False.
             """
             if interactive:
                 fig = make_subplots(rows=2, cols=1)
                 colors = px.colors.sample_colorscale(
-                    "turbo", 
+                    "turbo",
                     [n / (
-                         len(self._qubits) + 2 - 1) 
+                         len(self._qubits) + 2 - 1)
                          for n in range(len(self._qubits) + 2
                         )
                     ]
@@ -233,19 +231,19 @@ def TwoTone(
                 for i, q in enumerate(self._qubits):
                     fig.add_trace(
                         go.Scatter(
-                            x=self._freqs[q], 
-                            y=20 * np.log10(self._mag[q]), 
+                            x=self._freqs[q],
+                            y=20 * np.log10(self._mag[q]),
                             name=f'Q{q}',
-                            line=dict(width=4, color=colors[i + 1]),
+                            line={'width': 4, 'color': colors[i + 1]},
                         ),
                         row=1, col=1
                     )
                     fig.add_trace(
                         go.Scatter(
-                            x=self._freqs[q], 
-                            y=self._phase[q], 
+                            x=self._freqs[q],
+                            y=self._phase[q],
                             name=f'Q{q}',
-                            line=dict(width=4, color=colors[i + 1]),
+                            line={'width': 4, 'color': colors[i + 1]},
                             showlegend=False
                         ),
                         row=2, col=1
@@ -285,34 +283,34 @@ def TwoTone(
                         ax = axes[i]
 
                     ax[0].plot(
-                        np.real(self._iq[q]), 
-                        np.imag(self._iq[q]), 
+                        np.real(self._iq[q]),
+                        np.imag(self._iq[q]),
                         'b-',
                         label=f'Meas, Q{q}'
                     )
                     ax[1].plot(
-                        self._freqs[q], 
-                        20 * np.log10(self._mag[q]), 
+                        self._freqs[q],
+                        20 * np.log10(self._mag[q]),
                         'b-',
                         label=f'Meas, Q{q}'
                     )
                     ax[2].plot(
-                        self._freqs[q], 
-                        self._phase[q], 
+                        self._freqs[q],
+                        self._phase[q],
                         'b-',
                         label=f'Meas, Q{q}'
                     )
 
                     if self._char_values[q]:
                         ax[1].axvline(
-                            self._char_values[q], 
+                            self._char_values[q],
                             ls='--', c='k', label='Freq. fit'
                         )
                         ax[2].axvline(
-                            self._char_values[q], 
+                            self._char_values[q],
                             ls='--', c='k', label='Freq. fit'
                         )
-                      
+
                     ax[0].set_xlabel('Re (I)', fontsize=15)
                     ax[1].set_xlabel('Frequency (Hz)', fontsize=15)
                     ax[2].set_xlabel('Frequency (Hz)', fontsize=15)
@@ -332,20 +330,20 @@ def TwoTone(
                 fig.set_tight_layout(True)
                 if settings.Settings.save_data:
                     fig.savefig(
-                        self._data_manager._save_path + 
-                        'twotone_spectroscopy.png', 
+                        self._data_manager._save_path +
+                        'twotone_spectroscopy.png',
                         dpi=300
                     )
                     fig.savefig(
-                        self._data_manager._save_path + 
+                        self._data_manager._save_path +
                         'twotone_spectroscopy.pdf'
                     )
                     fig.savefig(
-                        self._data_manager._save_path + 
+                        self._data_manager._save_path +
                         'twotone_spectroscopy.svg'
                     )
                 plt.show()
-            
+
         def final(self) -> None:
             """Final calibration method."""
             Characterize.final(self)

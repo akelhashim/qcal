@@ -1,18 +1,10 @@
 """Submodule for resonator spectroscopy.
 
 """
-import qcal.settings as settings
-
-from qcal.characterization.characterize import Characterize
-from qcal.circuit import Cycle, Circuit, CircuitSet
-from qcal.config import Config
-from qcal.fitting.fit import FitLinear
-from qcal.gates.single_qubit import Meas
-from qcal.qpu.qpu import QPU
-# from qcal.characterization.spectroscopy.utils import find_inflection_points
-from qcal.units import GHz
-
 import logging
+from collections.abc import Iterable
+from typing import Callable, Dict
+
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -20,27 +12,35 @@ import plotly.express as px
 import plotly.graph_objects as go
 import plotly.io as pio
 import seaborn as sns
-
-from collections.abc import Iterable
 from IPython.display import clear_output
 from numpy.typing import NDArray
 from plotly.subplots import make_subplots
 from scipy.ndimage import gaussian_filter1d
 from scipy.signal import find_peaks
-from typing import Callable, Dict
+
+import qcal.settings as settings
+from qcal.characterization.characterize import Characterize
+from qcal.circuit import Circuit, CircuitSet, Cycle
+from qcal.config import Config
+from qcal.fitting.fit import FitLinear
+from qcal.gates.single_qubit import Meas
+from qcal.qpu.qpu import QPU
+
+# from qcal.characterization.spectroscopy.utils import find_inflection_points
+from qcal.units import GHz
 
 logger = logging.getLogger(__name__)
 
 
-def Punchout(             
-        qpu:    QPU,
-        config: Config,
-        qubits: Iterable[int],
-        amps:   NDArray | Dict[int, NDArray],
-        freqs:  NDArray | Dict[int, NDArray],
-        params: Dict | None = None,
-        **kwargs
-    ) -> Callable:
+def Punchout(
+    qpu:    QPU,
+    config: Config,
+    qubits: Iterable[int],
+    amps:   NDArray | Dict[int, NDArray],
+    freqs:  NDArray | Dict[int, NDArray],
+    params: Dict | None = None,
+    **kwargs
+) -> Callable:
     """Resonator Punchout.
 
     Args:
@@ -57,17 +57,18 @@ def Punchout(
     Returns:
         Callable: Punchout
     """
-    
+
     class Punchout(qpu, Characterize):
 
-        def __init__(self, 
-                config: Config,
-                qubits: Iterable[int],
-                amps:   NDArray | Dict[int, NDArray],
-                freqs:  NDArray | Dict[int, NDArray],
-                params: Dict | None = None,
-                **kwargs
-            ) -> None:
+        def __init__(
+            self,
+            config: Config,
+            qubits: Iterable[int],
+            amps:   NDArray | Dict[int, NDArray],
+            freqs:  NDArray | Dict[int, NDArray],
+            params: Dict | None = None,
+            **kwargs
+        ) -> None:
             """
             Instantiate the Punchout class within the function.
             """
@@ -77,12 +78,12 @@ def Punchout(
             self._qubits = qubits
 
             if not isinstance(amps, dict):
-                self._amps = {q: amps for q in qubits}
+                self._amps = dict.fromkeys(qubits, amps)
             else:
                 self._amps = amps
 
             if not isinstance(freqs, dict):
-                self._freqs = {q: freqs for q in qubits}
+                self._freqs = dict.fromkeys(qubits, freqs)
             else:
                 self._freqs = freqs
 
@@ -94,7 +95,7 @@ def Punchout(
                 for q in qubits:
                     self._params[q] = (
                         f'readout/{q}/amp', f'readout/{q}/freq'
-                    ) 
+                    )
             else:
                 self._params = params
 
@@ -111,7 +112,7 @@ def Punchout(
                 Dict: amp sweep for each qubit.
             """
             return self._amps
-        
+
         @property
         def frequencies(self) -> Dict:
             """Frequency sweep.
@@ -120,7 +121,7 @@ def Punchout(
                 Dict: frequency sweep for each qubit.
             """
             return self._freqs
-        
+
         @property
         def iq(self) -> Dict:
             """IQ data.
@@ -129,7 +130,7 @@ def Punchout(
                 Dict: IQ data for each qubit.
             """
             return self._iq
-        
+
         @property
         def mag(self) -> Dict:
             """Magnitude data.
@@ -138,7 +139,7 @@ def Punchout(
                 Dict: magnitude data for each qubit.
             """
             return self._mag
-        
+
         @property
         def phase(self) -> Dict:
             """Phase data.
@@ -163,18 +164,18 @@ def Punchout(
 
             for q in self._qubits:
                 idx_amp = [
-                    i for i, param in enumerate(self._params[q]) if 'amp' in 
+                    i for i, param in enumerate(self._params[q]) if 'amp' in
                     param
                 ]
                 idx_freq = [
-                    i for i, param in enumerate(self._params[q]) if 'freq' in 
+                    i for i, param in enumerate(self._params[q]) if 'freq' in
                     param
                 ]
 
                 amps = []
                 for amp in self._amps[q]:
                     amps.extend([amp] * self._freqs[q].size)
-                
+
                 self._circuits[f'param: {self._params[q][idx_amp[0]]}'] = (
                     amps
                 )
@@ -197,7 +198,7 @@ def Punchout(
                     self._iq[q].append(iq)
                     self._mag[q].append(np.abs(iq))
                     self._phase[q].append(np.unwrap(np.angle(iq)))
-                
+
                 self._iq[q] = np.array(self._iq[q])
                 self._mag[q] = np.array(self._mag[q])
                 self._phase[q] = np.array(self._phase[q])
@@ -215,7 +216,7 @@ def Punchout(
             # """Plot the sweep results.
 
             # Args:
-            #     interactive (bool, optional): whether to plot the 2D sweep 
+            #     interactive (bool, optional): whether to plot the 2D sweep
             #         using interactive plotting with Plotly. Defaults to False.
             # """
         def plot(self) -> None:
@@ -235,7 +236,7 @@ def Punchout(
             #                 colorbar=dict(title="Log(mag) (dB)"),
             #                 colorbar_x=0.45
             #             ),
-            #             row=i+1, 
+            #             row=i+1,
             #             col=1
             #         )
 
@@ -247,7 +248,7 @@ def Punchout(
             #                 colorscale='Viridis',
             #                 colorbar=dict(title="Unwrapped Phase (rad.)")
             #             ),
-            #             row=i+1, 
+            #             row=i+1,
             #             col=2
             #         )
 
@@ -270,9 +271,9 @@ def Punchout(
             #             }
             #         }
             #         fig.show(config=save_properties)
-            
+
             # else:
-            
+
             figsize = (5 * ncols, 4 * nrows)
             fig, axes = plt.subplots(
                 nrows, ncols, figsize=figsize, layout='constrained'
@@ -283,10 +284,10 @@ def Punchout(
                     ax = axes
                 else:
                     ax = axes[i]
-            
+
                 p = sns.heatmap(
-                    20 * np.log10(self._mag[q]), 
-                    cmap='viridis', 
+                    20 * np.log10(self._mag[q]),
+                    cmap='viridis',
                     cbar=True,
                     ax=ax[0],
                 )
@@ -301,7 +302,7 @@ def Punchout(
                 cbar.ax.tick_params(labelsize=10)
                 # ax[0].set_title(f'R{q}', fontsize=12)
                 ax[0].text(
-                        0.05, 0.9, f'R{q}', size=12, 
+                        0.05, 0.9, f'R{q}', size=12,
                         transform=ax[0].transAxes
                     )
                 ax[0].set_xlabel('Frequency (GHz)', fontsize=12)
@@ -321,8 +322,8 @@ def Punchout(
                 ax[0].invert_yaxis()
 
                 p = sns.heatmap(
-                    self._phase[q], 
-                    cmap='viridis', 
+                    self._phase[q],
+                    cmap='viridis',
                     cbar=True,
                     ax=ax[1],
                 )
@@ -337,7 +338,7 @@ def Punchout(
                 cbar.ax.tick_params(labelsize=10)
                 # ax[1].set_title(f'R{q}', fontsize=12)
                 ax[1].text(
-                        0.05, 0.9, f'R{q}', size=12, 
+                        0.05, 0.9, f'R{q}', size=12,
                         transform=ax[1].transAxes
                     )
                 ax[1].set_xlabel('Frequency (GHz)', fontsize=12)
@@ -358,7 +359,7 @@ def Punchout(
 
             if settings.Settings.save_data:
                 fig.savefig(
-                    self._data_manager._save_path + 'resonator_punchout.png', 
+                    self._data_manager._save_path + 'resonator_punchout.png',
                     dpi=600
                 )
                 fig.savefig(
@@ -368,7 +369,7 @@ def Punchout(
                     self._data_manager._save_path + 'resonator_punchout.svg'
                 )
             plt.show()
-            
+
         def final(self) -> None:
             """Final calibration method."""
             # Characterize.final(self)
@@ -393,14 +394,14 @@ def Punchout(
     )
 
 
-def Resonator(             
-        qpu:    QPU,
-        config: Config,
-        qubits: Iterable[int],
-        freqs:  NDArray | Dict[int, NDArray],
-        params: Dict | None = None,
-        **kwargs
-    ) -> Callable:
+def Resonator(
+    qpu:    QPU,
+    config: Config,
+    qubits: Iterable[int],
+    freqs:  NDArray | Dict[int, NDArray],
+    params: Dict | None = None,
+    **kwargs
+) -> Callable:
     """Resonator Spectroscopy.
 
     Args:
@@ -415,16 +416,17 @@ def Resonator(
     Returns:
         Callable: Resonator
     """
-    
+
     class Resonator(qpu, Characterize):
 
-        def __init__(self, 
-                config: Config,
-                qubits: Iterable[int],
-                freqs:  NDArray | Dict[int, NDArray],
-                params: Dict | None = None,
-                **kwargs
-            ) -> None:
+        def __init__(
+            self,
+            config: Config,
+            qubits: Iterable[int],
+            freqs:  NDArray | Dict[int, NDArray],
+            params: Dict | None = None,
+            **kwargs
+        ) -> None:
             """
             Instantiate the Resonator Spectroscopy class within the function.
             """
@@ -434,7 +436,7 @@ def Resonator(
             self._qubits = qubits
 
             if not isinstance(freqs, dict):
-                self._freqs = {q: freqs for q in qubits}
+                self._freqs = dict.fromkeys(qubits, freqs)
             else:
                 self._freqs = freqs
             self._param_sweep = self._freqs
@@ -457,7 +459,7 @@ def Resonator(
                 Dict: frequency sweep for each qubit.
             """
             return self._freqs
-        
+
         @property
         def iq(self) -> Dict:
             """IQ data.
@@ -466,7 +468,7 @@ def Resonator(
                 Dict: IQ data for each qubit.
             """
             return self._iq
-        
+
         @property
         def mag(self) -> Dict:
             """Magnitude data.
@@ -475,7 +477,7 @@ def Resonator(
                 Dict: magnitude data for each qubit.
             """
             return self._mag
-        
+
         @property
         def phase(self) -> Dict:
             """Phase data.
@@ -511,7 +513,7 @@ def Resonator(
                 self._iq[q] = np.squeeze(iq.mean(axis=1))
                 self._mag[q] = np.abs(self._iq[q])
                 self._phase[q] = np.unwrap(np.angle(self._iq[q]))
-                
+
                 # Fit the first 1/3 of the unwrapped phase to extract the slope
                 n_elements = self._freqs[q].shape[0]
                 self._linear_fit[q].fit(
@@ -537,8 +539,8 @@ def Resonator(
                         self._char_values[q] = self._freqs[q][peaks][0]
                     else:
                         raise Exception("Fitting error! Too many peaks.")
-                    
-                    # sigma = 10 
+
+                    # sigma = 10
                     # inflection_idxs = find_inflection_points(
                     #     self._freqs[q], self._phase[q], sigma=sigma
                     # )
@@ -550,7 +552,7 @@ def Resonator(
                     #     if sigma == 50:
                     #         raise Exception("Fitting error!")
                     # self._char_values[q] = self._freqs[q][inflection_idxs][0]
-                
+
                 except Exception as e:
                     self._char_values[q] = None
                     logger.warning(
@@ -571,10 +573,10 @@ def Resonator(
 
         def plot(self, interactive=False) -> None:
             """Plot the results.
-            
+
             Args:
                 interactive (bool, optional): whether to plot the spectroscopy
-                    results using interactive plotting with Plotly. Defaults to 
+                    results using interactive plotting with Plotly. Defaults to
                     False.
             """
             if interactive:
@@ -582,9 +584,9 @@ def Resonator(
 
                 fig = make_subplots(rows=2, cols=1)
                 colors = px.colors.sample_colorscale(
-                    "turbo", 
+                    "turbo",
                     [n / (
-                         len(self._qubits) + 2 - 1) 
+                         len(self._qubits) + 2 - 1)
                          for n in range(len(self._qubits) + 2
                         )
                     ]
@@ -592,19 +594,19 @@ def Resonator(
                 for i, q in enumerate(self._qubits):
                     fig.add_trace(
                         go.Scatter(
-                            x=self._freqs[q], 
-                            y=20 * np.log10(self._mag[q]), 
+                            x=self._freqs[q],
+                            y=20 * np.log10(self._mag[q]),
                             name=f'R{q}',
-                            line=dict(width=4, color=colors[i + 1]),
+                            line={'width': 4, 'color': colors[i + 1]},
                         ),
                         row=1, col=1
                     )
                     fig.add_trace(
                         go.Scatter(
-                            x=self._freqs[q], 
-                            y=self._phase[q], 
+                            x=self._freqs[q],
+                            y=self._phase[q],
                             name=f'R{q}',
-                            line=dict(width=4, color=colors[i + 1]),
+                            line={'width': 4, 'color': colors[i + 1]},
                             showlegend=False
                         ),
                         row=2, col=1
@@ -644,34 +646,34 @@ def Resonator(
                         ax = axes[i]
 
                     ax[0].plot(
-                        np.real(self._iq[q]), 
-                        np.imag(self._iq[q]), 
+                        np.real(self._iq[q]),
+                        np.imag(self._iq[q]),
                         'b-',
                         label=f'Meas, R{q}'
                     )
                     ax[1].plot(
-                        self._freqs[q], 
-                        20 * np.log10(self._mag[q]), 
+                        self._freqs[q],
+                        20 * np.log10(self._mag[q]),
                         'b-',
                         label=f'Meas, R{q}'
                     )
                     ax[2].plot(
-                        self._freqs[q], 
-                        self._phase[q], 
+                        self._freqs[q],
+                        self._phase[q],
                         'b-',
                         label=f'Meas, R{q}'
                     )
 
                     if self._char_values[q]:
                         ax[1].axvline(
-                            self._char_values[q], 
+                            self._char_values[q],
                             ls='--', c='k', label='Freq. fit'
                         )
                         ax[2].axvline(
-                            self._char_values[q], 
+                            self._char_values[q],
                             ls='--', c='k', label='Freq. fit'
                         )
-                      
+
                     ax[0].set_xlabel('Re (I)', fontsize=15)
                     ax[1].set_xlabel('Frequency (Hz)', fontsize=15)
                     ax[2].set_xlabel('Frequency (Hz)', fontsize=15)
@@ -691,20 +693,20 @@ def Resonator(
                 fig.set_tight_layout(True)
                 if settings.Settings.save_data:
                     fig.savefig(
-                        self._data_manager._save_path + 
-                        'resonator_spectroscopy.png', 
+                        self._data_manager._save_path +
+                        'resonator_spectroscopy.png',
                         dpi=300
                     )
                     fig.savefig(
-                        self._data_manager._save_path + 
+                        self._data_manager._save_path +
                         'resonator_spectroscopy.pdf'
                     )
                     fig.savefig(
-                        self._data_manager._save_path + 
+                        self._data_manager._save_path +
                         'resonator_spectroscopy.svg'
                     )
                 plt.show()
-            
+
         def final(self) -> None:
             """Final calibration method."""
             Characterize.final(self)

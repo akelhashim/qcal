@@ -24,17 +24,17 @@ logger = logging.getLogger(__name__)
 
 
 def Sweep2D(
-        qpu:      QPU,
-        config:   Config,
-        qubits:   Iterable[int],
-        sweep1:   NDArray | Dict[int, NDArray],
-        sweep2:   NDArray | Dict[int, NDArray],
-        params:   Dict[int, Iterable[str]],
-        prepulse: Cycle | Circuit = None,
-        xlabel:   str = '',
-        ylabel:   str = '',
-        **kwargs
-    ) -> Callable:
+    qpu:      QPU,
+    config:   Config,
+    qubits:   Iterable[int],
+    sweep1:   NDArray | Dict[int, NDArray],
+    sweep2:   NDArray | Dict[int, NDArray],
+    params:   Dict[int, Iterable[str]],
+    prepulse: Cycle | Circuit = None,
+    xlabel:   str = '',
+    ylabel:   str = '',
+    **kwargs
+) -> Callable:
     """2D sweep for qubit spectroscopy.
 
     Args:
@@ -56,17 +56,18 @@ def Sweep2D(
 
     class Sweep2D(qpu, Characterize):
 
-        def __init__(self,
-                config:   Config,
-                qubits:   Iterable[int],
-                sweep1:   NDArray | Dict[int, NDArray],
-                sweep2:   NDArray | Dict[int, NDArray],
-                params:   Dict[int, Iterable[str]],
-                prepulse: Cycle | Circuit = None,
-                xlabel:   str = '',
-                ylabel:   str = '',
-                **kwargs
-            ) -> None:
+        def __init__(
+            self,
+            config:   Config,
+            qubits:   Iterable[int],
+            sweep1:   NDArray | Dict[int, NDArray],
+            sweep2:   NDArray | Dict[int, NDArray],
+            params:   Dict[int, Iterable[str]],
+            prepulse: Cycle | Circuit = None,
+            xlabel:   str = '',
+            ylabel:   str = '',
+            **kwargs
+        ) -> None:
             """
             Instantiate the Sweep2D class within the function.
             """
