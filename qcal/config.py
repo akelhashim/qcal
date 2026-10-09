@@ -32,7 +32,7 @@ __all__ = ('EXAMPLE_CONFIG_PATH', 'Config')
 
 # Path to the example config shipped with the repository
 EXAMPLE_CONFIG_PATH = (
-    pathlib.Path(__file__).parent.parent.parent
+    pathlib.Path(__file__).resolve().parent.parent
     / 'examples' / 'config' / 'config.yaml'
 )
 
