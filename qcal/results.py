@@ -59,7 +59,7 @@ def readout_correction(results: Results, confusion_matrix: DataFrame) -> Dict:
             ' of the provided bitstrings. No readout correction will be'
             ' performed!'
         )
-        return results
+        return results.dict
 
     else:
         # Tensor product of confusion matricies
@@ -319,12 +319,21 @@ class Results:
             confusion_matrix (DataFrame): confusion matrix measured using the
                 ```qcal.benchmarking.fidelity.ReadoutFidelity``` module.
         """
-        self._confusion_matrix = confusion_matrix
+        # Always correct the raw results so that repeated calls do not
+        # compound the correction
+        self._results = copy.deepcopy(self.__raw_results)
+        self.__df = None
+        self._confusion_matrix = None
         try:
-            self._results = readout_correction(self, confusion_matrix)
-            self._rebuild_df()
+            corrected = readout_correction(self, confusion_matrix)
+            # readout_correction returns self._results unchanged if the
+            # confusion matrix does not match the bitstring length
+            if corrected is not self._results:
+                self._results = corrected
+                self._confusion_matrix = confusion_matrix
         except Exception:
             self._results = copy.deepcopy(self.__raw_results)
+        self.__df = None
 
     def marginalize(self, idx: int | Tuple[int]):
         """Marginalize the results over a given bistring index.
