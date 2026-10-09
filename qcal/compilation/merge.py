@@ -8,15 +8,12 @@ as two back-to-back gates.
 """
 from __future__ import annotations
 
-from functools import lru_cache
-
 from qcal.circuit import Cycle
 from qcal.gates.gate import Gate
 
 __all__ = ('merge_gates', 'merge_cycles')
 
 
-@lru_cache(maxsize=None)
 def merge_gates(first: Gate, second: Gate) -> Gate:
     """Merge two gates acting on the same qubits into a single gate.
 
@@ -51,7 +48,6 @@ def merge_gates(first: Gate, second: Gate) -> Gate:
     return Gate(second.unitary @ first.unitary, first.qubits)
 
 
-@lru_cache(maxsize=None)
 def merge_cycles(first: Cycle, second: Cycle) -> Cycle:
     """Merge two cycles acting on the same qubits into a single cycle.
 

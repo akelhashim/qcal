@@ -15,12 +15,13 @@ U' satisfy:
 
 from which a, b, c are extracted directly.
 """
-from functools import lru_cache
+from functools import lru_cache, reduce
 
 import numpy as np
 from numpy.typing import NDArray
 
 from qcal.circuit import Circuit, Cycle
+from qcal.compilation.merge import merge_gates
 from qcal.gates.single_qubit import (
     SX,
     SY,
@@ -79,8 +80,8 @@ from qcal.gates.single_qubit import (
 )
 
 __all__ = (
-    'ZXZXZ_DECOMPOSITIONS', 'unitary_to_zxzxz', 'decompose_cycle',
-    'pauli_to_cycle'
+    'ZXZXZ_DECOMPOSITIONS', 'unitary_to_zxzxz', 'zxzxz_to_unitary',
+    'decompose_cycle', 'pauli_to_cycle'
 )
 
 PauliString = tuple[str, ...]
@@ -114,23 +115,27 @@ def unitary_to_zxzxz(U: NDArray) -> tuple[float, float, float]:
     return float(np.real(a)), float(np.real(b)), float(np.real(c))
 
 
-def _decomp(matrix: NDArray):
-    """Return f(qubit) -> [Rz(a), X90, Rz(b), X90, Rz(c)] for the given unitary.
+def zxzxz_to_unitary(
+    angles: tuple[float, float, float]
+) -> NDArray[np.complex128]:
+    """Return the unitary for [Rz(a), X90, Rz(b), X90, Rz(c)] in order.
+
+    Inverse of `unitary_to_zxzxz`: the returned unitary is
+    Rz(c)·X90·Rz(b)·X90·Rz(a), built by merging the five gates in
+    application order via `merge_gates`.
 
     Args:
-        matrix (NDArray): 2x2 unitary matrix.
+        angles (tuple[float, float, float]): angles (a, b, c) in radians.
 
     Returns:
-        callable: f(qubit) -> list of 5 gates implementing the unitary.
+        NDArray[np.complex128]: 2x2 unitary matrix.
     """
-    a, b, c = unitary_to_zxzxz(matrix)
-
-    def _factory(qubit: int) -> list:
-        return [
-            Rz(qubit, a), X90(qubit), Rz(qubit, b), X90(qubit), Rz(qubit, c)
-        ]
-
-    return _factory
+    qubit = 0
+    a, b, c = angles
+    return reduce(
+        merge_gates,
+        [Rz(qubit, a), X90(qubit), Rz(qubit, b), X90(qubit), Rz(qubit, c)],
+    ).unitary
 
 
 def decompose_cycle(cycle: Cycle) -> Circuit:
@@ -192,6 +197,90 @@ def decompose_to_zxzxz(label: str, qubit: int) -> tuple:
             application order.
     """
     return tuple(ZXZXZ_DECOMPOSITIONS[label](qubit))
+
+
+# Local alias so `pauli_to_cycle`'s `decompose_to_zxzxz` parameter can
+# shadow the module-level function name without losing the reference.
+_zxzxz_gates = decompose_to_zxzxz
+
+
+@lru_cache(maxsize=1024)
+def pauli_to_cycle(
+        pauli: PauliString, qubits: tuple, decompose_to_zxzxz: bool = False
+) -> Circuit:
+    """Convert a PauliString to a Cycle (or subcircuit) of Pauli gates.
+
+    Cached (bounded): the number of distinct n-qubit Pauli strings is 4^n,
+    so for small n (few-qubit benchmarked cycles) the same twirl/prep
+    pattern recurs often across randomizations/depths and caching avoids
+    rebuilding it; for large n the cache simply stays capped at `maxsize`
+    (a fixed, bounded footprint) rather than growing without bound. The
+    returned Circuit is shared across cache hits rather than copied: callers
+    only ever `.extend()` it (never mutate its cycles in place).
+
+    Args:
+        pauli (PauliString): tuple of single-qubit Pauli labels,
+            e.g. ('X', 'Z', 'I').
+        qubits (tuple): qubit labels corresponding to each position in
+            pauli.
+        decompose_to_zxzxz (bool): whether to decompose all single-qubit gates
+            to ZXZXZ decomposition. Defaults to False. Setting to True can be
+            useful when implementing CB using hardware-efficient randomization.
+
+    Returns:
+        Circuit: a Circuit containing a Cycle of I/X/Y/Z gate for each
+            non-identity entry of pauli, or a Circuit containing the ZXZXZ
+            decomposition of each Pauli gate.
+    """
+    circuit = Circuit()
+    if decompose_to_zxzxz:
+        # Each qubit's decomposition is the same fixed-length [Rz, X90, Rz,
+        # X90, Rz] sequence, so transposing across qubits and appending one
+        # shared Cycle per step gives the same result as `.join()`-ing each
+        # qubit's sub-circuit in one at a time, without `.join()`'s
+        # per-call rebuild of every existing Cycle.
+        gate_lists = [
+            _zxzxz_gates(p, q)
+            for p, q in zip(pauli, qubits, strict=True)
+        ]
+        for gates_at_step in zip(*gate_lists, strict=True):
+            circuit.append(Cycle(gates_at_step))
+
+    else:
+        cycle = Cycle()
+        for p, q in zip(pauli, qubits, strict=True):
+            match p:
+                case 'I':
+                    cycle.append(Id(q))
+                case 'X':
+                    cycle.append(X(q))
+                case 'Y':
+                    cycle.append(Y(q))
+                case 'Z':
+                    cycle.append(Z(q))
+
+        circuit.append(cycle)
+
+    return circuit
+
+
+def _decomp(matrix: NDArray):
+    """Return f(qubit) -> [Rz(a), X90, Rz(b), X90, Rz(c)] for the given unitary.
+
+    Args:
+        matrix (NDArray): 2x2 unitary matrix.
+
+    Returns:
+        callable: f(qubit) -> list of 5 gates implementing the unitary.
+    """
+    a, b, c = unitary_to_zxzxz(matrix)
+
+    def _factory(qubit: int) -> list:
+        return [
+            Rz(qubit, a), X90(qubit), Rz(qubit, b), X90(qubit), Rz(qubit, c)
+        ]
+
+    return _factory
 
 
 ZXZXZ_DECOMPOSITIONS: dict[str | type, callable] = {
@@ -303,68 +392,3 @@ ZXZXZ_DECOMPOSITIONS.update({
     Z:       ZXZXZ_DECOMPOSITIONS['Z'],
     Z90:     ZXZXZ_DECOMPOSITIONS['Z90'],
 })
-
-
-# Local alias so `pauli_to_cycle`'s `decompose_to_zxzxz` parameter can
-# shadow the module-level function name without losing the reference.
-_zxzxz_gates = decompose_to_zxzxz
-
-
-@lru_cache(maxsize=1024)
-def pauli_to_cycle(
-        pauli: PauliString, qubits: tuple, decompose_to_zxzxz: bool = False
-) -> Circuit:
-    """Convert a PauliString to a Cycle (or subcircuit) of Pauli gates.
-
-    Cached (bounded): the number of distinct n-qubit Pauli strings is 4^n,
-    so for small n (few-qubit benchmarked cycles) the same twirl/prep
-    pattern recurs often across randomizations/depths and caching avoids
-    rebuilding it; for large n the cache simply stays capped at `maxsize`
-    (a fixed, bounded footprint) rather than growing without bound. The
-    returned Circuit is shared across cache hits rather than copied: callers
-    only ever `.extend()` it (never mutate its cycles in place).
-
-    Args:
-        pauli (PauliString): tuple of single-qubit Pauli labels,
-            e.g. ('X', 'Z', 'I').
-        qubits (tuple): qubit labels corresponding to each position in
-            pauli.
-        decompose_to_zxzxz (bool): whether to decompose all single-qubit gates
-            to ZXZXZ decomposition. Defaults to False. Setting to True can be
-            useful when implementing CB using hardware-efficient randomization.
-
-    Returns:
-        Circuit: a Circuit containing a Cycle of I/X/Y/Z gate for each
-            non-identity entry of pauli, or a Circuit containing the ZXZXZ
-            decomposition of each Pauli gate.
-    """
-    circuit = Circuit()
-    if decompose_to_zxzxz:
-        # Each qubit's decomposition is the same fixed-length [Rz, X90, Rz,
-        # X90, Rz] sequence, so transposing across qubits and appending one
-        # shared Cycle per step gives the same result as `.join()`-ing each
-        # qubit's sub-circuit in one at a time, without `.join()`'s
-        # per-call rebuild of every existing Cycle.
-        gate_lists = [
-            _zxzxz_gates(p, q)
-            for p, q in zip(pauli, qubits, strict=True)
-        ]
-        for gates_at_step in zip(*gate_lists, strict=True):
-            circuit.append(Cycle(gates_at_step))
-
-    else:
-        cycle = Cycle()
-        for p, q in zip(pauli, qubits, strict=True):
-            match p:
-                case 'I':
-                    cycle.append(Id(q))
-                case 'X':
-                    cycle.append(X(q))
-                case 'Y':
-                    cycle.append(Y(q))
-                case 'Z':
-                    cycle.append(Z(q))
-
-        circuit.append(cycle)
-
-    return circuit
