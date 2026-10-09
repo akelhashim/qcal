@@ -992,5 +992,3 @@ class PyQuilTranspiler(Transpiler):
         tprograms = CircuitSet(circuits=tprograms)
         return tprograms
 
-# [X]  Readout randomization + RC: we aren't referencing the randomized readout destination
-# [ ] Readout randomization: we need to update the memory map for the randomized readout source to reflect user phase angles.
