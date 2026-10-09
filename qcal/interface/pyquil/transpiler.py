@@ -754,8 +754,7 @@ def transpile_circuit(
             for qubit in qubits:
                 call = rc_configuration.apply_pauli_pair(
                     qubit,
-                    rc_configuration.cycle_count,  # TODO: switch
-                    # rc_configuration._cycle_count,
+                    rc_configuration.cycle_count,
                     source_unitaries=(
                         readout_configuation.destination_names(qubit)
                     ),
@@ -837,7 +836,7 @@ def transpile_cycle(
                 [qubit_to_cref[q] for q in gate.qubits]
             )
         elif rc_tracker is not None and gate.name in PHASE_GATES:
-            tprogram += rc_tracker.emit_phase_gate(gate)
+            tprogram += rc_tracker.emit_phase_gate(gate, readout_tracker)
         elif readout_tracker is not None and gate.name in PHASE_GATES:
             tprogram += readout_tracker.emit_phase_gate(gate)
         else:
@@ -992,3 +991,6 @@ class PyQuilTranspiler(Transpiler):
 
         tprograms = CircuitSet(circuits=tprograms)
         return tprograms
+
+# [X]  Readout randomization + RC: we aren't referencing the randomized readout destination
+# [ ] Readout randomization: we need to update the memory map for the randomized readout source to reflect user phase angles.

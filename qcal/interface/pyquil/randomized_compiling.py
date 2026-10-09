@@ -33,6 +33,13 @@ from typing import (
 import numpy as np
 from numpy.typing import NDArray
 
+
+from functools import reduce
+
+from qcal.compilation.merge import merge_gates
+from qcal.gates.single_qubit import Rz, X90
+from qcal.compilation.decompositions import unitary_to_zxzxz
+
 from qcal.circuit import Circuit, Cycle
 
 logger = logging.getLogger(__name__)
@@ -406,7 +413,7 @@ class RCLayerTracker:
             ) for q in configuration.qubits_sorted
         }
 
-    def emit_phase_gate(self, gate) -> 'Program':  # type: ignore  # noqa: F821
+    def emit_phase_gate(self, gate, readout_tracker: ReadoutLayerTracker | None = None) -> 'Program':  # type: ignore  # noqa: F821
         """Replace a Rz/VirtualZ gate with its twirled memory reference.
 
         Records the gate's original phase into `source_phases` at
@@ -420,6 +427,7 @@ class RCLayerTracker:
             Program: single-instruction PyQuil Program.
         """
         from pyquil.gates import RZ
+        from pyquil.quilbase import MemoryReference
 
         q = gate.qubits[0]
         phase = gate.properties['params']['phase']
@@ -428,9 +436,12 @@ class RCLayerTracker:
             self.layer_index * 3 + self.angle_index[q]
         ] = phase / (2 * np.pi)
 
-        ref = self.configuration.variables.twirled_unitaries_ref(
-            q, self.layer_index, self.angle_index[q]
-        )
+        if readout_tracker is not None and self.layer_index == self.configuration.cycle_count - 1:
+            ref = MemoryReference(readout_tracker.configuration.destination_names(q), index=self.layer_index * _ANGLES_PER_UNITARY + self.angle_index[q])
+        else:
+            ref = self.configuration.variables.twirled_unitaries_ref(
+                q, self.layer_index, self.angle_index[q]
+            )
         self.angle_index[q] += 1
         return RZ(2 * np.pi * ref, q)
 
@@ -588,6 +599,7 @@ class _U2Randomization:
     destination_names: Callable[[int], str]
     seed_names: Callable[[int], str]
     source_name: str
+    source_unitary_count: int
     source_unitary_phases: list[float]
 
     @property
@@ -642,9 +654,25 @@ class _U2Randomization:
         }
 
     def build_memory_map(
-            self, seeds: Mapping[int, int]
+        self, seeds: Mapping[int, int], phases: tuple[float, float, float] | None = None 
     ) -> Mapping[str, list[float] | list[int]]:
-        memory_map = {self.source_name: self.source_unitary_phases}
+        """
+        Build the memory map for unitary randomization, including the randomization destination and seeds for each qubit.
+
+        If `phases` are provided, then the randomization source unitaries will pre-merge them here.
+        """
+        if phases is not None:
+            source_unitary_phases = []
+            provided_unitary = _zxzxz_phase_angles_to_unitary(phases)
+            for unitary_index in range(self.source_unitary_count):
+                start_index = unitary_index * _ANGLES_PER_UNITARY
+                random_unitary = _zxzxz_phase_angles_to_unitary(self.source_unitary_phases[start_index : start_index + _ANGLES_PER_UNITARY])
+                provided_unitary_randomized = merge_gates(provided_unitary, random_unitary)
+                source_unitary_phases.extend(unitary_to_zxzxz(provided_unitary_randomized))
+        else:
+            source_unitary_phases = self.source_unitary_phases
+        
+        memory_map = {self.source_name: source_unitary_phases}
         for qubit in self.qubits:
             memory_map[self.destination_names(qubit)] = [0.0, 0.5, 0.5]
             memory_map[self.seed_names(qubit)] = [seeds[qubit]]
@@ -668,3 +696,13 @@ class _U2Randomization:
             )
             indices[:, qubit_index] = np.asarray(sequence, dtype=np.int8)
         return indices
+
+
+def _zxzxz_phase_angles_to_unitary(angles: tuple[float, float, float]) -> NDArray[np.complex128]:
+    qubit = 0
+    a, b, c = angles
+    return reduce(
+        merge_gates,
+        [Rz(qubit, a), X90(qubit), Rz(qubit, b), X90(qubit), Rz(qubit, c)],
+    ).unitary
+
