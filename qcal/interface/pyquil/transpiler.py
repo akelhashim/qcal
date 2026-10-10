@@ -682,9 +682,9 @@ def transpile_circuit(
         # RC's own RCLayerTracker already tracks this same final layer
         # (see RCLayerTracker.__init__), so only build a dedicated
         # tracker for it when RC is off.
-        if not randomized_compiling:
-            readout_tracker = ReadoutLayerTracker(readout_configuation)
-            readout_final_layer = final_layer_cycle_indices(circuit)
+        # if not randomized_compiling:
+        readout_tracker = ReadoutLayerTracker(readout_configuation)
+        readout_final_layer = final_layer_cycle_indices(circuit)
 
     non_barrier_idx = 0
     cycle_defs = {}
