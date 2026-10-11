@@ -666,7 +666,7 @@ def transpile_circuit(
             qubits=qubits,
             destination_names=lambda qubit: f"measurement_unitary_q{qubit}",
             seed_names=lambda qubit: f"measurement_seed_q{qubit}",
-            source_name="measurement_unitaries",
+            source_names=lambda qubit: f"measurement_source_unitaries_q{qubit}",
             # Flat, per `_U2Randomization.source_unitary_phases: list[float]` --
             # `source_unitary_count`, the Declare size in `build_quil_program`,
             # and the raw values in `build_memory_map` all assume a flat
