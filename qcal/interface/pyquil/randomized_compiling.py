@@ -17,8 +17,8 @@ if PyQuil is not installed when building docs.
 """
 from __future__ import annotations
 
-from collections import defaultdict
 import logging
+from collections import defaultdict
 from dataclasses import dataclass
 from typing import (
     Callable,
@@ -633,7 +633,9 @@ class _U2Randomization:
                 self.destination_names(qubit), "REAL", _ANGLES_PER_UNITARY
             )
             program += Declare(
-                self.source_names(qubit), "REAL", _ANGLES_PER_UNITARY * self.source_unitary_count
+                self.source_names(qubit),
+                "REAL",
+                _ANGLES_PER_UNITARY * self.source_unitary_count
             )
             program += Declare(self.seed_names(qubit), "INTEGER", 1)
         for qubit in self.qubits:
@@ -706,16 +708,21 @@ class _U2Randomization:
                     )
                     source_unitary_phases_by_qubit[qubit].extend(
                         float(angle) / (2 * np.pi)
-                        for angle in unitary_to_zxzxz(provided_unitary_randomized)
+                        for angle in 
+                        unitary_to_zxzxz(provided_unitary_randomized)
                     )
         else:
-            source_unitary_phases_by_qubit = {qubit: self.source_unitary_phases for qubit in self.qubits}
+            source_unitary_phases_by_qubit = dict.fromkeys(
+                self.qubits, self.source_unitary_phases
+            )
 
         memory_map = {}
         for qubit in self.qubits:
             memory_map[self.destination_names(qubit)] = [0.0, 0.5, 0.5]
             memory_map[self.seed_names(qubit)] = [seeds[qubit]]
-            memory_map[self.source_names(qubit)] = source_unitary_phases_by_qubit[qubit]
+            memory_map[self.source_names(qubit)] = (
+                source_unitary_phases_by_qubit[qubit]
+            )
         return memory_map
 
     def generate_indices( # Qubit index to seed value
