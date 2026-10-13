@@ -17,6 +17,7 @@ if PyQuil is not installed when building docs.
 """
 from __future__ import annotations
 
+from collections import defaultdict
 import logging
 from dataclasses import dataclass
 from typing import (
@@ -610,7 +611,7 @@ class _U2Randomization:
     qubits: Sequence[int]
     destination_names: Callable[[int], str]
     seed_names: Callable[[int], str]
-    source_name: str
+    source_names: Callable[[int], str]
     source_unitary_phases: list[float]
 
     @property
@@ -627,12 +628,12 @@ class _U2Randomization:
             return
 
         program = Program()
-        program += Declare(
-            self.source_name, "REAL", len(self.source_unitary_phases)
-        )
         for qubit in self.qubits:
             program += Declare(
                 self.destination_names(qubit), "REAL", _ANGLES_PER_UNITARY
+            )
+            program += Declare(
+                self.source_names(qubit), "REAL", _ANGLES_PER_UNITARY * self.source_unitary_count
             )
             program += Declare(self.seed_names(qubit), "INTEGER", 1)
         for qubit in self.qubits:
@@ -642,7 +643,7 @@ class _U2Randomization:
                     inst.CallArgument.from_identifier(
                         self.destination_names(qubit)
                     ),
-                    inst.CallArgument.from_identifier(self.source_name),
+                    inst.CallArgument.from_identifier(self.source_names(qubit)),
                     inst.CallArgument.from_immediate(
                         complex(_ANGLES_PER_UNITARY)),
                     inst.CallArgument.from_identifier(
@@ -662,26 +663,30 @@ class _U2Randomization:
     def build_memory_map(
         self,
         seeds:  Mapping[int, int],
-        phases: tuple[float, float, float] | None = None
+        phases_by_qubit: Mapping[int, tuple[float, float, float]] | None = None
     ) -> Mapping[str, list[float] | list[int]]:
-        """
-        Build the memory map for unitary randomization, including the
-        randomization destination and seeds for each qubit.
+        """Build the per-qubit memory map for unitary randomization.
 
-        If `phases` are provided, then the randomization source unitaries will
-        pre-merge them here.
+        Each qubit gets its own destination, seed, and source register
+        (`source_names(qubit)`). If `phases_by_qubit` is given, each
+        qubit's ZXZXZ phases are pre-merged into every source unitary
+        (provided applied first, then random), so source registers differ
+        per qubit; otherwise every qubit gets `source_unitary_phases`.
 
-        All phases (`phases`, `source_unitary_phases`, and the returned
-        memory values) are in units of turns (fractions of 2π), matching
-        `emit_phase_gate`, which records `phase / (2π)` and emits
-        `RZ(2π * ref)`. `zxzxz_to_unitary`/`unitary_to_zxzxz` work in
-        radians, so phases are converted on the way in and out.
+        All phases are in turns (fractions of 2π), matching
+        `emit_phase_gate`; they are converted to/from radians around
+        `zxzxz_to_unitary`/`unitary_to_zxzxz`.
+
+        Args:
+            seeds (Mapping[int, int]): PRNG seed per qubit.
+            phases_by_qubit (Mapping[int, tuple[float, float, float]] |
+                None): ZXZXZ phases (turns) to merge, per qubit.
+
+        Returns:
+            Mapping[str, list[float] | list[int]]: register name to values.
         """
-        if phases is not None:
-            source_unitary_phases = []
-            provided_unitary = zxzxz_to_unitary(
-                2 * np.pi * np.asarray(phases)
-            )
+        if phases_by_qubit is not None:
+            source_unitary_phases_by_qubit = defaultdict(list)
             for unitary_index in range(self.source_unitary_count):
                 start_index = unitary_index * _ANGLES_PER_UNITARY
                 random_unitary = zxzxz_to_unitary(
@@ -691,21 +696,26 @@ class _U2Randomization:
                         ]
                     )
                 )
-                # provided applied first, then random
-                provided_unitary_randomized = (
-                    random_unitary @ provided_unitary
-                )
-                source_unitary_phases.extend(
-                    float(angle) / (2 * np.pi)
-                    for angle in unitary_to_zxzxz(provided_unitary_randomized)
-                )
+                for qubit in self.qubits:
+                    provided_unitary = zxzxz_to_unitary(
+                        2 * np.pi * np.asarray(phases_by_qubit[qubit])
+                    )
+                    # provided applied first, then random
+                    provided_unitary_randomized = (
+                        random_unitary @ provided_unitary
+                    )
+                    source_unitary_phases_by_qubit[qubit].extend(
+                        float(angle) / (2 * np.pi)
+                        for angle in unitary_to_zxzxz(provided_unitary_randomized)
+                    )
         else:
-            source_unitary_phases = self.source_unitary_phases
+            source_unitary_phases_by_qubit = {qubit: self.source_unitary_phases for qubit in self.qubits}
 
-        memory_map = {self.source_name: source_unitary_phases}
+        memory_map = {}
         for qubit in self.qubits:
             memory_map[self.destination_names(qubit)] = [0.0, 0.5, 0.5]
             memory_map[self.seed_names(qubit)] = [seeds[qubit]]
+            memory_map[self.source_names(qubit)] = source_unitary_phases_by_qubit[qubit]
         return memory_map
 
     def generate_indices( # Qubit index to seed value
