@@ -13,6 +13,7 @@ import numpy as np
 
 from qcal.circuit import Barrier, Circuit, CircuitSet, Cycle
 from qcal.interface.pyquil.randomized_compiling import (
+    _READOUT_PAULI_PHASES,
     PHASE_GATES,
     PULSE_GATES,
     RCLayerTracker,
@@ -667,17 +668,7 @@ def transpile_circuit(
             destination_names=lambda qubit: f"measurement_unitary_q{qubit}",
             seed_names=lambda qubit: f"measurement_seed_q{qubit}",
             source_names=lambda qubit: f"measurement_source_unitaries_q{qubit}",
-            # Flat, per `_U2Randomization.source_unitary_phases: list[float]` --
-            # `source_unitary_count`, the Declare size in `build_quil_program`,
-            # and the raw values in `build_memory_map` all assume a flat
-            # length-12 list (4 unitaries x 3 ZXZXZ angles each), not this
-            # matrix's (4, 3) shape.
-            source_unitary_phases=np.array(
-                [[ 0.  ,  0.5 ,  0.5 ], # I
-                 [-0.25,  0.  , -0.25], # X
-                 [ 0.5 ,  0.  ,  0.  ], # Y
-                 [ 0.25,  0.5 , -0.25]] # Z
-            ).flatten().tolist()
+            source_unitary_phases=_READOUT_PAULI_PHASES,
         )
         # RC's own RCLayerTracker already tracks this same final layer
         # (see RCLayerTracker.__init__), so only build a dedicated

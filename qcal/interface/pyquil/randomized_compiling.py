@@ -62,6 +62,19 @@ PHASE_GATES = ('Rz', 'VirtualZ')
 PULSE_GATES = ('X90', 'SX')
 _ANGLES_PER_UNITARY = 3  # ZXZXZ decomposition
 
+# Readout randomization unitaries I, X, Y, Z as ZXZXZ angles (units of 2*pi).
+# Flat, per `_U2Randomization.source_unitary_phases`: 4 unitaries x 3 angles.
+_READOUT_PAULI_PHASES = [
+    0.,    0.5, 0.5,    # I
+    -0.25, 0.,  -0.25,  # X
+    0.5,   0.,  0.,     # Y
+    0.25,  0.5, -0.25,  # Z
+]
+# Whether each of `_READOUT_PAULI_PHASES` flips the measured bit, for undoing
+# randomized readout in post-processing.
+# This can be imported in remote libraries for post-processing.
+_READOUT_PAULI_FLIPS = np.array([False, True, True, False])
+
 
 def is_rc_layer(
     cycle: Cycle,
