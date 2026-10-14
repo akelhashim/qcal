@@ -22,75 +22,7 @@ from qcal.math.probability import total_variation_distance
 logger = logging.getLogger(__name__)
 
 
-__all__ = ('readout_correction', 'Results')
-
-
-def readout_correction(results: Results, confusion_matrix: DataFrame) -> Dict:
-    """Perform readout correction using a measured confusion matrix.
-
-    This readout correction is performed individually on each qubit.
-    Therefore, it is scalable, but will not correct correlated readout
-    errors.
-
-    Args:
-        results (Results): Results object.
-        confusion_matrix (DataFrame): confusion matrix measured using the
-            ```qcal.benchmarking.fidelity.ReadoutFidelity``` module.
-
-    Returns:
-        Dict: corrected results dictionary.
-    """
-    if confusion_matrix.columns[0][0] == 'Meas State':
-        cmats = [confusion_matrix.to_numpy().astype(float)]
-    else:
-        cmats = []
-        qubits = set()
-        for col in confusion_matrix:
-            qubits.add(col[0])
-        qubits = tuple(sorted(qubits, key=lambda x: int(x[1:])))
-        for q in qubits:
-            cmats.append(
-                confusion_matrix[q].to_numpy().astype(float)
-            )
-
-    if len(cmats) != len(tuple(results._results.keys())[0]):
-        logger.warning(
-            ' The number of confusion matrices does not match the length'
-            ' of the provided bitstrings. No readout correction will be'
-            ' performed!'
-        )
-        return results.dict
-
-    else:
-        # Tensor product of confusion matricies
-        cmat_inv = reduce(np.kron,
-            [np.linalg.inv(cmat) for cmat in cmats]
-        ).astype(float)
-
-        # Generate all possible dit strings
-        dtstrs = [
-            ''.join(i) for i in itertools.product(
-                [str(j) for j in results.levels],
-                repeat=len(results.states[0])
-            )
-        ]
-
-        # Probability distribution over all possible dit strings
-        probs = {
-            **dict.fromkeys(dtstrs, 0.0),
-            **dict(results.probabilities.astype(float))
-        }
-        probs = np.array(list(probs.values()))#.reshape(-1, 1)
-
-        # Perform the readout correction
-        corr_probs = np.array(
-            # probs @ np.linalg.inv(cmat) * results.n_shots
-            probs @ cmat_inv * results.n_shots
-        ).astype(int)
-
-        corrected_results = dict(zip(dtstrs, corr_probs, strict=False))
-
-    return corrected_results
+__all__ = ('qp_readout_correction', 'readout_correction', 'Results')
 
 
 # TODO: add fidelity and TVD
@@ -104,7 +36,7 @@ class Results:
     """
 
     def __init__(self,
-        results: Dict | None = None,
+        results:          Dict | None = None,
         confusion_matrix: DataFrame | None = None
     ) -> None:
         """Initialize a Results object.
@@ -382,17 +314,29 @@ class Results:
             title = 'Counts'
             fig.add_trace(go.Bar(y=self.counts))
 
+        # Scale the width with the number of states, but keep it within
+        # reasonable bounds so that large dit string sets do not produce an
+        # arbitrarily wide figure
+        n_states = len(self.states)
+        width = min(max(100 * n_states, 400), 1000)
+
+        # Rotate the tick labels if they are wider than the space allotted
+        # to each bar (~9 px per character at font size 15, ~150 px margins)
+        px_per_bar = (width - 150) / n_states
+        rotate = 9 * len(self.states[0]) > px_per_bar
+
         fig.update_traces(marker_color='blue')
         fig.update_layout(
             autosize=False,
-            width=150 * len(self.states),
+            width=width,
             height=400,
             xaxis={
                 'tickvals': list(range(len(self.states))),
                 'ticktext': self.states,
                 'title': 'Dit String',
                 'titlefont_size': 20,
-                'tickfont_size': 15
+                'tickfont_size': 15,
+                'tickangle': -45 if rotate else 0
             },
             yaxis={
                 'title': title,
@@ -400,8 +344,6 @@ class Results:
                 'tickfont_size': 15
             }
         )
-        if len(self.states[0]) > 5:
-            fig.update_xaxes(tickangle=-45)
 
         save_properties = {
             'toImageButtonOptions': {
@@ -425,3 +367,279 @@ class Results:
             float: tvd.
         """
         return total_variation_distance(self, results)
+
+
+def readout_correction(results: Results, confusion_matrix: DataFrame) -> Dict:
+    """Perform readout correction using a measured confusion matrix.
+
+    This readout correction is performed individually on each qubit.
+    Therefore, it is scalable, but will not correct correlated readout
+    errors.
+
+    Args:
+        results (Results): Results object.
+        confusion_matrix (DataFrame): confusion matrix measured using the
+            ```qcal.benchmarking.fidelity.ReadoutFidelity``` module.
+
+    Returns:
+        Dict: corrected results dictionary.
+    """
+    if confusion_matrix.columns[0][0] == 'Meas State':
+        cmats = [confusion_matrix.to_numpy().astype(float)]
+    else:
+        cmats = []
+        qubits = set()
+        for col in confusion_matrix:
+            qubits.add(col[0])
+        qubits = tuple(sorted(qubits, key=lambda x: int(x[1:])))
+        for q in qubits:
+            cmats.append(
+                confusion_matrix[q].to_numpy().astype(float)
+            )
+
+    if len(cmats) != len(tuple(results._results.keys())[0]):
+        logger.warning(
+            ' The number of confusion matrices does not match the length'
+            ' of the provided bitstrings. No readout correction will be'
+            ' performed!'
+        )
+        return results.dict
+
+    else:
+        # Tensor product of confusion matricies
+        cmat_inv = reduce(np.kron,
+            [np.linalg.inv(cmat) for cmat in cmats]
+        ).astype(float)
+
+        # Generate all possible dit strings
+        dtstrs = [
+            ''.join(i) for i in itertools.product(
+                [str(j) for j in results.levels],
+                repeat=len(results.states[0])
+            )
+        ]
+
+        # Probability distribution over all possible dit strings
+        probs = {
+            **dict.fromkeys(dtstrs, 0.0),
+            **dict(results.probabilities.astype(float))
+        }
+        probs = np.array(list(probs.values()))#.reshape(-1, 1)
+
+        # Perform the readout correction
+        corr_probs = np.array(
+            # probs @ np.linalg.inv(cmat) * results.n_shots
+            probs @ cmat_inv * results.n_shots
+        ).astype(int)
+
+        corrected_results = dict(zip(dtstrs, corr_probs, strict=False))
+
+    return corrected_results
+
+
+def qp_readout_correction(
+    results:      Results | Dict,
+    mrc_results:  Results | Dict,
+    order:        int = 2,
+    clip_to_zero: bool = True,
+    threshold:    float = 1e-8,
+) -> Dict:
+    """Quasi-probabilistic readout correction (QPRC).
+
+    Implements the readout correction scheme of
+    https://arxiv.org/abs/2312.14139. Under measurement randomized compiling
+    (MRC), readout noise is tailored into a stochastic bit-flip channel
+    described by a probability distribution p over error bitstrings x. This
+    distribution is obtained by measuring the all-zero state with randomized
+    readout (``mrc_results``). Writing e = sum_{x != 0} p_x x, the order-k
+    quasi-probabilistic inverse is
+
+        q^(k) = c * sum_{j=0}^{2k-1} (-e / p_0)^j,
+
+    where powers denote convolution over bitwise addition mod 2 and c
+    normalizes q^(k) to unit sum. For k = 1, this reduces to
+    q = (p_0 0 - e) / (2 p_0 - 1). Residual readout errors are suppressed
+    from O(1 - p_0) to O((1 - p_0)^(2k)). The corrected counts are given by
+    the convolution of the measured counts with q^(k).
+
+    Bitstrings are encoded as integers and convolved in a vectorized,
+    chunked manner, so the cost scales with the number of observed
+    bitstrings rather than with 2^n.
+
+    Args:
+        results (Results | Dict): measured results to correct. These must be
+            obtained using randomized readout.
+        mrc_results (Results | Dict): results of measuring the all-zero
+            state with randomized readout.
+        order (int, optional): order k of the quasi-probabilistic inverse.
+            Defaults to 2.
+        clip_to_zero (bool, optional): whether to set negative corrected
+            counts to zero. Defaults to True.
+        threshold (float, optional): quasi-probabilities with magnitude
+            less than or equal to this value are discarded when constructing
+            the inverse. This bounds the growth of the support for
+            ``order > 1``. Defaults to 1e-8.
+
+    Returns:
+        Dict: corrected results dictionary.
+
+    Raises:
+        ValueError: if the bitstrings are not binary, do not have consistent
+            lengths, if ``order < 1``, or if p_0 <= 0.5 (in which case the
+            inverse is undefined).
+    """
+    if order < 1:
+        raise ValueError('order must be >= 1!')
+
+    # Encode each bitstring as an integer so that bitwise addition mod 2
+    # becomes a vectorized XOR. Every distribution below is stored sparsely
+    # as a pair of arrays: (keys, vals) = (bitstrings, weights).
+    b_keys, b_vals, n = _to_xor_arrays(results)
+    p_keys, p_vals, n_mrc = _to_xor_arrays(mrc_results)
+    if n != n_mrc:
+        raise ValueError(
+            f'Bitstring length of the results ({n}) does not match that of'
+            f' the MRC results ({n_mrc})!'
+        )
+
+    # Under MRC, measuring the all-zero state yields the error bitstring
+    # directly, so the normalized MRC results are the error distribution p.
+    # p0 is the probability of no readout error. The inverse requires
+    # p0 > 0.5, since otherwise the normalization (2 p0 - 1 for k = 1)
+    # vanishes or changes sign.
+    p_vals = p_vals / p_vals.sum()
+    is_zero = p_keys == 0
+    p0 = p_vals[is_zero].sum()
+    if p0 <= 0.5:
+        raise ValueError(
+            f'The all-zero probability ({p0:.3f}) must be greater than 0.5'
+            ' for the readout inverse to exist!'
+        )
+
+    # Build q^(k) = c * sum_{j=0}^{2k-1} (-e / p0)^j, i.e. the Neumann
+    # series of p^-1 = (1 / p0) (0 + e / p0)^-1 truncated after 2k terms.
+    # e_vals holds -e / p0: the non-zero error strings, rescaled and negated.
+    e_keys, e_vals = p_keys[~is_zero], -p_vals[~is_zero] / p0
+    # The j = 0 term is the identity for XOR convolution: all weight on the
+    # all-zero bitstring. q accumulates the series; t holds the current
+    # term (-e / p0)^j.
+    q_keys = t_keys = np.zeros(1, dtype=p_keys.dtype)
+    q_vals = t_vals = np.ones(1)
+    # If no errors were observed, p is the identity and so is its inverse
+    if len(e_keys) > 0:
+        for _ in range(2 * order - 1):
+            # Next term: (-e / p0)^j = (-e / p0)^(j-1) * (-e / p0), dropping
+            # entries with magnitude <= threshold to bound the support
+            t_keys, t_vals = _xor_convolve(
+                t_keys, t_vals, e_keys, e_vals, threshold
+            )
+            # Add the term to the running sum, merging duplicate bitstrings
+            q_keys, q_vals = _xor_reduce(
+                np.concatenate([q_keys, t_keys]),
+                np.concatenate([q_vals, t_vals]),
+                threshold
+            )
+    # Without truncation, the sum is (p0^2k - (1 - p0)^2k) / p0^(2k-1)
+    q_vals = q_vals / q_vals.sum()
+
+    keys, vals = _xor_convolve(b_keys, b_vals, q_keys, q_vals)
+    if clip_to_zero:
+        vals = np.clip(vals, 0., None)
+    counts = np.rint(vals).astype(np.int64)
+
+    return {
+        format(int(k), f'0{n}b'): int(c)
+        for k, c in zip(keys, counts, strict=True) if c != 0
+    }
+
+
+def _to_xor_arrays(results: Results | Dict) -> Tuple[np.ndarray, ...]:
+    """Convert bitstring results to integer keys and float values.
+
+    Bitstrings are encoded as integers so that bitwise addition mod 2 can be
+    performed with ``np.bitwise_xor``. Bitstrings longer than 64 bits fall
+    back to arbitrary-precision Python integers.
+
+    Args:
+        results (Results | Dict): results object or dictionary mapping
+            bitstrings to counts.
+
+    Returns:
+        Tuple[np.ndarray, ...]: integer keys, float values, and bitstring
+            length.
+    """
+    results = results.dict if isinstance(results, Results) else results
+    lengths = {len(s) for s in results}
+    if len(lengths) != 1:
+        raise ValueError('All bitstrings must have the same length!')
+    n = lengths.pop()
+    if any(set(s) - {'0', '1'} for s in results):
+        raise ValueError('Bitstrings must be binary!')
+
+    dtype = np.uint64 if n <= 64 else object
+    keys = np.array([int(s, 2) for s in results], dtype=dtype)
+    vals = np.array(list(results.values()), dtype=float)
+    return keys, vals, n
+
+
+def _xor_reduce(
+    keys: np.ndarray, vals: np.ndarray, threshold: float = 0.
+) -> Tuple[np.ndarray, np.ndarray]:
+    """Sum values with identical keys and discard negligible entries.
+
+    Args:
+        keys (np.ndarray): integer-encoded bitstrings (may repeat).
+        vals (np.ndarray): (quasi-)probabilities or counts.
+        threshold (float, optional): entries with magnitude less than or
+            equal to this value are discarded. Defaults to 0.
+
+    Returns:
+        Tuple[np.ndarray, np.ndarray]: unique keys and summed values.
+    """
+    uniq, inv = np.unique(keys, return_inverse=True)
+    summed = np.bincount(inv.ravel(), weights=vals, minlength=len(uniq))
+    mask = np.abs(summed) > threshold
+    return uniq[mask], summed[mask]
+
+
+def _xor_convolve(
+    keys1: np.ndarray,
+    vals1: np.ndarray,
+    keys2: np.ndarray,
+    vals2: np.ndarray,
+    threshold: float = 0.,
+    max_size: int = 2**22,
+) -> Tuple[np.ndarray, np.ndarray]:
+    """Convolve two sparse distributions over bitwise addition mod 2.
+
+    Computes r(z) = sum_{x ^ y = z} a(x) b(y). The outer product is evaluated
+    in chunks of at most ``max_size`` elements to bound memory usage.
+
+    Args:
+        keys1 (np.ndarray): integer-encoded bitstrings of the first
+            distribution.
+        vals1 (np.ndarray): values of the first distribution.
+        keys2 (np.ndarray): integer-encoded bitstrings of the second
+            distribution.
+        vals2 (np.ndarray): values of the second distribution.
+        threshold (float, optional): entries with magnitude less than or
+            equal to this value are discarded. Defaults to 0.
+        max_size (int, optional): maximum number of elements in each chunk
+            of the outer product. Defaults to 2**22.
+
+    Returns:
+        Tuple[np.ndarray, np.ndarray]: keys and values of the convolution.
+    """
+    rows = max(1, max_size // max(1, len(keys2)))
+    chunks = [
+        _xor_reduce(
+            np.bitwise_xor.outer(keys1[i:i + rows], keys2).ravel(),
+            np.multiply.outer(vals1[i:i + rows], vals2).ravel(),
+        )
+        for i in range(0, len(keys1), rows)
+    ]
+    return _xor_reduce(
+        np.concatenate([k for k, _ in chunks]),
+        np.concatenate([v for _, v in chunks]),
+        threshold
+    )

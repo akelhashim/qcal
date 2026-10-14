@@ -28,6 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   transformations under conjugation by Clifford gates, cycles, and
   circuits
 - `draw_qpu_heatmap` for plotting variable lattice-based values
+- `qp_readout_correction` for applying quasi-probabilistic readout correction
 
 ### Changed
 
