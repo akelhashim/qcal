@@ -533,7 +533,10 @@ def to_pyquil(
             qubit_to_cref=qubit_to_cref,
             cycles_to_defcircuits=cycles_to_defcircuits,
             fence_between_cycles=fence_between_cycles,
-            randomized_readout=randomized_readout
+            randomized_readout=randomized_readout,
+            # Only `layer_period` is used without randomized compiling, to
+            # find a single-qubit-only circuit's final template.
+            rc_kwargs=rc_kwargs,
         )
         if randomized_readout:
             readout_configuation = _tprogram.readout_configuation
@@ -639,6 +642,11 @@ def transpile_circuit(
     layer_period = effective_layer_period(
         circuit, (rc_kwargs or {}).get('layer_period')
     )
+    # Non-barrier Cycles excluding terminal measurements, matching
+    # `is_rc_layer`'s `n_cycles`.
+    n_interior_cycles = sum(
+        not cycle.is_barrier for cycle in circuit.cycles[:-1]
+    )
 
     rc_tracker = None
     if randomized_compiling:
@@ -675,7 +683,9 @@ def transpile_circuit(
         # tracker for it when RC is off.
         # if not randomized_compiling:
         readout_tracker = ReadoutLayerTracker(readout_configuation)
-        readout_final_layer = final_layer_cycle_indices(circuit)
+        readout_final_layer = final_layer_cycle_indices(
+            circuit, layer_period
+        )
 
     non_barrier_idx = 0
     cycle_defs = {}
@@ -733,7 +743,7 @@ def transpile_circuit(
                     ),
                 )
                 if rc_tracker is not None and is_rc_layer(
-                    cycle, non_barrier_idx, layer_period
+                    cycle, non_barrier_idx, layer_period, n_interior_cycles
                 ):
                     rc_tracker.close_layer()
                 non_barrier_idx += 1
@@ -764,7 +774,21 @@ def transpile_circuit(
             tprogram.readout_configuation = readout_configuation
 
     elif randomized_readout:
-        tprogram = readout_configuation.build_quil_program() + tprogram
+        # Without RC, nothing else declares the extern that
+        # `_U2Randomization` CALLs (pyquil's RC `build_quil_program` declares
+        # every extern, so only add it here to avoid a duplicate PRAGMA).
+        from pyquil._qpu._classical_computations import (
+            build_extern_function_signatures,
+        )
+        tprogram = (
+            Program(
+                build_extern_function_signatures()[
+                    'choose_random_real_sub_regions'
+                ]
+            )
+            + readout_configuation.build_quil_program()
+            + tprogram
+        )
         tprogram.readout_configuation = readout_configuation
         tprogram.source_phases = readout_tracker.source_phases
 

@@ -80,6 +80,7 @@ def is_rc_layer(
     cycle: Cycle,
     index: int | None = None,
     layer_period: int | None = None,
+    n_cycles: int | None = None,
 ) -> bool:
     """Whether a Cycle is a randomized-compiling layer boundary.
 
@@ -101,8 +102,16 @@ def is_rc_layer(
     is treated as a boundary, as if a `base_cycle` of identities sat
     there, without requiring any change to the circuit itself. Both
     call sites must pass the same `index` numbering (non-barrier
-    cycles only) and `layer_period` for this to stay consistent with
-    `base_cycles`.
+    cycles only), `layer_period` and `n_cycles` for this to stay
+    consistent with `base_cycles`.
+
+    Positional boundaries are only placed *between* templates, never
+    after the last one: pyquil's RC engine always plays a final layer
+    after the last base cycle (to undo the accumulated Pauli frame), so
+    the last template must be that final layer. A boundary after it
+    would leave the final layer with no gates -- the frame would never
+    be undone, and its twirled-unitary register (sized for
+    `cycle_count + 1` layers) would be longer than the source phases.
 
     Args:
         cycle (Cycle): qcal Cycle.
@@ -112,6 +121,10 @@ def is_rc_layer(
         layer_period (int | None, optional): close a layer every this
             many non-barrier cycles, regardless of content. Defaults
             to `None`, which disables the positional fallback.
+        n_cycles (int | None, optional): number of non-barrier cycles
+            in the circuit's interior (excluding terminal
+            measurements). Defaults to `None`, which disables the
+            positional fallback.
 
     Returns:
         bool: True if `cycle` should count as an RC layer.
@@ -124,8 +137,19 @@ def is_rc_layer(
     return (
         layer_period is not None
         and index is not None
+        and n_cycles is not None
         and (index + 1) % layer_period == 0
+        and index + 1 < n_cycles
     )
+
+
+def _interior_cycles(circuit: Circuit) -> List[Cycle]:
+    """Non-barrier Cycles of `circuit`, excluding terminal measurements."""
+    return [
+        cycle
+        for cycle in circuit.cycles[:-1]  # Exclude terminal measurements
+        if not cycle.is_barrier
+    ]
 
 
 def effective_layer_period(
@@ -253,9 +277,10 @@ def build_rc_configuration(
             `base_cycles` repeats in `circuit`. Defaults to `None`,
             which auto-detects the smallest repeating unit (and its
             repeat count) from the circuit's actual RC-layer sequence
-            (see `_minimal_period`). Pass an explicit value to require
-            a specific repeat count instead -- a mismatch raises
-            `ValueError`.
+            (see `_minimal_period`), or to 1 when the positional
+            `layer_period` fallback is in effect. Pass an explicit value
+            to require a specific repeat count instead -- a mismatch
+            raises `ValueError`.
         layer_period (int | None, optional): forwarded to `is_rc_layer`
             as a positional fallback boundary, for circuits with no
             two-qubit gates or measurements to key off of (e.g. a run
@@ -281,17 +306,28 @@ def build_rc_configuration(
         return
 
     layer_period = effective_layer_period(circuit, layer_period)
-    non_barrier_cycles = [
-        cycle
-        for cycle in circuit.cycles[:-1]  # Exclude terminal measurements
-        if not cycle.is_barrier
-    ]
+    non_barrier_cycles = _interior_cycles(circuit)
     layers = tuple(
         cycle_to_base_cycle(cycle, qubits)
         for idx, cycle in enumerate(non_barrier_cycles)
-        if is_rc_layer(cycle, idx, layer_period)
+        if is_rc_layer(cycle, idx, layer_period, len(non_barrier_cycles))
     )
+    if not layers:
+        raise ValueError(
+            "The circuit has no randomized-compiling layer boundaries "
+            "(two-qubit gates, mid-circuit measurements, or more than "
+            f"one layer_period={layer_period} single-qubit template), "
+            "so there is nothing to twirl."
+        )
 
+    if base_cycle_repetitions is None and layer_period is not None:
+        # Positional layers are all identical identity cycles, so
+        # auto-detection would always find a 1-cycle unit repeated
+        # len(layers) times. pyquil then emits a classical base-cycle
+        # loop, which magneto can't schedule (cyclic dependency between
+        # the loop's merge CALLs and the shot body), so keep the
+        # sequence flat.
+        base_cycle_repetitions = 1
     if base_cycle_repetitions is None:
         period = _minimal_period(layers)
         base_cycle_repetitions = len(layers) // period if period else 1
@@ -358,14 +394,10 @@ def has_trailing_single_qubit_layer(
             which case the whole interior is one trailing layer).
     """
     layer_period = effective_layer_period(circuit, layer_period)
-    non_barrier_cycles = [
-        cycle
-        for cycle in circuit.cycles[:-1]  # Exclude terminal measurements
-        if not cycle.is_barrier
-    ]
+    non_barrier_cycles = _interior_cycles(circuit)
     last_boundary = -1
     for idx, cycle in enumerate(non_barrier_cycles):
-        if is_rc_layer(cycle, idx, layer_period):
+        if is_rc_layer(cycle, idx, layer_period, len(non_barrier_cycles)):
             last_boundary = idx
     return last_boundary < len(non_barrier_cycles) - 1
 
@@ -479,7 +511,9 @@ class RCLayerTracker:
         )
 
 
-def final_layer_cycle_indices(circuit: Circuit) -> FrozenSet[int]:
+def final_layer_cycle_indices(
+    circuit: Circuit, layer_period: int | None = None
+) -> FrozenSet[int]:
     """Indices of every Cycle in the final pre-measurement layer.
 
     The final layer is the full ZXZXZ template -- however many Cycles
@@ -496,12 +530,25 @@ def final_layer_cycle_indices(circuit: Circuit) -> FrozenSet[int]:
 
     Args:
         circuit (Circuit): qcal circuit.
+        layer_period (int | None, optional): forwarded to
+            `is_rc_layer`, matching the (already resolved, see
+            `effective_layer_period`) value randomized compiling uses,
+            so that a `layer_period`-tiled circuit's final layer is
+            just its last template. Defaults to `None`.
 
     Returns:
         FrozenSet[int]: indices into `circuit`, possibly empty (e.g. a
             circuit with no single-qubit content before its terminal
             measurement(s), or with no measurement at all).
     """
+    # Position of each non-barrier Cycle among the circuit's
+    # non-barrier Cycles, matching `is_rc_layer`'s `index` numbering.
+    non_barrier_index = {}
+    for i, cycle in enumerate(circuit):
+        if not cycle.is_barrier:
+            non_barrier_index[i] = len(non_barrier_index)
+    n_cycles = len(_interior_cycles(circuit))
+
     i = len(circuit) - 1
     while i >= 0:
         cycle = circuit[i]
@@ -517,7 +564,9 @@ def final_layer_cycle_indices(circuit: Circuit) -> FrozenSet[int]:
         cycle = circuit[i]
         if cycle.is_barrier:
             i -= 1
-        elif is_rc_layer(cycle):
+        elif is_rc_layer(
+            cycle, non_barrier_index[i], layer_period, n_cycles
+        ):
             break
         else:
             indices.append(i)
