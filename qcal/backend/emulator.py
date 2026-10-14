@@ -204,16 +204,17 @@ class Emulator(QPU):
 
         - A ``'results'`` column is added (one results dict per
           circuit).
-        - A ``'state'`` column is added (one
-          ``state.pretty_print()`` string per circuit).
+        - A ``'state'`` column is added (one final ``quax`` state
+          object per circuit). Call ``.pretty_print()`` on an entry
+          for a readable string; this is not done eagerly because
+          formatting a density matrix scales as 4**n and dominates
+          runtime beyond a few qubits.
         - For qcal :class:`~qcal.circuit.Circuit` objects the results
           dict is also written to the circuit's ``.results``
           attribute directly.
         """
         all_results = self._measurements['results']
-        all_states = [
-            state.pretty_print() for state in self._measurements['states']
-        ]
+        all_states = self._measurements['states']
 
         for circuit_set in (
             self._circuits,
