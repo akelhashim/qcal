@@ -114,6 +114,13 @@ def draw_circuit(circuit: Circuit, show: bool = True):
 
     qubit_index = {q: i for i, q in enumerate(circuit.qubits)}
 
+    # Gates drawn independently on each qubit, even when a single gate
+    # object acts on multiple qubits (e.g. MCM:(1, 3)).
+    per_qubit_gates = ('Meas', 'MCM', 'Reset')
+
+    def is_per_qubit(gate: Gate) -> bool:
+        return gate.is_single_qudit or gate.name in per_qubit_gates
+
     node_x = []
     node_y = []
     node_text = []
@@ -131,7 +138,7 @@ def draw_circuit(circuit: Circuit, show: bool = True):
         else:
             c -= n_barriers
             for gate in cycle.gates:
-                if gate.is_single_qudit:
+                if is_per_qubit(gate):
                     for q in gate.qubits:
                         node_x.append(c)
                         node_y.append(qubit_index[q])
@@ -154,7 +161,7 @@ def draw_circuit(circuit: Circuit, show: bool = True):
                         [symbol_map[gate.name][0]] * len(gate.qubits)
                     )
                     if label_gates:
-                        gate_names.append(
+                        gate_names.extend(
                             {'x': c,
                              'y': qubit_index[q],
                              'text': 'M' if gate.name in (
@@ -165,7 +172,7 @@ def draw_circuit(circuit: Circuit, show: bool = True):
                              ),
                              'font': {'color': 'black', 'size': 13},
                              'showarrow': False
-                            }
+                            } for q in gate.qubits
                         )
                     marker_colors.extend(
                         [color_map[gate.name]] * len(gate.qubits)
@@ -193,8 +200,14 @@ def draw_circuit(circuit: Circuit, show: bool = True):
                             gate, include_matrix=label_gates
                         )
                         qnode_text[cache_key] = text
-                    node_text.extend([text] * 2)
-                    node_symbols.extend(symbol_map[gate.name])
+                    # Keep the marker lists aligned with node_x/node_y:
+                    # one symbol per qubit, padding with the last symbol
+                    # for gates on more qubits than the map specifies.
+                    n_q = len(gate.qubits)
+                    symbols = symbol_map[gate.name][:n_q]
+                    symbols += [symbols[-1]] * (n_q - len(symbols))
+                    node_text.extend([text] * n_q)
+                    node_symbols.extend(symbols)
                     if label_gates:
                         gate_names.append(
                             {
@@ -205,7 +218,7 @@ def draw_circuit(circuit: Circuit, show: bool = True):
                                 'showarrow': False
                             },
                         )
-                    marker_colors.extend(['white', 'white'])
+                    marker_colors.extend(['white'] * n_q)
 
     # ms_scale = 200
     node_trace = go.Scatter(
@@ -247,7 +260,7 @@ def draw_circuit(circuit: Circuit, show: bool = True):
             for gate in cycle.gates:
                 edge_x_mq = []
                 edge_y_mq = []
-                if gate.is_multi_qudit:
+                if not is_per_qubit(gate):
                     for q in gate.qubits:
                         edge_x_mq.append(c)
                         edge_y_mq.append(circuit.qubits.index(q))
