@@ -23,6 +23,7 @@ from qcal.compilation.compiler import Compiler
 from qcal.config import Config
 from qcal.managers.classification_manager import ClassificationManager
 from qcal.managers.data_manager import DataMananger
+from qcal.results import Results
 from qcal.transpilation.transpiler import Transpiler
 from qcal.utils import load_from_pickle
 
@@ -59,6 +60,7 @@ class QPU:
         '_n_shots',
         '_raster_circuits',
         '_rcorr_cmat',
+        '_rcorr_rr_results',
         '_runtime',
         '_sequence',
         '_transpiled_circuits',
@@ -67,17 +69,18 @@ class QPU:
 
     def __init__(
             self,
-            config:          Config,
-            compiler:        Any | Compiler | List[Any] | None = None,
-            transpiler:      Any | Transpiler | List[Any] | None = None,
-            classifier:      ClassificationManager | None = None,
-            n_shots:         int = 1024,
-            n_batches:       int = 1,
-            n_circs_per_seq: int = 1,
-            n_levels:        int = 2,
-            jit:             bool = True,
-            raster_circuits: bool = False,
-            rcorr_cmat:      pd.DataFrame | None = None,
+            config:           Config,
+            compiler:         Any | Compiler | List[Any] | None = None,
+            transpiler:       Any | Transpiler | List[Any] | None = None,
+            classifier:       ClassificationManager | None = None,
+            n_shots:          int = 1024,
+            n_batches:        int = 1,
+            n_circs_per_seq:  int = 1,
+            n_levels:         int = 2,
+            jit:              bool = True,
+            raster_circuits:  bool = False,
+            rcorr_cmat:       pd.DataFrame | None = None,
+            rcorr_rr_results: Results | Dict | None = None
         ) -> None:
         """Initialize an instance of the Quantum Processing Unit.
 
@@ -114,6 +117,11 @@ class QPU:
                 readout correction. Defaults to ``None``. If passed, the readout
                 correction will be applied to the raw bit strings in
                 post-processing.
+            rcorr_rr_results (Results | Dict | None, optional): characterization
+                results of measuring the all-zero state with randomized readout.
+                Defaults to ``None``. If passed, quasi-prabilistic readout
+                correction will be applied to the raw bit strings in
+                post-processing.
         """
         self._config = config
         self._compiler = compiler
@@ -125,9 +133,17 @@ class QPU:
         self._jit = jit
         self._raster_circuits = raster_circuits
         self._rcorr_cmat = rcorr_cmat
+        self._rcorr_rr_results = rcorr_rr_results
 
-        assert n_levels <= 3, 'n_levels > 3 is not currently supported!'
-        self._n_levels = n_levels
+        if self._rcorr_cmat is not None and self._rcorr_rr_results is not None:
+            raise ValueError(
+                "rcorr_cmat and rcorr_rr_results cannot both be passed!"
+            )
+
+        if n_levels <= 3:
+            self._n_levels = n_levels
+        else:
+            raise ValueError("n_levels > 3 is not currently supported!")
 
         if self._classifier is None:
             try:
@@ -139,11 +155,14 @@ class QPU:
                 logger.warning(' No classifier has been instantiated!')
 
         if self._classifier is not None:
-            assert n_levels <= self._classifier[
+            if n_levels <= self._classifier[
                 self._classifier._qubits[0]
-            ].n_components, (
-                "'n_levels' is greater than the number of classified states!"
-            )
+            ].n_components:
+                self._n_levels = n_levels
+            else:
+                raise ValueError(
+                    "n_levels is greater than the number of classified states!"
+                )
 
         self._circuits = None
         self._classified_results = None
@@ -528,12 +547,13 @@ class QPU:
 
         logger.info(f" Data save location: {self._data_manager._save_path}\n")
 
-    def run(self,
-            circuits:  Any | List[Any],
-            n_shots:   int | None = None,
-            n_batches: int | None = None,
-            save:      bool = True
-        ) -> None:
+    def run(
+        self,
+        circuits:  Any | List[Any],
+        n_shots:   int | None = None,
+        n_batches: int | None = None,
+        save:      bool = True
+    ) -> None:
         """Run all experimental methods.
 
         Args:
