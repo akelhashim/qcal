@@ -37,7 +37,8 @@ class Results:
 
     def __init__(self,
         results:          Dict | None = None,
-        confusion_matrix: DataFrame | None = None
+        confusion_matrix: DataFrame | None = None,
+        rr_char_results:  Results | Dict | None = None,
     ) -> None:
         """Initialize a Results object.
 
@@ -46,7 +47,21 @@ class Results:
                 Defaults to None.
             confusion_matrix (DataFrame | None, optional): confusion matrix
                 used for readout correction. Defaults to None.
+            rr_char_results (Results | Dict | None, optional): results of
+                measuring the all-zero state with randomized readout, used
+                for quasi-probabilistic readout correction (with default
+                settings). Defaults to None.
+
+        Raises:
+            ValueError: if both ``confusion_matrix`` and ``rr_char_results``
+                are provided.
         """
+        if confusion_matrix is not None and rr_char_results is not None:
+            raise ValueError(
+                'Only one of confusion_matrix or rr_char_results can be'
+                ' provided!'
+            )
+
         if results is not None:
             results = dict(sorted(results.items()))
         else:
@@ -55,10 +70,13 @@ class Results:
         self._results = results
         self.__raw_results = copy.deepcopy(results)
         self._confusion_matrix = None
+        self._rr_char_results = None
         self.__df = None
 
         if confusion_matrix is not None:
             self.apply_readout_correction(confusion_matrix)
+        elif rr_char_results is not None:
+            self.apply_qp_readout_correction(rr_char_results)
 
     def _rebuild_df(self) -> None:
         """(Re)build the counts/probabilities DataFrame from self._results.
@@ -128,6 +146,16 @@ class Results:
             pd.Series: integer counts.
         """
         return self._df.loc['counts']
+
+    @property
+    def confusion_matrix(self) -> DataFrame | None:
+        """Confusion matrix used to correct the results.
+
+        Returns:
+            DataFrame | None: confusion matrix, or None if the results have
+                not been corrected using a confusion matrix.
+        """
+        return self._confusion_matrix
 
     @property
     def dim(self) -> int:
@@ -236,6 +264,30 @@ class Results:
         return tuple(sorted(levels))
 
     @property
+    def raw_results(self) -> Dict:
+        """Dictionary of uncorrected bitstrings and counts.
+
+        A copy is returned so that the raw results, from which any readout
+        correction is computed, cannot be modified.
+
+        Returns:
+            Dict: raw results.
+        """
+        return dict(self.__raw_results)
+
+    @property
+    def rr_char_results(self) -> Results | Dict | None:
+        """Randomized readout characterization results used to correct the
+        results.
+
+        Returns:
+            Results | Dict | None: results of measuring the all-zero state
+                with randomized readout, or None if the results have not
+                been corrected using quasi-probabilistic readout correction.
+        """
+        return self._rr_char_results
+
+    @property
     def states(self) -> Tuple:
         """Distinct bitstrings in the results.
 
@@ -256,6 +308,7 @@ class Results:
         self._results = copy.deepcopy(self.__raw_results)
         self.__df = None
         self._confusion_matrix = None
+        self._rr_char_results = None
         try:
             corrected = readout_correction(self, confusion_matrix)
             # readout_correction returns self._results unchanged if the
@@ -263,7 +316,57 @@ class Results:
             if corrected is not self._results:
                 self._results = corrected
                 self._confusion_matrix = confusion_matrix
-        except Exception:
+        except Exception as e:
+            logger.warning(
+                f' Readout correction failed: {e} No readout correction'
+                ' will be performed!'
+            )
+            self._results = copy.deepcopy(self.__raw_results)
+        self.__df = None
+
+    def apply_qp_readout_correction(
+        self,
+        rr_char_results: Results | Dict,
+        order:           int = 2,
+        clip_to_zero:    bool = True,
+        threshold:       float = 1e-8,
+    ) -> None:
+        """Apply quasi-probabilistic readout correction (QPRC).
+
+        See ``qp_readout_correction`` for details. The results must have
+        been obtained using randomized readout.
+
+        Args:
+            rr_char_results (Results | Dict): results of measuring the
+                all-zero state with randomized readout.
+            order (int, optional): order k of the quasi-probabilistic
+                inverse. Defaults to 2.
+            clip_to_zero (bool, optional): whether to set negative corrected
+                counts to zero. Defaults to True.
+            threshold (float, optional): quasi-probabilities with magnitude
+                less than or equal to this value are discarded when
+                constructing the inverse. Defaults to 1e-8.
+        """
+        # Always correct the raw results so that repeated calls do not
+        # compound the correction
+        self._results = copy.deepcopy(self.__raw_results)
+        self.__df = None
+        self._confusion_matrix = None
+        self._rr_char_results = None
+        try:
+            self._results = dict(sorted(qp_readout_correction(
+                self,
+                rr_char_results,
+                order=order,
+                clip_to_zero=clip_to_zero,
+                threshold=threshold
+            ).items()))
+            self._rr_char_results = rr_char_results
+        except Exception as e:
+            logger.warning(
+                f' QP readout correction failed: {e} No readout correction'
+                ' will be performed!'
+            )
             self._results = copy.deepcopy(self.__raw_results)
         self.__df = None
 
@@ -438,11 +541,11 @@ def readout_correction(results: Results, confusion_matrix: DataFrame) -> Dict:
 
 
 def qp_readout_correction(
-    results:      Results | Dict,
-    mrc_results:  Results | Dict,
-    order:        int = 2,
-    clip_to_zero: bool = True,
-    threshold:    float = 1e-8,
+    results:          Results | Dict,
+    rr_char_results:  Results | Dict,
+    order:            int = 2,
+    clip_to_zero:     bool = True,
+    threshold:        float = 1e-8,
 ) -> Dict:
     """Quasi-probabilistic readout correction (QPRC).
 
@@ -451,7 +554,7 @@ def qp_readout_correction(
     (MRC), readout noise is tailored into a stochastic bit-flip channel
     described by a probability distribution p over error bitstrings x. This
     distribution is obtained by measuring the all-zero state with randomized
-    readout (``mrc_results``). Writing e = sum_{x != 0} p_x x, the order-k
+    readout (``rr_char_results``). Writing e = sum_{x != 0} p_x x, the order-k
     quasi-probabilistic inverse is
 
         q^(k) = c * sum_{j=0}^{2k-1} (-e / p_0)^j,
@@ -469,8 +572,8 @@ def qp_readout_correction(
     Args:
         results (Results | Dict): measured results to correct. These must be
             obtained using randomized readout.
-        mrc_results (Results | Dict): results of measuring the all-zero
-            state with randomized readout.
+        rr_char_results (Results | Dict): characterization results of
+            measuring the all-zero state with randomized readout.
         order (int, optional): order k of the quasi-probabilistic inverse.
             Defaults to 2.
         clip_to_zero (bool, optional): whether to set negative corrected
@@ -495,15 +598,15 @@ def qp_readout_correction(
     # becomes a vectorized XOR. Every distribution below is stored sparsely
     # as a pair of arrays: (keys, vals) = (bitstrings, weights).
     b_keys, b_vals, n = _to_xor_arrays(results)
-    p_keys, p_vals, n_mrc = _to_xor_arrays(mrc_results)
-    if n != n_mrc:
+    p_keys, p_vals, n_rr_char = _to_xor_arrays(rr_char_results)
+    if n != n_rr_char:
         raise ValueError(
             f'Bitstring length of the results ({n}) does not match that of'
-            f' the MRC results ({n_mrc})!'
+            f' the RR char results ({n_rr_char})!'
         )
 
-    # Under MRC, measuring the all-zero state yields the error bitstring
-    # directly, so the normalized MRC results are the error distribution p.
+    # Under RR, measuring the all-zero state yields the error bitstring
+    # directly, so the normalized RR results are the error distribution p.
     # p0 is the probability of no readout error. The inverse requires
     # p0 > 0.5, since otherwise the normalization (2 p0 - 1 for k = 1)
     # vanishes or changes sign.
