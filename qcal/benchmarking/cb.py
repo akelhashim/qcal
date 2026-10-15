@@ -1049,8 +1049,6 @@ def CB(
                     'dressed', np.nan
                 )
 
-            self._build_subsystem_summary()
-
         def _accumulate_subsystem_evs(
             self,
             pauli_tuple:          PauliString,
@@ -1296,6 +1294,8 @@ def CB(
             equivalents are saved to disk when Settings.save_data is
             True.
             """
+            self._build_subsystem_summary()
+
             if self._analyze_subsystems:
                 self._plot_subsystem_heatmap()
 
@@ -1645,8 +1645,8 @@ def CB(
             """Run all experimental methods and analyze results."""
             self.generate_circuits()
             qpu.run(self, self._circuits, save=False)
-            self.save()
             self.analyze()
+            self.save()
             self.plot()
             self.final()
 
