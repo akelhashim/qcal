@@ -9,7 +9,7 @@ import itertools
 import logging
 from collections import defaultdict
 from functools import reduce
-from typing import Dict, Tuple
+from typing import Dict, Sequence, Tuple
 
 import numpy as np
 import pandas as pd
@@ -330,6 +330,9 @@ class Results:
         order:           int = 2,
         clip_to_zero:    bool = True,
         threshold:       float = 1e-8,
+        partitions:      Sequence[Sequence[Sequence[int]]] | None = None,
+        max_iterations:  int = 10,
+        tol:             float = 1e-3,
     ) -> None:
         """Apply quasi-probabilistic readout correction (QPRC).
 
@@ -346,6 +349,15 @@ class Results:
             threshold (float, optional): quasi-probabilities with magnitude
                 less than or equal to this value are discarded when
                 constructing the inverse. Defaults to 1e-8.
+            partitions (Sequence[Sequence[Sequence[int]]] | None, optional):
+                levels of disjoint partitions of bitstring indices over
+                which to correct before the global correction. If None,
+                partitions are only used if p_0 <= 1/2. Defaults to None.
+            max_iterations (int, optional): maximum number of global
+                corrections. Defaults to 10.
+            tol (float, optional): L1 distance between the residual error
+                quasi-distribution and the identity below which no further
+                global corrections are performed. Defaults to 1e-3.
         """
         # Always correct the raw results so that repeated calls do not
         # compound the correction
@@ -359,7 +371,10 @@ class Results:
                 rr_char_results,
                 order=order,
                 clip_to_zero=clip_to_zero,
-                threshold=threshold
+                threshold=threshold,
+                partitions=partitions,
+                max_iterations=max_iterations,
+                tol=tol
             ).items()))
             self._rr_char_results = rr_char_results
         except Exception as e:
@@ -546,6 +561,9 @@ def qp_readout_correction(
     order:            int = 2,
     clip_to_zero:     bool = True,
     threshold:        float = 1e-8,
+    partitions:       Sequence[Sequence[Sequence[int]]] | None = None,
+    max_iterations:   int = 10,
+    tol:              float = 1e-3,
 ) -> Dict:
     """Quasi-probabilistic readout correction (QPRC).
 
@@ -565,6 +583,22 @@ def qp_readout_correction(
     from O(1 - p_0) to O((1 - p_0)^(2k)). The corrected counts are given by
     the convolution of the measured counts with q^(k).
 
+    The global inverse requires p_0 > 1/2, which is violated for large
+    numbers of qubits (e.g. ~34 qubits with independent 2% errors). In this
+    case, the correction is first performed over increasingly larger
+    partitions of the qubits (Appendix D): for each level of disjoint
+    partitions S_1, ..., S_m, the error distribution is marginalized over
+    each partition, the local inverses q_S1 ... q_Sm are applied to both
+    the measured counts and the error distribution, and the residual error
+    quasi-distribution is used for the next level.
+
+    Finally, the global correction is performed. Each global correction is
+    also applied to the error distribution, and is repeated on the residual
+    error quasi-distribution p' until ||p' - 0||_1 <= ``tol``. For p_0 close
+    to 1, a single correction typically suffices; repetition is needed when
+    p is far from the identity (e.g. after partitioned corrections in the
+    presence of correlated errors).
+
     Bitstrings are encoded as integers and convolved in a vectorized,
     chunked manner, so the cost scales with the number of observed
     bitstrings rather than with 2^n.
@@ -582,17 +616,35 @@ def qp_readout_correction(
             less than or equal to this value are discarded when constructing
             the inverse. This bounds the growth of the support for
             ``order > 1``. Defaults to 1e-8.
+        partitions (Sequence[Sequence[Sequence[int]]] | None, optional):
+            levels of disjoint partitions of bitstring indices over which to
+            correct before the global correction, e.g.
+            ``[[(0,), (1,), (2,), (3,)], [(0, 1), (2, 3)]]``. Indices follow
+            the same convention as ``Results.marginalize``. If None, no
+            partitions are used if p_0 > 1/2; otherwise, partitions of size
+            1, 2, 4, ... of adjacent indices are used. Defaults to None.
+        max_iterations (int, optional): maximum number of global
+            corrections. A warning is logged if the residual error has not
+            converged to within ``tol`` after this many. Use 1 for a single
+            global correction. Defaults to 10.
+        tol (float, optional): L1 distance between the residual error
+            quasi-distribution and the identity below which no further
+            global corrections are performed. Defaults to 1e-3.
 
     Returns:
         Dict: corrected results dictionary.
 
     Raises:
         ValueError: if the bitstrings are not binary, do not have consistent
-            lengths, if ``order < 1``, or if p_0 <= 0.5 (in which case the
-            inverse is undefined).
+            lengths, if ``order < 1`` or ``max_iterations < 1``, if the
+            partitions are not disjoint, or
+            if p_0 <= 1/2 for any partition or for the global correction (in
+            which case the inverse is undefined).
     """
     if order < 1:
         raise ValueError('order must be >= 1!')
+    if max_iterations < 1:
+        raise ValueError('max_iterations must be >= 1!')
 
     # Encode each bitstring as an integer so that bitwise addition mod 2
     # becomes a vectorized XOR. Every distribution below is stored sparsely
@@ -607,21 +659,136 @@ def qp_readout_correction(
 
     # Under RR, measuring the all-zero state yields the error bitstring
     # directly, so the normalized RR results are the error distribution p.
-    # p0 is the probability of no readout error. The inverse requires
-    # p0 > 0.5, since otherwise the normalization (2 p0 - 1 for k = 1)
-    # vanishes or changes sign.
+    # p0 is the probability of no readout error.
     p_vals = p_vals / p_vals.sum()
+    p0 = p_vals[p_keys == 0].sum()
+
+    # The global inverse requires p0 > 0.5. If this is not satisfied, first
+    # correct over increasingly larger partitions of the qubits (Appendix D)
+    if partitions is None:
+        partitions = [] if p0 > 0.5 else _default_partitions(n)
+
+    for level in partitions:
+        blocks = [tuple(block) for block in level]
+        flat = [i for block in blocks for i in block]
+        if len(flat) != len(set(flat)) or not all(0 <= i < n for i in flat):
+            raise ValueError(
+                f'Partition {blocks} must contain disjoint bitstring indices'
+                f' in [0, {n})!'
+            )
+
+        # The local inverses act on disjoint bits, so their XOR convolution
+        # is their tensor product: Q = q_S1 q_S2 ... q_Sk
+        Q_keys = np.zeros(1, dtype=p_keys.dtype)
+        Q_vals = np.ones(1)
+        for block in blocks:
+            # Zeroing all bits outside of the block marginalizes p over the
+            # block, while keeping its bitstrings embedded in the full space
+            mask = sum(1 << (n - 1 - i) for i in block)
+            if p_keys.dtype != object:
+                mask = p_keys.dtype.type(mask)
+            m_keys, m_vals = _xor_reduce(p_keys & mask, p_vals)
+            q_keys, q_vals = _qp_inverse(
+                m_keys, m_vals, order, threshold, block
+            )
+            Q_keys, Q_vals = _xor_convolve(
+                Q_keys, Q_vals, q_keys, q_vals, threshold
+            )
+        Q_vals = Q_vals / Q_vals.sum()
+
+        # Apply Q to both the data and the error distribution. The latter
+        # becomes the residual error quasi-distribution p' = Q p, which is
+        # closer to the identity, so that larger partitions can be inverted
+        # next. Negligible counts are dropped to bound the data's support.
+        b_keys, b_vals = _xor_convolve(
+            b_keys, b_vals, Q_keys, Q_vals, threshold * b_vals.sum()
+        )
+        p_keys, p_vals = _xor_convolve(
+            p_keys, p_vals, Q_keys, Q_vals, threshold
+        )
+
+    # Global correction over all qubits. This is repeated on the residual
+    # error quasi-distribution until it sufficiently approximates the
+    # identity, since a single correction can converge slowly if p is far
+    # from the identity (e.g. after correcting over partitions in the
+    # presence of correlated errors).
+    for _ in range(max_iterations):
+        q_keys, q_vals = _qp_inverse(p_keys, p_vals, order, threshold)
+        b_keys, b_vals = _xor_convolve(
+            b_keys, b_vals, q_keys, q_vals, threshold * b_vals.sum()
+        )
+        p_keys, p_vals = _xor_convolve(
+            p_keys, p_vals, q_keys, q_vals, threshold
+        )
+        # L1 distance of the residual error quasi-distribution from the
+        # identity (all weight on the all-zero bitstring)
+        is_zero = p_keys == 0
+        residual = (
+            np.abs(p_vals[~is_zero]).sum()
+            + abs(p_vals[is_zero].sum() - 1)
+        )
+        if residual <= tol:
+            break
+    else:
+        logger.warning(
+            f' QP readout correction did not converge after {max_iterations}'
+            f' iteration(s): residual error = {residual:.2e} > {tol:.2e}.'
+        )
+
+    keys, vals = b_keys, b_vals
+    if clip_to_zero:
+        vals = np.clip(vals, 0., None)
+    counts = np.rint(vals).astype(np.int64)
+
+    return {
+        format(int(k), f'0{n}b'): int(c)
+        for k, c in zip(keys, counts, strict=True) if c != 0
+    }
+
+
+def _qp_inverse(
+    p_keys:    np.ndarray,
+    p_vals:    np.ndarray,
+    order:     int,
+    threshold: float = 0.,
+    block:     Tuple[int] | None = None,
+) -> Tuple[np.ndarray, np.ndarray]:
+    """Order-k quasi-probabilistic inverse of an error distribution.
+
+    Computes q^(k) = c * sum_{j=0}^{2k-1} (-e / p0)^j, where e is the
+    distribution p without the all-zero bitstring and c normalizes q^(k) to
+    unit sum.
+
+    Args:
+        p_keys (np.ndarray): integer-encoded error bitstrings.
+        p_vals (np.ndarray): normalized (quasi-)probabilities of the error
+            bitstrings.
+        order (int): order k of the inverse.
+        threshold (float, optional): quasi-probabilities with magnitude less
+            than or equal to this value are discarded. Defaults to 0.
+        block (Tuple[int] | None, optional): bitstring indices over which p
+            is defined, used only for error messages. Defaults to None.
+
+    Returns:
+        Tuple[np.ndarray, np.ndarray]: keys and values of the inverse.
+
+    Raises:
+        ValueError: if p0 <= 1/2.
+    """
+    # The inverse requires p0 > 1/2, since otherwise the normalization
+    # (2 p0 - 1 for k = 1) vanishes or changes sign
     is_zero = p_keys == 0
     p0 = p_vals[is_zero].sum()
     if p0 <= 0.5:
+        where = f' over indices {block}' if block is not None else ''
         raise ValueError(
-            f'The all-zero probability ({p0:.3f}) must be greater than 0.5'
-            ' for the readout inverse to exist!'
+            f'The all-zero probability{where} ({p0:.3f}) must be greater'
+            ' than 0.5 for the readout inverse to exist!'
         )
 
-    # Build q^(k) = c * sum_{j=0}^{2k-1} (-e / p0)^j, i.e. the Neumann
-    # series of p^-1 = (1 / p0) (0 + e / p0)^-1 truncated after 2k terms.
-    # e_vals holds -e / p0: the non-zero error strings, rescaled and negated.
+    # q^(k) is the Neumann series of p^-1 = (1 / p0) (0 + e / p0)^-1
+    # truncated after 2k terms. e_vals holds -e / p0: the non-zero error
+    # strings, rescaled and negated.
     e_keys, e_vals = p_keys[~is_zero], -p_vals[~is_zero] / p0
     # The j = 0 term is the identity for XOR convolution: all weight on the
     # all-zero bitstring. q accumulates the series; t holds the current
@@ -643,17 +810,26 @@ def qp_readout_correction(
                 threshold
             )
     # Without truncation, the sum is (p0^2k - (1 - p0)^2k) / p0^(2k-1)
-    q_vals = q_vals / q_vals.sum()
+    return q_keys, q_vals / q_vals.sum()
 
-    keys, vals = _xor_convolve(b_keys, b_vals, q_keys, q_vals)
-    if clip_to_zero:
-        vals = np.clip(vals, 0., None)
-    counts = np.rint(vals).astype(np.int64)
 
-    return {
-        format(int(k), f'0{n}b'): int(c)
-        for k, c in zip(keys, counts, strict=True) if c != 0
-    }
+def _default_partitions(n: int) -> list:
+    """Levels of partitions of adjacent indices of size 1, 2, 4, ... < n.
+
+    Args:
+        n (int): bitstring length.
+
+    Returns:
+        list: levels of disjoint partitions.
+    """
+    partitions = []
+    size = 1
+    while size < n:
+        partitions.append(
+            [tuple(range(i, min(i + size, n))) for i in range(0, n, size)]
+        )
+        size *= 2
+    return partitions
 
 
 def _to_xor_arrays(results: Results | Dict) -> Tuple[np.ndarray, ...]:
@@ -733,7 +909,10 @@ def _xor_convolve(
     Returns:
         Tuple[np.ndarray, np.ndarray]: keys and values of the convolution.
     """
-    rows = max(1, max_size // max(1, len(keys2)))
+    if len(keys1) == 0 or len(keys2) == 0:
+        return keys1[:0], vals1[:0]
+
+    rows = max(1, max_size // len(keys2))
     chunks = [
         _xor_reduce(
             np.bitwise_xor.outer(keys1[i:i + rows], keys2).ravel(),

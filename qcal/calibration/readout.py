@@ -164,7 +164,6 @@ def ReadoutCalibration(
             if self._gate == 'X90':
                 circuit1.extend([
                     Cycle({X90(q, subspace='GE') for q in self._qubits}),
-                    Barrier(self._qubits),
                     Cycle({X90(q, subspace='GE') for q in self._qubits}),
                 ])
             elif self._gate == 'X':
@@ -180,11 +179,9 @@ def ReadoutCalibration(
                 if self._gate == 'X90':
                     circuit2.extend([
                         Cycle({X90(q, subspace='GE') for q in self._qubits}),
-                        Barrier(self._qubits),
                         Cycle({X90(q, subspace='GE') for q in self._qubits}),
                         Barrier(self._qubits),
                         Cycle({X90(q, subspace='EF') for q in self._qubits}),
-                        Barrier(self._qubits),
                         Cycle({X90(q, subspace='EF') for q in self._qubits}),
                     ])
                 elif self._gate == 'X':
