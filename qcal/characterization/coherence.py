@@ -1,6 +1,7 @@
 """"Submodule for qubit coherence experiments.
 
 """
+import itertools
 import logging
 from typing import Callable, Dict, List, Sequence
 
@@ -20,8 +21,10 @@ from qcal.fitting.fit import (
     FitCosine,
     FitDecayingCosine,
     FitDecayingCosineExponential,
+    FitError,
     FitExponential,
 )
+from qcal.fitting.utils import est_freq_fft
 from qcal.gates.single_qubit import X90, Idle, Rz, X, Z
 from qcal.math.utils import (
     reciprocal_uncertainty,
@@ -1064,20 +1067,28 @@ def ParityOscillations(
                 results = circuit.results.marginalize(q_index)
                 self._evs.append(results.ev)
 
-            self._fit.fit(
-                self._phases,
-                self._evs,
-                p0=(max(self._evs), 1.0/((len(self._qubits)-1) * np.pi), 0, 0)
-            )
-            assert self._fit.fit_success, 'Cosine fit was unsuccessful!'
-            errors.append(self._fit.error[0])
+            try:
+                est_freq = est_freq_fft(self._phases, self._evs)
+                params = Parameters()
+                params.add('amp', value=max(self._evs), min=-1., max=1.)
+                params.add('freq', value=est_freq)
+                params.add('phase', value=0., min=-np.pi, max=np.pi)
+                params.add('offset', value=0., min=-1., max=1.)
+                self._fit.fit(self._phases, self._evs, params=params)
+                if not self._fit.fit_success:
+                    raise FitError('Cosine fit was unsuccessful!')
 
-            fidelity = (pop0 + pop1 + abs(self._fit.fit_params[0])) / 2
-            error = uncertainty_of_sum(errors)
-            fidelity, error = round_to_order_error(fidelity, error)
-            self._fidelity = {
-                'val': fidelity, 'err': error
-            }
+                errors.append(self._fit.fit_params['amp'].stderr)
+                fidelity = (
+                    pop0 + pop1 + abs(self._fit.fit_params['amp'].value)
+                ) / 2
+                error = uncertainty_of_sum(errors)
+                fidelity, error = round_to_order_error(fidelity, error)
+                self._fidelity = {
+                    'val': fidelity, 'err': error
+                }
+            except Exception as e:
+                logger.warning(f' Could not determine fidelity: {e}')
 
         def save(self):
             """Save all circuits and data."""
@@ -1103,24 +1114,28 @@ def ParityOscillations(
 
             fig, ax = plt.subplots(1, 2, figsize=(10,4))
 
+            states = [
+                ''.join(bits) for bits in
+                itertools.product('01', repeat=len(self._qubits))
+            ]
+            populations = (
+                self._circuits[0].results.marginalize(q_index).populations
+            )
             ax[0].bar(
-                [0, 1, 2, 3],
-                list(
-                   self._circuits[0].results.marginalize(q_index).probabilities
-                ),
+                range(len(states)),
+                [populations[state] for state in states],
                 color='blue'
             )
-            ax[0].set_xticks([0, 1, 2, 3])
-            ax[0].set_xticklabels(
-                self._circuits[0].results.marginalize(q_index).states
-            )
+            ax[0].set_xticks(range(len(states)))
+            ax[0].set_xticklabels(states)
             ax[0].set_ylabel('Probability', fontsize=15)
             ax[0].tick_params(axis='both', which='major', labelsize=12)
 
             ax[1].plot(self._phases, self._evs, 'o', ms=6, color='blue')
-            ax[1].plot(
-                self._phases, self._fit.predict(self._phases), color='k'
-            )
+            if self._fit.fit_success:
+                ax[1].plot(
+                    self._phases, self._fit.predict(self._phases), color='k'
+                )
             ax[1].set_ylabel('Parity', fontsize=15)
             ax[1].set_xlabel('Phase (rad.)', fontsize=15)
             ax[1].set_ylim((-1.1, 1.1))
@@ -1148,9 +1163,10 @@ def ParityOscillations(
 
         def final(self):
             """Final experimental method."""
-            fidelity = self._fidelity['val']
-            error = self._fidelity['err']
-            print(f'\nFidelity = {fidelity} ({error})')
+            if self._fidelity is not None:
+                fidelity = self._fidelity['val']
+                error = self._fidelity['err']
+                print(f'\nFidelity = {fidelity} ({error})')
             print(f"\nRuntime: {repr(self._runtime)[8:]}\n")
 
         def run(self):
