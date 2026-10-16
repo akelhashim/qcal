@@ -10,8 +10,8 @@ logger = logging.getLogger(__name__)
 
 
 def est_freq_fft(
-        x: ArrayLike, y: ArrayLike, padding_factor=10
-    ) -> float:
+    x: ArrayLike, y: ArrayLike, padding_factor=10
+) -> float:
     """Estimate frequency using zero-padded FFT.
 
     Args:
