@@ -339,15 +339,15 @@ def draw_DAG(G: nx.Graph | nx.DiGraph):
                         'size': 20,
                         # family="Arial",
                         # color="darkblue"
-                    }
+                    },
+                    'side': 'right'
                 },
                 'tickfont': {
                     'size': 15,
                     # family="Arial",
                     # color="darkred"
                 },
-                'xanchor': 'left',
-                'titleside': 'right'
+                'xanchor': 'left'
             },
             'line_width': 2
         }
