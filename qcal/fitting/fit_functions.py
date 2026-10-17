@@ -4,7 +4,7 @@
 import logging
 
 import numpy as np
-from numpy.typing import ArrayLike, NDArray
+from numpy.typing import ArrayLike
 
 logger = logging.getLogger(__name__)
 
@@ -21,7 +21,7 @@ __all__ = (
 )
 
 
-def absolute_value(x: ArrayLike, a: float, b: float, c: float) -> NDArray:
+def absolute_value(x: ArrayLike, a: float, b: float, c: float) -> ArrayLike:
     """Absolute value function.
 
     Args:
@@ -31,18 +31,18 @@ def absolute_value(x: ArrayLike, a: float, b: float, c: float) -> NDArray:
         c (float): y-offset
 
     Returns:
-        NDArray: absolute value curve.
+        ArrayLike: absolute value curve.
     """
     return a * np.abs(x - b)  + c
 
 
 def base_exponential(
-        x:    ArrayLike,
-        base: float,
-        a:    float,
-        b:    float,
-        c:    float,
-    ) -> NDArray:
+    x:    ArrayLike,
+    base: float,
+    a:    float,
+    b:    float,
+    c:    float,
+) -> ArrayLike:
     """Exponential function.
 
     Args:
@@ -53,14 +53,14 @@ def base_exponential(
         c (float): y-offset
 
     Returns:
-        NDArray: exponential curve.
+        ArrayLike: exponential curve.
     """
     return a * np.power(base, b * x) + c
 
 
 def cosine(
-        x: ArrayLike, amp: float, freq: float, phase: float, offset: float
-    ) -> NDArray:
+    x: ArrayLike, amp: float, freq: float, phase: float, offset: float
+) -> ArrayLike:
     """Cosine function.
 
     Args:
@@ -71,14 +71,14 @@ def cosine(
         offset (float): phase offset.
 
     Returns:
-        NDArray: cosine curve.
+        ArrayLike: cosine curve.
     """
     return amp * np.cos(2 * np.pi * freq * x + phase) + offset
 
 
 def decaying_cosine(
-        x: ArrayLike, a: float, b: float, c: float, d: float, e: float
-    ) -> NDArray:
+    x: ArrayLike, a: float, b: float, c: float, d: float, e: float
+) -> ArrayLike:
     """Decaying cosine function.
 
     Args:
@@ -90,15 +90,15 @@ def decaying_cosine(
         e (float): y-offset.
 
     Returns:
-        NDArray: decaying cosine curve.
+        ArrayLike: decaying cosine curve.
     """
     return a * np.exp(-b * x) * np.cos(2 * np.pi * c * x + d) + e
 
 
 def decaying_cosine_exponential(
-        x: ArrayLike, a: float, b: float, c: float, d: float, e: float,
-        f: float, g: float
-    ) -> NDArray:
+    x: ArrayLike, a: float, b: float, c: float, d: float, e: float,
+    f: float, g: float
+) -> ArrayLike:
     """Decaying cosine function with an exponential baseline.
 
     Args:
@@ -112,7 +112,7 @@ def decaying_cosine_exponential(
         g (float): constant y-offset.
 
     Returns:
-        NDArray: decaying cosine curve.
+        ArrayLike: decaying cosine curve.
     """
     return (
         a * np.exp(-b * x) * np.cos(2 * np.pi * c * x + d)
@@ -120,7 +120,7 @@ def decaying_cosine_exponential(
     )
 
 
-def exponential(x: ArrayLike, a: float, b: float, c: float) -> NDArray:
+def exponential(x: ArrayLike, a: float, b: float, c: float) -> ArrayLike:
     """Exponential function.
 
     Args:
@@ -130,7 +130,7 @@ def exponential(x: ArrayLike, a: float, b: float, c: float) -> NDArray:
         c (float): y-offset
 
     Returns:
-        NDArray: exponential curve.
+        ArrayLike: exponential curve.
     """
     return a * np.exp(-b * x) + c
 
