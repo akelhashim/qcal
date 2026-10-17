@@ -300,7 +300,7 @@ class Cycle:
         Returns:
             Tuple: qudit labels.
         """
-        return self._qubits
+        return self.qubits
 
     @property
     def unitary(self) -> NDArray:
@@ -634,7 +634,7 @@ class Circuit:
         Returns:
             Tuple: qudit labels.
         """
-        return self._qubits
+        return self.qubits
 
     @property
     def unitary(self) -> NDArray:
