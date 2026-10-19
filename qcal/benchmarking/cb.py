@@ -460,16 +460,33 @@ def CB(
             return self._process_infidelities.get('reference', np.nan)
 
         @property
-        def loss(self) -> dict[tuple, ufloat]:
-            """Loss for the cycle_or_circuit.
+        def loss(self) -> dict[int | tuple[int, ...], ufloat]:
+            """Loss for each subsystem of the cycle_or_circuit.
 
-            This property can be used for parameter optimization.
+            This property can be used for parameter optimization. The
+            loss is the process infidelity of each gate-body subsystem
+            (see subsystem_infidelities). If analyze_subsystems was
+            False, the whole register is the only subsystem and its
+            process infidelity is used.
 
             Returns:
-                dict[tuple, ufloat]: process infidelity of
-                    cycle_or_circuit, keyed by its qubits.
+                dict[int | tuple[int, ...], ufloat]: subsystem label to
+                    process infidelity map. A single-qubit subsystem is
+                    labeled by its qubit (int), and a multi-qubit
+                    subsystem by its qubits (tuple[int, ...]).
             """
-            return {tuple(self._qubits): self.process_infidelity}
+            if self._analyze_subsystems:
+                infidelities = {
+                    s: e_F
+                    for s, e_F in self.subsystem_infidelities.items()
+                    if s != self._qubits
+                }
+            else:
+                infidelities = {self._qubits: self.process_infidelity}
+            return {
+                (s[0] if len(s) == 1 else tuple(s)): e_F
+                for s, e_F in infidelities.items()
+            }
 
         @property
         def subsystem_infidelities(self) -> dict[tuple, ufloat]:
