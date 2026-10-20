@@ -516,6 +516,7 @@ def to_pyquil(
         rc_source_phases = _tprogram.source_phases
         if randomized_readout:
             readout_configuation = _tprogram.readout_configuation
+            readout_source_phases = _tprogram.readout_source_phases
         declarations += _declarations
         tprogram += _tprogram
 
@@ -550,6 +551,7 @@ def to_pyquil(
         final_program.source_phases = rc_source_phases
     if randomized_readout:
         final_program.readout_configuation = readout_configuation
+        final_program.readout_source_phases = readout_source_phases
         if not randomized_compiling:
             final_program.source_phases = readout_source_phases
 
@@ -650,14 +652,30 @@ def transpile_circuit(
 
     rc_tracker = None
     if randomized_compiling:
+        rc_kwargs = dict(rc_kwargs or {})
+        reserve_final_layer = has_trailing_single_qubit_layer(
+            circuit, layer_period
+        )
+        if randomized_readout:
+            # The final layer's phases are written into the readout
+            # destination register instead (see
+            # `RCLayerTracker.emit_phase_gate`), and the accumulated Pauli
+            # frame is undone there via `apply_pauli_pair` below, so RC's
+            # own final-layer twirl would never be read.
+            rc_kwargs.setdefault('skip_final_layer', True)
+        elif rc_kwargs.get('skip_final_layer') and reserve_final_layer:
+            raise ValueError(
+                'skip_final_layer=True requires randomized_readout: '
+                'without it, the final pre-measurement layer reads RC\'s '
+                'twirled unitary memory, which skip_final_layer leaves '
+                'unallocated.'
+            )
         rc_configuration = build_rc_configuration(
-            circuit, qubits, **(rc_kwargs or {})
+            circuit, qubits, **rc_kwargs
         )
         rc_tracker = RCLayerTracker(
             rc_configuration,
-            reserve_final_layer=has_trailing_single_qubit_layer(
-                circuit, layer_period
-            ),
+            reserve_final_layer=reserve_final_layer,
         )
         # RandomizedCompilingConfiguration.build_quil_program() only
         # declares its twirled destination registers (`unitaries_q{n}`);
@@ -678,10 +696,9 @@ def transpile_circuit(
             source_names=lambda qubit: f"measurement_source_unitaries_q{qubit}",
             source_unitary_phases=_READOUT_PAULI_PHASES,
         )
-        # RC's own RCLayerTracker already tracks this same final layer
-        # (see RCLayerTracker.__init__), so only build a dedicated
-        # tracker for it when RC is off.
-        # if not randomized_compiling:
+        # With RC, RCLayerTracker emits the final layer's gates but
+        # records their phases into this tracker (see
+        # RCLayerTracker.emit_phase_gate).
         readout_tracker = ReadoutLayerTracker(readout_configuation)
         readout_final_layer = final_layer_cycle_indices(
             circuit, layer_period
@@ -772,6 +789,7 @@ def transpile_circuit(
         tprogram.source_phases = rc_tracker.source_phases
         if randomized_readout:
             tprogram.readout_configuation = readout_configuation
+            tprogram.readout_source_phases = readout_tracker.source_phases
 
     elif randomized_readout:
         # Without RC, nothing else declares the extern that
@@ -791,6 +809,7 @@ def transpile_circuit(
         )
         tprogram.readout_configuation = readout_configuation
         tprogram.source_phases = readout_tracker.source_phases
+        tprogram.readout_source_phases = readout_tracker.source_phases
 
     return (declarations, tprogram)
 

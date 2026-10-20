@@ -277,8 +277,9 @@ def build_rc_configuration(
             `base_cycles` repeats in `circuit`. Defaults to `None`,
             which auto-detects the smallest repeating unit (and its
             repeat count) from the circuit's actual RC-layer sequence
-            (see `_minimal_period`), or to 1 when the positional
-            `layer_period` fallback is in effect. Pass an explicit value
+            (see `_minimal_period`). Positional `layer_period` layers
+            are all identical, so they always collapse to a single
+            base cycle repeated once per layer. Pass an explicit value
             to require a specific repeat count instead -- a mismatch
             raises `ValueError`.
         layer_period (int | None, optional): forwarded to `is_rc_layer`
@@ -320,14 +321,6 @@ def build_rc_configuration(
             "so there is nothing to twirl."
         )
 
-    if base_cycle_repetitions is None and layer_period is not None:
-        # Positional layers are all identical identity cycles, so
-        # auto-detection would always find a 1-cycle unit repeated
-        # len(layers) times. pyquil then emits a classical base-cycle
-        # loop, which magneto can't schedule (cyclic dependency between
-        # the loop's merge CALLs and the shot body), so keep the
-        # sequence flat.
-        base_cycle_repetitions = 1
     if base_cycle_repetitions is None:
         period = _minimal_period(layers)
         base_cycle_repetitions = len(layers) // period if period else 1
@@ -446,10 +439,17 @@ class RCLayerTracker:
             configuration.qubits_sorted, 0
         )
 
+        # With `skip_final_layer` (set alongside randomized readout), the
+        # final layer's phases are recorded by the readout tracker
+        # instead (see `emit_phase_gate`), and this register must match
+        # the length of pyquil's twirled register, which then excludes it.
         n_layers = (
             configuration.base_cycle_repetitions
             * len(configuration.base_cycles)
-            + (1 if reserve_final_layer else 0)
+            + (
+                1 if reserve_final_layer
+                and not configuration.skip_final_layer else 0
+            )
         )
         self.source_phases: Dict[str, List[float]] = {
             configuration.variables.source_unitaries(q): (
@@ -472,8 +472,9 @@ class RCLayerTracker:
             gate (Rz | VirtualZ): qcal Rz or VirtualZ gate.
             readout_tracker (ReadoutLayerTracker | None, optional): when
                 randomized readout is also active, the readout tracker
-                for the final pre-measurement layer; its destination
-                register is referenced instead of the RC twirled one.
+                for the final pre-measurement layer; the phase is
+                recorded into its `source_phases` and its destination
+                register is referenced, instead of the RC ones.
                 Defaults to `None`.
 
         Returns:
@@ -484,19 +485,23 @@ class RCLayerTracker:
 
         q = gate.qubits[0]
         phase = gate.properties['params']['phase']
-        key = self.configuration.variables.source_unitaries(q)
-        self.source_phases[key][
-            self.layer_index * 3 + self.angle_index[q]
-        ] = phase / (2 * np.pi)
         if readout_tracker is not None:
             # Only passed for the final pre-measurement layer (see
-            # `transpile_circuit`), at layer_index == cycle_count. Its
+            # `transpile_circuit`), at layer_index == cycle_count, which
+            # `skip_final_layer` excludes from the RC registers. Its
             # destination register holds a single unitary's 3 angles.
+            readout_tracker.source_phases[q][self.angle_index[q]] = (
+                phase / (2 * np.pi)
+            )
             ref = MemoryReference(
                 readout_tracker.configuration.destination_names(q),
                 self.angle_index[q],
             )
         else:
+            key = self.configuration.variables.source_unitaries(q)
+            self.source_phases[key][
+                self.layer_index * 3 + self.angle_index[q]
+            ] = phase / (2 * np.pi)
             ref = self.configuration.variables.twirled_unitaries_ref(
                 q, self.layer_index, self.angle_index[q]
             )
