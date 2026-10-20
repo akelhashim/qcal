@@ -1378,7 +1378,7 @@ def CB(
 
             gate_n = self._subsystem_gate_names[s]
             qubit_str = ', '.join(str(q) for q in s)
-            title_prefix = f"{experiment.capitalize()} {gate_n} ({qubit_str})"
+            title_prefix = f"{experiment.capitalize()} {gate_n}({qubit_str})"
             qubit_suffix = '_'.join(str(q) for q in s)
             file_suffix = (
                 f'_{gate_n}_{qubit_suffix}'

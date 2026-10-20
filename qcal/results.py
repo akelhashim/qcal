@@ -442,10 +442,15 @@ class Results:
         n_states = len(self.states)
         width = min(max(100 * n_states, 400), 1000)
 
-        # Rotate the tick labels if they are wider than the space allotted
-        # to each bar (~9 px per character at font size 15, ~150 px margins)
+        # Rotate the tick labels if they (plus ~2 characters of padding
+        # between neighboring labels) are wider than the space allotted to
+        # each bar (~9 px per character at font size 15, ~150 px margins)
         px_per_bar = (width - 150) / n_states
-        rotate = 9 * len(self.states[0]) > px_per_bar
+        rotate = 9 * (len(self.states[0]) + 2) > px_per_bar
+
+        # Only call these dit strings if they contain levels beyond 0 and 1
+        is_binary = set(self.levels) <= {0, 1}
+        xaxis_title = 'Bit String' if is_binary else 'Dit String'
 
         fig.update_traces(marker_color='blue')
         fig.update_layout(
@@ -455,7 +460,7 @@ class Results:
             xaxis={
                 'tickvals': list(range(len(self.states))),
                 'ticktext': self.states,
-                'title': 'Dit String',
+                'title': xaxis_title,
                 'titlefont_size': 20,
                 'tickfont_size': 15,
                 'tickangle': -45 if rotate else 0
