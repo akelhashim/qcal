@@ -53,6 +53,7 @@ class QPU:
         '_data_manager',
         '_exp_circuits',
         '_jit',
+        '_keep_per_shot_results',
         '_measurements',
         '_n_batches',
         '_n_circs_per_seq',
@@ -80,7 +81,8 @@ class QPU:
             jit:              bool = True,
             raster_circuits:  bool = False,
             rcorr_cmat:       pd.DataFrame | None = None,
-            rcorr_rr_results: Results | Dict | None = None
+            rcorr_rr_results: Results | Dict | None = None,
+            keep_per_shot_results: bool = False,
         ) -> None:
         """Initialize an instance of the Quantum Processing Unit.
 
@@ -122,6 +124,11 @@ class QPU:
                 Defaults to ``None``. If passed, quasi-prabilistic readout
                 correction will be applied to the raw bit strings in
                 post-processing.
+            keep_per_shot_results (bool, optional): whether to keep the
+                per-shot outcomes of every measurement cycle (e.g. for
+                decoding) in each circuit's ``per_shot_results``. These can
+                be large, so they are only kept on request. Defaults to
+                ``False``.
         """
         self._config = config
         self._compiler = compiler
@@ -134,6 +141,7 @@ class QPU:
         self._raster_circuits = raster_circuits
         self._rcorr_cmat = rcorr_cmat
         self._rcorr_rr_results = rcorr_rr_results
+        self._keep_per_shot_results = keep_per_shot_results
 
         if self._rcorr_cmat is not None and self._rcorr_rr_results is not None:
             raise ValueError(

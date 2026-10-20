@@ -11,6 +11,19 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Limit code lines to **79 characters** and docstring/comment lines to
   **79 characters**, per PEP 8.
 - Use **Google style** docstring formatting.
+- Always include types in docstrings, e.g. `name (type): description` for
+  `Args` and `Attributes` (including dataclass fields), and `type:
+  description` for `Returns`.
+
+## Changelog
+
+- For any significant change (new features, changed or removed behavior,
+  bug fixes, breaking changes), add an entry to the `[Unreleased]` section
+  of [CHANGELOG.md](CHANGELOG.md) under the matching heading (`Breaking`,
+  `Added`, `Changed`, `Deprecated`, `Removed`, `Fixed`, `Security`), per
+  [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
+- Write entries for users of qcal: describe the public API and behavior,
+  not internal refactors, formatting, or test-only changes.
 
 ## Commands
 

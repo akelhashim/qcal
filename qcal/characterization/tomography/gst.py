@@ -2195,11 +2195,8 @@ def QuantumInstrumentGST(
                 pp = PostProcessor(
                     self._config,
                     results,
-                    passes=[
-                        discard_heralded_shots,
-                        relabel_esp,
-                        compute_conditional_counts
-                    ]
+                    passes=[discard_heralded_shots, relabel_esp],
+                    aggregate=compute_conditional_counts,
                 )
                 pp.run()
 

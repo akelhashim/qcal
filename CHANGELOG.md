@@ -29,6 +29,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   circuits
 - `draw_qpu_heatmap` for plotting variable lattice-based values
 - `qp_readout_correction` for applying quasi-probabilistic readout correction
+- Post-processing of ragged measurement results, where qubits in a circuit
+  are measured a different number of times (e.g. ancillas measured
+  mid-circuit every round, but data qubits only at the end), via the
+  `measurement_cycles` argument of `PostProcessor` and
+  `construct_dataframes`
+- `circuit_measurement_cycles` utility to find which read of each qubit is
+  made in each measurement cycle of a circuit
+- `PerShotResults` class for storing the per-shot outcomes of every
+  measurement cycle of a circuit (e.g. for decoding), with
+  `measurement_record()` and `cycle_results` DataFrame views indexed by the
+  original shot numbers
+- `PostProcessor.per_shot_results`, and a `Circuit.per_shot_results`
+  property (with a setter) for recording the per-shot outcomes of a circuit
+- `keep_per_shot_results` argument of `QPU` for keeping the per-shot
+  outcomes of every measurement cycle in each circuit's `per_shot_results`
+  (defaults to False, since they can be large)
+- `aggregate` argument of `PostProcessor` for the pass that aggregates
+  per-shot outcomes into counts (defaults to `compute_counts`)
 
 ### Changed
 
@@ -38,6 +56,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   text labels and matrix hover-text details above a node-count
   threshold
 - Replaced storing values and their errors in dictionaries with ufloats.
+- `PostProcessor` runs per-shot `passes` first, then `aggregate`. An
+  aggregation pass at the end of `passes` is moved to `aggregate` for
+  backwards compatibility; one elsewhere in `passes` raises a `ValueError`
+- `QuantumInstrumentGST` passes `compute_conditional_counts` to
+  `PostProcessor` as `aggregate` rather than as the last of its `passes`
 
 ### Deprecated
 
@@ -49,6 +72,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `DensityMatrixSimulator` returning negative probabilities
 - DataFrame concat warning for `config.coherence_times`
 - Circuit plotting bug when `MCM` is interpreted as a multi-qubit gate
+- `compute_conditional_counts` not relabeling mid-circuit measurement
+  outcomes of 2 and 3 (e.g. leakage) as `p2` and `p3`
 
 ### Security
 

@@ -8,12 +8,14 @@ import copy
 import itertools
 import logging
 from collections import defaultdict
+from dataclasses import dataclass
 from functools import reduce
-from typing import Dict, Sequence, Tuple
+from typing import Dict, List, Sequence, Tuple
 
 import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
+from numpy.typing import NDArray
 from pandas import DataFrame
 
 from qcal.math.entropy import shannon_entropy
@@ -22,7 +24,9 @@ from qcal.math.probability import total_variation_distance
 logger = logging.getLogger(__name__)
 
 
-__all__ = ('qp_readout_correction', 'readout_correction', 'Results')
+__all__ = (
+    'PerShotResults', 'qp_readout_correction', 'readout_correction', 'Results'
+)
 
 
 # TODO: add fidelity and TVD
@@ -485,6 +489,152 @@ class Results:
             float: tvd.
         """
         return total_variation_distance(self, results)
+
+
+@dataclass(frozen=True, eq=False)
+class PerShotResults:
+    """Per-shot outcomes of every measurement cycle of a single circuit.
+
+    The outcomes are stored as a single array with one row per kept shot
+    (e.g. after discarding heralded shots) and one column per read. Use
+    ``cycle_results`` or ``measurement_record`` to view them as DataFrames,
+    indexed by their original shot numbers.
+
+    Qubits can be measured a different number of times (e.g. ancillas are
+    measured mid-circuit every round, but data qubits only at the end), so
+    the reads of each qubit are ragged. Rather than padding them into a
+    ``(n_shots, n_cycles, n_qubits)`` array, every read gets its own column,
+    and the reads of each measurement cycle are laid out side by side, in
+    cycle order. ``columns`` labels each column with the ``(cycle, qubit)``
+    that it was read in. For example, if ancilla 1 is measured mid-circuit
+    twice and data qubit 0 is only measured at the end, and shot 1 failed
+    heralding::
+
+                  cycle 0   cycle 1   cycle 2
+        columns:  (0, 1)    (1, 1)    (2, 0)
+        shot 0       0         1         1
+        shot 2       1         0         1
+        shot 3       0         0         1
+
+    Here, ``outcomes`` has shape ``(3, 3)`` and ``shot_index`` is
+    ``[0, 2, 3]``. In general, ``outcomes`` has one column for every read in
+    the circuit, so a cycle measuring more qubits spans more columns. For
+    example, 10 rounds of measuring 2 ancillas followed by measuring all 5
+    qubits gives ``10 * 2 + 5 = 25`` columns.
+
+    Attributes:
+        outcomes (NDArray): outcomes with shape ``(n_shots, n_reads)``, where
+            ``n_reads`` is the total number of reads of all qubits in the
+            circuit. Stored as int8 if this is lossless.
+        shot_index (NDArray[np.int64]): original shot index of each row of
+            ``outcomes``.
+        columns (Tuple[Tuple[int, int], ...]): ``(cycle, qubit)`` of each
+            column of ``outcomes``, in cycle order.
+    """
+    outcomes:   NDArray
+    shot_index: NDArray[np.int64]
+    columns:    Tuple[Tuple[int, int], ...]
+
+    @classmethod
+    def from_cycles(cls, cycles: List[pd.DataFrame]) -> PerShotResults:
+        """Compact the per-shot outcomes of a circuit's measurement cycles.
+
+        Args:
+            cycles (List[pd.DataFrame]): per-shot outcomes of each
+                measurement cycle, with one column per measured qubit. All
+                cycles must be indexed by the same shots.
+
+        Returns:
+            PerShotResults: compacted outcomes.
+
+        Raises:
+            ValueError: if the cycles are indexed by different shots.
+        """
+        if not cycles:
+            return cls(
+                outcomes=np.empty((0, 0), dtype=np.int8),
+                shot_index=np.empty(0, dtype=np.int64),
+                columns=(),
+            )
+
+        index = cycles[0].index
+        if any(not df.index.equals(index) for df in cycles[1:]):
+            raise ValueError(
+                "All measurement cycles must be indexed by the same shots."
+            )
+
+        outcomes = np.column_stack([df.to_numpy() for df in cycles])
+        compact = outcomes.astype(np.int8)
+        if np.array_equal(compact, outcomes):
+            outcomes = compact
+
+        return cls(
+            outcomes=outcomes,
+            shot_index=index.to_numpy(dtype=np.int64),
+            columns=tuple(
+                (cycle, q) for cycle, df in enumerate(cycles)
+                for q in df.columns
+            ),
+        )
+
+    @property
+    def n_measurement_cycles(self) -> int:
+        """Number of measurement cycles.
+
+        Returns:
+            int: number of measurement cycles.
+        """
+        return len({cycle for cycle, _ in self.columns})
+
+    @property
+    def n_shots(self) -> int:
+        """Number of (kept) shots.
+
+        Returns:
+            int: number of shots.
+        """
+        return len(self.shot_index)
+
+    @property
+    def cycle_results(self) -> List[pd.DataFrame]:
+        """Per-shot results of each measurement cycle.
+
+        Returns:
+            List[pd.DataFrame]: one DataFrame per measurement cycle, with a
+                column per measured qubit and a row per shot.
+        """
+        record = self.measurement_record()
+        return [record[cycle] for cycle in range(self.n_measurement_cycles)]
+
+    def measurement_record(self, include_final: bool = True) -> pd.DataFrame:
+        """Per-shot outcomes of all measurement cycles, by shot.
+
+        The measurement record has one row per shot, and a ``(cycle, qubit)``
+        column for every read. For example, a circuit whose ancilla 1 is
+        measured mid-circuit twice before data qubit 0 is measured gives the
+        columns ``(0, 1), (1, 1), (2, 0)``. For a QEC circuit, this is the
+        input a decoder needs.
+
+        Args:
+            include_final (bool, optional): whether to include the final
+                (terminating) measurement cycle. Defaults to True.
+
+        Returns:
+            pd.DataFrame: outcomes indexed by shot, with ``(cycle, qubit)``
+                columns.
+        """
+        n_columns = len(self.columns)
+        if not include_final and self.columns:
+            final = self.columns[-1][0]
+            n_columns = sum(cycle != final for cycle, _ in self.columns)
+
+        return pd.DataFrame(
+            self.outcomes[:, :n_columns],
+            index=pd.Index(self.shot_index, name='shot'),
+            columns=pd.MultiIndex.from_tuples(
+                self.columns[:n_columns], names=['cycle', 'qubit']
+            ),
+        )
 
 
 def readout_correction(results: Results, confusion_matrix: DataFrame) -> Dict:

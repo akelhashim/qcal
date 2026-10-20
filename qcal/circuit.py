@@ -32,7 +32,7 @@ from numpy.typing import NDArray
 from qcal.gates.gate import Gate
 from qcal.gates.single_qubit import Meas, basis_rotation, prep_rotation
 from qcal.plotting.sequence import plot_mock_sequence
-from qcal.results import Results
+from qcal.results import PerShotResults, Results
 
 pio.renderers.default = 'colab'  # TODO: replace with settings
 
@@ -400,7 +400,9 @@ class Layer(Cycle):
 
 class Circuit:
 
-    __slots__ = ('_cycles', '_qubits', '_results', '_mcm_results')
+    __slots__ = (
+        '_cycles', '_qubits', '_results', '_mcm_results', '_per_shot_results'
+    )
 
     def __init__(self,
             cycles_or_layers: Iterable[Cycle | Layer | Barrier] = None
@@ -426,6 +428,7 @@ class Circuit:
 
         self._results = Results()
         self._mcm_results = []
+        self._per_shot_results = None
 
     def __copy__(self) -> Circuit:
         """Make a deep copy of the Circuit."""
@@ -608,6 +611,18 @@ class Circuit:
         ].Partitions.iloc[0]
 
     @property
+    def per_shot_results(self) -> PerShotResults | None:
+        """Per-shot outcomes of every measurement cycle, e.g. for decoding.
+
+        Only recorded when explicitly requested, since they can be large.
+
+        Returns:
+            PerShotResults | None: per-shot outcomes, or None if they weren't
+                recorded.
+        """
+        return self._per_shot_results
+
+    @property
     def results(self) -> Results:
         """Circuit results.
 
@@ -684,6 +699,15 @@ class Circuit:
     def mcm_results(self):
         """Clear all recorded mid-circuit measurement results."""
         self._mcm_results = []
+
+    @per_shot_results.setter
+    def per_shot_results(self, results: PerShotResults | None):
+        """Record the per-shot outcomes of the circuit.
+
+        Args:
+            results (PerShotResults | None): per-shot outcomes.
+        """
+        self._per_shot_results = results
 
     @results.setter
     def results(self, results: Dict):
