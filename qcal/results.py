@@ -521,44 +521,54 @@ class PerShotResults:
         shot 2       1         0         1
         shot 3       0         0         1
 
-    Here, ``outcomes`` has shape ``(3, 3)`` and ``shot_index`` is
-    ``[0, 2, 3]``. In general, ``outcomes`` has one column for every read in
-    the circuit, so a cycle measuring more qubits spans more columns. For
-    example, 10 rounds of measuring 2 ancillas followed by measuring all 5
-    qubits gives ``10 * 2 + 5 = 25`` columns.
+    Here, ``outcomes`` has shape ``(3, 3)``, ``kept`` is
+    ``[True, False, True, True]`` and ``shot_index`` is ``[0, 2, 3]``. In
+    general, ``outcomes`` has one column for every read in the circuit, so a
+    cycle measuring more qubits spans more columns. For example, 10 rounds of
+    measuring 2 ancillas followed by measuring all 5 qubits gives
+    ``10 * 2 + 5 = 25`` columns.
 
     Attributes:
         outcomes (NDArray): outcomes with shape ``(n_shots, n_reads)``, where
             ``n_reads`` is the total number of reads of all qubits in the
             circuit. Stored as int8 if this is lossless.
-        shot_index (NDArray[np.int64]): original shot index of each row of
-            ``outcomes``.
+        kept (NDArray[np.bool_]): whether each original shot was kept, with
+            one entry per measured shot. The rows of ``outcomes`` are the
+            kept shots, in order. This is stored instead of the indices of
+            the kept shots, since it is 8x smaller.
         columns (Tuple[Tuple[int, int], ...]): ``(cycle, qubit)`` of each
             column of ``outcomes``, in cycle order.
     """
     outcomes:   NDArray
-    shot_index: NDArray[np.int64]
+    kept:       NDArray[np.bool_]
     columns:    Tuple[Tuple[int, int], ...]
 
     @classmethod
-    def from_cycles(cls, cycles: List[pd.DataFrame]) -> PerShotResults:
+    def from_cycles(
+        cls, cycles: List[pd.DataFrame], n_shots: int | None = None
+    ) -> PerShotResults:
         """Compact the per-shot outcomes of a circuit's measurement cycles.
 
         Args:
             cycles (List[pd.DataFrame]): per-shot outcomes of each
                 measurement cycle, with one column per measured qubit. All
-                cycles must be indexed by the same shots.
+                cycles must be indexed by the same (original) shot numbers,
+                in increasing order.
+            n_shots (int | None, optional): number of shots that were
+                measured, including any that were discarded. Defaults to
+                None, in which case it is one more than the last kept shot.
 
         Returns:
             PerShotResults: compacted outcomes.
 
         Raises:
-            ValueError: if the cycles are indexed by different shots.
+            ValueError: if the cycles are indexed by different shots, or by
+                shots that aren't increasing or are out of range.
         """
         if not cycles:
             return cls(
                 outcomes=np.empty((0, 0), dtype=np.int8),
-                shot_index=np.empty(0, dtype=np.int64),
+                kept=np.zeros(n_shots or 0, dtype=np.bool_),
                 columns=(),
             )
 
@@ -568,6 +578,19 @@ class PerShotResults:
                 "All measurement cycles must be indexed by the same shots."
             )
 
+        shot_index = index.to_numpy(dtype=np.int64)
+        if np.any(np.diff(shot_index) <= 0):
+            raise ValueError("Shots must be indexed in increasing order.")
+        if n_shots is None:
+            n_shots = int(shot_index[-1]) + 1 if len(shot_index) else 0
+        if len(shot_index) and (shot_index[0] < 0 or shot_index[-1] >= n_shots):
+            raise ValueError(
+                f"Shots must be indexed in [0, {n_shots}), got "
+                f"[{shot_index[0]}, {shot_index[-1]}]."
+            )
+        kept = np.zeros(n_shots, dtype=np.bool_)
+        kept[shot_index] = True
+
         outcomes = np.column_stack([df.to_numpy() for df in cycles])
         compact = outcomes.astype(np.int8)
         if np.array_equal(compact, outcomes):
@@ -575,12 +598,21 @@ class PerShotResults:
 
         return cls(
             outcomes=outcomes,
-            shot_index=index.to_numpy(dtype=np.int64),
+            kept=kept,
             columns=tuple(
                 (cycle, q) for cycle, df in enumerate(cycles)
                 for q in df.columns
             ),
         )
+
+    @property
+    def shot_index(self) -> NDArray[np.int64]:
+        """Original shot index of each row of ``outcomes``.
+
+        Returns:
+            NDArray[np.int64]: indices of the kept shots.
+        """
+        return np.flatnonzero(self.kept)
 
     @property
     def n_measurement_cycles(self) -> int:
@@ -598,7 +630,7 @@ class PerShotResults:
         Returns:
             int: number of shots.
         """
-        return len(self.shot_index)
+        return self.outcomes.shape[0]
 
     @property
     def cycle_results(self) -> List[pd.DataFrame]:

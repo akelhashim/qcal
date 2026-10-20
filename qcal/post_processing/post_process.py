@@ -57,6 +57,10 @@ class PostProcessor:
             cycles of each circuit (see ``circuit_measurement_cycles``).
             Required if qubits in a circuit are measured a different number
             of times. Defaults to None.
+        keep_per_shot_results (bool): whether to keep the per-shot outcomes
+            of every measurement cycle (e.g. for decoding) in
+            ``per_shot_results``. These can be large, so they are only built
+            on request. Defaults to False.
     """
     config:  Config = field(default_factory=Config)
     results: List[dict[int, Array2D]] = field(default_factory=list)
@@ -68,6 +72,7 @@ class PostProcessor:
     )
     aggregate: Pass = compute_counts
     measurement_cycles: List[MeasurementCycles] | None = None
+    keep_per_shot_results: bool = False
 
     def __post_init__(self):
         # Backwards compatibility: passes used to end with the aggregation
@@ -172,10 +177,18 @@ class PostProcessor:
         """Run the post-processing routine."""
         self._construct_dataframes()
         self._apply_passes()
-        self._per_shot_results = [
-            PerShotResults.from_cycles(cycle)
-            for cycle in self._circuit_results
-        ]
+        if self.keep_per_shot_results:
+            self._per_shot_results = [
+                PerShotResults.from_cycles(
+                    cycles,
+                    n_shots=next(
+                        (reads.shape[0] for reads in result.values()), None
+                    ),
+                )
+                for cycles, result in zip(
+                    self._circuit_results, self.results, strict=True
+                )
+            ]
         self.aggregate(self)
         self._mcm_results = [result[:-1] for result in self._circuit_results]
         self._tm_results = [result[-1] for result in self._circuit_results]

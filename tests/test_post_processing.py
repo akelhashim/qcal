@@ -265,6 +265,7 @@ def test_per_shot_results_are_kept_after_aggregation():
     assert per_shot.columns == ((0, 1), (1, 1), (2, 0))
     assert per_shot.n_measurement_cycles == 3
     # Shot 1 failed heralding; the rest keep their original shot numbers.
+    assert per_shot.kept.tolist() == [True, False, True, True]
     assert per_shot.shot_index.tolist() == [0, 2, 3]
     assert per_shot.n_shots == 3
 
