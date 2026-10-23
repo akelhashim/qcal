@@ -10,6 +10,7 @@ from typing import Any
 import pandas as pd
 
 import qcal.settings as settings
+from qcal import __version__
 from qcal.utils import save_to_csv, save_to_pickle
 
 logger = logging.getLogger(__name__)
@@ -24,10 +25,11 @@ class DataMananger:
     )
 
     def __init__(self) -> None:
-        """Initialize a DataManager.
-        """
+        """Initialize a DataManager."""
         self._date = datetime.today().strftime('%Y-%m-%d')
-        self._exp_id = datetime.now().strftime('%Y%m%d_%H%M%S')
+        self._exp_id = (
+            datetime.now().strftime('%Y%m%d_%H%M%S') + f'_v{__version__}'
+        )
         self._save_path = None
 
     def __repr__(self) -> str:
@@ -67,18 +69,19 @@ class DataMananger:
 
     def generate_exp_id(self) -> None:
         """Generate a new experimental id."""
-        self._exp_id = datetime.now().strftime('%Y%m%d_%H%M%S')
-        # self._exp_id = datetime.now().strftime('%H%M%S')
+        self._exp_id = (
+            datetime.now().strftime('%Y%m%d_%H%M%S') + f'_v{__version__}'
+        )
 
     def create_data_path(self) -> None:
         """Create a directory for data if none exists."""
-        base_dir = settings.Settings.data_path
+        base_dir = settings.Settings.data_save_path
         self._save_path = base_dir + f'{self._date}/' + f'{self._exp_id}/'
         try:
             path = pathlib.Path(self._save_path)
             path.mkdir(parents=True, exist_ok=True)
         except Exception as e:
-            logger.warning(f' {e.message}')
+            logger.warning(f' {e}')
 
     def save_to_csv(self, data: pd.DataFrame, filename: str) -> None:
         """Save a dataframe to a csv file.
