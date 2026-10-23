@@ -29,7 +29,7 @@ GATE_MAPPER: Dict[str, str] = {
 }
 
 
-__all__ = 'pygsti_pspec'
+__all__ = ('pygsti_pspec',)
 
 
 def pygsti_pspec(

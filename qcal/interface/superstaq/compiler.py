@@ -1,6 +1,8 @@
 """Submodule for SuperstaQ compiler.
 
 """
+from __future__ import annotations
+
 import logging
 from typing import Any, Dict, List
 
@@ -65,7 +67,7 @@ class CirqCompiler:
             gateset (Dict): gateset for superstaq compiler. Defaults to None. If
                 None, it is generated automatically from the native gates in the
                 Config object.
-            gate_defs (Dict): gate definitions for nonstandard multi-qubit gates 
+            gate_defs (Dict): gate definitions for nonstandard multi-qubit gates
                 in the gateset. Defaults to None.
         """
         import cirq_superstaq as css
@@ -134,8 +136,8 @@ class CirqCompiler:
         return self._service
 
     def compile(
-            self, circuits: cirq.Circuit | List[cirq.Circuit] | CircuitSet,
-        ) -> CircuitSet:
+        self, circuits: cirq.Circuit | List[cirq.Circuit] | CircuitSet,
+    ) -> CircuitSet:
         """Compile circuits using the compiler.
 
         Args:
@@ -175,11 +177,11 @@ class QiskitCompiler:
     )
 
     def __init__(self,
-            api_key: str,
-            config: Config,
-            gateset: Dict = None,
-            gate_defs: Dict = None
-        ) -> None:
+        api_key: str,
+        config: Config,
+        gateset: Dict = None,
+        gate_defs: Dict = None
+    ) -> None:
         """Initialize a Qiskit Superstaq compiler.
 
         Args:
@@ -188,7 +190,7 @@ class QiskitCompiler:
             gateset (Dict): gateset for superstaq compiler. Defaults to None. If
                 None, it is generated automatically from the native gates in the
                 Config object.
-            gate_defs (Dict): gate definitions for nonstandard multi-qubit gates 
+            gate_defs (Dict): gate definitions for nonstandard multi-qubit gates
                 in the gateset. Defaults to None.
         """
         import qiskit_superstaq as qss
@@ -257,13 +259,14 @@ class QiskitCompiler:
         """
         return self._provider
 
-    def compile(self,
-            circuits: QuantumCircuit | List[QuantumCircuit] | CircuitSet,
-        ) -> CircuitSet:
+    def compile(
+        self,
+        circuits: QuantumCircuit | List[QuantumCircuit] | CircuitSet,
+    ) -> CircuitSet:
         """Compile circuits using the compiler.
 
         Args:
-            circuits (QuantumCircuit | List[QuantumCircuit] | CircuitSet): 
+            circuits (QuantumCircuit | List[QuantumCircuit] | CircuitSet):
                 circuits to compile.
 
         Returns:

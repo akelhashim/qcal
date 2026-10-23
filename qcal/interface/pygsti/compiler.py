@@ -36,9 +36,7 @@ PAULI_TO_CLIFFORD = {
 PAULI_NAMES = tuple(PAULI_TO_CLIFFORD.values())
 
 
-def decompose_X90(
-        phases: Dict[int, List]
-) -> List[List[L | tuple]]:
+def decompose_X90(phases: Dict[int, List]) -> List[List[Label | tuple]]:
     """Decompose an X90 gate into ZXZ or ZXZXZ.
 
     Args:
@@ -70,8 +68,8 @@ def decompose_X90(
 
 
 def decompose_CZ(
-        phases: Dict[Tuple[int, int], List]
-) -> List[List[L | tuple]]:
+    phases: Dict[Tuple[int, int], List]
+) -> List[List[Label | tuple]]:
     """Decompose a CZ gate into CZ + IZ + ZI.
 
     Args:

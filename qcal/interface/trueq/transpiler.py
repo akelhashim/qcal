@@ -3,6 +3,8 @@
 NOTE: we do not use TYPE_CHECKING for trueq types because this might fail if
 trueq is not installed when building docs.
 """
+from __future__ import annotations
+
 import logging
 from collections import deque
 from typing import Dict
@@ -32,6 +34,7 @@ def transpile_cycle(cycle: trueq.Cycle, gate_mapper: GateMapper) -> Cycle:  # ty
         import trueq as tq
     except ImportError:
         logger.warning(' Unable to import trueq!')
+        return
 
     tcycle = Cycle()
     for q, gate in cycle:

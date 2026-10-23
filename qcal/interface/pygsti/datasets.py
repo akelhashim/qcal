@@ -13,7 +13,7 @@ from qcal.results import Results
 logger = logging.getLogger(__name__)
 
 
-__all__ = 'generate_pygsti_report'
+__all__ = ('generate_pygsti_dataset',)
 
 
 def generate_pygsti_dataset(
