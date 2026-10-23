@@ -4,14 +4,13 @@
 """
 from __future__ import annotations
 
-from .utils import find_mapping
-
 import logging
-import numpy as np
+from typing import Dict, List
 
+import numpy as np
 from numpy.typing import ArrayLike
 from sklearn.mixture import GaussianMixture
-from typing import Dict, List
+from sklearn.mixture._gaussian_mixture import _compute_precision_cholesky
 
 logger = logging.getLogger(__name__)
 
@@ -19,19 +18,19 @@ logger = logging.getLogger(__name__)
 class GMM(GaussianMixture):
 
     def __init__(
-            self,
-            n_components:    int = 2,
-            covariance_type: str = 'spherical',
-            **kwargs
-        ) -> None:
+        self,
+        n_components:    int = 2,
+        covariance_type: str = 'spherical',
+        **kwargs
+    ) -> None:
         """Gaussian Mixture Model
 
         This class inherits from scikit-learn's GaussianMixture class.
 
         Args:
-            n_components (int, optional): The number of mixture components. 
+            n_components (int, optional): The number of mixture components.
                 Defaults to 2.
-            covariance_type (str, optional): String describing the type of 
+            covariance_type (str, optional): String describing the type of
                 covariance parameters to use. Defaults to 'spherical'.
         """
         super().__init__(
@@ -52,7 +51,7 @@ class GMM(GaussianMixture):
             bool: fitted or not.
         """
         return self._is_fitted
-    
+
     @property
     def snr(self) -> Dict:
         """Signal to noise ratio.
@@ -70,7 +69,7 @@ class GMM(GaussianMixture):
             ArrayLike: input data.
         """
         return self.__X
-    
+
     @property
     def y(self) -> ArrayLike:
         """Classification labels.
@@ -84,22 +83,14 @@ class GMM(GaussianMixture):
         """Fit a Guassian Mixture Model to the input data.
 
         Args:
-            X (ArrayLike): array-like of shape (n_samples, n_features). List of 
-                n_features-dimensional data points. Each row corresponds to a 
+            X (ArrayLike): array-like of shape (n_samples, n_features). List of
+                n_features-dimensional data points. Each row corresponds to a
                 single data point.
             y (ArrayLike): fit labels for each data point. Defaults to None.
         """
         super().fit(X)
         self.__X = X
         self.__y = y
-
-        # if y is not None and not np.all(self.predict(X) == y):
-        #     mapping = find_mapping(self.predict(X), y)
-        #     permutation = np.zeros(self.n_components).astype(int)
-        #     for i, j in mapping.items():
-        #         permutation[j] = i
-            
-        #     self.relabel(permutation)
 
         self._is_fitted = True
         self.calculate_snr()
@@ -119,11 +110,20 @@ class GMM(GaussianMixture):
 
     def calculate_snr(self) -> None:
         """Calculate the signal-to-noise between each pair of clusters."""
+        if self.covariance_type == 'full':
+            variances = np.diagonal(self.covariances_, axis1=-2, axis2=-1)
+        elif self.covariance_type == 'tied':
+            variances = np.tile(
+                np.diag(self.covariances_), (self.n_components, 1)
+            )
+        else:
+            variances = self.covariances_
+
         for clusters in np.array(np.triu_indices(self.n_components, 1)).T:
             dist = np.sqrt(np.sum(np.diff(self.means_[clusters], axis=0) ** 2))
-            err = np.sum(np.sqrt(self.covariances_[clusters]) * 2)
+            err = np.sum(np.sqrt(variances[clusters]) * 2)
             self._snr["{0}{1}".format(*clusters)] = dist / err
-        
+
     def save(self, filepath: str) -> None:
         """Save the parameters of the GMM.
 
@@ -145,17 +145,14 @@ class GMM(GaussianMixture):
         Args:
             filename (str): filename of the saved model.
         """
-        model = np.load(filename)
-        # gmm = GMM(len(model['means']))
-        gmm = GMM(*model['params'][0])
-        gmm.precisions_cholesky_ = np.linalg.cholesky(
-            np.linalg.inv(model['covariances'])
+        model = np.load(filename, allow_pickle=True)
+        params = model['params'].item()
+        gmm = GMM(**params)
+        gmm.precisions_cholesky_ = _compute_precision_cholesky(
+            model['covariances'], params['covariance_type']
         )
         gmm.covariances_ = model['covariances']
         gmm.means_ = model['means']
         gmm.weights_ = model['weights']
-        
+
         return gmm
-        
-
-
