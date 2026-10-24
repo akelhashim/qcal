@@ -17,7 +17,7 @@ import plotly.graph_objects as go
 from pandas import DataFrame
 from uncertainties import ufloat
 
-from qcal.math.entropy import shannon_entropy
+from qcal.math.entropy import classical_entropy
 from qcal.math.probability import hellinger_fidelity, total_variation_distance
 
 logger = logging.getLogger(__name__)
@@ -200,13 +200,13 @@ class Results:
         return self._results
 
     @property
-    def entropy(self) -> float:
+    def entropy(self) -> ufloat:
         """Shannon entropy of the results.
 
         Returns:
-            float: entropy.
+            ufloat: entropy, with propagated shot-noise uncertainty.
         """
-        return shannon_entropy(self)
+        return classical_entropy(self)
 
     @property
     def ev(self) -> float:

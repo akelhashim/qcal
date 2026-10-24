@@ -36,12 +36,14 @@ def round_sig_figures(x: float, n_sig_figs: int = 1) -> float:
     Returns:
         float: rounded number.
     """
+    if x == 0:
+        return 0.0
     return round(x, n_sig_figs - int(np.floor(np.log10(abs(x)))) - 1)
 
 
 def round_to_order_error(
-        val: float, err: float, error_precision: int = 1
-    ) -> Tuple[float]:
+    val: float, err: float, error_precision: int = 1
+) -> Tuple[float]:
     """Rounds a value to its meaningful precision given an uncertainty.
 
     Args:
@@ -87,10 +89,10 @@ def uncertainty_of_exp(val: float, err: float, p: float | int) -> float:
 
 
 def uncertainty_of_product(
-        values: NDArray,
-        stds:   NDArray | None = None,
-        cov:    NDArray | None = None,
-    ) -> float:
+    values: NDArray,
+    stds:   NDArray | None = None,
+    cov:    NDArray | None = None,
+) -> float:
     """Computes the uncertainty of a product of values.
 
     Without covariance:

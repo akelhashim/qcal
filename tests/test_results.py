@@ -80,11 +80,11 @@ class TestProperties:
 
     def test_entropy_of_certain_outcome_is_zero(self):
         results = Results({'0': 100})
-        assert results.entropy == 0.
+        assert results.entropy.nominal_value == pytest.approx(0.)
 
     def test_entropy_of_uniform_distribution_is_one_bit(self):
         results = Results({'0': 50, '1': 50})
-        assert results.entropy == pytest.approx(1.0)
+        assert results.entropy.nominal_value == pytest.approx(1.0)
 
 
 class TestGetItem:
