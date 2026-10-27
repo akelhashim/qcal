@@ -47,6 +47,7 @@ logger = logging.getLogger(__name__)
 __all__ = (
     'PHASE_GATES',
     'PULSE_GATES',
+    'has_phase_gate',
     'is_rc_layer',
     'effective_layer_period',
     'cycle_to_base_cycle',
@@ -74,6 +75,25 @@ _READOUT_PAULI_PHASES = [
 # randomized readout in post-processing.
 # This can be imported in remote libraries for post-processing.
 _READOUT_PAULI_FLIPS = np.array([False, True, True, False])
+
+
+def has_phase_gate(cycle: Cycle) -> bool:
+    """Whether a Cycle contains a phase gate (see `PHASE_GATES`).
+
+    Phase gates are the only gates a tracker rewrites (see
+    `RCLayerTracker.emit_phase_gate`/`ReadoutLayerTracker.
+    emit_phase_gate`), into a memory reference specific to the layer
+    they sit in. A tracked Cycle containing one therefore cannot be
+    written once as a DEFCIRCUIT and reused, whereas a Cycle of only
+    X90/SX pulses, two-qubit gates, or measurements can.
+
+    Args:
+        cycle (Cycle): qcal Cycle.
+
+    Returns:
+        bool: True if any gate in `cycle` is in `PHASE_GATES`.
+    """
+    return any(gate.name in PHASE_GATES for gate in cycle.gates)
 
 
 def is_rc_layer(

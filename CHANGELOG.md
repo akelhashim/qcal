@@ -20,6 +20,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `pyquil._qpu.randomized_compiling`
 - Randomized readout: twirl the final pre-measurement single-qubit
   gates, usable independently or alongside randomized compiling
+- `cycle_replacement` and `cycles_to_defcircuits` can be combined with
+  randomized compiling and randomized readout in the PyQuil transpiler.
+  Cycles of X90/SX pulses, two-qubit gates, mid-circuit measurements, or
+  terminal measurements can be replaced with DEFCIRCUITs; replacing a
+  randomized cycle containing an `Rz`/`VirtualZ` raises a `ValueError`,
+  and `cycles_to_defcircuits` leaves such cycles as literal gates
 - `decompose_to_zxzxz` parameter for Cycle Benchmarking circuit
   generation
 - `pauli_to_cycle` utility to convert a Pauli string into a `Circuit`,
