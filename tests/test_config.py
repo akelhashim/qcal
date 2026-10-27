@@ -1,8 +1,10 @@
 """Unit tests for qcal.config.Config, using the example config.yaml."""
 import pandas as pd
+import plotly.graph_objects as go
 import pytest
 
 from qcal.config import Config
+from qcal.units import GHz
 
 
 class TestLoading:
@@ -122,6 +124,78 @@ class TestTables:
         df = config.coherence_times
         row = df[(df['Qubit'] == 0) & (df['Coherence Type'] == 'T1 GE')]
         assert row['Coherence Time'].iloc[0] == 5.4e-05
+
+
+@pytest.fixture
+def captured_figure(monkeypatch):
+    captured = []
+    monkeypatch.setattr(
+        go.Figure, 'show', lambda self, *a, **kw: captured.append(self)
+    )
+    return captured
+
+
+class TestPlotCoherences:
+
+    def _trace(self, fig, name):
+        for tr in fig.data:
+            if tr.name == name and tr.type == 'scatter':
+                return tr
+        raise AssertionError(f'no scatter trace named {name!r}')
+
+    def test_excludes_ef_by_default(self, config, captured_figure):
+        config.plot_coherences()
+
+        names = {tr.name for tr in captured_figure[0].data}
+        assert not any('EF' in name for name in names)
+        assert 'T1 GE' in names
+
+    def test_plot_ef_includes_ef_traces(self, config, captured_figure):
+        config.plot_coherences(plot_EF=True)
+
+        names = {tr.name for tr in captured_figure[0].data}
+        assert 'T1 EF' in names
+
+    def test_qubits_filters_to_requested_qubits(self, config, captured_figure):
+        config.plot_coherences(qubits=[0])
+
+        trace = self._trace(captured_figure[0], 'T1 GE')
+        assert set(trace.x) == {config['single_qubit/0/GE/T1']}
+
+
+class TestPlotFreqs:
+
+    def _trace(self, fig, name):
+        for tr in fig.data:
+            if tr.name == name:
+                return tr
+        raise AssertionError(f'no trace named {name!r}')
+
+    def test_plots_ge_ef_readout_and_two_qubit_frequencies(
+        self, config, captured_figure
+    ):
+        config.plot_freqs()
+
+        fig = captured_figure[0]
+        assert self._trace(fig, 'Q0 GE').x[0] == pytest.approx(
+            config['single_qubit/0/GE/freq'] / GHz
+        )
+        assert self._trace(fig, 'Q0 EF').x[0] == pytest.approx(
+            config['single_qubit/0/EF/freq'] / GHz
+        )
+        assert self._trace(fig, 'R0').x[0] == pytest.approx(
+            config['readout/0/freq'] / GHz
+        )
+        assert self._trace(fig, 'CZ (0, 1)').x[0] == pytest.approx(
+            config['two_qubit/(0, 1)/CZ/freq'] / GHz
+        )
+
+    def test_qubits_filters_to_requested_qubits(self, config, captured_figure):
+        config.plot_freqs(qubits=[0], qubit_pairs=[])
+
+        names = {tr.name for tr in captured_figure[0].data}
+        assert 'Q0 GE' in names
+        assert 'Q1 GE' not in names
 
 
 class TestCopy:

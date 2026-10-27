@@ -34,10 +34,25 @@ class Arrow3D(FancyArrowPatch):
         Args:
             renderer (Any): matplotlib renderer instance.
         """
-        xs3d, ys3d, zs3d = self._verts3d
-        xs, ys, zs = proj3d.proj_transform(xs3d, ys3d, zs3d, renderer.M)
-        self.set_positions((xs[0], ys[0]), (xs[1], ys[1]))
         FancyArrowPatch.draw(self, renderer)
+
+    def do_3d_projection(self, renderer: Any = None) -> float:
+        """Project the 3D arrow onto the 2D view before drawing.
+
+        Required by matplotlib's 3D rendering pipeline (since ~3.5) to
+        depth-sort artists prior to calling draw().
+
+        Args:
+            renderer (Any, optional): unused; kept for backwards
+                compatibility with the older draw(renderer)-based API.
+
+        Returns:
+            float: minimum projected z-value, used for depth-sorting.
+        """
+        xs3d, ys3d, zs3d = self._verts3d
+        xs, ys, zs = proj3d.proj_transform(xs3d, ys3d, zs3d, self.axes.M)
+        self.set_positions((xs[0], ys[0]), (xs[1], ys[1]))
+        return np.min(zs)
 
 
 class BlochSphere:
@@ -646,9 +661,6 @@ class BlochSphere:
     def show(
         self,
         save: bool = False,
-        save_pdf: bool = False,
-        save_svg: bool = False,
-        directory: Optional[str] = None,
         filename: Optional[str] = None,
     ) -> None:
         """Plot the Bloch Sphere in a figure.
@@ -656,12 +668,6 @@ class BlochSphere:
         Args:
             save (bool, optional): save the figure as a PNG. Defaults to
                 False.
-            save_pdf (bool, optional): save the figure as a PDF. Defaults to
-                False.
-            save_svg (bool, optional): save the figure as an SVG. Defaults to
-                False.
-            directory (str, optional): directory in which to save the figure.
-                If None, saves in the current directory. Defaults to None.
             filename (str, optional): prefix prepended to 'Bloch_sphere.png'
                 for the filename. Defaults to None.
         """
@@ -674,14 +680,12 @@ class BlochSphere:
         # plt.tight_layout()  # Creates issues with legend
         if save is True:
             plt.savefig(
-                f'{directory}{filename}Bloch_sphere.png', dpi=300
+                f'{filename}Bloch_sphere.png', dpi=300
             )
-            if save_pdf is True:
-                plt.savefig(
-                    f'{directory}{filename}Bloch_sphere.pdf', dpi=300
-                )
-            if save_svg is True:
-                plt.savefig(
-                    f'{directory}{filename}Bloch_sphere.svg', dpi=300
-                )
+            plt.savefig(
+                f'{filename}Bloch_sphere.pdf', dpi=300
+            )
+            plt.savefig(
+                f'{filename}Bloch_sphere.svg', dpi=300
+            )
         plt.show()

@@ -2,7 +2,6 @@
 
 """
 import logging
-
 from typing import Tuple
 
 logger = logging.getLogger(__name__)
@@ -19,6 +18,8 @@ def calculate_nrows_ncols(n_elements: int, max_ncols: int = 4) -> Tuple:
     Returns:
         Tuple: number of rows, columns
     """
+    if n_elements <= 0:
+        return 0, 0
     ncols = min(n_elements, max_ncols)
     nrows = (n_elements + ncols - 1) // ncols
     return nrows, ncols
