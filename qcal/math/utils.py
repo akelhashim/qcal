@@ -49,7 +49,7 @@ def round_to_order_error(
     Args:
         val (float): value; number to round.
         err (float): error used for rounding the value.
-        error_precision (int, optional): number of significant digits to round 
+        error_precision (int, optional): number of significant digits to round
             the error to. Defaults to 1.
 
     Returns:
