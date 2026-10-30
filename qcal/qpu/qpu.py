@@ -43,6 +43,7 @@ class QPU:
     methods.
     """
     __slots__ = (
+        '_active_sequence',
         '_circuits',
         '_classified_results',
         '_classifier',
@@ -66,19 +67,19 @@ class QPU:
     )
 
     def __init__(
-            self,
-            config:          Config,
-            compiler:        Any | Compiler | List[Any] | None = None,
-            transpiler:      Any | Transpiler | List[Any] | None = None,
-            classifier:      ClassificationManager | None = None,
-            n_shots:         int = 1024,
-            n_batches:       int = 1,
-            n_circs_per_seq: int = 1,
-            n_levels:        int = 2,
-            jit:             bool = True,
-            raster_circuits: bool = False,
-            rcorr_cmat:      pd.DataFrame | None = None,
-        ) -> None:
+        self,
+        config:          Config,
+        compiler:        Any | Compiler | List[Any] | None = None,
+        transpiler:      Any | Transpiler | List[Any] | None = None,
+        classifier:      ClassificationManager | None = None,
+        n_shots:         int = 1024,
+        n_batches:       int = 1,
+        n_circs_per_seq: int = 1,
+        n_levels:        int = 2,
+        jit:             bool = True,
+        raster_circuits: bool = False,
+        rcorr_cmat:      pd.DataFrame | None = None,
+    ) -> None:
         """Initialize an instance of the Quantum Processing Unit.
 
         Args:
@@ -145,6 +146,7 @@ class QPU:
                 "'n_levels' is greater than the number of classified states!"
             )
 
+        self._active_sequence = None
         self._circuits = None
         self._classified_results = None
         self._compiled_circuits = None
@@ -154,6 +156,26 @@ class QPU:
         self._transpiled_circuits = None
         self._measurements = []
         self._data_manager = DataMananger()
+
+    @property
+    def active_sequence(self) -> Any:
+        """The sequence currently being measured.
+
+        This is a snapshot of ``self._sequence`` taken right after
+        ``write()`` completes for the current batch. ``acquire()``
+        should read this instead of ``self._sequence`` directly: in
+        the JIT path of ``_batch_measurements()``, ``acquire()`` for
+        batch i can run on a background thread concurrently with
+        ``_prepare()`` for batch i+1, which overwrites
+        ``self._sequence``. ``active_sequence`` is only ever
+        reassigned once the previous batch's ``acquire()`` call has
+        already returned, so it's safe to read even from that
+        background thread.
+
+        Returns:
+            Any: sequence for the batch currently being acquired.
+        """
+        return self._active_sequence
 
     @property
     def circuits(self) -> Any | CircuitSet | None:
@@ -375,6 +397,12 @@ class QPU:
     def acquire(self) -> None:
         """Measure the sequence.
 
+        Read self.active_sequence here, not self._sequence: in the
+        JIT path of _batch_measurements(), this method can run on a
+        background thread while _prepare() for the next batch
+        concurrently overwrites self._sequence. See
+        self.active_sequence's docstring for details.
+
         The output of this method should be appended to self._measurements.
         """
         pass
@@ -394,6 +422,7 @@ class QPU:
         logger.info(' Writing sequences...')
         t0 = timeit.default_timer()
         self.write()
+        self._active_sequence = self._sequence
         self._runtime['Write'] += round(timeit.default_timer() - t0, 1)
 
         logger.info(' Measuring...')
@@ -431,7 +460,8 @@ class QPU:
                 # Prepare the first batch before entering the pipeline loop.
                 self._exp_circuits = batches[0]
                 logger.info(
-                    f' Batch 1/{n_circ_batches}: {batches[0].n_circuits} circuit(s)'
+                    f' Batch 1/{n_circ_batches}: {batches[0].n_circuits} '
+                    'circuit(s)'
                 )
                 self._prepare()
 
@@ -443,13 +473,17 @@ class QPU:
                         logger.info(' Writing sequences...')
                         t0 = timeit.default_timer()
                         self.write()
+                        self._active_sequence = self._sequence
                         self._runtime['Write'] += round(
                             timeit.default_timer() - t0, 1
                         )
 
-                        # Acquire in a background thread; self._sequence has
-                        # already been sent to hardware so the main thread can
-                        # safely overwrite it while the hardware runs.
+                        # Acquire in a background thread. self.active_sequence
+                        # has snapshotted self._sequence for this batch, so
+                        # the main thread can safely overwrite self._sequence
+                        # (via _prepare() below) while the hardware runs;
+                        # acquire() must read self.active_sequence, not
+                        # self._sequence, to stay safe from that race.
                         logger.info(' Measuring...')
                         future = pool.submit(_acquire)
 
@@ -528,12 +562,13 @@ class QPU:
 
         logger.info(f" Data save location: {self._data_manager._save_path}\n")
 
-    def run(self,
-            circuits:  Any | List[Any],
-            n_shots:   int | None = None,
-            n_batches: int | None = None,
-            save:      bool = True
-        ) -> None:
+    def run(
+        self,
+        circuits:  Any | List[Any],
+        n_shots:   int | None = None,
+        n_batches: int | None = None,
+        save:      bool = True
+    ) -> None:
         """Run all experimental methods.
 
         Args:
@@ -543,9 +578,9 @@ class QPU:
             n_batches (int | None, optional): number of batches of shots.
                 Defaults to ``None``.
             save (bool): whether or not to save data at the end of the run
-                method. Defaults to ``True``. This should be used for determining
-                when the data is saved for custom QPUs which inherit this
-                class.
+                method. Defaults to ``True``. This should be used for
+                determining when the data is saved for custom QPUs which inherit
+                this class.
         """
         t_start = timeit.default_timer()
         self._initialize(circuits, n_shots, n_batches)

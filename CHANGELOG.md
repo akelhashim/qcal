@@ -26,6 +26,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `QPU.acquire()` racing against the next batch's `generate_sequence()` when
+  running with `jit=True`, which could overwrite `self._sequence` before
+  `acquire()` read it; `acquire()` now reads a race-safe `active_sequence`
+  snapshot instead
+
 ### Security
 
 ## [4.0.1] - 2026-09-18
