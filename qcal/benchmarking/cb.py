@@ -1549,10 +1549,10 @@ def CB(
                 )
                 pfig2.add_hrect(
                     y0=e_F.n - e_F.s, y1=e_F.n + e_F.s,
-                    fillcolor='#F26C8C', opacity=0.3, line_width=0,
+                    fillcolor='#2CA02C', opacity=0.3, line_width=0,
                 )
                 pfig2.add_hline(
-                    y=e_F.n, line={'color': '#F26C8C', 'dash': 'dash'},
+                    y=e_F.n, line={'color': '#2CA02C', 'dash': 'dash'},
                 )
                 pfig2.add_annotation(
                     text=e_F_label,
@@ -1560,9 +1560,9 @@ def CB(
                     x=0.02, y=0.98,
                     xanchor='left', yanchor='top',
                     showarrow=False,
-                    font={'color': '#F26C8C', 'size': 15},
+                    font={'color': '#2CA02C', 'size': 15},
                     bgcolor='white',
-                    bordercolor='#F26C8C',
+                    bordercolor='#2CA02C',
                     borderwidth=1,
                     borderpad=4,
                 )
@@ -1609,19 +1609,19 @@ def CB(
                     plt.bar(x, y, yerr=yerr, color='#1f77b4', capsize=3)
                     plt.axhspan(
                         e_F.n - e_F.s, e_F.n + e_F.s,
-                        color='#F26C8C', alpha=0.3,
+                        color='#2CA02C', alpha=0.3,
                     )
                     plt.axhline(
-                        e_F.n, color='#F26C8C', linestyle='--'
+                        e_F.n, color='#2CA02C', linestyle='--'
                     )
                     plt.text(
                         0.02, 0.98, e_F_label,
                         transform=plt.gca().transAxes,
                         ha='left', va='top',
-                        color='#F26C8C', fontsize=12,
+                        color='#2CA02C', fontsize=12,
                         bbox={
                             'facecolor': 'white',
-                            'edgecolor': '#F26C8C',
+                            'edgecolor': '#2CA02C',
                             'boxstyle': 'round,pad=0.3',
                         },
                     )

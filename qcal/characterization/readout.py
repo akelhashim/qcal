@@ -8,7 +8,9 @@ import logging
 from collections.abc import Sequence
 from typing import Callable
 
+import numpy as np
 from IPython.display import clear_output
+from uncertainties import UFloat, ufloat
 
 import qcal.settings as settings
 from qcal.circuit import Barrier, Circuit, CircuitSet, Cycle
@@ -82,6 +84,21 @@ def RandomizedReadout(
             )
             self._qubits = sorted(qubits)
             self._probabilities = None
+
+        @property
+        def fidelity(self) -> UFloat:
+            """Probability of measuring the all-zero state.
+
+            The uncertainty is the binomial standard error,
+            sqrt(p * (1 - p) / n_shots).
+
+            Returns:
+                UFloat: all-zero state probability with uncertainty.
+            """
+            results = self.results
+            n_shots = results.n_shots
+            p0 = results.populations['0' * len(self._qubits)]
+            return ufloat(p0, np.sqrt(p0 * (1 - p0) / n_shots))
 
         @property
         def results(self) -> Results:

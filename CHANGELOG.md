@@ -28,6 +28,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and `cycles_to_defcircuits` leaves such cycles as literal gates
 - `decompose_to_zxzxz` parameter for Cycle Benchmarking circuit
   generation
+- `RandomizedReadout.fidelity` property: the all-zero state probability
+  as a `ufloat` with binomial standard error
 - `pauli_to_cycle` utility to convert a Pauli string into a `Circuit`,
   with ZXZXZ decomposition and caching
 - `conjugate_pauli` utilities for efficiently tracking Pauli operator
