@@ -90,7 +90,7 @@ def compute_conditional_counts(p: PostProcessor) -> None:
         # Mid-circuit measurements
         for df in circuit_results[:-1]:
             mapped = df.astype(int).replace(
-                {0: 'p0', 1: 'p1', '2': 'p2', '3': 'p3'}
+                {0: 'p0', 1: 'p1', 2: 'p2', 3: 'p3'}
             ).astype(str)
             outcomes.append(  # e.g. "p0p1p0"
                 mapped.agg("".join, axis=1).reset_index(drop=True)
