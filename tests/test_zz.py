@@ -150,7 +150,7 @@ class TestJAZZSimulatedRun:
         jazz.generate_circuits()
         _inject_zz(jazz, zz_true)
 
-        Emulator.run(jazz, jazz._circuits, save=False)
+        Emulator.run(jazz, jazz._circuits, auto_save=False)
         jazz.save()
         jazz.analyze()
 
@@ -169,7 +169,7 @@ class TestJAZZSimulatedRun:
         jazz.generate_circuits()
         _inject_zz(jazz, zz_true)
 
-        Emulator.run(jazz, jazz._circuits, save=False)
+        Emulator.run(jazz, jazz._circuits, auto_save=False)
         jazz.save()
         jazz.analyze()
         jazz.final()

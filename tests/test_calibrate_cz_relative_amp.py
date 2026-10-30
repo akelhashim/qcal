@@ -106,7 +106,7 @@ class TestRelativeAmpSimulatedRun:
         for circuit, amp in zip(cal._circuits, amp_col, strict=True):
             _set_cz_unitary(circuit, _cz_conditional_phase(amp, amp0))
 
-        Emulator.run(cal, cal._circuits, save=False)
+        Emulator.run(cal, cal._circuits, auto_save=False)
         cal.analyze()
 
         assert cal._R[pair].max() == pytest.approx(1.0, abs=1e-6)

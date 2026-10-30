@@ -115,7 +115,7 @@ class TestFrequencySimulatedRun:
                 circuit, _cz_conditional_phase(freq, freq_true, k)
             )
 
-        Emulator.run(cal, cal._circuits, save=False)
+        Emulator.run(cal, cal._circuits, auto_save=False)
         cal.analyze()
         return cal, pair, freq_true, detunings
 

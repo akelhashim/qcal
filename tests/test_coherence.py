@@ -122,7 +122,7 @@ class TestT1SimulatedRun:
             n_elements=30, gate='X90', simulator=sim, n_shots=2000,
         )
         exp.generate_circuits()
-        Emulator.run(exp, exp.circuits, save=False)
+        Emulator.run(exp, exp.circuits, auto_save=False)
         exp.analyze()
 
         assert exp._fit[0].fit_success
@@ -141,7 +141,7 @@ class TestT1SimulatedRun:
             n_elements=30, gate='X', simulator=sim, n_shots=2000,
         )
         exp.generate_circuits()
-        Emulator.run(exp, exp.circuits, save=False)
+        Emulator.run(exp, exp.circuits, auto_save=False)
         exp.analyze()
 
         assert exp.characterized_values[0] == pytest.approx(
@@ -159,7 +159,7 @@ class TestT1SimulatedRun:
             n_elements=30, simulator=sim, n_shots=2000,
         )
         exp.generate_circuits()
-        Emulator.run(exp, exp.circuits, save=False)
+        Emulator.run(exp, exp.circuits, auto_save=False)
         exp.analyze()
         exp.final()
 
@@ -202,7 +202,7 @@ class TestT2SimulatedRun:
             simulator=sim, n_shots=3000,
         )
         exp.generate_circuits()
-        Emulator.run(exp, exp.circuits, save=False)
+        Emulator.run(exp, exp.circuits, auto_save=False)
         exp.analyze()
 
         assert exp._fit[0].fit_success
@@ -223,7 +223,7 @@ class TestT2SimulatedRun:
             echo=True, n_elements=40, simulator=sim, n_shots=3000,
         )
         exp.generate_circuits()
-        Emulator.run(exp, exp.circuits, save=False)
+        Emulator.run(exp, exp.circuits, auto_save=False)
         exp.analyze()
 
         assert exp.characterized_values[0] == pytest.approx(
@@ -260,7 +260,7 @@ class TestT2DDSimulatedRun:
             n_elements=20, n_pulses=4, simulator=sim, n_shots=2000,
         )
         exp.generate_circuits()
-        Emulator.run(exp, exp.circuits, save=False)
+        Emulator.run(exp, exp.circuits, auto_save=False)
         exp.analyze()
 
         assert exp._fit[0].fit_success
@@ -297,7 +297,7 @@ class TestParityOscillationsSimulatedRun:
             simulator=StateVectorSimulator(), n_shots=None, n_elements=21,
         )
         po.generate_circuits()
-        Emulator.run(po, po.circuits, save=False)
+        Emulator.run(po, po.circuits, auto_save=False)
         po.analyze()
 
         assert po._fit.fit_success
@@ -315,7 +315,7 @@ class TestParityOscillationsSimulatedRun:
             simulator=StateVectorSimulator(), n_shots=None, n_elements=21,
         )
         po.generate_circuits()
-        Emulator.run(po, po.circuits, save=False)
+        Emulator.run(po, po.circuits, auto_save=False)
         po.analyze()
 
         po.plot()
@@ -326,7 +326,7 @@ class TestParityOscillationsSimulatedRun:
             simulator=StateVectorSimulator(), n_shots=None, n_elements=21,
         )
         po.generate_circuits()
-        Emulator.run(po, po.circuits, save=False)
+        Emulator.run(po, po.circuits, auto_save=False)
         # Force a fit failure to exercise the graceful-degradation path.
         po._fit.fit = lambda *a, **k: None  # leaves fit_success False
 

@@ -147,7 +147,7 @@ class TestAmplitudeSimulatedRun:
                 circuit, _cz_conditional_phase(amp, amp_ideal)
             )
 
-        Emulator.run(cal, cal._circuits, save=False)
+        Emulator.run(cal, cal._circuits, auto_save=False)
         cal.analyze()
         return cal, pair, amp_ideal, amps
 

@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Breaking
 
+- Renamed `QPU.run()`'s `save` kwarg to `auto_save` for clarity
+
 ### Added
 
 - Comprehensive unit tests
@@ -30,6 +32,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   running with `jit=True`, which could overwrite `self._sequence` before
   `acquire()` read it; `acquire()` now reads a race-safe `active_sequence`
   snapshot instead
+- `QPU._initialize()` silently overwriting the `exp_id` (and orphaning the
+  save folder) that GST/CRB/MCB protocols set up before calling `qpu.run()`;
+  added `DataMananger.reserve_exp_id()` so those protocols can protect their
+  `exp_id` from the next `generate_exp_id()` call
 
 ### Security
 

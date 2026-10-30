@@ -567,7 +567,7 @@ class QPU:
         circuits:  Any | List[Any],
         n_shots:   int | None = None,
         n_batches: int | None = None,
-        save:      bool = True
+        auto_save: bool = True
     ) -> None:
         """Run all experimental methods.
 
@@ -577,10 +577,11 @@ class QPU:
                 Defaults to ``None``.
             n_batches (int | None, optional): number of batches of shots.
                 Defaults to ``None``.
-            save (bool): whether or not to save data at the end of the run
-                method. Defaults to ``True``. This should be used for
-                determining when the data is saved for custom QPUs which inherit
-                this class.
+            auto_save (bool): whether this method should save data itself
+                right after measuring. Defaults to ``True``. Custom QPUs
+                whose own run() orchestrates further steps (e.g. analyze())
+                before the real save point should pass ``False`` here and
+                call ``self.save()`` themselves at the right time instead.
         """
         t_start = timeit.default_timer()
         self._initialize(circuits, n_shots, n_batches)
@@ -590,7 +591,7 @@ class QPU:
         )
 
         clear_output(wait=True)
-        if settings.Settings.save_data and save:
+        if settings.Settings.save_data and auto_save:
             self.save()
 
         print(f"Runtime: {repr(self._runtime)[8:]}\n")

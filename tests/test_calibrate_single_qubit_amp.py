@@ -139,7 +139,7 @@ class TestAmplitudeSimulatedRabi:
 
         # n_shots=None -> exact probabilities, no shot noise, so the
         # fit below has nothing to converge to but the analytic curve.
-        Emulator.run(cal, cal._circuits, save=False)
+        Emulator.run(cal, cal._circuits, auto_save=False)
         cal.analyze()
 
         assert cal._fit[0].fit_success
@@ -174,7 +174,7 @@ class TestAmplitudeSimulatedRabi:
         ):
             _set_x90_unitary(circuit, (np.pi / 2) * (amp / amp_cal))
 
-        Emulator.run(cal, cal._circuits, save=False)
+        Emulator.run(cal, cal._circuits, auto_save=False)
         cal.analyze()
         return cal, amp_cal
 

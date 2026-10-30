@@ -134,7 +134,7 @@ class TestLeakageSimulatedRun:
         for circuit, theta in zip(cal._circuits, param_col, strict=True):
             _set_x90_unitary(circuit, _leakage_unitary(theta))
 
-        Emulator.run(cal, cal._circuits, save=False)
+        Emulator.run(cal, cal._circuits, auto_save=False)
         cal.analyze()
 
         assert cal._sweep_results[0][len(sweep) // 2] == pytest.approx(
@@ -162,7 +162,7 @@ class TestLeakageSimulatedRun:
             theta_eff = (np.pi / 2) * (1 - abs(theta - theta_peak))
             _set_x90_unitary(circuit, _leakage_unitary(theta_eff))
 
-        Emulator.run(cal, cal._circuits, save=False)
+        Emulator.run(cal, cal._circuits, auto_save=False)
         cal.analyze()
 
         assert cal.calibrated_values[0] == pytest.approx(theta_peak)
@@ -181,7 +181,7 @@ class TestLeakageSimulatedRun:
         for circ, theta in zip(cal._circuits, param_col, strict=True):
             _set_x90_unitary(circ, _leakage_unitary(theta))
 
-        Emulator.run(cal, cal._circuits, save=False)
+        Emulator.run(cal, cal._circuits, auto_save=False)
         cal.analyze()
 
         # Both qubits leak identically, so the summed loss at theta=0

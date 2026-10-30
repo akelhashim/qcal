@@ -892,7 +892,7 @@ def GST(
         def run(self):
             """Run all experimental methods and analyze results."""
             self.generate_circuits()
-            qpu.run(self, self._circuits, save=False)
+            qpu.run(self, self._circuits, auto_save=False)
             self.save()
             self.analyze()
             self.plot()
@@ -1276,7 +1276,7 @@ def SimultaneousGST(
         def run(self):
             """Run all experimental methods and analyze results."""
             self.generate_circuits()
-            qpu.run(self, self._circuits, save=False)
+            qpu.run(self, self._circuits, auto_save=False)
             self.save()
             self.analyze()
             self.plot()

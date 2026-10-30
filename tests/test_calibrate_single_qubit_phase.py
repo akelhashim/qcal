@@ -175,7 +175,7 @@ class TestPhaseSimulatedRun:
                 circuit, 'X', rz(p + delta_true) @ rx(np.pi)
             )
 
-        Emulator.run(cal, cal._circuits, save=False)
+        Emulator.run(cal, cal._circuits, auto_save=False)
         cal.analyze()
 
         assert cal._fit[0].fit_success
@@ -207,7 +207,7 @@ class TestPhaseSimulatedRun:
                 circuit, 'X90', rz(psi) @ rx(np.pi / 2) @ rz(psi)
             )
 
-        Emulator.run(cal, cal._circuits, save=False)
+        Emulator.run(cal, cal._circuits, auto_save=False)
         cal.analyze()
 
         # Equal and opposite first-order sensitivity to the residual

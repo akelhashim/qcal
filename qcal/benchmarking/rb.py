@@ -398,6 +398,11 @@ def CRB(
                     sparse=True,
                     clobber_ok=True
                 )
+                # Keep this exp_id (and the folder written above) for
+                # the qpu.run() call about to happen -- otherwise its
+                # _initialize() would overwrite _exp_id with a fresh
+                # one before analyze()/save() write into this folder.
+                self._data_manager.reserve_exp_id()
 
         def save(self):
             """Save all circuits and data."""
@@ -817,7 +822,7 @@ def CRB(
         def run(self):
             """Run all experimental methods and analyze results."""
             self.generate_circuits()
-            qpu.run(self, self._circuits, save=False)
+            qpu.run(self, self._circuits, auto_save=False)
             self.save()
             self.analyze()
             self.plot()
@@ -1052,7 +1057,7 @@ def SRB(
         def run(self):
             """Run all experimental methods and analyze results."""
             self.generate_circuits()
-            qpu.run(self, self._circuits, save=False)
+            qpu.run(self, self._circuits, auto_save=False)
             self.save()
             self.analyze()
             self.plot()

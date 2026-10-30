@@ -120,7 +120,7 @@ class TestParamSweepSimulatedRun:
         for circuit, theta in zip(cal._circuits, param_col, strict=True):
             _set_x90_unitary(circuit, theta)
 
-        Emulator.run(cal, cal._circuits, save=False)
+        Emulator.run(cal, cal._circuits, auto_save=False)
         cal.analyze()
 
         # rx(theta) applied to |0> gives Prob(1) = sin^2(theta/2),
@@ -145,7 +145,7 @@ class TestParamSweepSimulatedRun:
         for circuit, theta in zip(cal._circuits, param_col, strict=True):
             _set_x90_unitary(circuit, theta)
 
-        Emulator.run(cal, cal._circuits, save=False)
+        Emulator.run(cal, cal._circuits, auto_save=False)
         cal.analyze()
 
         # Prob(0) = cos^2(theta/2), which is minimized at theta = pi.
@@ -172,7 +172,7 @@ class TestParamSweepSimulatedRun:
         for circuit, theta in zip(cal._circuits, param_col, strict=True):
             _set_x90_unitary(circuit, theta)
 
-        Emulator.run(cal, cal._circuits, save=False)
+        Emulator.run(cal, cal._circuits, auto_save=False)
         cal.analyze()
 
         assert cal.calibrated_values[0] == pytest.approx(np.pi)
@@ -192,7 +192,7 @@ class TestParamSweepSimulatedRun:
         for circ, theta in zip(cal._circuits, param_col, strict=True):
             _set_x90_unitary(circ, theta)
 
-        Emulator.run(cal, cal._circuits, save=False)
+        Emulator.run(cal, cal._circuits, auto_save=False)
         cal.analyze()
 
         # Both qubits rotate identically, so Prob(11) = sin^4(theta/2),

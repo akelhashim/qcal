@@ -452,7 +452,7 @@ def ReadoutCalibration(
                     meshgrid. It is best to set this to False if doing a sweep.
             """
             self.generate_circuits()
-            qpu.run(self, self._circuits, save=False)
+            qpu.run(self, self._circuits, auto_save=False)
             self.analyze()
             self.save()
             if plot:

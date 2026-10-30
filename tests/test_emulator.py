@@ -85,7 +85,7 @@ class TestRun:
         # Noiseless simulator: X on |0> deterministically measures '1'.
         circuit = Circuit([Cycle(X(0)), Cycle(Meas(0))])
         emu = Emulator(simulator=StateVectorSimulator())
-        emu.run(circuit, save=False)
+        emu.run(circuit, auto_save=False)
 
         assert isinstance(circuit.results, Results)
         assert dict(circuit.results.dict) == {'1': 1024}
@@ -93,7 +93,7 @@ class TestRun:
     def test_run_respects_n_shots_override(self):
         circuit = Circuit([Cycle(X(0)), Cycle(Meas(0))])
         emu = Emulator(simulator=StateVectorSimulator())
-        emu.run(circuit, n_shots=10, save=False)
+        emu.run(circuit, n_shots=10, auto_save=False)
 
         assert circuit.results.n_shots == 10
         assert dict(circuit.results.dict) == {'1': 10}
@@ -101,7 +101,7 @@ class TestRun:
     def test_run_writes_results_and_states_columns(self):
         circuit = Circuit([Cycle(X(0)), Cycle(Meas(0))])
         emu = Emulator(simulator=StateVectorSimulator())
-        emu.run(CircuitSet([circuit]), save=False)
+        emu.run(CircuitSet([circuit]), auto_save=False)
 
         assert list(emu.circuits['results']) == [{'1': 1024}]
         assert emu.circuits['states'].iloc[0] == '1|1⟩'

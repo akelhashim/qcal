@@ -527,7 +527,7 @@ def AmpFreqSweep(
         def run(self):
             """Run all experimental methods and analyze results."""
             self.generate_circuits()
-            qpu.run(self, self._circuits, save=False)
+            qpu.run(self, self._circuits, auto_save=False)
             self.analyze()
             self.save()
             self.plot()
@@ -883,7 +883,7 @@ def Amplitude(
         def run(self):
             """Run all experimental methods and analyze results."""
             self.generate_circuits()
-            qpu.run(self, self._circuits, save=False)
+            qpu.run(self, self._circuits, auto_save=False)
             self.analyze()
             self.save()
             self.plot()
@@ -1208,7 +1208,7 @@ def Frequency(
         def run(self):
             """Run all experimental methods and analyze results."""
             self.generate_circuits()
-            qpu.run(self, self._circuits, save=False)
+            qpu.run(self, self._circuits, auto_save=False)
             self.analyze()
             self.save()
             self.plot()
@@ -1466,7 +1466,7 @@ def RelativeAmp(
         def run(self):
             """Run all experimental methods and analyze results."""
             self.generate_circuits()
-            qpu.run(self, self._circuits, save=False)
+            qpu.run(self, self._circuits, auto_save=False)
             self.analyze()
             self.save()
             self.plot()
@@ -1706,7 +1706,7 @@ def RelativePhase(
         def run(self):
             """Run all experimental methods and analyze results."""
             self.generate_circuits()
-            qpu.run(self, self._circuits, save=False)
+            qpu.run(self, self._circuits, auto_save=False)
             self.analyze()
             self.save()
             self.plot()
@@ -2230,7 +2230,7 @@ def LocalPhases(
         def run(self):
             """Run all experimental methods and analyze results."""
             self.generate_circuits()
-            qpu.run(self, self._circuits, save=False)
+            qpu.run(self, self._circuits, auto_save=False)
             self.analyze()
             self.save()
             self.plot()
@@ -2632,7 +2632,7 @@ def SpectatorPhase(
         def run(self):
             """Run all experimental methods and analyze results."""
             self.generate_circuits()
-            qpu.run(self, self._circuits, save=False)
+            qpu.run(self, self._circuits, auto_save=False)
             self.analyze()
             self.save()
             self.plot()

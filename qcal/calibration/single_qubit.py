@@ -327,7 +327,7 @@ def Amplitude(
         def run(self):
             """Run all experimental methods and analyze results."""
             self.generate_circuits()
-            qpu.run(self, self._circuits, save=False)
+            qpu.run(self, self._circuits, auto_save=False)
             self.analyze()
             clear_output(wait=True)
             self._data_manager._exp_id += (
@@ -714,7 +714,7 @@ def Frequency(
         def run(self):
             """Run all experimental methods and analyze results."""
             self.generate_circuits()
-            qpu.run(self, self._circuits, save=False)
+            qpu.run(self, self._circuits, auto_save=False)
             self.analyze()
             clear_output(wait=True)
             self._data_manager._exp_id += (
@@ -1278,7 +1278,7 @@ def Phase(
         def run(self):
             """Run all experimental methods and analyze results."""
             self.generate_circuits()
-            qpu.run(self, self._circuits, save=False)
+            qpu.run(self, self._circuits, auto_save=False)
             self.analyze()
             self.save()
             self.plot()

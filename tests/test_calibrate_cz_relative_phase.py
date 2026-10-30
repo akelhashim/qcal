@@ -107,7 +107,7 @@ class TestRelativePhaseSimulatedRun:
                 circuit, _cz_conditional_phase(p, phase_true)
             )
 
-        Emulator.run(cal, cal._circuits, save=False)
+        Emulator.run(cal, cal._circuits, auto_save=False)
         cal.analyze()
 
         assert cal._R[pair].max() == pytest.approx(1.0, abs=1e-6)
