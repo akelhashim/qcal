@@ -378,8 +378,8 @@ def XX_N(
     Returns:
         Circuit: qcal Circuit.
     """
-    qubits_even = [q for i, q in enumerate(qubits) if i % 2 == 0]
-    qubits_odd = [q for i, q in enumerate(qubits) if i % 2 == 1]
+    qubits_even = [q for q in qubits if q % 2 == 0]
+    qubits_odd = [q for q in qubits if q % 2 == 1]
     syncopated = bool(qubits_even and qubits_odd)
 
     if n_pulses is None and syncopated:

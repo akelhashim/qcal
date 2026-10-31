@@ -25,9 +25,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Removed
 
 - Removed `qcal/characterization/tomography/analysis.py`
+- Removed empty, unused `qcal/sequence/sequencer.py`
 
 ### Fixed
 
+- `cosine_square()` crashing with a `ZeroDivisionError` for `ramp_fraction=0.0`,
+  and silently returning a pulse of the wrong length for `-0.5 <
+  ramp_fraction < 0`; a negative `ramp_fraction` (or one `> 0.5`) now
+  consistently produces a one-sided ramp
+- `XX_N()` partitioning qubits into "even"/"odd" by their position in the
+  input list instead of by qubit label parity (unlike `XY_N()`), so e.g.
+  `XX_N([1, 3], ...)` incorrectly syncopated two same-parity qubits
 - `QPU.acquire()` racing against the next batch's `generate_sequence()` when
   running with `jit=True`, which could overwrite `self._sequence` before
   `acquire()` read it; `acquire()` now reads a race-safe `active_sequence`
