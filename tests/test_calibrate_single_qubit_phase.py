@@ -62,7 +62,27 @@ class TestPhaseConstruction:
             qpu=Emulator, config=config, qubits=[0],
             phases=np.linspace(-1, 1, 5), gate='X',
         )
-        assert cal.params[0] == 'single_qubit/0/GE/X/pulse/1/kwargs/phase'
+        assert cal.params[0] == 'single_qubit/0/GE/X/pulse/0/kwargs/phase'
+
+    def test_relative_phase_with_x90_gate(self, config):
+        cal = Phase(
+            qpu=Emulator, config=config, qubits=[0],
+            phases=np.array([0.1, 0.2]), gate='X90', relative_phase=True,
+        )
+        offset = config['single_qubit/0/GE/X90/pulse/0/kwargs/phase']
+        np.testing.assert_allclose(
+            cal.phases[0], np.array([0.1, 0.2]) + offset
+        )
+
+    def test_relative_phase_with_x_gate(self, config):
+        cal = Phase(
+            qpu=Emulator, config=config, qubits=[0],
+            phases=np.array([0.1, 0.2]), gate='X', relative_phase=True,
+        )
+        offset = config['single_qubit/0/GE/X/pulse/0/kwargs/phase']
+        np.testing.assert_allclose(
+            cal.phases[0], np.array([0.1, 0.2]) + offset
+        )
 
     def test_invalid_gate_raises(self, config):
         with pytest.raises(ValueError):
@@ -113,48 +133,24 @@ class TestPhaseConstruction:
         assert set(cal._circuits['sequence']) == {'X90_X_X90'}
 
 
-class TestKnownIssues:
+class TestPhaseSimulatedRun:
 
-    @pytest.mark.xfail(
-        reason=(
-            "relative_phase=True crashes for gate='X': self._params[q] "
-            "is a plain string for gate='X' (only gate='X90' gives a "
-            "2-element list), so self._params[q][0] indexes the "
-            "string's first character instead of the param path, and "
-            "config[...] on that bogus path returns None, which then "
-            "fails to add to a float."
-        ),
-        raises=TypeError,
-        strict=True,
-    )
-    def test_relative_phase_with_x_gate(self, config):
-        Phase(
-            qpu=Emulator, config=config, qubits=[0],
-            phases=np.array([0.1, 0.2]), gate='X', relative_phase=True,
-        )
-
-    @pytest.mark.xfail(
-        reason=(
-            "Phase(gate='X').run() crashes on the example config: the "
-            "default params path hardcodes pulse segment index 1 "
-            "('single_qubit/.../X/pulse/1/kwargs/phase'), but the example "
-            "config's X pulse has only one segment (index 0). final() "
-            "then fails to write the calibrated phase back, since "
-            "config[bogus_path] resolves to None."
-        ),
-        raises=TypeError,
-        strict=True,
-    )
-    def test_run_with_x_gate(self, config):
+    def test_run_with_x_gate_writes_a_calibrated_phase_back_to_config(
+        self, config
+    ):
+        # Regression test: final() used to crash writing the
+        # calibrated phase back, because the default params path for
+        # gate='X' pointed at pulse segment 1, which doesn't exist for
+        # the example config's single-segment X pulse.
         phases = np.linspace(-np.pi, np.pi, 5)
         cal = Phase(
             qpu=Emulator, config=config, qubits=[0], phases=phases,
             gate='X', simulator=StateVectorSimulator(), n_shots=None,
         )
         cal.run()
-
-
-class TestPhaseSimulatedRun:
+        assert isinstance(
+            config['single_qubit/0/GE/X/pulse/0/kwargs/phase'], float
+        )
 
     def test_x_gate_cosine_fit_recovers_known_phase_error(self, config):
         # X90 - X(phase) - X90 - measure. The X gate has only one

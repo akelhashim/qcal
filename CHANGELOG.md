@@ -50,6 +50,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `GateMapper.call()` treating a `str` result as a generic `Iterable` and
   crashing with a confusing `AttributeError` instead of the intended
   `TypeError` for an unsupported gate-function return type
+- `Config.hardware` crashing (or silently returning an empty table) for any
+  config, due to using `pd.DataFrame.from_dict(orient='index')` on a dict of
+  opaque values instead of table rows
+- `pygsti_pspec()` dropping a two-qubit gate's availability whenever the
+  config declared that qubit pair in descending order (e.g. a ring
+  topology's wraparound edge `(7, 0)`), since it only matched ascending
+  qubit-pair tuples
+- `Phase(gate='X', relative_phase=True)` crashing by indexing into the
+  first character of the (string, not list) param path; `Phase(gate='X')`'s
+  default param path also pointed at a pulse segment that doesn't exist for
+  single-segment X pulses, crashing `final()`
+- `update_clifford_labels()` crashing on any single-qubit Clifford layer,
+  since a pyGSTi `Label` with exactly one component collapses to a form
+  whose direct iteration yields raw tuple fields instead of sub-`Label`s
+- `TruthTable.analyze()` silently returning an all-zero truth table (no
+  error) when `qubits` is a strict superset of `circuit.qubits` (e.g. an
+  untouched ancilla included only for state preparation), because it
+  marginalized away those extra qubits before looking up the (differently-
+  shaped) `self._states` keys
 
 ### Security
 

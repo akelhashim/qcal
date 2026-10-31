@@ -836,12 +836,16 @@ def Phase(
                             pulse + '0/kwargs/phase', pulse + '2/kwargs/phase'
                         ]
                     elif gate == 'X':
-                        self._params[q] = pulse + '1/kwargs/phase'
+                        self._params[q] = pulse + '0/kwargs/phase'
 
             if relative_phase:
                 for q in qubits:
+                    param = (
+                        self._params[q][0] if gate == 'X90'
+                        else self._params[q]
+                    )
                     self._phases[q] = (
-                        self._phases[q] + config[self._params[q][0]]
+                        self._phases[q] + config[param]
                     )
             self._param_sweep = self._phases
 

@@ -234,9 +234,7 @@ class Config:
         Returns:
             pd.DataFrame: hardware properties.
         """
-        return pd.DataFrame.from_dict(
-            self.parameters['hardware'], orient='index', columns=['hardware']
-        )
+        return pd.DataFrame({'hardware': self.parameters['hardware']})
 
     @property
     def n_qubits(self) -> int:

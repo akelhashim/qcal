@@ -134,8 +134,17 @@ def TruthTable(
             """Analyze the data."""
             logger.info(' Analyzing the data...')
 
+            # Each generated circuit measures *all* of self._qubits
+            # (not just self._circuit.qubits, which may be a strict
+            # subset when ancilla/spectator qubits are included), and
+            # a simulator reports bitstrings in sorted-qubit-label
+            # order. q_index reorders that sorted bitstring to match
+            # self._qubits' given order, so it lines up with
+            # self._states (built in that same order) -- without
+            # discarding any ancilla qubits.
+            measured_qubits = tuple(sorted(self._qubits))
             q_index = tuple([
-                self._qubits.index(q) for q in self._circuit.qubits
+                measured_qubits.index(q) for q in self._qubits
             ])
 
             probs = []

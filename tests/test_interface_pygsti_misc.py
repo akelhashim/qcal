@@ -121,6 +121,17 @@ class TestPygstiPspec:
         )
         assert pspec.availability['Gxpi2'] == [('Q0',)]
 
+    def test_wraparound_qubit_pair_availability_is_kept(self, config):
+        # The example config's ring topology declares its wraparound
+        # edge as the descending tuple (7, 0) (not (0, 7)), while
+        # pairings is always built from ascending-sorted qubit
+        # combinations; the pair must still be matched regardless of
+        # which order the config declares it in.
+        pspec = pygsti_pspec(
+            config, qubits=(0, 1, 7), native_gates=('CZ',)
+        )
+        assert ('Q7', 'Q0') in pspec.availability['Gcphase']
+
 
 class TestDunderAll:
 
@@ -133,19 +144,3 @@ class TestDunderAll:
         assert p.__all__ == ('pygsti_pspec',)
 
 
-class TestKnownIssues:
-
-    @pytest.mark.xfail(raises=AssertionError, strict=True)
-    def test_wraparound_qubit_pair_availability_is_dropped(self, config):
-        # pygsti_pspec() builds `pairings` via
-        # itertools.combinations(qubits, 2), which always yields
-        # ascending-sorted tuples, then checks
-        # `qubit_pair in pairings` against config.native_gates
-        # ['two_qubit'].keys() verbatim. The example config's ring
-        # topology declares its wraparound edge as the descending
-        # tuple (7, 0) (not (0, 7)), so it never matches any ascending
-        # `pairings` entry and is silently dropped from availability
-        pspec = pygsti_pspec(
-            config, qubits=(0, 1, 7), native_gates=('CZ',)
-        )
-        assert ('Q7', 'Q0') in pspec.availability['Gcphase']

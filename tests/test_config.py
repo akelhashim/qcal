@@ -125,6 +125,12 @@ class TestTables:
         row = df[(df['Qubit'] == 0) & (df['Coherence Type'] == 'T1 GE')]
         assert row['Coherence Time'].iloc[0] == 5.4e-05
 
+    def test_hardware_table(self, config):
+        df = config.hardware
+        assert df.loc['sample_rate', 'hardware'] == {
+            'ADC': 2000000000.0, 'DAC': 8000000000.0
+        }
+
 
 @pytest.fixture
 def captured_figure(monkeypatch):
@@ -209,26 +215,6 @@ class TestCopy:
         deep = config.__copy__(deep_copy=True)
         deep['single_qubit'][0]['GE']['T1'] = 999
         assert config['single_qubit/0/GE/T1'] != 999
-
-
-class TestKnownIssues:
-
-    @pytest.mark.xfail(
-        reason=(
-            "Config.hardware crashes on configs where the 'hardware' "
-            "section mixes dict-valued keys (e.g. sample_rate) with "
-            "None-valued keys (e.g. readout_LO): pandas.DataFrame.from_dict"
-            "(orient='index') calls .items() on the None and raises "
-            "AttributeError."
-        ),
-        raises=AttributeError,
-        strict=True,
-    )
-    def test_hardware_table(self, config):
-        df = config.hardware
-        assert df.loc['sample_rate', 'hardware'] == {
-            'ADC': 2000000000.0, 'DAC': 8000000000.0
-        }
 
 
 class TestSaveLoad:

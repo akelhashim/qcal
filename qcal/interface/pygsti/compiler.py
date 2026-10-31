@@ -292,7 +292,13 @@ def update_clifford_labels(
     new_layer = []
     used_qubits = set()
 
-    for g in layer:
+    # layer may be a real pyGSTi Label -- iterating it directly yields
+    # its raw (name, qubit) tuple fields when it's atomic (exactly one
+    # component, e.g. a single-qubit layer), rather than sub-Labels,
+    # so .components must be used instead -- or a plain list of
+    # Labels, which is already iterable as-is.
+    components = layer.components if isinstance(layer, Label) else layer
+    for g in components:
         idx = qubit_to_idx[g.qubits[0]]
         p_name = _pauli_entry_to_clifford_name(p_vec, idx, n)
         q_name = _pauli_entry_to_clifford_name(q_vec, idx, n)

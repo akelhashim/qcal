@@ -18,16 +18,12 @@ need to seed `np.random` or tolerate statistical noise.
 
 `.run()` is used directly throughout.
 
-Known issue: when `qubits` is a strict superset of `circuit.qubits`
-(e.g. an untouched ancilla included only for state preparation),
-`analyze()` reuses `self._states` -- built from the full `qubits`
-list -- as the *output*-state lookup keys against a `Results` object
-that was marginalized down to just `circuit.qubits` (a different,
-shorter bitstring length). Every lookup therefore misses and silently
-returns 0 (`populations` is a zero-defaulting `defaultdict`), so
-`truth_table` comes back all zeros instead of the correct,
-ancilla-invariant truth table -- with no error raised. See
-`TestKnownIssues` below.
+`qubits` may be a strict superset of `circuit.qubits` (e.g. an
+untouched ancilla included only for state preparation); every
+generated circuit still measures all of `qubits`, and `analyze()`
+reorders that full-width result to match `qubits`' given order before
+looking up each entry of `self._states` -- see
+test_ancilla_superset_qubits_gives_ancilla_invariant_truth_table.
 """
 import numpy as np
 import pytest
@@ -139,25 +135,14 @@ class TestTruthTableSimulatedRun:
         assert tt.truth_table == pytest.approx(CNOT_TRUTH_TABLE)
         assert tt.fidelity['val'] == pytest.approx(0.5)
 
-
-class TestKnownIssues:
-
-    @pytest.mark.xfail(
-        reason=(
-            "analyze() reuses self._states (built from the full "
-            "`qubits` list) as the output-state lookup keys even when "
-            "`qubits` is a strict superset of circuit.qubits, but the "
-            "marginalized Results it looks up has shorter bitstring "
-            "keys (circuit.qubits-length). Every lookup misses and "
-            "silently returns 0 via the zero-defaulting populations "
-            "defaultdict, so truth_table comes back all zeros instead "
-            "of the correct, ancilla-invariant truth table."
-        ),
-        strict=True,
-    )
-    def test_ancilla_superset_qubits_gives_nonzero_truth_table(
+    def test_ancilla_superset_qubits_gives_ancilla_invariant_truth_table(
         self, config
     ):
+        # qubits=[0, 1] is a strict superset of circuit.qubits=(1,):
+        # qubit 0 is an untouched ancilla, included only for state
+        # preparation. The circuit (X on qubit 1 only) should leave
+        # qubit 0 unchanged regardless of its prepared state, while
+        # qubit 1 always flips -- e.g. prepared '00' -> measured '01'.
         circuit = Circuit([Cycle({X(1)})])
         tt = TruthTable(
             qpu=Emulator, config=config, circuit=circuit, qubits=[0, 1],
@@ -165,4 +150,10 @@ class TestKnownIssues:
         )
         tt.run()
 
-        assert tt.truth_table.sum() > 0
+        expected = np.array([
+            [0, 1, 0, 0],
+            [1, 0, 0, 0],
+            [0, 0, 0, 1],
+            [0, 0, 1, 0],
+        ], dtype=float)
+        assert tt.truth_table == pytest.approx(expected)

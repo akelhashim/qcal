@@ -157,6 +157,33 @@ class TestPauliRandomizeCliffordCircuit:
         assert bs == '00'
         np.testing.assert_array_equal(q_vec, np.zeros(4, dtype=int))
 
+    def test_single_qubit_circuit_implements_same_unitary_up_to_final_pauli(
+        self, monkeypatch
+    ):
+        # Regression test: pad_layer_clifford() returns a plain atomic
+        # Label (not a compound one) whenever the padded layer has
+        # exactly one component, which happens for every single-qubit
+        # circuit. update_clifford_labels() used to iterate that Label
+        # directly instead of its .components, crashing on every
+        # single-qubit Clifford circuit.
+        monkeypatch.setattr(
+            np.random, 'randint',
+            lambda low, high, size: np.zeros(size, dtype=int)
+        )
+        circuit = pygsti.circuits.Circuit(
+            [Label('Gc1', 0), Label('Gc5', 0)], line_labels=(0,)
+        )
+
+        rc, bs, q_vec = pauli_randomize_clifford_circuit(circuit)
+
+        assert rc.width == 1
+        assert rc.depth == circuit.depth
+        np.testing.assert_allclose(
+            self._unitary(rc), self._unitary(circuit), atol=1e-10
+        )
+        assert bs == '0'
+        np.testing.assert_array_equal(q_vec, np.zeros(2, dtype=int))
+
     def test_two_qubit_circuit_matches_unitary_up_to_tracked_pauli(self):
         np.random.seed(0)
         circuit = pygsti.circuits.Circuit(
@@ -186,28 +213,3 @@ class TestPauliRandomizeCliffordCircuit:
         np.testing.assert_allclose(
             expected * phase, U_rand, atol=1e-8
         )
-
-
-class TestKnownIssues:
-
-    @pytest.mark.xfail(
-        reason=(
-            "pad_layer_clifford()'s `return Label(padded_layer)` "
-            "collapses to a plain atomic LabelTup (not a compound "
-            "label) whenever padded_layer ends up with exactly one "
-            "component -- i.e. whenever a circuit only involves a "
-            "single qubit. Iterating that atomic Label then yields its "
-            "raw (name, qubit) tuple contents instead of sub-Label "
-            "objects, so pauli_randomize_clifford_circuit's "
-            "update_clifford_labels(padded_layer, ...) crashes with "
-            "AttributeError: 'str' object has no attribute 'qubits' "
-            "for any single-qubit Clifford circuit."
-        ),
-        raises=AttributeError,
-        strict=True,
-    )
-    def test_pauli_randomize_single_qubit_circuit(self):
-        circuit = pygsti.circuits.Circuit(
-            [Label('Gc1', 0), Label('Gc5', 0)], line_labels=(0,)
-        )
-        pauli_randomize_clifford_circuit(circuit)
