@@ -10,6 +10,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Breaking
 
 - Renamed `QPU.run()`'s `save` kwarg to `auto_save` for clarity
+- `Transpiler.transpile()` is now an abstract method (`Transpiler` is an
+  `ABC`); the base class and any subclass that doesn't override it can no
+  longer be instantiated
 
 ### Added
 
@@ -44,6 +47,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   save folder) that GST/CRB/MCB protocols set up before calling `qpu.run()`;
   added `DataMananger.reserve_exp_id()` so those protocols can protect their
   `exp_id` from the next `generate_exp_id()` call
+- `GateMapper.call()` treating a `str` result as a generic `Iterable` and
+  crashing with a confusing `AttributeError` instead of the intended
+  `TypeError` for an unsupported gate-function return type
 
 ### Security
 
