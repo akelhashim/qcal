@@ -1,9 +1,10 @@
-"""Main submodule for handing transpilation.
+"""Main submodule for handling transpilation.
 
 Transpilation describes the process of mapping one circuit type to another
 circuit type at the same level of abstraction.
 """
 import logging
+from abc import ABC, abstractmethod
 from typing import Any
 
 from qcal.circuit import CircuitSet
@@ -12,7 +13,7 @@ from qcal.transpilation.utils import GateMapper
 logger = logging.getLogger(__name__)
 
 
-class Transpiler:
+class Transpiler(ABC):
     """Parent Transpiler class."""
 
     def __init__(self, gate_mapper: GateMapper) -> None:
@@ -35,6 +36,7 @@ class Transpiler:
         """
         return self._gate_mapper
 
+    @abstractmethod
     def transpile(self, circuits: Any) -> CircuitSet:
         """Transpile all circuits.
 
@@ -44,6 +46,3 @@ class Transpiler:
         Returns:
             CircuitSet[Any]: transpiled circuits.
         """
-        raise NotImplementedError(
-            'This method should be handled by the child class!'
-        )

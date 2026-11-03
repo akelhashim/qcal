@@ -20,14 +20,14 @@ logger = logging.getLogger(__name__)
 
 
 def Leakage(
-        qpu:         QPU,
-        config:      Config,
-        circuit:     Circuit,
-        params:      Dict,
-        param_sweep: Dict,
-        maximize:    bool = False,
-        **kwargs
-    ) -> Callable:
+    qpu:         QPU,
+    config:      Config,
+    circuit:     Circuit,
+    params:      Dict,
+    param_sweep: Dict,
+    maximize:    bool = False,
+    **kwargs
+) -> Callable:
     """Leakage calibration.
 
     This calibration finds the param value for which the leakage on
@@ -56,9 +56,9 @@ def Leakage(
         leakage_qubit (int): qubit on which leakage should be minimized.
         params (Dict): dictionary mapping the qubits on which leakage occurs to
             the config parameter which is causing the leakage.
-        param_sweep (Dict): dictionary mapping the qubits on which leakage 
+        param_sweep (Dict): dictionary mapping the qubits on which leakage
             occurs to sweep values for the parameter to be optimized.
-        maximize (bool, optional): whether to select the parameter that 
+        maximize (bool, optional): whether to select the parameter that
             maximizes leakage, instead of minimze. Defaults to False. This can
             be used to find gate parameters that amplify leakage, such that one
             can better tune other parameters to cancel leakage.
@@ -74,14 +74,15 @@ def Leakage(
         function.
         """
 
-        def __init__(self,
-                config:      Config,
-                circuit:     Circuit,
-                params:      Dict,
-                param_sweep: Dict,
-                maximize:    bool = False,
-                **kwargs
-            ) -> None:
+        def __init__(
+            self,
+            config:      Config,
+            circuit:     Circuit,
+            params:      Dict,
+            param_sweep: Dict,
+            maximize:    bool = False,
+            **kwargs
+        ) -> None:
             """Initialize the Leakage class within the function."""
             qpu.__init__(self, config=config, **kwargs)
             Calibration.__init__(self, config)
@@ -239,14 +240,15 @@ def Leakage(
                             self.set_param(p, val)
                     else:
                         self.set_param(self._params[q], val)
-            self._config.save()
+            if settings.Settings.save_data:
+                self._config.save()
 
             print(f"\nRuntime: {repr(self._runtime)[8:]}\n")
 
         def run(self):
             """Run all experimental methods and analyze results."""
             self.generate_circuits()
-            qpu.run(self, self._circuits, save=False)
+            qpu.run(self, self._circuits, auto_save=False)
             self.analyze()
             self.save()
             self.plot()

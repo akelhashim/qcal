@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 
 def set_cycles(
-        circuit: trueq.Circuit, list_of_cycles: List[trueq.Cycle]  # noqa: F821 # type: ignore
+    circuit: trueq.Circuit, list_of_cycles: List[trueq.Cycle]  # noqa: F821 # type: ignore
 ) -> trueq.Circuit:  # noqa: F821 # type: ignore
     """Function that changes the cycles of a circuit.
 
@@ -30,6 +30,7 @@ def set_cycles(
         import trueq as tq
     except ImportError:
         logger.warning(' Unable to import trueq!')
+        return
 
     circuit_dict = circuit.to_dict()
     circuit_dict['cycles'] = tq.Circuit(list_of_cycles).to_dict()['cycles']
@@ -51,6 +52,7 @@ def set_marker(cycle: trueq.Cycle, marker: int) -> trueq.Cycle:  # noqa: F821 # 
         import trueq as tq
     except ImportError:
         logger.warning(' Unable to import trueq!')
+        return
 
     dict_cycle = cycle.to_dict()
     dict_cycle['marker']= marker
@@ -75,6 +77,7 @@ def serialize_cycles(circuit: trueq.Circuit) -> trueq.Circuit:  # noqa: F821 # t
         import trueq as tq
     except ImportError:
         logger.warning(' Unable to import trueq!')
+        return
 
     # To keep track of original cycle markers
     markers = []
@@ -112,8 +115,8 @@ def serialize_cycles(circuit: trueq.Circuit) -> trueq.Circuit:  # noqa: F821 # t
 
 
 def X90_phases(
-        qubits: Iterable[int], compiler: trueq.Compiler, in_radians: bool = True  # noqa: F821 # type: ignore
-    ) -> Dict[int, List[float]]:
+    qubits: Iterable[int], compiler: trueq.Compiler, in_radians: bool = True  # noqa: F821 # type: ignore
+) -> Dict[int, List[float]]:
     """Extracts the phases of a decomposed X90.
 
     Args:
@@ -128,6 +131,7 @@ def X90_phases(
         import trueq as tq
     except ImportError:
         logger.warning(' Unable to import trueq!')
+        return
 
     phases = {q: [] for q in qubits}
     compiled_X90 = compiler.compile(

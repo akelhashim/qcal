@@ -61,7 +61,7 @@ class GateMapper(dict):
             return {result}
         elif isinstance(result, Iterator):
             return set(result)
-        elif isinstance(result, Iterable):
+        elif isinstance(result, Iterable) and not isinstance(result, str):
             return Circuit([
                 Cycle({gate}) for gate in result
             ])

@@ -492,10 +492,7 @@ def RPE(
                     error_deg, unc_deg = round_to_order_error(
                         err_uf.n * 180 / np.pi, err_uf.s * 180 / np.pi
                     )
-                    self._trusted_err_est[ql][angle] = {
-                        'val': error, 'err': unc
-                    }
-                    row[f'{angle} Error (rad.)'] = f'{error} ({unc})'
+                    row[f'{angle} Error (rad.)'] = f'{err_uf.n} ({err_uf.s})'
                     row[f'{angle} Error (deg.)'] = (
                         f'{error_deg} ({unc_deg})'
                     )
@@ -788,7 +785,7 @@ def RPE(
         def run(self):
             """Run all experimental methods and analyze results."""
             self.generate_circuits()
-            qpu.run(self, self._circuits, save=False)
+            qpu.run(self, self._circuits, auto_save=False)
             self.save()
             self.generate_pygsti_dataset()
             self.analyze()

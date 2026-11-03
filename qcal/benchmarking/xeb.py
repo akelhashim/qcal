@@ -33,12 +33,12 @@ def XEB(
         qpu (QPU): custom QPU object.
         api_key (str): Superstaq API key.
         config (Config): qcal Config object.
-        interleaved_layer (cirq.Gate | cirq.Moment | cirq.Circuit): gate, 
+        interleaved_layer (cirq.Gate | cirq.Moment | cirq.Circuit): gate,
             moment, or subcircuit to benchmark.
-        circuit_depths (Iterable[int]): a list of positive integers 
-            specifying how many interleaved cycles of the target layer and 
+        circuit_depths (Iterable[int]): a list of positive integers
+            specifying how many interleaved cycles of the target layer and
             random SU(2) gates to generate, for example, [4, 16, 64].
-        n_circuits (int, optional): the number of circuits for each circuit 
+        n_circuits (int, optional): the number of circuits for each circuit
             depth. Defaults to 30.
 
     Returns:
@@ -48,14 +48,15 @@ def XEB(
     class XEB(qpu):
         """Supermarq XEB protocol."""
 
-        def __init__(self,
-                config:            Config,
-                api_key:           str,
-                interleaved_layer: Any,
-                circuit_depths:    Iterable[int],
-                n_circuits:        int = 30,
-                **kwargs
-            ) -> None:
+        def __init__(
+            self,
+            config:            Config,
+            api_key:           str,
+            interleaved_layer: Any,
+            circuit_depths:    Iterable[int],
+            n_circuits:        int = 30,
+            **kwargs
+        ) -> None:
             from qcal.interface.superstaq.compiler import CirqCompiler
             from qcal.interface.superstaq.transpiler import CirqTranspiler
 
@@ -147,7 +148,7 @@ def XEB(
             print('')
             try:
                 for qs in self._qubit_subsets:
-                    results = self._results[list(qs)]
+                    results = self._results[list(list(qs))]
                     qubits = [q.x for q in list(qs)]
                     results.analyze(
                         plot_filename=self._data_manager._save_path +
@@ -178,7 +179,7 @@ def XEB(
         def run(self):
             """Run all experimental methods and analyze results."""
             self.generate_circuits()
-            qpu.run(self, self._circuits, save=False)
+            qpu.run(self, self._circuits, auto_save=False)
             self.save()
             self.analyze()
             self.final()

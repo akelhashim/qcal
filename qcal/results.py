@@ -17,9 +17,10 @@ import pandas as pd
 import plotly.graph_objects as go
 from numpy.typing import NDArray
 from pandas import DataFrame
+from uncertainties import ufloat
 
-from qcal.math.entropy import shannon_entropy
-from qcal.math.probability import total_variation_distance
+from qcal.math.entropy import classical_entropy
+from qcal.math.probability import hellinger_fidelity, total_variation_distance
 
 logger = logging.getLogger(__name__)
 
@@ -29,7 +30,6 @@ __all__ = (
 )
 
 
-# TODO: add fidelity and TVD
 class Results:
     """Results class.
 
@@ -189,13 +189,13 @@ class Results:
         return self._results
 
     @property
-    def entropy(self) -> float:
+    def entropy(self) -> ufloat:
         """Shannon entropy of the results.
 
         Returns:
-            float: entropy.
+            ufloat: entropy, with propagated shot-noise uncertainty.
         """
-        return shannon_entropy(self)
+        return classical_entropy(self)
 
     @property
     def ev(self) -> float:
@@ -484,14 +484,25 @@ class Results:
 
         fig.show(config=save_properties)
 
-    def tvd(self, results: Results) -> float:
+    def fidelity(self, results: Results) -> ufloat:
+        """Classical (Hellinger) fidelity with another distribution.
+
+        Args:
+            results (Results): other results.
+
+        Returns:
+            ufloat: fidelity, with propagated shot-noise uncertainty.
+        """
+        return hellinger_fidelity(self, results)
+
+    def tvd(self, results: Results) -> ufloat:
         """Total Variation Distance
 
         Args:
             results (Results): other results.
 
         Returns:
-            float: tvd.
+            ufloat: tvd, with propagated shot-noise uncertainty.
         """
         return total_variation_distance(self, results)
 

@@ -25,13 +25,13 @@ logger = logging.getLogger(__name__)
 
 
 def TruthTable(
-        qpu:             QPU,
-        config:          Config,
-        circuit:         Circuit,
-        qubits:          List | Tuple | None = None,
-        ideal_unitary:   NDArray | None = None,
-        **kwargs
-    ) -> Callable:
+    qpu:             QPU,
+    config:          Config,
+    circuit:         Circuit,
+    qubits:          List | Tuple | None = None,
+    ideal_unitary:   NDArray | None = None,
+    **kwargs
+) -> Callable:
     """Truth Table tomography.
 
     Args:
@@ -53,13 +53,14 @@ def TruthTable(
         characterization function.
         """
 
-        def __init__(self,
-                config:        Config,
-                circuit:       Circuit,
-                qubits:        List | Tuple = None,
-                ideal_unitary: NDArray | None = None,
-                **kwargs
-            ) -> None:
+        def __init__(
+            self,
+            config:          Config,
+            circuit:         Circuit,
+            qubits:          List | Tuple = None,
+            ideal_unitary:   NDArray | None = None,
+            **kwargs
+        ) -> None:
             """Initialize the TruthTable class within the function."""
 
             qpu.__init__(self,
@@ -134,8 +135,17 @@ def TruthTable(
             """Analyze the data."""
             logger.info(' Analyzing the data...')
 
+            # Each generated circuit measures *all* of self._qubits
+            # (not just self._circuit.qubits, which may be a strict
+            # subset when ancilla/spectator qubits are included), and
+            # a simulator reports bitstrings in sorted-qubit-label
+            # order. q_index reorders that sorted bitstring to match
+            # self._qubits' given order, so it lines up with
+            # self._states (built in that same order) -- without
+            # discarding any ancilla qubits.
+            measured_qubits = tuple(sorted(self._qubits))
             q_index = tuple([
-                self._qubits.index(q) for q in self._circuit.qubits
+                measured_qubits.index(q) for q in self._qubits
             ])
 
             probs = []
@@ -161,8 +171,9 @@ def TruthTable(
         def save(self):
             """Save all circuits and data."""
             clear_output(wait=True)
+            qstr = ''.join(str(q) for q in self._qubits)
             self._data_manager._exp_id += (
-              f'_TruthTableTomography _Q{"".join(str(q) for q in self._qubits)}'
+                f'_TruthTableTomography _Q{qstr}'
             )
             if settings.Settings.save_data:
                 qpu.save(self)
@@ -177,7 +188,7 @@ def TruthTable(
                 )
 
         def plot(self):
-            """Plot the parity oscillations."""
+            """Plot the truth table."""
 
             bg = colors.LinearSegmentedColormap.from_list(
                 'custom grey', [(1, 1, 1), '#d3d3d3'], N=256
@@ -216,18 +227,18 @@ def TruthTable(
 
             if settings.Settings.save_data:
                 fig.savefig(
-                    self._data_manager._save_path + 'parity_oscillations.png',
+                    self._data_manager._save_path + 'truth_table.png',
                     dpi=600,
                     bbox_inches='tight',
                     pad_inches=0
                 )
                 fig.savefig(
-                    self._data_manager._save_path + 'parity_oscillations.pdf',
+                    self._data_manager._save_path + 'truth_table.pdf',
                     bbox_inches='tight',
                     pad_inches=0
                 )
                 fig.savefig(
-                    self._data_manager._save_path + 'parity_oscillations.svg',
+                    self._data_manager._save_path + 'truth_table.svg',
                     bbox_inches='tight',
                     pad_inches=0
                 )
@@ -246,7 +257,7 @@ def TruthTable(
         def run(self):
             """Run all experimental methods and analyze results."""
             self.generate_circuits()
-            qpu.run(self, self._circuits, save=False)
+            qpu.run(self, self._circuits, auto_save=False)
             self.analyze()
             self.save()
             self.plot()

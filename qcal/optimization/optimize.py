@@ -53,16 +53,17 @@ class NoScaler:
 
 class LinearResponse:
 
-    def __init__(self,
-            config:       Config,
-            qubit_labels: Iterable[int | Tuple[int]],
-            params:       Dict[int | tuple[int], str | list[str]],
-            cost_func:    Any,
-            delta:        float | Dict[int | tuple, float],
-            n_iters:      int = 3,
-            x_label:      str = 'Param Value',
-            y_label:      str = 'Loss'
-        ) -> None:
+    def __init__(
+        self,
+        config:       Config,
+        qubit_labels: Iterable[int | Tuple[int]],
+        params:       Dict[int | tuple[int], str | list[str]],
+        cost_func:    Any,
+        delta:        float | Dict[int | tuple, float],
+        n_iters:      int = 3,
+        x_label:      str = 'Param Value',
+        y_label:      str = 'Loss'
+    ) -> None:
 
         self._config = config
         self._qubit_labels = qubit_labels
@@ -79,8 +80,9 @@ class LinearResponse:
 
         self._fit = {ql: FitLinear() for ql in qubit_labels}
         self._x = {
-            ql: np.linspace(0, self._delta[ql] * self._n_iters, self._n_iters)
-                for ql in qubit_labels
+            ql: np.linspace(
+                0, self._delta[ql] * (self._n_iters - 1), self._n_iters
+            ) for ql in qubit_labels
         }
         self._y = {ql: [] for ql in qubit_labels}
         self._opt_params = {

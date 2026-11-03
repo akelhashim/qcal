@@ -249,6 +249,15 @@ class Gate:
         return self._properties['name']
 
     @property
+    def params(self) -> dict:
+        """The parameters of the gate.
+
+        Returns:
+            dict: gate parameters.
+        """
+        return self._properties['params']
+
+    @property
     def properties(self) -> dict:
         """Properties of the gate.
 

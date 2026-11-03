@@ -36,9 +36,7 @@ PAULI_TO_CLIFFORD = {
 PAULI_NAMES = tuple(PAULI_TO_CLIFFORD.values())
 
 
-def decompose_X90(
-        phases: Dict[int, List]
-) -> List[List[L | tuple]]:
+def decompose_X90(phases: Dict[int, List]) -> List[List[Label | tuple]]:
     """Decompose an X90 gate into ZXZ or ZXZXZ.
 
     Args:
@@ -70,8 +68,8 @@ def decompose_X90(
 
 
 def decompose_CZ(
-        phases: Dict[Tuple[int, int], List]
-) -> List[List[L | tuple]]:
+    phases: Dict[Tuple[int, int], List]
+) -> List[List[Label | tuple]]:
     """Decompose a CZ gate into CZ + IZ + ZI.
 
     Args:
@@ -294,7 +292,13 @@ def update_clifford_labels(
     new_layer = []
     used_qubits = set()
 
-    for g in layer:
+    # layer may be a real pyGSTi Label -- iterating it directly yields
+    # its raw (name, qubit) tuple fields when it's atomic (exactly one
+    # component, e.g. a single-qubit layer), rather than sub-Labels,
+    # so .components must be used instead -- or a plain list of
+    # Labels, which is already iterable as-is.
+    components = layer.components if isinstance(layer, Label) else layer
+    for g in components:
         idx = qubit_to_idx[g.qubits[0]]
         p_name = _pauli_entry_to_clifford_name(p_vec, idx, n)
         q_name = _pauli_entry_to_clifford_name(q_vec, idx, n)

@@ -1,8 +1,9 @@
 """Helper functions for ML.
 
 """
-from numpy.typing import ArrayLike
 from typing import Dict
+
+from numpy.typing import ArrayLike
 
 
 def find_mapping(array1: ArrayLike, array2: ArrayLike) -> Dict:
@@ -23,7 +24,7 @@ def find_mapping(array1: ArrayLike, array2: ArrayLike) -> Dict:
 
     mapping = {}  # Initialize an empty dictionary to store the mapping
 
-    for num1, num2 in zip(array1, array2):
+    for num1, num2 in zip(array1, array2, strict=False):
         if num1 != num2:
             mapping[num1] = num2
 

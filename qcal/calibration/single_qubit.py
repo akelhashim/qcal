@@ -115,19 +115,16 @@ def Amplitude(
 
             self._qubits = qubits
 
-            assert gate in ('X90', 'X'), (
-                "'gate' must be one of 'X90' or 'X'!"
-            )
+            if gate not in ('X90', 'X'):
+                raise ValueError("'gate' must be one of 'X90' or 'X'!")
             self._gate = gate
 
-            assert method.upper() in ('RABI', 'RAP'), (
-                "'method' must be one of 'Rabi' or 'RAP'!"
-            )
+            if method.upper() not in ('RABI', 'RAP'):
+                raise ValueError("'method' must be one of 'Rabi' or 'RAP'!")
             self._method = method
 
-            assert subspace in ('GE', 'EF'), (
-                "'subspace' must be one of 'GE' or 'EF'!"
-            )
+            if subspace not in ('GE', 'EF'):
+                raise ValueError("'subspace' must be one of 'GE' or 'EF'!")
             self._subspace = subspace
 
             if not isinstance(amplitudes, dict):
@@ -154,9 +151,15 @@ def Amplitude(
             self._relative_amp = relative_amp
 
             if n_gates > 1 and gate == 'X90' and method.upper() == 'RABI':
-                assert n_gates % 4 == 0, 'n_gates must be a multiple of 4!'
+                if n_gates % 4 != 0:
+                    raise ValueError(
+                        "'n_gates' must be a multiple of 4 for X90!"
+                    )
             elif n_gates > 1 and gate == 'X' and method.upper() == 'RABI':
-                assert n_gates % 2 == 0, 'n_gates must be a multiple of 2!'
+                if n_gates % 2 != 0:
+                    raise ValueError(
+                        "'n_gates' must be a multiple of 2 for X!"
+                    )
             self._n_gates = n_gates
 
             if n_gates == 1:
@@ -324,7 +327,7 @@ def Amplitude(
         def run(self):
             """Run all experimental methods and analyze results."""
             self.generate_circuits()
-            qpu.run(self, self._circuits, save=False)
+            qpu.run(self, self._circuits, auto_save=False)
             self.analyze()
             clear_output(wait=True)
             self._data_manager._exp_id += (
@@ -424,9 +427,8 @@ def Frequency(
             self._qubits = qubits
             self._detunings = detunings
 
-            assert subspace in ('GE', 'EF'), (
-                "'subspace' must be one of 'GE' or 'EF'!"
-            )
+            if subspace not in ('GE', 'EF'):
+                raise ValueError("'subspace' must be one of 'GE' or 'EF'!")
             self._subspace = subspace
 
             self._times = {
@@ -704,7 +706,7 @@ def Frequency(
         def run(self):
             """Run all experimental methods and analyze results."""
             self.generate_circuits()
-            qpu.run(self, self._circuits, save=False)
+            qpu.run(self, self._circuits, auto_save=False)
             self.analyze()
             clear_output(wait=True)
             self._data_manager._exp_id += (
@@ -802,14 +804,12 @@ def Phase(
 
             self._qubits = qubits
 
-            assert gate in ('X90', 'X'), (
-                "'gate' must be one of 'X90' or 'X'!"
-            )
+            if gate not in ('X90', 'X'):
+                raise ValueError("'gate' must be one of 'X90' or 'X'!")
             self._gate = gate
 
-            assert subspace in ('GE', 'EF'), (
-                "'subspace' must be one of 'GE' or 'EF'!"
-            )
+            if subspace not in ('GE', 'EF'):
+                raise ValueError("'subspace' must be one of 'GE' or 'EF'!")
             self._subspace = subspace
 
             if not isinstance(phases, dict):
@@ -828,12 +828,16 @@ def Phase(
                             pulse + '0/kwargs/phase', pulse + '2/kwargs/phase'
                         ]
                     elif gate == 'X':
-                        self._params[q] = pulse + '1/kwargs/phase'
+                        self._params[q] = pulse + '0/kwargs/phase'
 
             if relative_phase:
                 for q in qubits:
+                    param = (
+                        self._params[q][0] if gate == 'X90'
+                        else self._params[q]
+                    )
                     self._phases[q] = (
-                        self._phases[q] + config[self._params[q][0]]
+                        self._phases[q] + config[param]
                     )
             self._param_sweep = self._phases
 
@@ -1270,7 +1274,7 @@ def Phase(
         def run(self):
             """Run all experimental methods and analyze results."""
             self.generate_circuits()
-            qpu.run(self, self._circuits, save=False)
+            qpu.run(self, self._circuits, auto_save=False)
             self.analyze()
             self.save()
             self.plot()

@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Breaking
 - `optuna`/`optunahub` as a qcal dependency
+- `plot_error_rates` takes a single dict mapping qubit labels to `ufloat`
+  error rates, instead of separate `error_rates` and `uncertainties` dicts
+- Renamed the `noise_model` argument and property of
+  `DensityMatrixSimulator` to `error_model`
+- Renamed the `step()` method of the `Adam`, `CMA`, `LQG`, and `LQR`
+  optimizers to `ask()`
+- `Calibration` and `Characterize` are abstract base classes: subclasses
+  must implement `analyze()` and `generate_circuits()`
 
 ### Added
 
@@ -55,6 +63,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (defaults to False, since they can be large)
 - `aggregate` argument of `PostProcessor` for the pass that aggregates
   per-shot outcomes into counts (defaults to `compute_counts`)
+- `OptunaHub` optimizer for using any OptunaHub sampler with `Optimize`
+- `global_min` argument of `Optimize` to choose the optimal parameters of
+  all qubit labels jointly, from the iteration with the smallest combined
+  loss, along with the `opt_loss_global` property
 
 ### Changed
 
@@ -69,10 +81,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   backwards compatibility; one elsewhere in `passes` raises a `ValueError`
 - `QuantumInstrumentGST` passes `compute_conditional_counts` to
   `PostProcessor` as `aggregate` rather than as the last of its `passes`
+- `QPU` raises a `ValueError` instead of an `AssertionError` for an
+  unsupported `n_levels`
+- `Optimize.run()` only saves the config when
+  `settings.Settings.save_data` is enabled
+- The `Emulator` stores each circuit's final simulated state object in a
+  `'state'` column, instead of a pretty-printed string in a `'states'`
+  column; call `.pretty_print()` on an entry for a readable string
 
 ### Deprecated
 
 ### Removed
+
+- `reciprocal_uncertainty`, `uncertainty_of_exp`, `uncertainty_of_product`,
+  and `uncertainty_of_sum` from `qcal.math.utils`; use `ufloat` instead
 
 ### Fixed
 
@@ -84,6 +106,69 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   outcomes of 2 and 3 (e.g. leakage) as `p2` and `p3`
 
 ### Security
+
+## [5.0.0] - 2026-11-03
+
+### Breaking
+
+- Renamed `QPU.run()`'s `save` kwarg to `auto_save` for clarity
+- `Transpiler.transpile()` is now an abstract method (`Transpiler` is an
+  `ABC`); the base class and any subclass that doesn't override it can no
+  longer be instantiated
+
+### Added
+
+- Comprehensive unit tests
+
+### Changed
+
+- Default plotting in MCB to plotly
+- Moved `plot_error_rates` to `qcal/plotting/error_rates.py`
+
+### Removed
+
+- Removed `qcal/characterization/tomography/analysis.py`
+- Removed empty, unused `qcal/sequence/sequencer.py`
+
+### Fixed
+
+- `cosine_square()` crashing with a `ZeroDivisionError` for `ramp_fraction=0.0`,
+  and silently returning a pulse of the wrong length for `-0.5 <
+  ramp_fraction < 0`; a negative `ramp_fraction` (or one `> 0.5`) now
+  consistently produces a one-sided ramp
+- `XX_N()` partitioning qubits into "even"/"odd" by their position in the
+  input list instead of by qubit label parity (unlike `XY_N()`), so e.g.
+  `XX_N([1, 3], ...)` incorrectly syncopated two same-parity qubits
+- `QPU.acquire()` racing against the next batch's `generate_sequence()` when
+  running with `jit=True`, which could overwrite `self._sequence` before
+  `acquire()` read it; `acquire()` now reads a race-safe `active_sequence`
+  snapshot instead
+- `QPU._initialize()` silently overwriting the `exp_id` (and orphaning the
+  save folder) that GST/CRB/MCB protocols set up before calling `qpu.run()`;
+  added `DataMananger.reserve_exp_id()` so those protocols can protect their
+  `exp_id` from the next `generate_exp_id()` call
+- `GateMapper.call()` treating a `str` result as a generic `Iterable` and
+  crashing with a confusing `AttributeError` instead of the intended
+  `TypeError` for an unsupported gate-function return type
+- `Config.hardware` crashing (or silently returning an empty table) for any
+  config, due to using `pd.DataFrame.from_dict(orient='index')` on a dict of
+  opaque values instead of table rows
+- `pygsti_pspec()` dropping a two-qubit gate's availability whenever the
+  config declared that qubit pair in descending order (e.g. a ring
+  topology's wraparound edge `(7, 0)`), since it only matched ascending
+  qubit-pair tuples
+- `Phase(gate='X', relative_phase=True)` crashing by indexing into the
+  first character of the (string, not list) param path; `Phase(gate='X')`'s
+  default param path also pointed at a pulse segment that doesn't exist for
+  single-segment X pulses, crashing `final()`
+- `update_clifford_labels()` crashing on any single-qubit Clifford layer,
+  since a pyGSTi `Label` with exactly one component collapses to a form
+  whose direct iteration yields raw tuple fields instead of sub-`Label`s
+- `TruthTable.analyze()` silently returning an all-zero truth table (no
+  error) when `qubits` is a strict superset of `circuit.qubits` (e.g. an
+  untouched ancilla included only for state preparation), because it
+  marginalized away those extra qubits before looking up the (differently-
+  shaped) `self._states` keys
 
 ## [4.0.1] - 2026-09-18
 
@@ -357,7 +442,8 @@ post-processing
 - Single- and two-qubit benchmarking methods
 - Advanced compilation tools
 
-[Unreleased]: https://github.com/akelhashim/qcal/compare/v4.0.1...HEAD
+[Unreleased]: https://github.com/akelhashim/qcal/compare/v5.0.0...HEAD
+[5.0.0]: https://github.com/akelhashim/qcal/releases/tag/v5.0.0
 [4.0.1]: https://github.com/akelhashim/qcal/releases/tag/v4.0.1
 [4.0.0]: https://github.com/akelhashim/qcal/releases/tag/v4.0.0
 [3.2.0]: https://github.com/akelhashim/qcal/releases/tag/v3.2.0

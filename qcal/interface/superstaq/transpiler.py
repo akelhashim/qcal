@@ -1,4 +1,4 @@
-"""Submodule for transpiler from cirq and qiskit circuits..
+"""Submodule for transpiler from cirq and qiskit circuits.
 
 """
 import logging
@@ -98,7 +98,7 @@ class CirqTranspiler(Transpiler):
         """Initialize with gate_mapper.
 
         Args:
-            gate_mapper (defaultdict | Dict | None, optional): dictionary which 
+            gate_mapper (defaultdict | Dict | None, optional): dictionary which
                 maps str names of Cirq gates to qcal gates. Defaults to None.
         """
         if gate_mapper is None:
@@ -120,8 +120,7 @@ class CirqTranspiler(Transpiler):
         """Transpile all circuits.
 
         Args:
-            circuits (Circuit | CircuitSet | List): circuits to 
-                transpile.
+            circuits (Circuit | CircuitSet | List): circuits to transpile.
 
         Returns:
             CircuitSet: transpiled circuits.
@@ -146,19 +145,19 @@ class QiskitTranspiler(Transpiler):
         """Initialize with gate_mapper.
 
         Args:
-            gate_mapper (defaultdict | Dict | None, optional): dictionary which 
+            gate_mapper (defaultdict | Dict | None, optional): dictionary which
                 maps str names of Qiskit gates to qcal gates. Defaults to None.
         """
         if gate_mapper is None:
             self._gate_mapper = defaultdict(lambda: transpilation_error,
                 {'barrier': Barrier,
                  'measure': Meas,
-                 'cnot': CNOT,
-                 'cx':   CX,
-                 'cz':   CZ,
-                 'rz':   Rz,
-                 'rx':   X90,
-                 'x':    X
+                 'cnot':    CNOT,
+                 'cx':      CX,
+                 'cz':      CZ,
+                 'rz':      Rz,
+                 'rx':      X90,
+                 'x':       X
                 }
             )
         else:
@@ -170,7 +169,7 @@ class QiskitTranspiler(Transpiler):
         """Transpile all circuits.
 
         Args:
-            circuits (Circuit | CircuitSet | List): circuits to 
+            circuits (Circuit | CircuitSet | List): circuits to
                 transpile.
 
         Returns:

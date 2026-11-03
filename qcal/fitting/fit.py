@@ -6,7 +6,7 @@ from typing import Callable, Dict
 
 import lmfit
 from lmfit import Model
-from numpy.typing import ArrayLike, NDArray
+from numpy.typing import ArrayLike
 
 from qcal.fitting.fit_functions import (
     absolute_value,
@@ -81,11 +81,11 @@ class Fit:
         return self._result.params
 
     @property
-    def error(self) -> NDArray:
+    def error(self) -> float:
         """Reduced chi-squared error.
 
         Returns:
-            NDArray: error array.
+            float: reduced chi-squared value.
         """
         return self._result.redchi
 
@@ -166,7 +166,7 @@ class FitDecayingCosineExponential(Fit):
     """Decaying cosine with exponential baseline fit class."""
 
     def __init__(
-            self, fit_function: Callable = decaying_cosine_exponential
+        self, fit_function: Callable = decaying_cosine_exponential
     ) -> None:
         """Initialize a decaying cosine with exponential baseline fitter using
         the decaying cosine with exponential baseline function.
@@ -180,16 +180,16 @@ class FitExponential(Fit):
     __slots__ = ('_base',)
 
     def __init__(
-            self,
-            fit_function: Callable = exponential,
-            base: float | None = None,
-        ) -> None:
+        self,
+        fit_function: Callable = exponential,
+        base: float | None = None,
+    ) -> None:
         """Initialize an exponential fitter using the exponential function."""
 
         if base is not None:
             def _fit_function(
                 x: ArrayLike, a: float, b: float, c: float
-            ) -> NDArray:
+            ) -> ArrayLike:
                 return base_exponential(x, base, a, b, c)
         else:
             _fit_function = fit_function

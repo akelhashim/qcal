@@ -51,7 +51,6 @@ class DAG:
     def nodes(self) -> list:
         """DAG Nodes"""
         return self._graph.nodes
-        # return self._nodes
 
     @property
     def edges(self) -> list:
@@ -87,9 +86,9 @@ class DAG:
         return False
 
     def _get_execution_range(self,
-            full_order: List[str],
-            start_node: Optional[str],
-            stop_node: Optional[str]
+        full_order: List[str],
+        start_node: Optional[str],
+        stop_node: Optional[str]
     ) -> List[str]:
         """
         Determine which nodes to execute based on start/stop/skip parameters.
@@ -135,7 +134,7 @@ class DAG:
         return execution_nodes
 
     def _mark_nodes_before_start_as_completed(
-            self, full_order: List[str], start_node: str
+        self, full_order: List[str], start_node: str
     ) -> None:
         """
         Mark all nodes before the start node as completed.
@@ -243,11 +242,11 @@ class DAG:
         return True
 
     def execute(self,
-            start_node: Optional[str] = None,
-            stop_node:  Optional[str] = None,
-            skip_nodes: Optional[List[str]] = None,
-            assume_completed_before_start: bool = True
-        ) -> None:
+        start_node: Optional[str] = None,
+        stop_node:  Optional[str] = None,
+        skip_nodes: Optional[List[str]] = None,
+        assume_completed_before_start: bool = True
+    ) -> None:
         """
         Execute the calibration workflow with optional start/stop nodes and
         optional nodes to skip.

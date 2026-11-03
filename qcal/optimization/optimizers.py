@@ -62,6 +62,7 @@ class Adam:
                 the gradient. If None, finite-difference is used.
         """
         self._x_t = x0  # Parameters at time t = 0
+        self._x_prev = x0  # Parameters at which self._loss was measured
         self._lr = lr
         self._beta_1 = beta_1
         self._beta_2 = beta_2
@@ -72,7 +73,7 @@ class Adam:
 
         self._grad = 0.
         self._prev_loss = 0.
-        self._opt_loss = loss
+        self._opt_loss = 1e10  # Large value for initial comparison
         self._opt_x = x0
         self._m_t = 0.     # Aggregate of gradients at time t
         self._m_t_bc = 0.  # Bias-corrected first moment estimate
@@ -102,16 +103,25 @@ class Adam:
         """Pass the parameter values and loss values for computing a gradient.
 
         If no gradient function is specified, the gradient is computed using
-        finite difference approximation:
+        finite difference approximation, relative to the parameters at which
+        the previous loss (self._loss) was measured:
 
-        delta = x - x_t
+        delta = x - x_prev
         df(x)/dx = [f(x + delta) - f(x)] / delta
+
+        Note: x_prev is tracked separately from x_t (the parameters
+        ask() proposes next), since ask() updates x_t to the
+        not-yet-evaluated next guess before tell() is called with the
+        loss measured at that guess.
 
         x (float | NDArray): parameter values corresponding to the loss.
         loss (float | NDArray): loss for each paramter value.
         """
         if isinstance(loss, list):  # Compatibility with Optimize class
             loss = loss[0]
+
+        x = np.asarray(x)
+        loss = np.asarray(loss)
 
         if np.abs(loss) < np.abs(self._opt_loss):
             self._opt_loss = loss.copy()
@@ -121,8 +131,9 @@ class Adam:
             self._grad_func.tell(x, loss)
             self._grad = self._grad_func.grad
         else:
-            delta = x.copy() - self._x_t
+            delta = x.copy() - self._x_prev
             self._grad = (loss - self._loss) / (delta + self._eps)
+        self._x_prev = x.copy()
 
         self._prev_loss = self._loss
         self._loss = loss
@@ -191,6 +202,7 @@ class CMA:
             logger.info(f" cma version: {cma.__version__}")
         except ImportError:
             logger.warning(' Unable to import cma!')
+            return
 
         self._es = cma.CMAEvolutionStrategy(x0, sigma0, kwargs)
 
@@ -448,6 +460,7 @@ class LQG:
             logger.info(f" control version: {control.__version__}")
         except ImportError:
             logger.warning(' Unable to import control!')
+            return
 
         self._x_t = x0.copy()    # True parameters at time t
         # self._x_est = x0.copy()  # Estimated parameters (Kalman filter state)
@@ -544,7 +557,8 @@ class LQG:
     def tell(self, x: float | NDArray, loss: float | NDArray) -> None:
         """Pass the parameter values and loss values for computing the control.
 
-        The control is computed using LQR gain and Kalman-filtered state estimate.
+        The control is computed using LQR gain and Kalman-filtered state
+        estimate.
 
         Args:
             x (float | NDArray): parameter values corresponding to the loss.
@@ -639,6 +653,7 @@ class LQR:
             logger.info(f" control version: {control.__version__}")
         except ImportError:
             logger.warning(' Unable to import control!')
+            return
 
         self._x_t = x0.copy()  # Parameters at time t = 0
         self._B = B

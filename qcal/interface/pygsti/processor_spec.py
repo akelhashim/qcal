@@ -29,7 +29,7 @@ GATE_MAPPER: Dict[str, str] = {
 }
 
 
-__all__ = 'pygsti_pspec'
+__all__ = ('pygsti_pspec',)
 
 
 def pygsti_pspec(
@@ -77,7 +77,10 @@ def pygsti_pspec(
             elif gate in TWO_QUBIT_GATES:
                 qubit_pairs = []
                 for qubit_pair in config.native_gates['two_qubit'].keys():
-                    if qubit_pair in pairings:
+                    if (
+                        qubit_pair in pairings
+                        or qubit_pair[::-1] in pairings
+                    ):
                         if gate in config.native_gates['two_qubit'][qubit_pair]:
                             qubit_pairs.append(
                                 tuple(f'Q{q}' for q in qubit_pair)

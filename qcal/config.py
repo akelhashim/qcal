@@ -139,7 +139,7 @@ class Config:
             dict: copy of the config dictionary.
         """
         if deep_copy is True:
-            return copy.deepycopy(self._parameters)
+            return copy.deepcopy(self._parameters)
         else:
             return self._parameters.copy()
 
@@ -247,9 +247,7 @@ class Config:
         Returns:
             pd.DataFrame: hardware properties.
         """
-        return pd.DataFrame.from_dict(
-            self.parameters['hardware'], orient='index', columns=['hardware']
-        )
+        return pd.DataFrame({'hardware': self.parameters['hardware']})
 
     @property
     def n_qubits(self) -> int:

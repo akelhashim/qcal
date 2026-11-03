@@ -20,24 +20,28 @@ def round_sig_figures(x: float, n_sig_figs: int = 1) -> float:
     Returns:
         float: rounded number.
     """
+    if x == 0:
+        return 0.0
     return round(x, n_sig_figs - int(np.floor(np.log10(abs(x)))) - 1)
 
 
 def round_to_order_error(
-        val: float, err: float, error_precision: int = 1
-    ) -> Tuple[float]:
+    val: float, err: float, error_precision: int = 1
+) -> Tuple[float]:
     """Rounds a value to its meaningful precision given an uncertainty.
 
     Args:
         val (float): value; number to round.
         err (float): error used for rounding the value.
-        error_precision (int, optional): number of significant digits to round 
+        error_precision (int, optional): number of significant digits to round
             the error to. Defaults to 1.
 
     Returns:
         Tuple[float]: rounded value, rounded error
     """
-    if abs(err) >= abs(val):
+    if err == 0:
+        return float(val), 0.0
+    elif abs(err) >= abs(val):
         logger.warning(" Uncertainty greater than value!")
         val_precision = 0
     else:

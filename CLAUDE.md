@@ -14,6 +14,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Always include types in docstrings, e.g. `name (type): description` for
   `Args` and `Attributes` (including dataclass fields), and `type:
   description` for `Returns`.
+- Internal helper functions in a module should be placed at the
+  bottom of the file, after the public-facing functions/classes that
+  use them.
 
 ## Changelog
 
