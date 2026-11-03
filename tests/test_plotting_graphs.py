@@ -5,8 +5,9 @@ import plotly.graph_objects as go
 import pytest
 
 from qcal.circuit import Barrier, Circuit, Cycle
+from qcal.compilation.merge import merge_gates
 from qcal.config import Config
-from qcal.gates.single_qubit import MCM, X90, Meas, Reset
+from qcal.gates.single_qubit import MCM, X90, Meas, Reset, X, Y
 from qcal.gates.two_qubit import CZ
 from qcal.plotting.graphs import (
     MAX_LABELED_NODES,
@@ -189,10 +190,6 @@ class TestFormatGateTextIncludeMatrix:
             format_gate_text(X90(0))
         )
 
-    @pytest.mark.xfail(
-        reason='format_gate_text ignores its include_matrix argument',
-        strict=True,
-    )
     def test_include_matrix_false_omits_matrix(self):
         text = format_gate_text(X90(0), include_matrix=False)
 
@@ -201,10 +198,6 @@ class TestFormatGateTextIncludeMatrix:
         assert 'Name: X90' in text
         assert 'Subspace: GE' in text
 
-    @pytest.mark.xfail(
-        reason='format_gate_text ignores its include_matrix argument',
-        strict=True,
-    )
     def test_include_matrix_false_omits_non_unitary_matrix(self):
         text = format_gate_text(Meas(0), include_matrix=False)
         assert 'Matrix:' not in text
@@ -286,6 +279,27 @@ class TestDrawCircuitLargeCircuits:
         texts = [a['text'] for a in fig.layout.annotations]
         assert texts == ['Quantum Circuit']
         assert len(fig.data[-1].x) == 2 * n_cycles
+
+
+class TestDrawCircuitHoverText:
+
+    def test_merged_gates_on_same_qubit_get_own_hover_text(self):
+        # Merged gates are all generic Gates named 'Gate' on qubit 0;
+        # only their matrices differ.
+        circuit = Circuit([
+            Cycle({merge_gates(X(0), Y(0))}),
+            Cycle({merge_gates(X90(0), X90(0))}),
+        ])
+        fig = draw_circuit(circuit, show=False)
+
+        node_text = fig.data[-1].text
+        assert node_text[0] == format_gate_text(
+            circuit.cycles[0].gates[0], include_matrix=True
+        )
+        assert node_text[1] == format_gate_text(
+            circuit.cycles[1].gates[0], include_matrix=True
+        )
+        assert node_text[0] != node_text[1]
 
 
 class TestDrawQpuHeatmap:
@@ -396,13 +410,6 @@ class TestDrawQpuHeatmap:
         with pytest.raises(ValueError, match='at least one entry'):
             draw_qpu_heatmap(config, {}, show=False)
 
-    @pytest.mark.xfail(
-        reason=(
-            'node hover text uses `label` (the figure title) instead '
-            'of `cbar_label`, unlike edge hover text'
-        ),
-        strict=True,
-    )
     def test_node_hover_text_uses_value_label(self, config):
         fig = draw_qpu_heatmap(
             config, {0: 1.0, (0, 1): 2.0}, label='My QPU',

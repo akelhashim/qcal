@@ -319,13 +319,6 @@ class TestMultiQubitReadoutCorrection:
         corrected = readout_correction(results, cmat)
         assert abs(corrected['00']) > 100
 
-    @pytest.mark.xfail(
-        reason='readout_correction truncates corrected counts with '
-               'astype(int) instead of rounding them, so floating-point '
-               'error turns 10000 into 9999 (qcal/results.py:749).',
-        raises=AssertionError,
-        strict=True,
-    )
     def test_corrected_counts_are_rounded_not_truncated(self):
         cmat = _multi_qubit_cmat({0: C0, 1: C1})
         results = Results(_measured_counts('01', 10000))
@@ -396,14 +389,6 @@ class TestApplyReadoutCorrection:
         assert results.confusion_matrix is None
         assert dict(results.dict) == {'00': 80, '11': 20}
 
-    @pytest.mark.xfail(
-        reason='readout_correction builds the dit strings from the levels '
-               'observed in the results rather than from the confusion '
-               'matrix, so results containing only 0s hit a shape error '
-               'and are silently left uncorrected (qcal/results.py:731).',
-        raises=AssertionError,
-        strict=True,
-    )
     def test_corrects_results_with_a_single_observed_level(self):
         # [1, 0] @ inv(C0) * 1000 = [1142.86, -142.86]
         results = Results({'0': 1000})
@@ -654,13 +639,6 @@ class TestApplyQPReadoutCorrection:
 
 class TestPlot:
 
-    @pytest.mark.xfail(
-        reason="Results.plot passes 'titlefont_size' to the axis layout, "
-               'which plotly >= 6 rejects (pyproject allows plotly>=5.15) '
-               '(qcal/results.py:464).',
-        raises=ValueError,
-        strict=True,
-    )
     def test_plot_does_not_raise(self):
         Results({'0': 90, '1': 10}).plot()
 

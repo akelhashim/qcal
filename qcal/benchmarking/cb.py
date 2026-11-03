@@ -11,6 +11,7 @@ trueq is not installed when building docs.
 from __future__ import annotations
 
 import logging
+import math
 from collections.abc import Iterable, Sequence
 from typing import Callable
 
@@ -645,27 +646,35 @@ def CB(
             """
             logger.info(" Generating circuits...")
 
-            # Generate the Pauli decays grouped by simultaneous measurements
+            # Generate the (non-identity) Pauli decays, grouped by
+            # simultaneous measurements. Measured qubits only allow I/Z.
+            identity = ('I',) * len(self._qubits)
+            n_available = math.prod(
+                2 if q in self._measured_qubits else 4 for q in self._qubits
+            ) - 1
             if self._targeted_decays is not None:
-                sampled_paulis = [
+                sampled_paulis = {
                     tuple(pauli) for pauli in self._targeted_decays
-                ]
-            elif self._n_decays > 4**len(self._qubits) - 1:
-                sampled_paulis = generate_n_qubit_paulis(
+                }
+            elif self._n_decays >= n_available:
+                sampled_paulis = set(generate_n_qubit_paulis(
                     self._qubits, measured_qubits=self._measured_qubits
-                )
+                ))
             else:
-                sampled_paulis = generate_random_n_qubit_paulis(
-                    self._qubits,
-                    measured_qubits=self._measured_qubits,
-                    n_random_paulis=self._n_decays,
-                )
-
-            # Drop the all-identity Pauli from the sampled set
-            if ('I',) * len(self._qubits) in sampled_paulis:
-                sampled_paulis.remove(('I',) * len(self._qubits))
+                # Sample until there are n_decays distinct decays
+                sampled_paulis = set()
+                while len(sampled_paulis - {identity}) < self._n_decays:
+                    sampled_paulis.update(generate_random_n_qubit_paulis(
+                        self._qubits,
+                        measured_qubits=self._measured_qubits,
+                        n_random_paulis=(
+                            self._n_decays
+                            - len(sampled_paulis - {identity})
+                        ),
+                    ))
+            sampled_paulis.discard(identity)
             self._pauli_groups = generate_n_qubit_pauli_measurement_groups(
-                set(sampled_paulis)
+                sampled_paulis
             )
 
             circuits: list[Circuit] = []
@@ -2346,14 +2355,16 @@ def _propagate_sign(
     """Determine the ±1 eigenstate sign after ideal evolution.
 
     In the Heisenberg picture, the measurement observable S is propagated
-    backward through the circuit.  Each application of the cycle G
-    transforms S → G†SG, so the effective Pauli that twirl layer i sees
-    alternates between S and G(S) = GSG†.
+    backward through the circuit. Each application of the cycle G
+    transforms S → G†SG, so twirl layer i (0-indexed; i = 0 is the
+    leading twirl, before the first cycle application) sees the effective
+    Pauli (G†)^(depth - i) S G^(depth - i).
 
-    For 0-indexed twirl position i (i = 0 is the leading twirl, before the
-    first cycle application), the effective Pauli is:
-      G(S)  if (i + depth) % 2 == 1
-      S     otherwise
+    Since G is Clifford, it permutes the Pauli strings, so S lies on a
+    finite orbit S, G(S), G²(S), ... (with G(S) = GSG†) of some period p,
+    and G† steps backward along it. The effective Pauli at twirl i is
+    therefore orbit[(i - depth) % p]. Conjugation signs are not tracked:
+    since G^depth ∝ I, they multiply to +1 over the whole circuit.
 
     The sign flips whenever the effective Pauli and the twirl anticommute
     (odd number of qubit positions where both are non-identity and differ).
@@ -2369,10 +2380,17 @@ def _propagate_sign(
     Returns:
         int: +1 or -1.
     """
-    g_pauli, _ = conjugate_pauli(decay_pauli, cycle_or_circuit)
+    orbit = [decay_pauli]
+    while True:
+        next_pauli, _ = conjugate_pauli(orbit[-1], cycle_or_circuit)
+        if next_pauli == decay_pauli:
+            break
+        orbit.append(next_pauli)
+    period = len(orbit)
+
     sign = 1
     for i, twirl in enumerate(twirl_paulis):
-        effective = g_pauli if (i + depth) % 2 == 1 else decay_pauli
+        effective = orbit[(i - depth) % period]
         n_anticommuting = sum(
             1
             for p, q in zip(effective, twirl, strict=True)

@@ -42,18 +42,14 @@ def format_gate_text(gate: Gate, include_matrix: bool = True):
         text += f'Alias: {gate.alias}<br>'
     text += f'Qubits: {gate.qubits}<br>'
     text += f'Dim: {gate.dim}<br>'
-    if gate.unitary is not None:
-        text += (
-            'Unitary: <br>  '
-            + np.array_str(np.around(gate.unitary, 3)).replace(
-                "\n ", "<br>" + '   '
-            )
-            + '<br>'
+    if include_matrix:
+        label, matrix = (
+            ('Unitary', gate.unitary) if gate.unitary is not None
+            else ('Matrix', gate.matrix)
         )
-    else:
         text += (
-            'Matrix: <br>  '
-            + np.array_str(np.around(gate.matrix, 3)).replace(
+            f'{label}: <br>  '
+            + np.array_str(np.around(matrix, 3)).replace(
                 "\n ", "<br>" + '   '
             )
             + '<br>'
@@ -142,18 +138,15 @@ def draw_circuit(circuit: Circuit, show: bool = True):
                     for q in gate.qubits:
                         node_x.append(c)
                         node_y.append(qubit_index[q])
-                    name = gate.name
-                    if 'phase' in gate.properties['params'].keys():
-                        name += str(gate.properties['params']['phase'])
-                    elif name == 'Idle':
-                        name += str(gate.properties['params']['duration'])
-                    cache_key = f'{name}{gate.subspace}:{gate.qubits}'
-                    text = qnode_text[cache_key]
+                    # Gate identity includes params and matrix, so gates
+                    # with different phases/durations or merged matrices
+                    # get their own hover text.
+                    text = qnode_text[gate]
                     if not text:
                         text = format_gate_text(
                             gate, include_matrix=label_gates
                         )
-                        qnode_text[cache_key] = text
+                        qnode_text[gate] = text
                     node_text.extend(
                         [text] * len(gate.qubits)
                     )
@@ -193,13 +186,12 @@ def draw_circuit(circuit: Circuit, show: bool = True):
                             mode='lines'
                         )
                     )
-                    cache_key = f'{gate.name}{gate.subspace}:{gate.qubits}'
-                    text = qnode_text[cache_key]
+                    text = qnode_text[gate]
                     if not text:
                         text = format_gate_text(
                             gate, include_matrix=label_gates
                         )
-                        qnode_text[cache_key] = text
+                        qnode_text[gate] = text
                     # Keep the marker lists aligned with node_x/node_y:
                     # one symbol per qubit, padding with the last symbol
                     # for gates on more qubits than the map specifies.
@@ -663,13 +655,14 @@ def draw_qpu_heatmap(
             label (int) to a node value, or from qubit pair (tuple of
             ints) to an edge value. Qubits/pairs not present in this
             dict are drawn using `missing_color`.
-        label (str): colorbar title describing what `values`
-            represents (e.g. 'T1 (us)' or 'Gate Infidelity'). Defaults
-            to 'Value'.
+        label (str): figure title. Defaults to 'QPU'.
+        cbar_label (str): colorbar title (also used in the hover text)
+            describing what `values` represents (e.g. 'T1 (us)' or
+            'Gate Infidelity'). Defaults to 'Value'.
         colorscale (str): Plotly colorscale name. Defaults to
             'Tealgrn'.
         missing_color (str): color used for qubits/pairs that are not
-            present in `values`. Defaults to '#CCCCCC'.
+            present in `values`. Defaults to '#FFFFFF'.
         plot_full_qpu (bool): if True, plot the full QPU lattice from
             `config.qubit_pairs`, filling in any qubits/pairs missing
             from `values` with `missing_color`. If False (default),
@@ -724,7 +717,7 @@ def draw_qpu_heatmap(
         val = node_values.get(node)
         node_color.append(to_color(val))
         node_text.append(
-            f'Q{node}<br>{label}: '
+            f'Q{node}<br>{cbar_label}: '
             + (f'{val}<br>' if val is not None else 'N/A<br>')
         )
 

@@ -101,9 +101,6 @@ class TestComposesToIdentity:
             composes_to_identity(Cycle(T(0)), 1)
 
     def test_merged_cycle_identity(self):
-        # Unique qubit labels: merged generic gates collide in the
-        # module's lru_caches with any other merge on the same qubits
-        # (see the xfail test below).
         merged = merge_cycles(
             Cycle([H(80), S(81)]), Cycle([H(80), S(81)])
         )
@@ -111,19 +108,11 @@ class TestComposesToIdentity:
         assert composes_to_identity(merged, 1) is False
         assert composes_to_identity(merged, 2) is True
 
-    @pytest.mark.xfail(
-        reason=(
-            'composes_to_identity (and conjugate_pauli*, which it calls) '
-            'are lru_cached on Cycle/Gate, whose hash/eq ignore the '
-            'matrix of generic merged gates; two merged cycles on the '
-            'same qubits collide and the first cached answer is reused.'
-        ),
-        strict=True,
-    )
     def test_merged_cycles_with_different_matrices_not_conflated(self):
-        # Both are Cycle(Gate(<matrix>, (93,))) and compare equal.
+        # Both are Cycle(Gate(<matrix>, (93,))); only the matrices
+        # differ, which Gate equality/hashing must account for.
         is_x = merge_cycles(Cycle(X(93)), Cycle(Id(93)))
         is_identity = merge_cycles(Cycle(X(93)), Cycle(X(93)))
-        assert is_x == is_identity
+        assert is_x != is_identity
         assert composes_to_identity(is_x, 1) is False
         assert composes_to_identity(is_identity, 1) is True

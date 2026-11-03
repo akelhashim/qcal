@@ -692,6 +692,10 @@ def conjugate_pauli_by_unitary(
         tuple[NQubitPauliString, complex]: the Pauli string of U P U†,
             and the scalar such that U P U† = scalar * (matrix of the
             returned string).
+
+    Raises:
+        ValueError: if U P U† is not proportional to a Pauli operator,
+            i.e. U is not Clifford.
     """
     P = pauli_str_to_matrix(pauli)
     M = U @ P @ U.conj().T
@@ -703,6 +707,11 @@ def conjugate_pauli_by_unitary(
         if abs(Q[r, c]) > 1e-9
     )
     scalar = M[row, col] / Q[row, col]
+    if not np.allclose(M, scalar * Q, atol=1e-8):
+        raise ValueError(
+            f'U P U† is not proportional to a Pauli for P = {pauli}; '
+            'the gate is not Clifford.'
+        )
     return new_pauli, scalar
 
 

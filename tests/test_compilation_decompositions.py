@@ -236,13 +236,12 @@ class TestDecomposeCycle:
             Rz(1, 0.4).unitary @ X90(1).unitary,
         )
 
-    def test_not_fooled_by_equal_hash_merged_cycles(self):
-        # Two merged cycles compare equal (generic Gate equality ignores
-        # the matrix) but implement different unitaries; decompose_cycle
-        # must decompose each from its actual matrix.
+    def test_distinct_merged_cycles_decompose_independently(self):
+        # Two merged cycles of generic Gates on the same qubit, differing
+        # only in their matrices; each must decompose from its own.
         c1 = Cycle(merge_gates(X(0), X(0)))
         c2 = Cycle(merge_gates(X(0), H(0)))
-        assert c1 == c2
+        assert c1 != c2
         u1 = _qubit_unitary(decompose_cycle(c1), 0)
         u2 = _qubit_unitary(decompose_cycle(c2), 0)
         assert _equal_up_to_phase(u1, np.eye(2))

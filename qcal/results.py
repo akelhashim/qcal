@@ -460,14 +460,12 @@ class Results:
             xaxis={
                 'tickvals': list(range(len(self.states))),
                 'ticktext': self.states,
-                'title': xaxis_title,
-                'titlefont_size': 20,
+                'title': {'text': xaxis_title, 'font': {'size': 20}},
                 'tickfont_size': 15,
                 'tickangle': -45 if rotate else 0
             },
             yaxis={
-                'title': title,
-                'titlefont_size': 20,
+                'title': {'text': title, 'font': {'size': 20}},
                 'tickfont_size': 15
             }
         )
@@ -727,10 +725,12 @@ def readout_correction(results: Results, confusion_matrix: DataFrame) -> Dict:
             [np.linalg.inv(cmat) for cmat in cmats]
         ).astype(float)
 
-        # Generate all possible dit strings
+        # Generate all possible dit strings. The levels come from the
+        # confusion matrix, not the results, which may not contain every
+        # level (e.g. if only 0s were measured).
         dtstrs = [
             ''.join(i) for i in itertools.product(
-                [str(j) for j in results.levels],
+                [str(j) for j in range(cmats[0].shape[0])],
                 repeat=len(results.states[0])
             )
         ]
@@ -743,10 +743,7 @@ def readout_correction(results: Results, confusion_matrix: DataFrame) -> Dict:
         probs = np.array(list(probs.values()))#.reshape(-1, 1)
 
         # Perform the readout correction
-        corr_probs = np.array(
-            # probs @ np.linalg.inv(cmat) * results.n_shots
-            probs @ cmat_inv * results.n_shots
-        ).astype(int)
+        corr_probs = np.rint(probs @ cmat_inv * results.n_shots).astype(int)
 
         corrected_results = dict(zip(dtstrs, corr_probs, strict=False))
 

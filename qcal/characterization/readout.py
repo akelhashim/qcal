@@ -107,7 +107,7 @@ def RandomizedReadout(
             Returns:
                 Results: qcal Results object.
             """
-            if self._circuits[0]:
+            if self._circuits is not None and len(self._circuits) > 0:
                 return self._circuits[0].results
             return Results()
 

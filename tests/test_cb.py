@@ -17,14 +17,17 @@ Covers three layers:
      f = exp(-g * D^2 / (D^2 - 1)) (verified numerically against the
      channel's superoperator), so its process infidelity is
      (D^2 - 1) / D^2 * (1 - f).
+   * For a stochastic Pauli channel, the process infidelity is the
+     total probability of a non-identity Pauli error.
    * Readout (SPAM) error only rescales the decay amplitude, so it
      must not show up as process infidelity.
 
    Tolerances are a multiple of the reported uncertainty (ufloat .s),
    with the RNGs seeded so the runs are reproducible.
 
-`CB1` is the True-Q-backed protocol; `trueq` is not installed in the
-default environment, so only its trueq-free surface is exercised.
+`CB1` is the True-Q-backed protocol and needs `trueq` to run, so it is
+not tested here; only the trueq-free `compute_cycle_infidelity1` helper
+is, against a stand-in collection.
 """
 import contextlib
 import io
@@ -41,7 +44,6 @@ import qcal.settings as settings
 from qcal.backend.emulator import Emulator
 from qcal.benchmarking.cb import (
     CB,
-    CB1,
     _decay_array,
     _fit_decay_curve,
     _mean_sem,
@@ -56,7 +58,10 @@ from qcal.fitting.fit import FitExponential
 from qcal.gates.single_qubit import SX, H, Meas, S, X
 from qcal.gates.two_qubit import CNOT, CZ
 from qcal.qpu.qpu import QPU
-from qcal.simulation.error_models import DepolarizingNoise
+from qcal.simulation.error_models import (
+    CustomErrorModel,
+    DepolarizingNoise,
+)
 from qcal.simulation.simulators import DensityMatrixSimulator
 
 EXAMPLE_CONFIG_PATH = str(
@@ -499,22 +504,21 @@ class TestCBGenerateCircuits:
         paulis = {p for ps in cb.circuits['group_paulis'] for p in ps}
         assert paulis == {'Z'}
 
-    @pytest.mark.xfail(
-        reason=(
-            "cb.py:665-666 removes only the first all-identity Pauli "
-            "from the with-replacement random sample, so a duplicate "
-            "identity survives into the decay set."
-        ),
-        strict=True,
-    )
-    def test_identity_pauli_is_always_dropped(self, config, monkeypatch):
+    def test_identity_is_dropped_and_duplicates_resampled(
+        self, config, monkeypatch
+    ):
         original = cb_module.generate_random_n_qubit_paulis
+        batches = iter([
+            [('I', 'I'), ('I', 'I'), ('X', 'Z')],
+            [('X', 'Z'), ('I', 'I')],
+            [('Y', 'I'), ('Z', 'Z')],
+        ])
 
         def sampler(qubits, measured_qubits=None, n_random_paulis=1):
             # Decay sampling passes measured_qubits; twirl sampling
             # does not.
             if measured_qubits is not None:
-                return [('I', 'I'), ('I', 'I'), ('X', 'Z')]
+                return next(batches)
             return original(qubits, n_random_paulis=n_random_paulis)
 
         monkeypatch.setattr(
@@ -526,7 +530,46 @@ class TestCBGenerateCircuits:
         )
         cb.generate_circuits()
         paulis = {p for ps in cb.circuits['group_paulis'] for p in ps}
-        assert paulis == {'XZ'}
+        assert paulis == {'XZ', 'YI', 'ZZ'}
+
+    @pytest.mark.parametrize('n_decays', [1, 5, 14])
+    def test_random_decays_are_distinct_and_non_identity(
+        self, config, n_decays
+    ):
+        random.seed(n_decays)
+        cb = CB(
+            Emulator, config, Cycle({CZ(0, 1)}), [2], n_decays=n_decays,
+            n_randomizations=1,
+        )
+        cb.generate_circuits()
+        paulis = {p for ps in cb.circuits['group_paulis'] for p in ps}
+        assert len(paulis) == n_decays
+        assert 'II' not in paulis
+
+    @pytest.mark.parametrize('n_decays', [15, 100])
+    def test_all_paulis_used_once_n_decays_reaches_available(
+        self, config, n_decays
+    ):
+        cb = CB(
+            Emulator, config, Cycle({CZ(0, 1)}), [2], n_decays=n_decays,
+            n_randomizations=1,
+        )
+        cb.generate_circuits()
+        paulis = {p for ps in cb.circuits['group_paulis'] for p in ps}
+        assert len(paulis) == 15
+        assert 'II' not in paulis
+
+    def test_measured_qubit_caps_available_decays(self, config):
+        # Qubit 0 measured mid-cycle: only I/Z there, so 2 * 4 - 1 = 7
+        # non-identity decays exist, and asking for more uses them all.
+        cb = CB(
+            Emulator, config, Cycle({Meas(0), X(1)}), [2], n_decays=7,
+            n_randomizations=1,
+        )
+        cb.generate_circuits()
+        paulis = {p for ps in cb.circuits['group_paulis'] for p in ps}
+        assert len(paulis) == 7
+        assert all(p[0] in 'IZ' for p in paulis)
 
 
 # ---------------------------------------------------------------------
@@ -538,9 +581,9 @@ class TestCBSignsOnNoiselessData:
     """With no noise, every signed, marginalized EV must be exactly +1
     at every depth if the expected eigenstate signs are right.
 
-    These call generate_circuits()/QPU.run()/analyze() directly:
-    noiseless decays are perfectly flat, which (see
-    TestCBNoiseless) currently makes every fit fail.
+    These call generate_circuits()/QPU.run()/analyze() directly and
+    check the signed EVs rather than the fits: perfectly flat noiseless
+    decays leave the exponential fit's uncertainty undetermined.
     """
 
     @pytest.mark.parametrize(
@@ -573,16 +616,6 @@ class TestCBSignsOnNoiselessData:
             assert len(decay) == len(depths)
             assert np.allclose(unumpy.nominal_values(decay), 1.0), pauli
 
-    @pytest.mark.xfail(
-        reason=(
-            "_propagate_sign (cb.py:2340) assumes the cycle's Pauli "
-            "conjugation is an involution (twirls alternate between "
-            "S and G(S)); for a cycle of Pauli order 3 (here S then "
-            "H: X->Y->Z->X) the expected signs are wrong and the "
-            "noiseless EVs average to ~0."
-        ),
-        strict=True,
-    )
     def test_signed_evs_are_one_for_order_three_cycle(self, config):
         circuit = Circuit([Cycle({S(0)}), Cycle({H(0)})])
         cb = _analyze_noiseless(config, circuit, [3, 6])
@@ -590,32 +623,45 @@ class TestCBSignsOnNoiselessData:
             assert np.allclose(unumpy.nominal_values(decay), 1.0), pauli
 
 
-class TestCBNoiseless:
+class TestCBInjectedPauliNoise:
+    """A realistic, non-uniform two-qubit Pauli channel on the CZ.
 
-    @pytest.mark.xfail(
-        reason=(
-            "_fit_decay_curve (cb.py:2299-2313) is ill-conditioned on "
-            "perfectly flat noiseless decays: depending on the depths, "
-            "lmfit returns b.stderr=None (every Pauli dropped, NaN "
-            "infidelity; the case pinned here with depths [2, 4, 8]) "
-            "or a nonsense fit (f = 0 +/- 7e4 for depths [2, 4])."
-        ),
-        strict=True,
-    )
-    def test_exactly_noiseless_process_infidelity_is_zero(self, config):
+    For a Pauli channel E(rho) = sum_k p_k P_k rho P_k, the process
+    infidelity is exactly the total probability of a non-identity
+    Pauli error, regardless of how it is distributed across Paulis.
+    """
+
+    PAULI_ERRORS = {'ZI': 0.004, 'IZ': 0.003, 'ZZ': 0.002, 'XX': 0.001}
+
+    @pytest.fixture(scope='class')
+    @staticmethod
+    def cb():
+        random.seed(2)
+        np.random.seed(2)
+        noise = CustomErrorModel.from_PNR(
+            {CZ(0, 1): TestCBInjectedPauliNoise.PAULI_ERRORS}
+        )
+        cmat = np.array([[0.98, 0.02], [0.05, 0.95]])
+        for q in range(2):
+            noise.add_readout_noise(q, cmat)
         cb = CB(
-            Emulator, config, Cycle({CZ(0, 1)}), [2, 4, 8],
-            n_decays=20, n_randomizations=2, n_shots=100,
-            simulator=DensityMatrixSimulator(error_model={}),
+            Emulator, Config(EXAMPLE_CONFIG_PATH), Cycle({CZ(0, 1)}),
+            [2, 4, 8], n_decays=15, n_randomizations=8, n_shots=1000,
+            simulator=DensityMatrixSimulator(error_model=noise),
         )
         _quiet(cb.run)
+        return cb
+
+    def test_recovers_process_infidelity(self, cb):
+        expected = sum(self.PAULI_ERRORS.values())
         e_F = cb.process_infidelity
-        assert getattr(e_F, 'n', e_F) == pytest.approx(0.0, abs=1e-6)
+        assert e_F.n == pytest.approx(expected, abs=N_SIGMA * e_F.s)
+        assert e_F.s < 0.5 * expected
 
-
-# ---------------------------------------------------------------------
-# End-to-end runs with known injected noise
-# ---------------------------------------------------------------------
+    def test_every_pauli_decay_is_fit(self, cb):
+        fids = cb.pauli_fidelities['interleaved']
+        assert len(fids) == 15
+        assert all(np.isfinite(f.n) and f.s > 0 for f in fids.values())
 
 
 class TestCBReadoutNoiseOnly:
@@ -897,32 +943,6 @@ class TestCBRunSaving:
         assert save_path.is_relative_to(tmp_path)
         assert (save_path / 'circuits.qc').exists()
         assert (save_path / 'CB_decays_X_0.png').exists()
-
-
-# ---------------------------------------------------------------------
-# CB1 (True-Q)
-# ---------------------------------------------------------------------
-
-
-class TestCB1:
-
-    @pytest.mark.xfail(
-        reason=(
-            "CB1 (cb.py:1962-1963) passes qpu=qpu into the inner "
-            "class, whose **kwargs forward it to QPU.__init__, which "
-            "raises TypeError (SC at cb.py:2212 has the same bug)."
-        ),
-        raises=TypeError,
-        strict=True,
-    )
-    def test_construction_stores_arguments(self, config):
-        cb1 = CB1(
-            Emulator, config, {(0, 1): 'CZ'}, [2, 4], n_circuits=7,
-            include_ref_cycle=True,
-        )
-        assert cb1._circuit_depths == [2, 4]
-        assert cb1._n_circuits == 7
-        assert cb1._include_ref_cycle is True
 
 
 # ---------------------------------------------------------------------

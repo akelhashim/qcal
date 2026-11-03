@@ -748,14 +748,20 @@ def transpile_circuit(
                     # X90/SX pulses here, since phase gates never reach
                     # this branch while tracked. The readout tracker is
                     # passed regardless of `readout_final_layer`, so the
-                    # body is the same wherever its key first appears.
+                    # body is the same wherever its key first appears. A
+                    # cycle with a phase gate only reaches this branch
+                    # outside the randomized final layer, so its phases
+                    # are left untracked (literal).
                     tcycle = transpile_cycle(
                         cycle=cycle,
                         gate_mapper=gate_mapper,
                         qubit_to_cref=qubit_to_cref,
                         cycles_to_defcircuits=True,
                         rc_tracker=rc_tracker,
-                        readout_tracker=readout_tracker,
+                        readout_tracker=(
+                            None if has_phase_gate(cycle)
+                            else readout_tracker
+                        ),
                     )
                     declarations += DefCircuit(
                         name=cycle_key,

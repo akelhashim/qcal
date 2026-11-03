@@ -480,15 +480,6 @@ class TestTranspileCircuitRandomizedReadout:
         )
         assert _Inst('QUIL', 'ENTANGLE 0 1') in program
 
-    @pytest.mark.xfail(
-        reason=(
-            'transpile_circuit passes readout_tracker to every '
-            'DEFCIRCUIT body, so transpile_cycle rejects phase gates '
-            'outside the randomized final layer'
-        ),
-        raises=ValueError,
-        strict=True,
-    )
     def test_defcircuits_allow_phase_gates_outside_final_layer(
         self, fake_pyquil
     ):

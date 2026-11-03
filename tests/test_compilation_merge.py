@@ -77,12 +77,21 @@ class TestMergeGates:
         with pytest.raises(ValueError):
             merge_gates(CNOT(0, 1), CNOT(1, 0))
 
-    def test_different_merges_compare_equal_but_differ_in_matrix(self):
-        # Documented caveat: equality ignores the merged matrix.
+    def test_merges_with_different_matrices_are_distinct(self):
+        # Merged gates are all generic Gates named 'Gate' with empty
+        # params, so equality/hashing must tell them apart by matrix.
         m1 = merge_gates(X(0), X(0))
         m2 = merge_gates(X(0), Y(0))
+        assert m1 != m2
+        assert len({m1, m2}) == 2
+
+    def test_merges_with_equal_matrices_are_equal(self):
+        # X @ X is a real identity, Y @ Y a complex one: equal values
+        # with different dtypes must still be equal and hash equally.
+        m1 = merge_gates(X(0), X(0))
+        m2 = merge_gates(Y(0), Y(0))
         assert m1 == m2
-        assert not np.allclose(m1.matrix, m2.matrix)
+        assert hash(m1) == hash(m2)
 
 
 class TestMergeCycles:

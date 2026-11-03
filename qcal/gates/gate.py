@@ -69,8 +69,10 @@ class Gate:
     def __eq__(self, other: object) -> bool:
         """Check equality between two gates.
 
-        Two gates are equal if they have the same name, qubits, subspace, and
-        params.
+        Two gates are equal if they have the same name, qubits, subspace,
+        params, and matrix. Comparing the matrix matters for generic gates
+        (e.g. from ``merge_gates``), which all share the name ``'Gate'``
+        and empty params regardless of the unitary they implement.
 
         Args:
             other (object): object to compare against.
@@ -86,15 +88,18 @@ class Gate:
             and self.subspace == other.subspace
             and self._properties.get('params', {})
             == other._properties.get('params', {})
+            and self._matrix_key() == other._matrix_key()
         )
 
     def __hash__(self) -> int:
-        """Hash the gate by its name, qubits, and subspace.
+        """Hash the gate by its name, qubits, subspace, and matrix.
 
         Returns:
             int: hash of the gate.
         """
-        return hash((self.name, self.qubits, self.subspace))
+        return hash(
+            (self.name, self.qubits, self.subspace, self._matrix_key())
+        )
 
     def _repr_html_(self):
         """Returns information about the gate.
@@ -292,3 +297,15 @@ class Gate:
             tuple: qudit label(s).
         """
         return self.qubits
+
+    def _matrix_key(self) -> tuple:
+        """Exact, hashable fingerprint of the gate's matrix.
+
+        Adding 0 maps -0.0 to 0.0, so matrices which compare equal
+        elementwise always produce the same key.
+
+        Returns:
+            tuple: matrix shape and the bytes of its complex entries.
+        """
+        matrix = np.asarray(self._matrix, dtype=complex) + 0
+        return (matrix.shape, matrix.tobytes())

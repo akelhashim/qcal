@@ -268,27 +268,10 @@ class TestConjugatePauliByGate:
         with pytest.raises(ValueError, match='Clifford'):
             conjugate_pauli_by_gate(('X',), sq.T(0))
 
-    @pytest.mark.xfail(
-        reason=(
-            'conjugate_pauli_by_unitary only checks one matrix entry '
-            'and identify_pauli_str never validates its input, so some '
-            'non-Clifford gates (e.g. CS on IY) are silently accepted '
-            'with a wrong (Pauli, sign) instead of raising ValueError.'
-        ),
-        strict=True,
-    )
     def test_non_clifford_two_qubit_raises(self):
         with pytest.raises(ValueError):
             conjugate_pauli_by_gate(('I', 'Y'), tq.CS(0, 1))
 
-    @pytest.mark.xfail(
-        reason=(
-            'conjugate_pauli_by_gate is lru_cached on Gate, whose hash/eq '
-            'ignore the matrix; two generic Gates on the same qubits '
-            '(e.g. outputs of merge_gates) collide in the cache.'
-        ),
-        strict=True,
-    )
     def test_generic_gates_with_different_matrices_not_conflated(self):
         conjugate_pauli_by_gate.cache_clear()
         hadamard = Gate(sq.h, 91)
@@ -382,8 +365,6 @@ class TestConjugatePauli:
             )
 
     def test_merged_generic_gate(self):
-        # Unique qubit label to avoid the generic-Gate cache collision
-        # covered by the xfail test above.
         merged = merge_gates(H(82), S(82))
         new, sign = conjugate_pauli(('X',), Cycle(merged))
         np.testing.assert_allclose(

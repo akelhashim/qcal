@@ -88,6 +88,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The `Emulator` stores each circuit's final simulated state object in a
   `'state'` column, instead of a pretty-printed string in a `'states'`
   column; call `.pretty_print()` on an entry for a readable string
+- `Gate` equality and hashing include the gate's matrix, so generic gates
+  (e.g. from `merge_gates`) with different unitaries are no longer equal
+- CB samples exactly `n_decays` distinct, non-identity Pauli decays, using
+  all of them when `n_decays` is at least the number available
 
 ### Deprecated
 
@@ -104,6 +108,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Circuit plotting bug when `MCM` is interpreted as a multi-qubit gate
 - `compute_conditional_counts` not relabeling mid-circuit measurement
   outcomes of 2 and 3 (e.g. leakage) as `p2` and `p3`
+- Pauli conjugation and CB depth checks returning cached results for a
+  different merged gate or cycle on the same qubits
+- CB expected signs for cycles whose Pauli conjugation is not an
+  involution (e.g. S followed by H, which maps X → Y → Z)
+- CB keeping an all-identity Pauli in its decays
+- `conjugate_pauli` accepting some non-Clifford gates instead of raising a
+  `ValueError`
+- `Results.plot` failing with plotly 6
+- `readout_correction` truncating instead of rounding corrected counts,
+  and skipping results that do not contain every level
+- `RandomizedReadout.results` raising before the experiment is run
+- `format_gate_text` ignoring `include_matrix`, so large circuit plots
+  still included gate matrices in their hover text
+- `draw_qpu_heatmap` node hover text showing the figure title instead of
+  `cbar_label`
+- `draw_circuit` showing the same hover text for different merged gates on
+  the same qubits
+- PyQuil transpiler raising for phase gates outside the final layer with
+  randomized readout and `cycles_to_defcircuits`
 
 ### Security
 

@@ -11,10 +11,6 @@ The Emulator does not implement randomized readout itself, but its
 inject a DensityMatrixSimulator whose only noise is a known per-qubit
 readout confusion matrix, so the expected all-zero probability is the
 product of each qubit's P(0 | 0).
-
-Results.plot() currently raises with plotly >= 6 (see the xfail in
-TestRandomizedReadoutPlot and in tests/test_results.py), and run()
-calls plot(), so most tests stub it out with the ``no_plot`` fixture.
 """
 import numpy as np
 import pytest
@@ -36,12 +32,6 @@ from qcal.simulation.simulators import (
 
 # P(read 1 | prepared 0) on qubit 0; qubit 1 has perfect readout.
 FLIP_Q0 = 0.1
-
-
-@pytest.fixture
-def no_plot(monkeypatch):
-    """Stub out Results.plot, which RandomizedReadout.run() calls."""
-    monkeypatch.setattr(Results, 'plot', lambda self, *a, **k: None)
 
 
 def _readout_only_simulator(cmats: dict) -> DensityMatrixSimulator:
@@ -134,7 +124,6 @@ class TestRandomizedReadoutCircuits:
         )
 
 
-@pytest.mark.usefixtures('no_plot')
 class TestRandomizedReadoutRun:
 
     def test_noiseless_fidelity_is_one(self, config):
@@ -242,14 +231,6 @@ class TestRandomizedReadoutRun:
 
 class TestRandomizedReadoutBeforeRun:
 
-    @pytest.mark.xfail(
-        reason='RandomizedReadout.results indexes self._circuits[0] '
-               'before checking it, so it raises TypeError instead of '
-               'returning an empty Results before generate_circuits() '
-               '(qcal/characterization/readout.py:110).',
-        raises=TypeError,
-        strict=True,
-    )
     def test_results_before_run_is_empty(self, config):
         ro = RandomizedReadout(Emulator, config, [0])
         assert dict(ro.results.dict) == {}
@@ -257,13 +238,6 @@ class TestRandomizedReadoutBeforeRun:
 
 class TestRandomizedReadoutPlot:
 
-    @pytest.mark.xfail(
-        reason="run() calls Results.plot, which passes 'titlefont_size' "
-               'to plotly; plotly >= 6 rejects it '
-               '(qcal/results.py:464).',
-        raises=ValueError,
-        strict=True,
-    )
     def test_run_with_plotting(self, config):
         ro = RandomizedReadout(
             Emulator, config, [0], simulator=StateVectorSimulator(),
