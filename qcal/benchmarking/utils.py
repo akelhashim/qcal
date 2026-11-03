@@ -7,10 +7,6 @@ from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from itertools import combinations, product
 
-import matplotlib.pyplot as plt
-import numpy as np
-import plotly.graph_objects as go
-
 logger = logging.getLogger(__name__)
 
 
@@ -27,127 +23,6 @@ class PauliMeasurementGroup:
     """
     measurement_basis: PauliString
     paulis: list[PauliString]
-
-
-def _combine_qwc_paulis(paulis: list[PauliString]) -> PauliString:
-    """Combines qubit-wise commuting Pauli strings into one basis.
-
-    The resulting Pauli string represents a measurement basis that can
-    simultaneously measure all input Pauli strings.
-
-    Args:
-        paulis (list[PauliString]): list of qubit-wise commuting Pauli strings.
-
-    Returns:
-        PauliString: a single Pauli string representing the measurement basis.
-
-    Raises:
-        ValueError: If the input Paulis are not qubit-wise commuting.
-    """
-    combined = []
-    for qubit_ops in zip(*paulis, strict=True):
-        non_identity = {op for op in qubit_ops if op != 'I'}
-        if len(non_identity) > 1:
-            raise ValueError("Paulis are not qubit-wise commuting.")
-        combined.append(non_identity.pop() if non_identity else 'I')
-    return tuple(combined)
-
-
-def _group_paulis_for_simultaneous_measurement(
-    paulis: list[PauliString],
-) -> list[PauliMeasurementGroup]:
-    """Groups Pauli strings into qubit-wise commuting measurement sets.
-
-    This uses a greedy algorithm: each Pauli string is assigned to the
-    first compatible group, or a new group is created if none match.
-
-    Args:
-        paulis (list[PauliString]): list of Pauli strings to group.
-
-    Returns:
-        list[PauliMeasurementGroup]: A list of PauliMeasurementGroup objects.
-            Each group contains:
-                - measurement_basis: The basis needed to measure the group.
-                - paulis: The original Pauli strings assigned to the group.
-    """
-    groups: list[PauliMeasurementGroup] = []
-
-    # Sort by weight (descending) for better packing.
-    paulis_sorted = sorted(
-        paulis,
-        key=lambda p: sum(x != 'I' for x in p),
-        reverse=True,
-    )
-
-    for pauli in paulis_sorted:
-        placed = False
-
-        for group in groups:
-            if _qwc_compatible(pauli, group.measurement_basis):
-                group.paulis.append(pauli)
-                group.measurement_basis = _combine_qwc_paulis(group.paulis)
-                placed = True
-                break
-
-        if not placed:
-            groups.append(
-                PauliMeasurementGroup(
-                    measurement_basis=pauli,
-                    paulis=[pauli],
-                )
-            )
-
-    return groups
-
-
-def _is_connected_subset(
-    qubits_subset: list[int],
-    adjacency:     dict[int, set[int]],
-) -> bool:
-    """Checks if a subset of qubits forms a connected subgraph.
-
-    Args:
-        qubits_subset (list[int]): qubit labels to check.
-        adjacency (dict[int, set[int]]): adjacency map of the full connectivity
-            graph.
-
-    Returns:
-        bool: True if the subset forms a connected subgraph.
-    """
-    if len(qubits_subset) <= 1:
-        return True
-    subset = set(qubits_subset)
-    visited = {qubits_subset[0]}
-    queue = [qubits_subset[0]]
-    while queue:
-        node = queue.pop()
-        for neighbor in adjacency.get(node, set()):
-            if neighbor in subset and neighbor not in visited:
-                visited.add(neighbor)
-                queue.append(neighbor)
-    return visited == subset
-
-
-def _qwc_compatible(p1: PauliString, p2: PauliString) -> bool:
-    """Checks if two Pauli strings are qubit-wise commuting.
-
-    Two Pauli strings are qubit-wise commuting if, on every qubit,
-    either:
-      - at least one is identity, or
-      - both are the same Pauli.
-
-    Args:
-        p1 (PauliString): First Pauli string.
-        p2 (PauliString): Second Pauli string.
-
-    Returns:
-        bool: True if the Pauli strings are qubit-wise commuting, False
-            otherwise.
-    """
-    for a, b in zip(p1, p2, strict=True):
-        if a != 'I' and b != 'I' and a != b:
-            return False
-    return True
 
 
 def generate_n_qubit_paulis(
@@ -293,129 +168,122 @@ def generate_n_qubit_pauli_measurement_map(
     return {g.measurement_basis: g.paulis for g in groups}
 
 
-def plot_error_rates(
-    error_rates: dict,
-    uncertainties: dict,
-    ylabel: str = 'Error Rate',
-    save_path: str | None = None
-) -> None:
-    """Plot error rates for randomized benchmarks.
+def _combine_qwc_paulis(paulis: list[PauliString]) -> PauliString:
+    """Combines qubit-wise commuting Pauli strings into one basis.
+
+    The resulting Pauli string represents a measurement basis that can
+    simultaneously measure all input Pauli strings.
 
     Args:
-        error_rates (dict): dictionary mapping qubit label to error rate.
-        uncertainties (dict): dictionary mapping qubit label to uncertainty.
-        ylabel (str, optional): y-axis label. Defaults to 'Error Rate'.
-        save_path (str | None, optional): save path for figure. Defaults to
-            None.
+        paulis (list[PauliString]): list of qubit-wise commuting Pauli strings.
+
+    Returns:
+        PauliString: a single Pauli string representing the measurement basis.
+
+    Raises:
+        ValueError: If the input Paulis are not qubit-wise commuting.
     """
-    qlabels = sorted(error_rates.keys())
-    error_rates = [error_rates[ql] for ql in qlabels]
-    uncertainties = [uncertainties[ql] for ql in qlabels]
+    combined = []
+    for qubit_ops in zip(*paulis, strict=True):
+        non_identity = {op for op in qubit_ops if op != 'I'}
+        if len(non_identity) > 1:
+            raise ValueError("Paulis are not qubit-wise commuting.")
+        combined.append(non_identity.pop() if non_identity else 'I')
+    return tuple(combined)
 
-    ms = 7
-    x = np.arange(len(qlabels))
 
-    if save_path:
-        # Matplotlib figure (for saving)
-        fig = plt.figure(figsize=(min(3*len(qlabels), 10), 4))
-        plt.errorbar(
-            x,
-            error_rates,
-            yerr=uncertainties,
-            fmt='o', ms=ms, color='blue'
-        )
-        plt.xlabel('Qubit Label', fontsize=15)
-        plt.ylabel(ylabel, fontsize=15)
-        plt.xticks(x, qlabels, fontsize=12)
-        plt.yticks(fontsize=12)
-        plt.grid(True)
-        plt.yscale('log')
-        fig.set_tight_layout(True)
-        fig.savefig(
-            save_path + 'error_rates.png',
-            dpi=600,
-            bbox_inches='tight',
-            # pad_inches=0
-        )
-        fig.savefig(
-            save_path + 'error_rates.pdf',
-            bbox_inches='tight',
-            # pad_inches=0
-        )
-        fig.savefig(
-            save_path + 'error_rates.svg',
-            bbox_inches='tight',
-            # pad_inches=0
-        )
-        plt.close(fig)
+def _group_paulis_for_simultaneous_measurement(
+    paulis: list[PauliString],
+) -> list[PauliMeasurementGroup]:
+    """Groups Pauli strings into qubit-wise commuting measurement sets.
 
-    # Plotly figure (for displaying)
-    pfig = go.Figure(
-        data=[
-            go.Scatter(
-                x=[str(ql) for ql in qlabels],
-                y=error_rates,
-                mode='markers',
-                marker={'color': '#1f77b4', 'size': 10},
-                error_y={
-                    'type': 'data',
-                    'array': uncertainties,
-                    'visible': True,
-                    'thickness': 1,
-                    'width': 6,
-                },
-                showlegend=False,
+    This uses a greedy algorithm: each Pauli string is assigned to the
+    first compatible group, or a new group is created if none match.
+
+    Args:
+        paulis (list[PauliString]): list of Pauli strings to group.
+
+    Returns:
+        list[PauliMeasurementGroup]: A list of PauliMeasurementGroup objects.
+            Each group contains:
+                - measurement_basis: The basis needed to measure the group.
+                - paulis: The original Pauli strings assigned to the group.
+    """
+    groups: list[PauliMeasurementGroup] = []
+
+    # Sort by weight (descending) for better packing.
+    paulis_sorted = sorted(
+        paulis,
+        key=lambda p: sum(x != 'I' for x in p),
+        reverse=True,
+    )
+
+    for pauli in paulis_sorted:
+        placed = False
+
+        for group in groups:
+            if _qwc_compatible(pauli, group.measurement_basis):
+                group.paulis.append(pauli)
+                group.measurement_basis = _combine_qwc_paulis(group.paulis)
+                placed = True
+                break
+
+        if not placed:
+            groups.append(
+                PauliMeasurementGroup(
+                    measurement_basis=pauli,
+                    paulis=[pauli],
+                )
             )
-        ]
-    )
-    pfig.update_layout(
-        height=350,
-        width=min(150 * len(qlabels), 1000),
-        margin={'t': 40, 'r': 20, 'b': 60, 'l': 80},
-        template='plotly_white',
-        paper_bgcolor='white',
-        plot_bgcolor='#fbfbfd',
-    )
-    pfig.update_xaxes(
-        title_text='Qubit Label',
-        type='category',
-        tickmode='array',
-        tickvals=[str(ql) for ql in qlabels],
-        ticktext=[str(ql) for ql in qlabels],
-        title_standoff=10,
-        automargin=True,
-        showgrid=True,
-    )
-    pfig.update_yaxes(
-        title_text=ylabel,
-        type='log',
-        title_standoff=10,
-        automargin=True,
-        showgrid=True,
-    )
-    pfig.update_xaxes(
-        showline=True,
-        mirror=True,
-        linecolor='#c7c7c7',
-        linewidth=1,
-        gridcolor='#e5e7eb',
-        zeroline=False,
-        ticks='outside',
-    )
-    pfig.update_yaxes(
-        showline=True,
-        mirror=True,
-        linecolor='#c7c7c7',
-        linewidth=1,
-        gridcolor='#e5e7eb',
-        zeroline=False,
-        ticks='outside',
-    )
-    save_properties = {
-        'toImageButtonOptions': {
-            'format': 'png',
-            'filename': 'error_rates',
-            'scale': 10,
-        }
-    }
-    pfig.show(config=save_properties)
+
+    return groups
+
+
+def _is_connected_subset(
+    qubits_subset: list[int],
+    adjacency:     dict[int, set[int]],
+) -> bool:
+    """Checks if a subset of qubits forms a connected subgraph.
+
+    Args:
+        qubits_subset (list[int]): qubit labels to check.
+        adjacency (dict[int, set[int]]): adjacency map of the full connectivity
+            graph.
+
+    Returns:
+        bool: True if the subset forms a connected subgraph.
+    """
+    if len(qubits_subset) <= 1:
+        return True
+    subset = set(qubits_subset)
+    visited = {qubits_subset[0]}
+    queue = [qubits_subset[0]]
+    while queue:
+        node = queue.pop()
+        for neighbor in adjacency.get(node, set()):
+            if neighbor in subset and neighbor not in visited:
+                visited.add(neighbor)
+                queue.append(neighbor)
+    return visited == subset
+
+
+def _qwc_compatible(p1: PauliString, p2: PauliString) -> bool:
+    """Checks if two Pauli strings are qubit-wise commuting.
+
+    Two Pauli strings are qubit-wise commuting if, on every qubit,
+    either:
+      - at least one is identity, or
+      - both are the same Pauli.
+
+    Args:
+        p1 (PauliString): First Pauli string.
+        p2 (PauliString): Second Pauli string.
+
+    Returns:
+        bool: True if the Pauli strings are qubit-wise commuting, False
+            otherwise.
+    """
+    for a, b in zip(p1, p2, strict=True):
+        if a != 'I' and b != 'I' and a != b:
+            return False
+    return True

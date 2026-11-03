@@ -125,7 +125,7 @@ cv = sqrtcnot = np.array([
 db = np.array([
     [1, 0., 0., 0],
     [0., np.cos(3*np.pi/8), -1j*np.sin(3*np.pi/8), 0.],
-    [0., -np.sin(3*np.pi/8), np.cos(3*np.pi/8), 0.],
+    [0., -1j*np.sin(3*np.pi/8), np.cos(3*np.pi/8), 0.],
     [0, 0., 0., 1]
 ])
 
@@ -142,7 +142,7 @@ ecp = 0.5 * np.array([
     [2*c, 0., 0., -1j*2*s],
     [0., (1+1.j)*(c-s), (1-1.j)*(c+s), 0.],
     [0., (1-1.j)*(c+s), (1+1.j)*(c-s), 0.],
-    [-1j*2*s, 0., 1., 2*c]
+    [-1j*2*s, 0., 0., 2*c]
 ])
 
 fswap = np.array([
@@ -169,11 +169,11 @@ m = 1/np.sqrt(2) * np.array([
 ms = 1/np.sqrt(2) * np.array([
     [1., 0., 0., 1.j],
     [0., 1., 1.j, 0.],
-    [0., 1.j, 0., 0.],
+    [0., 1.j, 1., 0.],
     [1.j, 0., 0., 1.]
 ])
 
-qft2 = np.array([
+qft2 = 0.5 * np.array([
     [1., 1., 1., 1.],
     [1., 1.j, -1., -1.j],
     [1., -1., 1., -1.],
@@ -356,11 +356,11 @@ def swap_alpha(alpha: float) -> NDArray:
         NDArray: SWAP-alpha gate with a power given by alpha.
     """
     angle = np.pi * alpha / 2
-    return  np.exp(angle) * np.array([
+    return  np.exp(1j*angle) * np.array([
         [np.exp(-1j*angle), 0., 0., 0],
         [0., np.cos(angle), 1j*np.sin(angle), 0.],
         [0., 1j*np.sin(angle), np.cos(angle), 0.],
-        [0, 0., 0., np.exp(-angle)]
+        [0, 0., 0., np.exp(-1j*angle)]
     ])
 
 
@@ -695,7 +695,7 @@ class CSdag(Gate):
         """
         super().__init__(cphase(-0.5), _normalize_qubits(qubits))
         self._properties['alias'] = 'sqrt(CZ)dag'
-        self._properties['name'] = 'CSDdag'
+        self._properties['name'] = 'CSdag'
         self._properties['params'] = {
             'angle': -np.pi/2,
         }

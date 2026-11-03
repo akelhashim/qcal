@@ -2,8 +2,8 @@
 
 """
 import logging
-import numpy as np
 
+import numpy as np
 from numpy.typing import NDArray
 from scipy.ndimage import gaussian_filter1d
 
@@ -16,7 +16,7 @@ def find_inflection_points(x: NDArray, y: NDArray, sigma=10) -> NDArray:
     Args:
         x (NDArray): independent variable.
         y (NDArray): dependent variable.
-        sigma (int, optional): standard deviation for Gaussian kernel. Defaults 
+        sigma (int, optional): standard deviation for Gaussian kernel. Defaults
             to 10.
 
     Returns:
@@ -26,5 +26,5 @@ def find_inflection_points(x: NDArray, y: NDArray, sigma=10) -> NDArray:
     dy_dx = np.gradient(y_smoothed, x)
     d2y_dx2 = np.gradient(dy_dx, x)
     inflection_idxs = np.where(np.diff(np.sign(d2y_dx2)))[0]
-    
+
     return inflection_idxs

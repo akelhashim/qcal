@@ -34,33 +34,33 @@ class QubicQPU(QPU):
     from qubic.state_disc import GMMManager
 
     def __init__(
-                self,
-                config:              Config,
-                compiler:            Any | None = None,
-                transpiler:          Any | None = None,
-                classifier:          ClassificationManager = None,
-                n_shots:             int = 1024,
-                n_batches:           int = 1,
-                n_circs_per_seq:     int = 1,
-                n_levels:            int = 2,
-                outputs:             List[str] = ['s11'],  # noqa: B006
-                hardware_vz_qubits:  List[str] = [],  # noqa: B006
-                measure_qubits:      List[str] | None = None,
-                rcorr_cmat:          pd.DataFrame | None = None,
-                circuit_for_loop:    bool = False,
-                raster_circuits:     bool = False,
-                reload_pulse:        bool = True,
-                barrier_between_cycles: bool = True,
-                reload_cmd:          bool = True,
-                reload_freq:         bool = True,
-                reload_env:          bool = True,
-                zero_between_reload: bool = True,
-                save_raw_data:       bool = False,
-                gmm_manager:         GMMManager = None,
-                sd_param:            Dict | None = None,
-                ip_address:          str = None,
-                port:                int = None
-        ) -> None:
+            self,
+            config:              Config,
+            compiler:            Any | None = None,
+            transpiler:          Any | None = None,
+            classifier:          ClassificationManager = None,
+            n_shots:             int = 1024,
+            n_batches:           int = 1,
+            n_circs_per_seq:     int = 1,
+            n_levels:            int = 2,
+            outputs:             List[str] = ['s11'],  # noqa: B006
+            hardware_vz_qubits:  List[str] = [],  # noqa: B006
+            measure_qubits:      List[str] | None = None,
+            rcorr_cmat:          pd.DataFrame | None = None,
+            circuit_for_loop:    bool = False,
+            raster_circuits:     bool = False,
+            reload_pulse:        bool = True,
+            barrier_between_cycles: bool = True,
+            reload_cmd:          bool = True,
+            reload_freq:         bool = True,
+            reload_env:          bool = True,
+            zero_between_reload: bool = True,
+            save_raw_data:       bool = False,
+            gmm_manager:         GMMManager = None,
+            sd_param:            Dict | None = None,
+            ip_address:          str = None,
+            port:                int = None
+    ) -> None:
         """Initialize a instance of a QPU for QubiC.
 
         Args:
@@ -261,6 +261,27 @@ class QubicQPU(QPU):
         """QubiC compiled_program object."""
         return self._compiled_program
 
+    @property
+    def active_n_reads_per_shot(self) -> dict:
+        """Read-count for the sequence currently being acquired.
+
+        Derived from self.active_sequence rather than stored
+        separately: generate_sequence() already embeds each channel's
+        read count onto the sequence object itself
+        (result_channels[ch].reads_per_shot), so reading it back off
+        self.active_sequence (QPU's race-safe snapshot of
+        self._sequence -- see its docstring) gives the same
+        protection without needing a second snapshot of
+        self._n_reads_per_shot.
+
+        Returns:
+            dict: number of reads per channel.
+        """
+        return {
+            ch: result.reads_per_shot
+            for ch, result in self.active_sequence[0].result_channels.items()
+        }
+
     def generate_sequence(self) -> None:
         """Generate a QubiC sequence.
 
@@ -307,11 +328,11 @@ class QubicQPU(QPU):
     def acquire(self) -> None:
         """Measure all circuits."""
         measurement = self._jobman.build_and_run_circuits(
-            self._sequence,
+            self.active_sequence,
             self._n_shots,
             self._outputs,
             fit_gmm=False,
-            reads_per_shot=self._n_reads_per_shot,
+            reads_per_shot=self.active_n_reads_per_shot,
             reload_cmd=self._reload_cmd,
             reload_freq=self._reload_freq,
             reload_env=self._reload_env,

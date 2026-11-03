@@ -10,6 +10,7 @@ from typing import Any
 import pandas as pd
 
 import qcal.settings as settings
+from qcal import __version__
 from qcal.utils import save_to_csv, save_to_pickle
 
 logger = logging.getLogger(__name__)
@@ -20,14 +21,17 @@ class DataMananger:
     __slots__ = (
         '_date',
         '_exp_id',
+        '_keep_exp_id',
         '_save_path'
     )
 
     def __init__(self) -> None:
-        """Initialize a DataManager.
-        """
+        """Initialize a DataManager."""
         self._date = datetime.today().strftime('%Y-%m-%d')
-        self._exp_id = datetime.now().strftime('%Y%m%d_%H%M%S')
+        self._exp_id = (
+            datetime.now().strftime('%Y%m%d_%H%M%S') + f'_v{__version__}'
+        )
+        self._keep_exp_id = False
         self._save_path = None
 
     def __repr__(self) -> str:
@@ -66,19 +70,40 @@ class DataMananger:
         return self._save_path
 
     def generate_exp_id(self) -> None:
-        """Generate a new experimental id."""
-        self._exp_id = datetime.now().strftime('%Y%m%d_%H%M%S')
-        # self._exp_id = datetime.now().strftime('%H%M%S')
+        """Generate a new experimental id.
+
+        A no-op immediately after reserve_exp_id() -- see its
+        docstring.
+        """
+        if self._keep_exp_id:
+            self._keep_exp_id = False
+            return
+        self._exp_id = (
+            datetime.now().strftime('%Y%m%d_%H%M%S') + f'_v{__version__}'
+        )
+
+    def reserve_exp_id(self) -> None:
+        """Prevent the next generate_exp_id() call from overwriting
+        the current exp_id.
+
+        Use this after deliberately customizing exp_id (e.g.
+        appending a protocol-specific suffix) and creating a save
+        path for it, before calling QPU.run(), whose _initialize()
+        otherwise unconditionally calls generate_exp_id() and would
+        silently clobber it. One-shot: only skips the very next
+        generate_exp_id() call.
+        """
+        self._keep_exp_id = True
 
     def create_data_path(self) -> None:
         """Create a directory for data if none exists."""
-        base_dir = settings.Settings.data_path
+        base_dir = settings.Settings.data_save_path
         self._save_path = base_dir + f'{self._date}/' + f'{self._exp_id}/'
         try:
             path = pathlib.Path(self._save_path)
             path.mkdir(parents=True, exist_ok=True)
         except Exception as e:
-            logger.warning(f' {e.message}')
+            logger.warning(f' {e}')
 
     def save_to_csv(self, data: pd.DataFrame, filename: str) -> None:
         """Save a dataframe to a csv file.

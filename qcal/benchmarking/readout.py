@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Sequence
-from typing import Callable, List, Tuple
+from typing import Callable
 
 import pandas as pd
 from IPython.display import clear_output
@@ -178,7 +178,7 @@ def ReadoutFidelity(
         def run(self):
             """Run all experimental methods and analyze results."""
             self.generate_circuits()
-            qpu.run(self, self._circuits, save=False)
+            qpu.run(self, self._circuits, auto_save=False)
             self.analyze()
             self.save()
             self.final()

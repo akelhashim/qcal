@@ -18,9 +18,14 @@ name. The :class:`~qcal.simulation.simulators.DensityMatrixSimulator`
 calls :meth:`ErrorModel.channel_for` on each gate during simulation.
 
 Most error models accept a *dims* tuple implicitly through separate
-per-category parameters: qubit categories always use ``dims=(2,)``
-and qutrit categories always use ``dims=(3,)`` when calling the
-underlying ``quax.channels.*`` functions.
+per-category parameters: single-qudit categories always use
+``dims=(2,)`` (qubit) or ``dims=(3,)`` (qutrit) when calling the
+underlying ``quax.channels.*`` functions, and are applied
+independently to each qudit touched by a multi-qudit gate. The
+``two_qubit`` parameter of :class:`DepolarizingNoise` and
+:class:`DephasingNoise` is the exception: it is a **joint** channel
+on the full two-qubit gate body (``dims=(2, 2)``), matching how a
+per-instance ``gate_unitaries`` error would act.
 
 Example::
 
@@ -337,6 +342,83 @@ def _qutrit_thermal_relaxation_channel(
 
 
 # ---------------------------------------------------------------------------
+# Joint two-qudit channel helpers
+# ---------------------------------------------------------------------------
+
+_Z: np.ndarray = np.array([[1.0, 0.0], [0.0, -1.0]], dtype=complex)
+_Z_GE_QUTRIT: np.ndarray = np.diag([1.0, -1.0, 1.0]).astype(complex)
+_Z_EF_QUTRIT: np.ndarray = np.diag([1.0, 1.0, -1.0]).astype(complex)
+
+
+def _joint_two_qubit_dephasing_channel(gamma: float) -> quax.SuperOp:
+    """Build a joint two-qubit dephasing channel on the gate body.
+
+    Generalizes ``quax.channels.dephasing`` — whose jump operator is
+    ``sqrt(gamma / 2) * Z`` on a single qubit, giving dephasing
+    probability ``p = 1 - exp(-gamma)`` — to the joint jump operator
+    ``sqrt(gamma / 2) * (Z⊗Z)`` on the two-qubit gate subsystem. Z⊗Z
+    is Hermitian and squares to the identity just like Z, so the same
+    derivation applies: this is the incoherent (stochastic) analogue
+    of a coherent Z⊗Z-type error such as an over-rotated CZ, applied
+    once to the gate body rather than as independent dephasing on
+    each qubit.
+
+    Args:
+        gamma (float): dephasing rate. Must be non-negative.
+
+    Returns:
+        quax.SuperOp: joint two-qubit dephasing channel.
+    """
+    zz = np.kron(_Z, _Z)
+    L = np.sqrt(gamma / 2.0) * zz
+    lindbladian = quax.Lindbladian(
+        hamiltonian=None,
+        jump_operators=quax.Operator.from_matrix(
+            jnp.array(L[np.newaxis]), ((2, 2), (2, 2))
+        ),
+    )
+    return quax.evolve(lindbladian, 1.0)
+
+
+def _joint_two_qutrit_dephasing_channel(
+    gamma_ge: float, gamma_ef: float
+) -> quax.SuperOp:
+    """Build a joint two-qutrit dephasing channel on the gate body.
+
+    Generalizes :func:`_joint_two_qubit_dephasing_channel` to qutrits
+    by using two joint jump operators instead of one: ``sqrt(gamma_ge
+    / 2) * (Z_ge⊗Z_ge)`` and ``sqrt(gamma_ef / 2) * (Z_ef⊗Z_ef)``,
+    where ``Z_ge = diag(1, -1, 1)`` and ``Z_ef = diag(1, 1, -1)``
+    generalize the qubit Z to the GE and EF subspaces respectively
+    (mirroring :func:`_qutrit_dephasing_channel`'s independent GE/EF
+    rates). Acts jointly on the two-qutrit gate subsystem rather than
+    independently on each qutrit.
+
+    Args:
+        gamma_ge (float): GE dephasing rate. Must be non-negative.
+        gamma_ef (float): EF dephasing rate. Must be non-negative.
+
+    Returns:
+        quax.SuperOp: joint two-qutrit dephasing channel.
+    """
+    jump_ops = []
+    if gamma_ge > 0.0:
+        zz_ge = np.kron(_Z_GE_QUTRIT, _Z_GE_QUTRIT)
+        jump_ops.append(np.sqrt(gamma_ge / 2.0) * zz_ge)
+    if gamma_ef > 0.0:
+        zz_ef = np.kron(_Z_EF_QUTRIT, _Z_EF_QUTRIT)
+        jump_ops.append(np.sqrt(gamma_ef / 2.0) * zz_ef)
+    L_stack = jnp.array(np.stack(jump_ops))
+    lindbladian = quax.Lindbladian(
+        hamiltonian=None,
+        jump_operators=quax.Operator.from_matrix(
+            L_stack, ((3, 3), (3, 3))
+        ),
+    )
+    return quax.evolve(lindbladian, 1.0)
+
+
+# ---------------------------------------------------------------------------
 # Base class
 # ---------------------------------------------------------------------------
 
@@ -469,8 +551,14 @@ class ErrorModel(ABC):
 class DepolarizingNoise(ErrorModel):
     """Depolarizing noise applied uniformly by gate category.
 
-    Delegates to ``quax.channels.depolarizing(rate, dims=(d,))``
-    where *d* is 2 for qubit categories and 3 for qutrit categories.
+    Single-qudit categories (``single_qubit``, ``single_qutrit``)
+    delegate to ``quax.channels.depolarizing(rate, dims=(d,))`` where
+    *d* is 2 or 3 respectively. The two-qudit categories are **joint**
+    channels on the gate body: ``two_qubit`` uses
+    ``dims=(2, 2)`` and ``two_qutrit`` uses ``dims=(3, 3)`` — the same
+    subsystem a per-instance ``gate_unitaries`` entry (e.g. a custom
+    Z⊗Z error) would act on — rather than two independent
+    single-qudit channels.
 
     Example::
 
@@ -485,12 +573,15 @@ class DepolarizingNoise(ErrorModel):
     Args:
         single_qubit (float): depolarizing rate for single-qubit
             gates. Defaults to ``0.0`` (no noise).
-        two_qubit (float): depolarizing rate for two-qubit gates.
-            Defaults to ``0.0``.
+        two_qubit (float): depolarizing rate for the joint two-qubit
+            gate body (a single 4-dimensional depolarizing channel on
+            the gate's two qudits together). Defaults to ``0.0``.
         single_qutrit (float): depolarizing rate for single-qutrit
             gates. Defaults to ``0.0``.
-        two_qutrit (float): depolarizing rate for two-qutrit gates,
-            applied independently to each qutrit. Defaults to ``0.0``.
+        two_qutrit (float): depolarizing rate for the joint
+            two-qutrit gate body (a single 9-dimensional depolarizing
+            channel on the gate's two qudits together). Defaults to
+            ``0.0``.
     """
 
     def __init__(
@@ -507,7 +598,7 @@ class DepolarizingNoise(ErrorModel):
                 if single_qubit > 0.0 else None
             ),
             'two_qubit': (
-                quax.channels.depolarizing(two_qubit, dims=(2,))
+                quax.channels.depolarizing(two_qubit, dims=(2, 2))
                 if two_qubit > 0.0 else None
             ),
             'single_qutrit': (
@@ -515,7 +606,7 @@ class DepolarizingNoise(ErrorModel):
                 if single_qutrit > 0.0 else None
             ),
             'two_qutrit': (
-                quax.channels.depolarizing(two_qutrit, dims=(3,))
+                quax.channels.depolarizing(two_qutrit, dims=(3, 3))
                 if two_qutrit > 0.0 else None
             ),
         }
@@ -611,11 +702,18 @@ class AmplitudeDamping(ErrorModel):
 class DephasingNoise(ErrorModel):
     """Dephasing (T2) noise applied uniformly by gate category.
 
-    Qubit categories use ``quax.channels.dephasing(rate)`` and model
-    GE (|0⟩–|1⟩) dephasing. Qutrit categories use a
+    ``single_qubit`` uses ``quax.channels.dephasing(rate)`` and models
+    GE (|0⟩–|1⟩) dephasing on a single qubit. ``single_qutrit`` uses a
     manually-constructed Kraus map (since ``quax.channels.dephasing``
-    does not accept a *dims* argument) where the qubit rates supply
-    γ_ge and the qutrit rates supply γ_ef:
+    does not accept a *dims* argument) where the qubit rate supplies
+    γ_ge and the qutrit rate supplies γ_ef. Both two-qudit categories
+    are **joint** channels on the gate body, mirroring how a
+    per-instance ``gate_unitaries`` entry (e.g. a custom Z⊗Z error)
+    would act, rather than independent dephasing on each qudit:
+    ``two_qubit`` uses :func:`_joint_two_qubit_dephasing_channel`
+    (Z⊗Z-axis) and ``two_qutrit`` uses
+    :func:`_joint_two_qutrit_dephasing_channel` (separate GE/EF-axis
+    jump operators on the joint two-qutrit subsystem):
 
     +---------------------+----------+----------+
     | Parameter           | γ_ge     | γ_ef     |
@@ -647,14 +745,13 @@ class DephasingNoise(ErrorModel):
         single_qubit (float): GE dephasing rate for single-qubit
             gates; also sets γ_ge for the single-qutrit channel
             (0 ≤ γ ≤ 1). Defaults to ``0.0``.
-        two_qubit (float): GE dephasing rate for two-qubit gates;
-            also sets γ_ge for the two-qutrit channel. Applied
-            independently to each qubit. Defaults to ``0.0``.
+        two_qubit (float): joint Z⊗Z dephasing rate for the two-qubit
+            gate body; also sets γ_ge for the two-qutrit gate body.
+            Defaults to ``0.0``.
         single_qutrit (float): EF dephasing rate (γ_ef) for the
             single-qutrit channel (0 ≤ γ ≤ 1). Defaults to ``0.0``.
-        two_qutrit (float): EF dephasing rate (γ_ef) for the
-            two-qutrit channel. Applied independently to each qutrit.
-            Defaults to ``0.0``.
+        two_qutrit (float): joint EF-axis dephasing rate (γ_ef) for
+            the two-qutrit gate body. Defaults to ``0.0``.
     """
 
     def __init__(
@@ -673,7 +770,7 @@ class DephasingNoise(ErrorModel):
                 if single_qubit > 0.0 else None
             ),
             'two_qubit': (
-                quax.channels.dephasing(two_qubit)
+                _joint_two_qubit_dephasing_channel(two_qubit)
                 if two_qubit > 0.0 else None
             ),
             'single_qutrit': (
@@ -681,7 +778,7 @@ class DephasingNoise(ErrorModel):
                 if _sq_active else None
             ),
             'two_qutrit': (
-                _qutrit_dephasing_channel(two_qubit, two_qutrit)
+                _joint_two_qutrit_dephasing_channel(two_qubit, two_qutrit)
                 if _tq_active else None
             ),
         }

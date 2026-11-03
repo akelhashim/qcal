@@ -20,7 +20,7 @@ from .utils import construct_dataframes, find_herald_idx
 logger = logging.getLogger(__name__)
 
 
-__all__ = 'PostProcessor'
+__all__ = ('PostProcessor',)
 
 
 # Array2D has shape (n_shots, n_meas)

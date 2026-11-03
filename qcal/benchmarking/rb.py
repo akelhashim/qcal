@@ -1,7 +1,7 @@
 """Submodule for RB routines.
 
 For CRB, see:
-https://github.com/sandialabs/pyGSTi/blob/master/jupyter_notebooks/Tutorials/algorithms/RB-CliffordRB.ipynb
+https://github.com/sandialabs/pyGSTi/blob/master/docs/markdown/rb/CliffordRB.md
 
 For SRB, see:
 https://trueq.quantumbenchmark.com/guides/error_diagnostics/srb.html
@@ -35,92 +35,19 @@ from pygsti.protocols import (
 from pygsti.protocols.protocol import ProtocolData
 
 from qcal.analysis.leakage import analyze_leakage
-from qcal.benchmarking.utils import plot_error_rates
 from qcal.circuit import CircuitSet
 from qcal.config import Config
 from qcal.fitting.fit_functions import base_exponential
 from qcal.interface.pygsti.datasets import generate_pygsti_dataset
 from qcal.interface.pygsti.processor_spec import pygsti_pspec
 from qcal.interface.pygsti.transpiler import PyGSTiTranspiler
+from qcal.plotting.error_rates import plot_error_rates
 from qcal.plotting.utils import calculate_nrows_ncols
 from qcal.qpu.qpu import QPU
 from qcal.settings import Settings
 from qcal.utils import flatten, get_package_directory
 
 logger = logging.getLogger(__name__)
-
-
-def _build_crb_edesign_for_qubit_label(
-    ql:             int | Tuple[int, int],
-    pspec:          QPSpec,
-    compilations:   Dict[str, CCR],
-    circuit_depths: Sequence[int],
-    n_circuits:     int,
-    randomizeout:   bool,
-    citerations:    int,
-) -> CliffordRBDesign:
-    """
-    Build a CRB experiment design for a given qubit label.
-
-    Attempts to load a pre-generated design from the default_experiments
-    directory first; falls back to generating a new one if not found or if
-    loading fails.
-
-    Args:
-        ql (int | Tuple[int, int]): Qubit label (int for single-qubit RB, or
-            2-tuple of ints for two-qubit RB).
-        pspec (QPSpec): PyGSTi processor specification.
-        compilations (Dict[str, CCR]): Clifford compilation rules keyed by
-            compilation type (e.g. ``'absolute'``, ``'paulieq'``).
-        circuit_depths (Sequence[int]): Circuit depths to benchmark.
-        n_circuits (int): Number of circuits per depth.
-        randomizeout (bool): Whether to randomize output.
-        citerations (int): Number of iterations.
-
-    Returns:
-        CliffordRBDesign: CRB experiment design.
-    """
-    qubits = list(flatten([ql]))
-    d = '_'.join(str(depth) for depth in circuit_depths)
-    path = (
-        get_package_directory()
-        / 'qcal'
-        / 'default_experiments'
-        / f'CRB_Q{ql}_depths_{d}_ncircs_{n_circuits}'
-    )
-    if randomizeout:
-        path = path.with_name(path.name + '_randout')
-
-    edesign = None
-    if path.exists():
-        try:
-            logger.info(f" Loading pre-generated circuits from {path}/...")
-            protocol_data = pygsti.io.read_data_from_dir(path)
-            edesign = protocol_data.edesign
-            if randomizeout:
-                defaultfit = 'A-fixed'
-            else:
-                defaultfit = 'full'
-            edesign.add_default_protocol(RB(name='RB', defaultfit=defaultfit))
-        except Exception as e:
-            logger.warning(
-                f" Failed to load pre-generated circuits from "
-                f"{path} due to error: {e}. Regenerating..."
-            )
-
-    if edesign is None:
-        edesign = CliffordRBDesign(
-            pspec=pspec,
-            clifford_compilations=compilations,
-            depths=circuit_depths,
-            circuits_per_depth=n_circuits,
-            qubit_labels=[f'Q{q}' for q in qubits],
-            randomizeout=randomizeout,
-            citerations=citerations,
-            add_default_protocol=True,
-        )
-
-    return edesign
 
 
 def CRB(
@@ -133,6 +60,7 @@ def CRB(
     pspec:          QPSpec | Dict[int | Tuple[int, int], QPSpec] | None = None,
     randomizeout:   bool = True,
     citerations:    int = 5,
+    seed:           int | None = None,
     **kwargs
 ) -> Callable:
     """Clifford Randomized Benchmarking.
@@ -175,6 +103,8 @@ def CRB(
             linear in `citerations * (CRB length + 2)`. Lower-depth / lower
             2-qubit gate count compilations of the Cliffords are important in
             order to successfully implement CRB on more qubits.
+        seed (int | None, optional): random seed for reproducibility in circuit
+            generation. Defaults to None.
 
     Returns:
         Callable: CRB class instance.
@@ -195,6 +125,7 @@ def CRB(
             ) = None,
             randomizeout:   bool = True,
             citerations:    int = 5,
+            seed:           int | None = None,
             **kwargs
         ) -> None:
             logger.info(f" pyGSTi version: {pygsti.__version__}\n")
@@ -204,7 +135,7 @@ def CRB(
             self._n_circuits = n_circuits
             self._randomizeout = randomizeout
             self._citerations = citerations
-
+            self._seed = seed
             if circuit_depths is None:
                 circuit_depths = (
                     [2, 4, 8, 32, 64]
@@ -421,6 +352,7 @@ def CRB(
                         qubit_labels=[f'Q{q}' for q in self._qubits],
                         randomizeout=self._randomizeout,
                         citerations=self._citerations,
+                        seed=self._seed
                     )
 
             elif self._sim_RB:
@@ -438,6 +370,7 @@ def CRB(
                             self._n_circuits,
                             self._randomizeout,
                             self._citerations,
+                            self._seed
                         )
                         for ql in self._qubit_labels
                     ]
@@ -465,6 +398,11 @@ def CRB(
                     sparse=True,
                     clobber_ok=True
                 )
+                # Keep this exp_id (and the folder written above) for
+                # the qpu.run() call about to happen -- otherwise its
+                # _initialize() would overwrite _exp_id with a fresh
+                # one before analyze()/save() write into this folder.
+                self._data_manager.reserve_exp_id()
 
         def save(self):
             """Save all circuits and data."""
@@ -884,7 +822,7 @@ def CRB(
         def run(self):
             """Run all experimental methods and analyze results."""
             self.generate_circuits()
-            qpu.run(self, self._circuits, save=False)
+            qpu.run(self, self._circuits, auto_save=False)
             self.save()
             self.analyze()
             self.plot()
@@ -899,6 +837,7 @@ def CRB(
         pspec=pspec,
         randomizeout=randomizeout,
         citerations=citerations,
+        seed=seed,
         **kwargs
     )
 
@@ -1118,7 +1057,7 @@ def SRB(
         def run(self):
             """Run all experimental methods and analyze results."""
             self.generate_circuits()
-            qpu.run(self, self._circuits, save=False)
+            qpu.run(self, self._circuits, auto_save=False)
             self.save()
             self.analyze()
             self.plot()
@@ -1134,3 +1073,80 @@ def SRB(
         include_rcal,
         **kwargs
     )
+
+
+def _build_crb_edesign_for_qubit_label(
+    ql:             int | Tuple[int, int],
+    pspec:          QPSpec,
+    compilations:   Dict[str, CCR],
+    circuit_depths: Sequence[int],
+    n_circuits:     int,
+    randomizeout:   bool,
+    citerations:    int,
+    seed:           int | None = None,
+) -> CliffordRBDesign:
+    """
+    Build a CRB experiment design for a given qubit label.
+
+    Attempts to load a pre-generated design from the default_experiments
+    directory first; falls back to generating a new one if not found or if
+    loading fails.
+
+    Args:
+        ql (int | Tuple[int, int]): Qubit label (int for single-qubit RB, or
+            2-tuple of ints for two-qubit RB).
+        pspec (QPSpec): PyGSTi processor specification.
+        compilations (Dict[str, CCR]): Clifford compilation rules keyed by
+            compilation type (e.g. ``'absolute'``, ``'paulieq'``).
+        circuit_depths (Sequence[int]): Circuit depths to benchmark.
+        n_circuits (int): Number of circuits per depth.
+        randomizeout (bool): Whether to randomize output.
+        citerations (int): Number of iterations.
+        seed (int | None, optional): Random seed for reproducibility in circuit
+            generation. Defaults to None.
+
+    Returns:
+        CliffordRBDesign: CRB experiment design.
+    """
+    qubits = list(flatten([ql]))
+    d = '_'.join(str(depth) for depth in circuit_depths)
+    path = (
+        get_package_directory()
+        / 'qcal'
+        / 'default_experiments'
+        / f'CRB_Q{ql}_depths_{d}_ncircs_{n_circuits}'
+    )
+    if randomizeout:
+        path = path.with_name(path.name + '_randout')
+
+    edesign = None
+    if path.exists():
+        try:
+            logger.info(f" Loading pre-generated circuits from {path}/...")
+            protocol_data = pygsti.io.read_data_from_dir(path)
+            edesign = protocol_data.edesign
+            if randomizeout:
+                defaultfit = 'A-fixed'
+            else:
+                defaultfit = 'full'
+            edesign.add_default_protocol(RB(name='RB', defaultfit=defaultfit))
+        except Exception as e:
+            logger.warning(
+                f" Failed to load pre-generated circuits from "
+                f"{path} due to error: {e}. Regenerating..."
+            )
+
+    if edesign is None:
+        edesign = CliffordRBDesign(
+            pspec=pspec,
+            clifford_compilations=compilations,
+            depths=circuit_depths,
+            circuits_per_depth=n_circuits,
+            qubit_labels=[f'Q{q}' for q in qubits],
+            randomizeout=randomizeout,
+            citerations=citerations,
+            add_default_protocol=True,
+            seed=seed,
+        )
+
+    return edesign

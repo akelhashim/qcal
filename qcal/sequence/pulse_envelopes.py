@@ -41,12 +41,12 @@ __all__ = [
 
 
 def cosine_square(
-        length:        float,
-        sample_rate:   float,
-        amp:           float = 1.0,
-        phase:         float = 0.0,
-        ramp_fraction: float = 0.25
-    ) -> NDArray[np.complex64]:
+    length:        float,
+    sample_rate:   float,
+    amp:           float = 1.0,
+    phase:         float = 0.0,
+    ramp_fraction: float = 0.25
+) -> NDArray[np.complex64]:
     """Pulse envelope with cosine ramps and a flat top.
 
     Args:
@@ -54,58 +54,62 @@ def cosine_square(
         sample_rate (float): sample rate in Hz.
         amp (float, optional): pulse amplitude. Defaults to 1.0.
         phase (float, optional): pulse phase. Defaults to 0.0.
-        ramp_fraction (float, optional): fraction of ramp for rising and 
-            falling edge. Defaults to 0.25.
+        ramp_fraction (float, optional): fraction of the pulse spent
+            ramping. In [0, 0.5], this is a symmetric two-sided ramp
+            (both the rising and falling edge ramp by this fraction).
+            A negative value instead produces a one-sided ramp on the
+            falling edge only (the magnitude gives the ramp fraction),
+            and a value greater than 0.5 produces a one-sided ramp on
+            the rising edge only. Defaults to 0.25.
 
     Returns:
         NDArray[np.complex64]: envelope with cosine ramps and a flat top.
     """
-    # assert ramp_fraction <= 0.5, 'ramp_fraction cannot be more than 0.5!'
     n_points = int(round(length * sample_rate))
 
+    one_sided = ramp_fraction < 0. or ramp_fraction > 0.5
     if abs(ramp_fraction) > 0.5:
         logger.warning(
             ' ramp_fraction is greater than 0.5!'
         )
-        n_points_cos = int(round(n_points * abs(ramp_fraction)))
-        n_points_square = n_points - n_points_cos
+
+    n_points_cos = int(round(n_points * abs(ramp_fraction)))
+
+    if n_points_cos == 0:
+        cos_square = np.ones(n_points)
+    else:
+        n_points_square = (
+            n_points - n_points_cos if one_sided else
+            n_points - 2 * n_points_cos
+        )
         freq = 1. / (2 * n_points_cos)
         cos = (
             np.cos(2. * np.pi * freq * np.arange(0, 2*n_points_cos) - np.pi )
             + 1
         ) / 2.
         square = np.ones([n_points_square])
-        if ramp_fraction > 0.:
+        if not one_sided:
+            cos_square = np.concatenate(
+                (cos[:n_points_cos], square, cos[n_points_cos:])
+            )
+        elif ramp_fraction > 0.:
             cos_square = np.concatenate(
                 (cos[:n_points_cos], square)
             )
-        elif ramp_fraction < 0.:
+        else:
             cos_square = np.concatenate(
                 (square, cos[n_points_cos:])
             )
-
-    else:
-        n_points_cos = int(round(n_points * ramp_fraction))
-        n_points_square = n_points - 2 * n_points_cos
-        freq = 1. / (2 * n_points_cos)
-        cos = (
-            np.cos(2. * np.pi * freq * np.arange(0, 2*n_points_cos) - np.pi )
-            + 1
-        ) / 2.
-        square = np.ones([n_points_square])
-        cos_square = np.concatenate(
-            (cos[:n_points_cos], square, cos[n_points_cos:])
-        )
 
     return np.array(amp * cos_square * np.exp(1j * phase)).astype(np.complex64)
 
 
 def CW(
-        length:        float,
-        sample_rate:   float,
-        amp:           float = 1.0,
-        phase:         float = 0.0
-    ) -> str:
+    length:      float,
+    sample_rate: float,
+    amp:         float = 1.0,
+    phase:       float = 0.0
+) -> str:
     """Continuous Wave (CW) pulse.
 
     The arguments here are included for consistency, but unused.
@@ -137,15 +141,15 @@ def custom(length: float, sample_rate: float, filename: str) -> NDArray:
 
 
 def DRAG(
-        length:      float,
-        sample_rate: float,
-        alpha:       float = 0.0,
-        amp:         float = 1.0,
-        anh:         float = -200e6,
-        df:          float = 0.0,
-        n_sigma:     int = 3,
-        phase:       float = 0.0
-    ) -> NDArray[np.complex64]:
+    length:      float,
+    sample_rate: float,
+    alpha:       float = 0.0,
+    amp:         float = 1.0,
+    anh:         float = -200e6,
+    df:          float = 0.0,
+    n_sigma:     int = 3,
+    phase:       float = 0.0
+) -> NDArray[np.complex64]:
     """Derivative Removal by Adiabatic Gate (DRAG) pulse envelope.
 
     References:
@@ -182,15 +186,15 @@ def DRAG(
 
 
 def FAST(
-        length:         float,
-        sample_rate:    float,
-        freq_intervals: List,
-        weights:        List,
-        amp:            float = 1.0,
-        N:              int = 4,
-        phase:          float = 0.0,
-        theta:          float = np.pi/2
-    ) -> NDArray[np.complex64]:
+    length:         float,
+    sample_rate:    float,
+    freq_intervals: List,
+    weights:        List,
+    amp:            float = 1.0,
+    N:              int = 4,
+    phase:          float = 0.0,
+    theta:          float = np.pi/2
+) -> NDArray[np.complex64]:
     """Fourier Ansatz Spectrum Tuning (FAST) pulse envelope.
 
     Reference:
@@ -233,17 +237,17 @@ def FAST(
 
 
 def FAST_DRAG(
-        length:         float,
-        sample_rate:    float,
-        freq_intervals: List = None,
-        weights:        List = None,
-        alpha:          float = 0.0,
-        amp:            float = 1.0,
-        anh:            float = -200e6,
-        N:              int = 4,
-        phase:          float = 0.0,
-        theta:          float = np.pi/2
-    ) -> NDArray[np.complex64]:
+    length:         float,
+    sample_rate:    float,
+    freq_intervals: List = None,
+    weights:        List = None,
+    alpha:          float = 0.0,
+    amp:            float = 1.0,
+    anh:            float = -200e6,
+    N:              int = 4,
+    phase:          float = 0.0,
+    theta:          float = np.pi/2
+) -> NDArray[np.complex64]:
     """Fourier Ansatz Spectrum Tuning (FAST) DRAG pulse envelope.
 
     Reference:
@@ -301,12 +305,12 @@ def FAST_DRAG(
 
 
 def gaussian(
-        length:      float,
-        sample_rate: float,
-        amp:         float = 1.0,
-        n_sigma:     int = 3,
-        phase:       float = 0.0
-    ) -> NDArray[np.complex64]:
+    length:      float,
+    sample_rate: float,
+    amp:         float = 1.0,
+    n_sigma:     int = 3,
+    phase:       float = 0.0
+) -> NDArray[np.complex64]:
     """Gaussian pulse envelope.
 
     Args:
@@ -327,13 +331,13 @@ def gaussian(
 
 
 def gaussian_square(
-        length:        float,
-        sample_rate:   float,
-        amp:           float = 1.0,
-        n_sigma:       int = 3,
-        phase:         float = 0.0,
-        ramp_fraction: float = 0.25
-    ) -> NDArray[np.complex64]:
+    length:        float,
+    sample_rate:   float,
+    amp:           float = 1.0,
+    n_sigma:       int = 3,
+    phase:         float = 0.0,
+    ramp_fraction: float = 0.25
+) -> NDArray[np.complex64]:
     """Pulse envelope with Gaussian ramps and a flat top.
 
     Args:
@@ -342,13 +346,14 @@ def gaussian_square(
         amp (float, optional): pulse amplitude. Defaults to 1.0.
         phase (float, optional): pulse phase. Defaults to 0.0.
         n_sigma (int, optional): number of standard deviations. Defaults to 3.
-        ramp_fraction (float, optional): fraction of ramp for rising and 
+        ramp_fraction (float, optional): fraction of ramp for rising and
             falling edge. Defaults to 0.25.
 
     Returns:
         NDArray[np.complex64]: Gaussian square envelope.
     """
-    assert ramp_fraction <= 0.5, 'ramp_fraction cannot be more than 0.5!'
+    if ramp_fraction > 0.5:
+        raise ValueError('ramp_fraction cannot be more than 0.5!')
     n_points = int(round(length * sample_rate))
     n_points_gauss = int(round(n_points * ramp_fraction))
     n_points_square = n_points - 2 * n_points_gauss
@@ -366,9 +371,9 @@ def gaussian_square(
 
 
 def IPM(
-       length: float, sample_rate: float, env: str, freq: float,
-       amp2: float = 1.0, phase2: float = 0.0, **kwargs
-    ) -> NDArray[np.complex64]:
+    length: float, sample_rate: float, env: str, freq: float,
+    amp2: float = 1.0, phase2: float = 0.0, **kwargs
+) -> NDArray[np.complex64]:
     """Intra-pulse Modulation (IPM).
 
     This pulse adds a beat frequency to the envelope, which is implemented
@@ -403,8 +408,8 @@ def IPM(
 
 
 def linear(
-        length: float, sample_rate: float, amp: float = 1.0, phase: float = 0.0
-    ) -> NDArray[np.complex64]:
+    length: float, sample_rate: float, amp: float = 1.0, phase: float = 0.0
+) -> NDArray[np.complex64]:
     """Linear ramp pulse envelope.
 
     The linear ramp starts at 0, and ends at amp.
@@ -425,9 +430,9 @@ def linear(
 
 
 def RAP(
-       length: float, sample_rate: float, env: str, f0: float, f1: float,
-        **kwargs
-    ) -> NDArray[np.complex64]:
+    length: float, sample_rate: float, env: str, f0: float, f1: float,
+    **kwargs
+) -> NDArray[np.complex64]:
     """Rapid Adiabatic Passage pulse.
 
     This pulse implements a frequency sweep (about the carrier frequency) by
@@ -464,9 +469,9 @@ def RAP(
 
 
 def STARAP(
-        length: float, sample_rate: float, env: str, f0: float, f1: float,
-        omega0: float = 100 * MHz, cd_weight: float = 1.0, **kwargs
-    ) -> NDArray[np.complex64]:
+    length: float, sample_rate: float, env: str, f0: float, f1: float,
+    omega0: float = 100 * MHz, cd_weight: float = 1.0, **kwargs
+) -> NDArray[np.complex64]:
     """Shortcut to Adiabaticity enhanced Rapid Adiabatic Passage pulse.
 
     This pulse implements a frequency sweep with counter-diabatic driving
@@ -729,12 +734,12 @@ def STARAP(
 
 
 def super_gaussian(
-        length:      float,
-        sample_rate: float,
-        amp:         float = 1.0,
-        n_sigma:     int = 2,
-        phase:       float = 0.0
-    ) -> NDArray[np.complex64]:
+    length:      float,
+    sample_rate: float,
+    amp:         float = 1.0,
+    n_sigma:     int = 2,
+    phase:       float = 0.0
+) -> NDArray[np.complex64]:
     """Super Gaussian pulse envelope.
 
     Args:
@@ -755,12 +760,12 @@ def super_gaussian(
 
 
 def sine(
-        length:      float,
-        sample_rate: float,
-        amp:         float = 1.0,
-        freq:        float = 0.0,
-        phase:       float= 0.0
-    ) -> NDArray[np.complex64]:
+    length:      float,
+    sample_rate: float,
+    amp:         float = 1.0,
+    freq:        float = 0.0,
+    phase:       float= 0.0
+) -> NDArray[np.complex64]:
     """Sine pulse envelope.
 
     Args:
@@ -781,8 +786,8 @@ def sine(
 
 
 def square(
-        length: float, sample_rate: float, amp: float = 1.0, phase: float = 0.0
-    ) -> NDArray[np.complex64]:
+    length: float, sample_rate: float, amp: float = 1.0, phase: float = 0.0
+) -> NDArray[np.complex64]:
     """Square pulse envelope.
 
     Args:
@@ -801,11 +806,11 @@ def square(
 
 
 def virtualz(
-        length:      float = 0,
-        sample_rate: float = 0,
-        amp:         float = 1.0,
-        phase:       float= 0.0
-    ) -> np.complex64:
+    length:      float = 0,
+    sample_rate: float = 0,
+    amp:         float = 1.0,
+    phase:       float= 0.0
+) -> np.complex64:
     """Virtual-z phase.
 
     Args:

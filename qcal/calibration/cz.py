@@ -47,9 +47,10 @@ def calculate_parametric_cz_frequency(
         intermediate_state (str, optional): intermediate state of the gate.
             Defaults to '02'. '20' is also accepted.
     """
-    assert intermediate_state in ('02', '20'), (
-        "'intermediate_state' must be one of ('02', '20')!"
-    )
+    if intermediate_state not in ('02', '20'):
+        raise ValueError(
+            "'intermediate_state' must be one of ('02', '20')!"
+        )
     for qp in qubit_pairs:
         freq_11 = (  # 11 transition frequency
             config[f'single_qubit/{qp[0]}/GE/freq'] +
@@ -74,7 +75,8 @@ def calculate_parametric_cz_frequency(
             freq_mapper[intermediate_state] - freq_11
         )
 
-    config.save()
+    if settings.Settings.save_data:
+        config.save()
 
 
 def tomography_circuits(
@@ -525,7 +527,7 @@ def AmpFreqSweep(
         def run(self):
             """Run all experimental methods and analyze results."""
             self.generate_circuits()
-            qpu.run(self, self._circuits, save=False)
+            qpu.run(self, self._circuits, auto_save=False)
             self.analyze()
             self.save()
             self.plot()
@@ -881,7 +883,7 @@ def Amplitude(
         def run(self):
             """Run all experimental methods and analyze results."""
             self.generate_circuits()
-            qpu.run(self, self._circuits, save=False)
+            qpu.run(self, self._circuits, auto_save=False)
             self.analyze()
             self.save()
             self.plot()
@@ -1206,7 +1208,7 @@ def Frequency(
         def run(self):
             """Run all experimental methods and analyze results."""
             self.generate_circuits()
-            qpu.run(self, self._circuits, save=False)
+            qpu.run(self, self._circuits, auto_save=False)
             self.analyze()
             self.save()
             self.plot()
@@ -1464,7 +1466,7 @@ def RelativeAmp(
         def run(self):
             """Run all experimental methods and analyze results."""
             self.generate_circuits()
-            qpu.run(self, self._circuits, save=False)
+            qpu.run(self, self._circuits, auto_save=False)
             self.analyze()
             self.save()
             self.plot()
@@ -1704,7 +1706,7 @@ def RelativePhase(
         def run(self):
             """Run all experimental methods and analyze results."""
             self.generate_circuits()
-            qpu.run(self, self._circuits, save=False)
+            qpu.run(self, self._circuits, auto_save=False)
             self.analyze()
             self.save()
             self.plot()
@@ -2228,7 +2230,7 @@ def LocalPhases(
         def run(self):
             """Run all experimental methods and analyze results."""
             self.generate_circuits()
-            qpu.run(self, self._circuits, save=False)
+            qpu.run(self, self._circuits, auto_save=False)
             self.analyze()
             self.save()
             self.plot()
@@ -2630,7 +2632,7 @@ def SpectatorPhase(
         def run(self):
             """Run all experimental methods and analyze results."""
             self.generate_circuits()
-            qpu.run(self, self._circuits, save=False)
+            qpu.run(self, self._circuits, auto_save=False)
             self.analyze()
             self.save()
             self.plot()

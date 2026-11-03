@@ -44,6 +44,7 @@ class TrueqCompiler:
             import trueq as tq
         except ImportError:
             logger.warning(' Unable to import trueq!')
+            return
 
         passes = (
             passes if passes is not None else tq.Compiler.HARDWARE_PASSES
@@ -150,6 +151,7 @@ class TrueqCompiler:
             import trueq as tq
         except ImportError:
             logger.warning(' Unable to import trueq!')
+            return
 
         class SqCycleDecomp(tq.compilation.base.NCyclePass):
 
@@ -217,15 +219,88 @@ class TrueqCompiler:
 
 class QuditCompiler:
     """True-Q qudit compiler."""
-    try:
-        import trueq as tq
-    except ImportError:
-        logger.warning(' Unable to import trueq!')
     # __slots__ = ('_config', '_tq_config', '_compiler')
 
     def __init__(self) -> None:
         """Initialize a True-Q qudit compiler."""
-        import trueq as tq
+        try:
+            import trueq as tq
+        except ImportError:
+            logger.warning(' Unable to import trueq!')
+            return
+
+        class DecompEFZ(tq.compilation.base.OperationReplacement):
+            r"""
+            Decomposes diagonal qutrit unitaries. Assumes that one of the
+            factories produces gates of the form diag(e^{-i phi}, 1, 1) and
+            that another produces gates of the form diag(1, 1, e^{-i phi}).
+            phi _must_ be in radians.
+            """
+
+            def __init__(self, factories):
+                """_summary_
+
+                Args:
+                    factories (_type_): _description_
+                """
+                def _IS_Z(x):
+                    return tq.math.proc_infidelity(
+                                x, np.diag(np.exp([-1j*np.pi/180,0,0]))
+                            ) < 1e-10
+
+                def _IS_EFZ(x):
+                    return tq.math.proc_infidelity(
+                                x, np.diag(np.exp([0,0,1j*np.pi/180]))
+                            ) < 1e-10
+
+                self.z = None
+                self.efz = None
+                for factory in factories:
+                    if factory.n_params == 1 and _IS_Z(factory(1).mat):
+                        self.z = factory
+
+                    if factory.n_params == 1 and _IS_EFZ(factory(1).mat):
+                        self.efz = factory
+
+                assert self.z is not None and self.efz is not None
+
+            @staticmethod
+            def is_diag(gate: trueq.Gate) -> bool:  # noqa: F821 # type: ignore
+                """Determine whether the given gate is unitary.
+
+                Args:
+                    gate (trueq.Gate): True-Q gate
+
+                Returns:
+                    bool: unitary or not.
+                """
+                return np.all(
+                    np.abs(gate.mat[np.triu_indices(gate.width, k=1)]) < 1e-12
+                )
+
+            def apply(
+                    self, labels: Sequence[int], operation: trueq.Gate  # noqa: F821 # type: ignore
+                ) -> List:
+                """Apply an operation to a given set of qudit labels.
+
+                Args:
+                    labels (Sequence[int]): qudit labels.
+                    operation (trueq.Gate): True-Q gate.
+
+                Returns:
+                    List: list of cycles.
+                """
+                if (
+                    len(labels) != 1 or not isinstance(operation, tq.Gate) or
+                    not self.is_diag(operation)
+                ):
+                    return [{labels: operation}]
+
+                diag = operation.mat[1,1].conj() * np.diag(operation.mat)
+                return [
+                    {labels: self.z(-180 / np.pi * np.angle(diag[0]))},
+                    {labels: self.efz(180 / np.pi * np.angle(diag[2]))}
+                ]
 
         factories = [
             tq.config.GateFactory.from_matrix(
@@ -254,7 +329,7 @@ class QuditCompiler:
 
         self._compiler = tq.Compiler([
             tq.compilation.OneQuditDecomp(factories),
-            tq.compilation.Parallel(self.DecompEFZ(factories)),
+            tq.compilation.Parallel(DecompEFZ(factories)),
         ])
 
     def compile(
@@ -271,79 +346,3 @@ class QuditCompiler:
                 CircuitCollection.
         """
         return self._compiler.compile(circuits)
-
-    class DecompEFZ(tq.compilation.base.OperationReplacement):
-        r"""
-        Decomposes diagonal qutrit unitaries. Assumes that one of the factories
-        produces gates of the form diag(e^{-i phi}, 1, 1) and that another
-        produces gates of the form diag(1, 1, e^{-i phi}). phi _must_ be in
-        radians.
-        """
-
-        def __init__(self, factories):
-            """_summary_
-
-            Args:
-                factories (_type_): _description_
-            """
-            import trueq as tq
-
-            def _IS_Z(x):
-                return tq.math.proc_infidelity(
-                            x, np.diag(np.exp([-1j*np.pi/180,0,0]))
-                        ) < 1e-10
-
-            def _IS_EFZ(x):
-                return tq.math.proc_infidelity(
-                            x, np.diag(np.exp([0,0,1j*np.pi/180]))
-                        ) < 1e-10
-
-            self.z = None
-            self.efz = None
-            for factory in factories:
-                if factory.n_params == 1 and _IS_Z(factory(1).mat):
-                    self.z = factory
-
-                if factory.n_params == 1 and _IS_EFZ(factory(1).mat):
-                    self.efz = factory
-
-            assert self.z is not None and self.efz is not None
-
-        @staticmethod
-        def is_diag(gate: trueq.Gate) -> bool:  # noqa: F821 # type: ignore
-            """Determine whether the given gate is unitary.
-
-            Args:
-                gate (trueq.Gate): True-Q gate
-
-            Returns:
-                bool: unitary or not.
-            """
-            return np.all(
-                np.abs(gate.mat[np.triu_indices(gate.width, k=1)]) < 1e-12
-            )
-
-        def apply(
-                self, labels: Sequence[int], operation: trueq.Gate  # noqa: F821 # type: ignore
-            ) -> List:
-            """Apply an operation to a given set of qudit labels.
-
-            Args:
-                labels (Sequence[int]): qudit labels.
-                operation (trueq.Gate): True-Q gate.
-
-            Returns:
-                List: list of cycles.
-            """
-            import trueq as tq
-
-            if (len(labels) != 1 or not isinstance(operation, tq.Gate) or
-                not self.is_diag(operation)
-                ):
-                return [{labels: operation}]
-
-            diag = operation.mat[1,1].conj() * np.diag(operation.mat)
-            return [
-                {labels: self.z(-180 / np.pi * np.angle(diag[0]))},
-                {labels: self.efz(180 / np.pi * np.angle(diag[2]))}
-            ]

@@ -1,11 +1,10 @@
 """Helper functions for calibration scripts.
 
 """
-from qcal.config import Config
-
 import numpy as np
-
 from numpy.typing import NDArray
+
+from qcal.config import Config
 
 
 def find_pulse_index(config: Config, param: str):
