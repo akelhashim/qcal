@@ -9,6 +9,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Breaking
 
+### Added
+
+### Changed
+
+### Deprecated
+
+### Removed
+
+### Fixed
+
+### Security
+
+## [5.0.0] - 2026-11-03
+
+### Breaking
+
 - Renamed `QPU.run()`'s `save` kwarg to `auto_save` for clarity
 - `Transpiler.transpile()` is now an abstract method (`Transpiler` is an
   `ABC`); the base class and any subclass that doesn't override it can no
@@ -22,8 +38,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Default plotting in MCB to plotly
 - Moved `plot_error_rates` to `qcal/plotting/error_rates.py`
-
-### Deprecated
 
 ### Removed
 
@@ -69,8 +83,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   untouched ancilla included only for state preparation), because it
   marginalized away those extra qubits before looking up the (differently-
   shaped) `self._states` keys
-
-### Security
 
 ## [4.0.1] - 2026-09-18
 
@@ -344,7 +356,8 @@ post-processing
 - Single- and two-qubit benchmarking methods
 - Advanced compilation tools
 
-[Unreleased]: https://github.com/akelhashim/qcal/compare/v4.0.1...HEAD
+[Unreleased]: https://github.com/akelhashim/qcal/compare/v5.0.0...HEAD
+[5.0.0]: https://github.com/akelhashim/qcal/releases/tag/v5.0.0
 [4.0.1]: https://github.com/akelhashim/qcal/releases/tag/v4.0.1
 [4.0.0]: https://github.com/akelhashim/qcal/releases/tag/v4.0.0
 [3.2.0]: https://github.com/akelhashim/qcal/releases/tag/v3.2.0
