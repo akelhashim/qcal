@@ -471,6 +471,77 @@ class Results:
 
         return Results(marg_results)
 
+    def post_select(self, levels: str = '01') -> Results:
+        """Post-select on bitstrings containing only the given levels.
+
+        By default, this discards every bitstring containing a leaked state
+        (e.g. '2'), so that the remaining results are binary. To discard only
+        leakage on a subset of the bits, marginalize first, e.g.
+        ``results.marginalize((0, 2)).post_select()``.
+
+        Args:
+            levels (str, optional): levels to keep. Bitstrings containing any
+                other level are discarded. Defaults to '01'.
+
+        Returns:
+            Results: post-selected results.
+
+        Raises:
+            ValueError: if no bitstrings remain after post-selection.
+        """
+        levels = set(levels)
+        post_selected = {
+            state: counts for state, counts in self._results.items()
+            if set(state) <= levels
+        }
+        if not post_selected:
+            raise ValueError(
+                f'No bitstrings remain after post-selecting on levels'
+                f' {sorted(levels)}!'
+            )
+        return Results(post_selected)
+
+    def subsample(self, n_shots: int, seed: int | None = None) -> Results:
+        """Randomly subsample shots from the results, without replacement.
+
+        Shots are drawn from the current counts, i.e. after any readout
+        correction, marginalization, post-selection, etc.
+
+        Args:
+            n_shots (int): number of shots to subsample.
+            seed (int | None, optional): seed for the random number generator.
+                Defaults to None.
+
+        Returns:
+            Results: subsampled results.
+
+        Raises:
+            ValueError: if the counts are not non-negative integers, or if
+                n_shots is not in [1, total number of shots].
+        """
+        states = list(self._results.keys())
+        counts = np.asarray(list(self._results.values()), dtype=float)
+        if not np.allclose(counts, np.round(counts)) or np.any(counts < 0):
+            raise ValueError(
+                'Cannot subsample results whose counts are not non-negative'
+                ' integers!'
+            )
+        counts = np.round(counts).astype(np.int64)
+
+        total = int(counts.sum())
+        if not 1 <= n_shots <= total:
+            raise ValueError(
+                f'n_shots = {n_shots} must be in [1, {total}]!'
+            )
+
+        rng = np.random.default_rng(seed)
+        sampled = rng.multivariate_hypergeometric(counts, n_shots)
+        subsampled = {
+            state: int(c)
+            for state, c in zip(states, sampled, strict=True) if c > 0
+        }
+        return Results(subsampled)
+
     def plot(self, normalize: bool = False) -> None:
         """Plot the results in a histogram.
 

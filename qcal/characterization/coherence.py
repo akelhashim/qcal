@@ -1076,7 +1076,17 @@ def ParityOscillations(
             # Parity
             for circuit in self._circuits[1:].circuit:
                 results = circuit.results.marginalize(q_index)
-                self._evs.append(results.ev)
+                # Leaked shots lie outside the qubit subspace, on which the
+                # parity operator acts, so they contribute zero but still
+                # count toward the total, consistent with the populations.
+                # Post-selecting them away would bias the fidelity upward.
+                if any(set(s) <= {'0', '1'} for s in results.states):
+                    binary = results.post_select()
+                    self._evs.append(
+                        binary.ev * binary.n_shots / results.n_shots
+                    )
+                else:
+                    self._evs.append(0.)
 
             try:
                 est_freq = est_freq_fft(self._phases, self._evs)

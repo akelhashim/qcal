@@ -990,7 +990,9 @@ def CB(
                                 )
                                 evs.append(
                                     sign
-                                    * results.marginalize(tuple(active)).ev
+                                    * results.marginalize(
+                                        tuple(active)
+                                    ).post_select().ev
                                 )
 
                                 if self._analyze_subsystems:
@@ -1132,7 +1134,9 @@ def CB(
                     twirl_tuples, interleaved_op, depth,
                 )
                 local_ev = (
-                    local_sign * results.marginalize(tuple(local_active)).ev
+                    local_sign * results.marginalize(
+                        tuple(local_active)
+                    ).post_select().ev
                 )
                 subsystem_local_evs[s].setdefault(
                     local_pattern, {}

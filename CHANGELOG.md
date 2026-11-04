@@ -70,6 +70,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `Results.expectation_value(idx)` for the expectation value of a Z-type
   Pauli on a subset of the bitstring indices (same convention as
   `marginalize`)
+- `Results.post_select(levels)` to discard bitstrings containing levels
+  other than those given (by default, leaked states)
+- `Results.subsample(n_shots, seed)` to randomly subsample shots without
+  replacement from the current (e.g. readout-corrected) counts
 
 ### Changed
 
@@ -107,6 +111,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and `uncertainty_of_sum` from `qcal.math.utils`; use `ufloat` instead
 
 ### Fixed
+
+- CB analysis no longer fails on 3-level (leakage) readout: Pauli
+  expectation values are post-selected on unleaked outcomes on each Pauli's
+  support
+- Parity oscillation (GHZ fidelity) analysis no longer fails on 3-level
+  readout: leaked shots contribute zero to the parity, instead of +1
 
 - PyQuil transpiler internal variable name bug
 - `DensityMatrixSimulator` returning negative probabilities
