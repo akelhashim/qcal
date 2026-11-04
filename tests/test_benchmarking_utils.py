@@ -8,6 +8,7 @@ import pytest
 
 from qcal.benchmarking.utils import (
     _combine_qwc_paulis,
+    _index_to_pauli,
     _is_connected_subset,
     _qwc_compatible,
     generate_n_qubit_pauli_measurement_groups,
@@ -15,6 +16,8 @@ from qcal.benchmarking.utils import (
     generate_n_qubit_paulis,
     generate_n_qubit_paulis_up_to_weight_k,
     generate_random_n_qubit_paulis,
+    local_pauli_options,
+    sample_distinct_n_qubit_paulis,
 )
 
 
@@ -90,6 +93,48 @@ class TestGenerateRandomNQubitPaulis:
         )
         assert all(p[1] in ('I', 'Z') for p in paulis)
         assert all(p[0] in ('I', 'X', 'Y', 'Z') for p in paulis)
+
+
+class TestSampleDistinctNQubitPaulis:
+
+    def test_index_decoding_matches_product_order(self):
+        options = local_pauli_options([0, 1, 2], measured_qubits={1})
+        paulis = generate_n_qubit_paulis([0, 1, 2], measured_qubits={1})
+        assert [
+            _index_to_pauli(i, options) for i in range(len(paulis))
+        ] == paulis
+
+    @pytest.mark.parametrize('n_paulis', [1, 5, 14])
+    def test_samples_are_distinct_and_non_identity(self, n_paulis):
+        paulis = sample_distinct_n_qubit_paulis([0, 1], n_paulis=n_paulis)
+        assert len(set(paulis)) == n_paulis
+        assert ('I', 'I') not in paulis
+
+    @pytest.mark.parametrize('n_paulis', [7, 100])
+    def test_returns_all_non_identity_once_n_reaches_available(
+        self, n_paulis
+    ):
+        paulis = sample_distinct_n_qubit_paulis(
+            [0, 1, 2], measured_qubits={1}, n_paulis=n_paulis
+        )
+        # 4 * 2 * 4 - 1 non-identity Paulis; capped at that many.
+        expected = generate_n_qubit_paulis([0, 1, 2], measured_qubits={1})
+        assert len(paulis) == min(n_paulis, 31)
+        assert set(paulis) <= set(expected[1:])
+
+    def test_measured_qubits_never_sampled_as_x_or_y(self):
+        paulis = sample_distinct_n_qubit_paulis(
+            [0, 1], measured_qubits={1}, n_paulis=7
+        )
+        assert all(p[1] in ('I', 'Z') for p in paulis)
+
+    def test_large_registers_are_not_enumerated(self):
+        # 4^40 Paulis: must sample by index rather than build the set.
+        paulis = sample_distinct_n_qubit_paulis(
+            list(range(40)), n_paulis=3
+        )
+        assert len(set(paulis)) == 3
+        assert all(len(p) == 40 for p in paulis)
 
 
 class TestPauliMeasurementGrouping:

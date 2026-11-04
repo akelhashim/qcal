@@ -39,7 +39,6 @@ import numpy as np
 import pytest
 from uncertainties import ufloat, unumpy
 
-import qcal.benchmarking.cb as cb_module
 import qcal.settings as settings
 from qcal.backend.emulator import Emulator
 from qcal.benchmarking.cb import (
@@ -503,34 +502,6 @@ class TestCBGenerateCircuits:
         assert cb._measured_qubits == frozenset({0})
         paulis = {p for ps in cb.circuits['group_paulis'] for p in ps}
         assert paulis == {'Z'}
-
-    def test_identity_is_dropped_and_duplicates_resampled(
-        self, config, monkeypatch
-    ):
-        original = cb_module.generate_random_n_qubit_paulis
-        batches = iter([
-            [('I', 'I'), ('I', 'I'), ('X', 'Z')],
-            [('X', 'Z'), ('I', 'I')],
-            [('Y', 'I'), ('Z', 'Z')],
-        ])
-
-        def sampler(qubits, measured_qubits=None, n_random_paulis=1):
-            # Decay sampling passes measured_qubits; twirl sampling
-            # does not.
-            if measured_qubits is not None:
-                return next(batches)
-            return original(qubits, n_random_paulis=n_random_paulis)
-
-        monkeypatch.setattr(
-            cb_module, 'generate_random_n_qubit_paulis', sampler
-        )
-        cb = CB(
-            Emulator, config, Cycle({CZ(0, 1)}), [2], n_decays=3,
-            n_randomizations=1,
-        )
-        cb.generate_circuits()
-        paulis = {p for ps in cb.circuits['group_paulis'] for p in ps}
-        assert paulis == {'XZ', 'YI', 'ZZ'}
 
     @pytest.mark.parametrize('n_decays', [1, 5, 14])
     def test_random_decays_are_distinct_and_non_identity(

@@ -2,7 +2,9 @@
 
 """
 import logging
+import math
 import random
+import sys
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from itertools import combinations, product
@@ -25,6 +27,30 @@ class PauliMeasurementGroup:
     paulis: list[PauliString]
 
 
+def local_pauli_options(
+    qubits:          Sequence[int],
+    measured_qubits: Iterable[int] | None = None,
+) -> list[list[str]]:
+    """Allowed local Paulis for each qubit.
+
+    Unmeasured qubits allow full {I, X, Y, Z}, while measured qubits are
+    restricted to {I, Z}.
+
+    Args:
+        qubits (Sequence[int]): sequence of qubit labels.
+        measured_qubits (Iterable[int] | None): iterable of measured qubit
+            labels. Defaults to None.
+
+    Returns:
+        list[list[str]]: allowed local Paulis for each qubit, in the order
+            of `qubits`. 'I' is always the first option.
+    """
+    measured = set(measured_qubits) if measured_qubits is not None else set()
+    return [
+        ['I', 'Z'] if q in measured else ['I', 'X', 'Y', 'Z'] for q in qubits
+    ]
+
+
 def generate_n_qubit_paulis(
     qubits:          Sequence[int],
     measured_qubits: Iterable[int] | None = None,
@@ -43,12 +69,7 @@ def generate_n_qubit_paulis(
     Returns:
         list[tuple[str, ...]]: list of groupings of n-qubit Paulis
     """
-    qubits = list(qubits)
-    measured = set(measured_qubits) if measured_qubits else set()
-    paulis_by_qubit = [
-        ['I', 'Z'] if q in measured else ['I', 'X', 'Y', 'Z'] for q in qubits
-    ]
-    paulis = list(product(*paulis_by_qubit))
+    paulis = list(product(*local_pauli_options(qubits, measured_qubits)))
     return paulis
 
 
@@ -122,16 +143,54 @@ def generate_random_n_qubit_paulis(
         list[tuple[str, ...]]: a list of randomly generated n-qubit Pauli
             strings.
     """
-    qubits = list(qubits)
-    measured = set(measured_qubits) if measured_qubits else set()
-    options = [
-        ['I', 'Z'] if q in measured else ['I', 'X', 'Y', 'Z'] for q in qubits
-    ]
-
+    options = local_pauli_options(qubits, measured_qubits)
     return [
         tuple(random.choice(opts) for opts in options)
         for _ in range(n_random_paulis)
     ]
+
+
+def sample_distinct_n_qubit_paulis(
+    qubits:          Sequence[int],
+    measured_qubits: Iterable[int] | None = None,
+    n_paulis:        int = 1,
+) -> list[PauliString]:
+    """Samples distinct, non-identity n-qubit Pauli strings.
+
+    Paulis are drawn uniformly without replacement. If `n_paulis` exceeds
+    the number of available non-identity Paulis, all of them are returned.
+
+    Each Pauli is identified by its index in the mixed-radix enumeration
+    of `local_pauli_options` (index 0 is the identity), so the full set of
+    up to 4^n Paulis is never built.
+
+    Args:
+        qubits (Sequence[int]): sequence of qubit labels.
+        measured_qubits (Iterable[int] | None): iterable of measured qubit
+            labels. Defaults to None.
+        n_paulis (int): number of distinct Pauli strings to sample.
+            Defaults to 1.
+
+    Returns:
+        list[PauliString]: the sampled Pauli strings, ordered by
+            `qubits`.
+    """
+    options = local_pauli_options(qubits, measured_qubits)
+    n_available = math.prod(len(opts) for opts in options) - 1
+    n_paulis = min(n_paulis, n_available)
+    if n_available <= sys.maxsize:
+        indices = random.sample(range(1, n_available + 1), n_paulis)
+    else:
+        # random.sample cannot take a range this long (~32+ qubits), but
+        # then a repeated draw is vanishingly rare, so redraw on repeats.
+        indices = []
+        seen = set()
+        while len(indices) < n_paulis:
+            index = random.randint(1, n_available)
+            if index not in seen:
+                seen.add(index)
+                indices.append(index)
+    return [_index_to_pauli(index, options) for index in indices]
 
 
 def generate_n_qubit_pauli_measurement_groups(
@@ -237,6 +296,26 @@ def _group_paulis_for_simultaneous_measurement(
             )
 
     return groups
+
+
+def _index_to_pauli(index: int, options: list[list[str]]) -> PauliString:
+    """Decode a mixed-radix index into a Pauli string.
+
+    Uses the same ordering as `itertools.product(*options)`, i.e. the last
+    qubit varies fastest.
+
+    Args:
+        index (int): index into the product of `options`.
+        options (list[list[str]]): allowed local Paulis for each qubit.
+
+    Returns:
+        PauliString: the Pauli string at `index`.
+    """
+    pauli = []
+    for opts in reversed(options):
+        index, digit = divmod(index, len(opts))
+        pauli.append(opts[digit])
+    return tuple(reversed(pauli))
 
 
 def _is_connected_subset(

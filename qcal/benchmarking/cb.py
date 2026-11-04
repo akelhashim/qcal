@@ -11,7 +11,6 @@ trueq is not installed when building docs.
 from __future__ import annotations
 
 import logging
-import math
 from collections.abc import Iterable, Sequence
 from functools import lru_cache
 from typing import Callable
@@ -30,8 +29,8 @@ from qcal.benchmarking.utils import (
     PauliString,
     _pad_pauli,
     generate_n_qubit_pauli_measurement_groups,
-    generate_n_qubit_paulis,
     generate_random_n_qubit_paulis,
+    sample_distinct_n_qubit_paulis,
 )
 from qcal.circuit import Barrier, Circuit, CircuitSet, Cycle
 from qcal.compilation.decompositions import decompose_cycle, pauli_to_cycle
@@ -649,31 +648,18 @@ def CB(
 
             # Generate the (non-identity) Pauli decays, grouped by
             # simultaneous measurements. Measured qubits only allow I/Z.
-            identity = ('I',) * len(self._qubits)
-            n_available = math.prod(
-                2 if q in self._measured_qubits else 4 for q in self._qubits
-            ) - 1
             if self._targeted_decays is not None:
                 sampled_paulis = {
                     tuple(pauli) for pauli in self._targeted_decays
                 }
-            elif self._n_decays >= n_available:
-                sampled_paulis = set(generate_n_qubit_paulis(
-                    self._qubits, measured_qubits=self._measured_qubits
-                ))
+                sampled_paulis.discard(('I',) * len(self._qubits))
             else:
-                # Sample until there are n_decays distinct decays
-                sampled_paulis = set()
-                while len(sampled_paulis - {identity}) < self._n_decays:
-                    sampled_paulis.update(generate_random_n_qubit_paulis(
-                        self._qubits,
-                        measured_qubits=self._measured_qubits,
-                        n_random_paulis=(
-                            self._n_decays
-                            - len(sampled_paulis - {identity})
-                        ),
-                    ))
-            sampled_paulis.discard(identity)
+                # All available decays if n_decays exceeds their number
+                sampled_paulis = set(sample_distinct_n_qubit_paulis(
+                    self._qubits,
+                    measured_qubits=self._measured_qubits,
+                    n_paulis=self._n_decays,
+                ))
             self._pauli_groups = generate_n_qubit_pauli_measurement_groups(
                 sampled_paulis
             )
