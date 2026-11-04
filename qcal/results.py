@@ -246,10 +246,13 @@ class Results:
             idx = tuple(range(n))
         elif isinstance(idx, int):
             idx = (idx,)
-        if len(set(idx)) != len(idx) or not all(0 <= i < n for i in idx):
-            raise ValueError(
-                f'Indices {idx} must be distinct and in [0, {n})!'
-            )
+        if not all(-n <= i < n for i in idx):
+            raise ValueError(f'Indices {idx} must be in [-{n}, {n})!')
+        # Normalize negative indices so that e.g. 0 and -n are duplicates
+        norm_idx = tuple(i % n for i in idx)
+        if len(set(norm_idx)) != len(norm_idx):
+            raise ValueError(f'Indices {idx} must refer to distinct bits!')
+        idx = norm_idx
 
         total = 0
         signed = 0
