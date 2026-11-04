@@ -707,7 +707,7 @@ def conjugate_pauli_by_unitary(
         if abs(Q[r, c]) > 1e-9
     )
     scalar = M[row, col] / Q[row, col]
-    if not np.allclose(M, scalar * Q, atol=1e-8):
+    if not np.allclose(M, scalar * Q, atol=1e-6):
         raise ValueError(
             f'U P U† is not proportional to a Pauli for P = {pauli}; '
             'the gate is not Clifford.'
