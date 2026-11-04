@@ -12,7 +12,7 @@ from sympy import Matrix
 
 class Gate:
 
-    __slots__ = ['_matrix', '_properties', '_unitary']
+    __slots__ = ['_matrix', '_matrix_key_cache', '_properties', '_unitary']
 
     def __init__(self,
         matrix: NDArray,
@@ -25,6 +25,7 @@ class Gate:
             qubits (int | tuple): qubit label(s).
         """
         self._matrix = matrix
+        self._matrix_key_cache = None
         self._unitary = matrix
         self._properties = {
             'alias':  None,
@@ -308,11 +309,19 @@ class Gate:
         Adding 0 maps -0.0 to 0.0, so matrices which compare equal
         elementwise always produce the same key.
 
+        The key is computed once and cached, since it is used by
+        ``__hash__`` and ``__eq__`` on hot cached paths (e.g. Pauli
+        conjugation). Gate matrices must therefore not be mutated in
+        place after the gate is hashed or compared.
+
         Returns:
             tuple: matrix shape and the bytes of its complex entries.
         """
-        matrix = np.asarray(self._matrix, dtype=complex) + 0
-        return (matrix.shape, matrix.tobytes())
+        # getattr: gates unpickled from older versions lack this slot.
+        if getattr(self, '_matrix_key_cache', None) is None:
+            matrix = np.asarray(self._matrix, dtype=complex) + 0
+            self._matrix_key_cache = (matrix.shape, matrix.tobytes())
+        return self._matrix_key_cache
 
 
 def _values_equal(a: Any, b: Any) -> bool:

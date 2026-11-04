@@ -13,6 +13,7 @@ from __future__ import annotations
 import logging
 import math
 from collections.abc import Iterable, Sequence
+from functools import lru_cache
 from typing import Callable
 
 import matplotlib.pyplot as plt
@@ -2384,12 +2385,7 @@ def _propagate_sign(
     Returns:
         int: +1 or -1.
     """
-    orbit = [decay_pauli]
-    while True:
-        next_pauli, _ = conjugate_pauli(orbit[-1], cycle_or_circuit)
-        if next_pauli == decay_pauli:
-            break
-        orbit.append(next_pauli)
+    orbit = _pauli_orbit(tuple(decay_pauli), cycle_or_circuit)
     period = len(orbit)
 
     sign = 1
@@ -2403,3 +2399,31 @@ def _propagate_sign(
         if n_anticommuting % 2 == 1:
             sign *= -1
     return sign
+
+
+@lru_cache(maxsize=None)
+def _pauli_orbit(
+    decay_pauli:      PauliString,
+    cycle_or_circuit: Cycle | Circuit,
+) -> tuple[PauliString, ...]:
+    """Orbit of a Pauli string under conjugation by a Clifford.
+
+    Cached, since the orbit depends only on the Pauli and the cycle, but
+    is needed for every depth, randomization, and subsystem.
+
+    Args:
+        decay_pauli (PauliString): the starting Pauli string, ordered by
+            `cycle_or_circuit.qubits`.
+        cycle_or_circuit (Cycle | Circuit): the Clifford cycle or circuit.
+
+    Returns:
+        tuple[PauliString, ...]: S, G(S), G²(S), ... up to (excluding) the
+            return to S, where G(S) = GSG†.
+    """
+    orbit = [decay_pauli]
+    while True:
+        next_pauli, _ = conjugate_pauli(orbit[-1], cycle_or_circuit)
+        if next_pauli == decay_pauli:
+            break
+        orbit.append(next_pauli)
+    return tuple(orbit)
