@@ -199,19 +199,69 @@ class Results:
 
     @property
     def ev(self) -> float:
-        """Expectation value of the measured observable.
+        """Expectation value of Z on every measured bit.
+
+        This is the parity <Z...Z> over all bits of the bitstrings. Use
+        ``expectation_value`` for a Z-type Pauli on a subset of the bits.
 
         Returns:
             float: expectation value.
         """
-        counts_p = 0
-        counts_m = 0
-        for state in self.states:
-            if state.count('1') % 2 == 1:
-                counts_m += self._results[state]
-            else:
-                counts_p += self._results[state]
-        return (counts_p - counts_m) / self.n_shots
+        return self.expectation_value()
+
+    def expectation_value(self, idx: int | Tuple[int] | None = None) -> float:
+        """Expectation value of a Z-type Pauli on the given bitstring indices.
+
+        For a Pauli with support s, each bitstring b contributes with sign
+        (-1)^(s . b), where s . b is the Z_2 inner product. Indices follow the
+        same convention as ``marginalize``, so ``expectation_value((0, 2))``
+        is equivalent to ``marginalize((0, 2)).ev``.
+
+        Args:
+            idx (int | Tuple[int] | None, optional): bitstring indices on
+                which the Pauli acts as Z. Defaults to None, in which case it
+                acts on every bit.
+
+        Returns:
+            float: expectation value.
+
+        Raises:
+            ValueError: if the results are empty, the bitstrings are not
+                binary (e.g. contain leaked states), or the indices are
+                repeated or out of range.
+        """
+        if not self._results:
+            raise ValueError(
+                'Cannot compute an expectation value of empty results!'
+            )
+        if any(set(s) - {'0', '1'} for s in self._results):
+            raise ValueError(
+                'Expectation values are only defined for binary bitstrings!'
+                ' Post-select or marginalize out non-binary (e.g. leaked)'
+                ' outcomes first.'
+            )
+
+        n = len(next(iter(self._results)))
+        if idx is None:
+            idx = tuple(range(n))
+        elif isinstance(idx, int):
+            idx = (idx,)
+        if len(set(idx)) != len(idx) or not all(0 <= i < n for i in idx):
+            raise ValueError(
+                f'Indices {idx} must be distinct and in [0, {n})!'
+            )
+
+        total = 0
+        signed = 0
+        for state, count in self._results.items():
+            parity = sum(state[i] == '1' for i in idx) % 2
+            signed += -count if parity else count
+            total += count
+        if total == 0:
+            raise ValueError(
+                'Cannot compute an expectation value with zero total counts!'
+            )
+        return signed / total
 
     @property
     def n_shots(self) -> int:

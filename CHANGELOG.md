@@ -67,6 +67,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `global_min` argument of `Optimize` to choose the optimal parameters of
   all qubit labels jointly, from the iteration with the smallest combined
   loss, along with the `opt_loss_global` property
+- `Results.expectation_value(idx)` for the expectation value of a Z-type
+  Pauli on a subset of the bitstring indices (same convention as
+  `marginalize`)
 
 ### Changed
 
@@ -85,6 +88,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   unsupported `n_levels`
 - `Optimize.run()` only saves the config when
   `settings.Settings.save_data` is enabled
+- `Results.ev` raises a `ValueError` for empty results or non-binary (e.g.
+  leaked) bitstrings, instead of a `ZeroDivisionError` or counting leaked
+  outcomes as +1
 - The `Emulator` stores each circuit's final simulated state object in a
   `'state'` column, instead of a pretty-printed string in a `'states'`
   column; call `.pretty_print()` on an entry for a readable string

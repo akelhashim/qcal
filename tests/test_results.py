@@ -89,6 +89,21 @@ class TestProperties:
         results = Results({'00': 30, '11': 30, '01': 20, '10': 20})
         assert results.ev == pytest.approx(0.2)
 
+    def test_ev_raises_for_empty_results(self):
+        with pytest.raises(ValueError, match='empty'):
+            Results().ev
+
+    def test_ev_raises_for_leaked_states(self):
+        # '02' has even 1-parity but must not be counted as +1.
+        results = Results({'00': 50, '02': 50})
+        with pytest.raises(ValueError, match='binary'):
+            results.ev
+
+    def test_ev_raises_for_zero_total_counts(self):
+        results = Results({'0': 5, '1': -5})
+        with pytest.raises(ValueError, match='zero total'):
+            results.ev
+
     def test_entropy_of_certain_outcome_is_zero(self):
         results = Results({'0': 100})
         assert results.entropy.nominal_value == pytest.approx(0.)
@@ -96,6 +111,46 @@ class TestProperties:
     def test_entropy_of_uniform_distribution_is_one_bit(self):
         results = Results({'0': 50, '1': 50})
         assert results.entropy.nominal_value == pytest.approx(1.0)
+
+
+class TestExpectationValue:
+
+    def test_default_matches_ev(self):
+        results = Results({'00': 30, '11': 30, '01': 20, '10': 20})
+        assert results.expectation_value() == pytest.approx(results.ev)
+
+    def test_bell_state_correlations(self):
+        results = Results({'00': 50, '11': 50})
+        assert results.expectation_value() == pytest.approx(1.0)
+        assert results.expectation_value(0) == pytest.approx(0.0)
+        assert results.expectation_value(1) == pytest.approx(0.0)
+
+    def test_single_index(self):
+        results = Results({'01': 70, '11': 30})
+        assert results.expectation_value(0) == pytest.approx(0.4)
+        assert results.expectation_value(1) == pytest.approx(-1.0)
+
+    def test_matches_marginalize(self):
+        rng = np.random.default_rng(0)
+        states = [''.join(b) for b in itertools.product('01', repeat=3)]
+        results = Results(
+            dict(zip(states, rng.integers(1, 100, len(states)).tolist()))
+        )
+        for idx in [0, 1, 2, (0, 1), (0, 2), (1, 2), (0, 1, 2), (2, 0)]:
+            assert results.expectation_value(idx) == pytest.approx(
+                results.marginalize(idx).ev
+            )
+
+    def test_quasi_probabilities(self):
+        # Negative (quasi-probabilistic) counts are weighted linearly.
+        results = Results({'0': 110, '1': -10})
+        assert results.expectation_value() == pytest.approx(1.2)
+
+    @pytest.mark.parametrize('idx', [(0, 0), (2,), -1])
+    def test_invalid_indices_raise(self, idx):
+        results = Results({'00': 50, '11': 50})
+        with pytest.raises(ValueError, match='distinct'):
+            results.expectation_value(idx)
 
 
 class TestGetItem:
