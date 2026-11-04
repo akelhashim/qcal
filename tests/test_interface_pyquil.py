@@ -135,6 +135,16 @@ class TestTranspilerFunctionsReturnNone:
         assert transpile_cycle(None, None, None) is None
 
 
+class TestDefaultGateMapper:
+
+    @pytest.mark.parametrize('name, fn', [
+        ('SX', add_X90), ('SXdag', add_SXdag),
+        ('SY', add_Y90), ('SYdag', add_SYdag),
+    ])
+    def test_sqrt_paulis_route_to_pulse_gates(self, name, fn):
+        assert DEFAULT_GATEMAPPER[name] is fn
+
+
 class TestPyQuilTranspilerConstruction:
 
     def test_does_not_crash(self):

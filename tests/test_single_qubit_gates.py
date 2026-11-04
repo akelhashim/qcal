@@ -291,17 +291,17 @@ class TestMeasurementAndNonUnitaryGates:
 
 class TestBasisRotation:
 
-    def test_x_basis_returns_ry_minus_half_pi(self):
+    def test_x_basis_returns_sydag(self):
         gate = basis_rotation(Meas(3, basis='X'))
-        assert isinstance(gate, Ry)
+        assert isinstance(gate, SYdag)
         assert gate.qubits == (3,)
         assert gate.properties['params']['angle'] == pytest.approx(
             -np.pi / 2
         )
 
-    def test_y_basis_returns_rx_half_pi(self):
+    def test_y_basis_returns_sx(self):
         gate = basis_rotation(Meas(3, basis='Y'))
-        assert isinstance(gate, Rx)
+        assert isinstance(gate, SX)
         assert gate.properties['params']['angle'] == pytest.approx(
             np.pi / 2
         )
@@ -312,7 +312,7 @@ class TestBasisRotation:
 
     def test_lowercase_basis_is_accepted(self):
         gate = basis_rotation(Meas(3, basis='x'))
-        assert isinstance(gate, Ry)
+        assert isinstance(gate, SYdag)
 
     def test_unsupported_basis_raises(self):
         with pytest.raises(KeyError):
@@ -471,6 +471,25 @@ class TestPrepRotation:
         assert gate.qubits == (2,)
         np.testing.assert_allclose(operator @ state, state, atol=1e-12)
 
+    @pytest.mark.parametrize('pauli, operator', [
+        ('-X', x), ('-Y', y), ('-Z', z),
+    ])
+    def test_prepares_minus_one_eigenstate(self, pauli, operator):
+        gate = prep_rotation(2, pauli)
+        state = gate.matrix @ np.array([1, 0])
+
+        assert gate.qubits == (2,)
+        np.testing.assert_allclose(operator @ state, -state, atol=1e-12)
+
+    @pytest.mark.parametrize('pauli', ['+X', '+Y', '+Z', '-x', '-y', '-z'])
+    def test_signed_paulis_accepted(self, pauli):
+        sign = -1 if pauli[0] == '-' else 1
+        operator = {'X': x, 'Y': y, 'Z': z}[pauli[1].upper()]
+        state = prep_rotation(0, pauli).matrix @ np.array([1, 0])
+        np.testing.assert_allclose(
+            operator @ state, sign * state, atol=1e-12
+        )
+
     @pytest.mark.parametrize('pauli, expected', [
         ('X', np.array([1, 1]) / np.sqrt(2)),
         ('Y', np.array([1, 1j]) / np.sqrt(2)),
@@ -481,7 +500,8 @@ class TestPrepRotation:
         assert np.isclose(abs(np.vdot(expected, state)), 1)
 
     @pytest.mark.parametrize('pauli, gate_cls, angle', [
-        ('X', Ry, np.pi / 2), ('Y', Rx, -np.pi / 2),
+        ('X', SY, np.pi / 2), ('Y', SXdag, -np.pi / 2),
+        ('-X', SYdag, -np.pi / 2), ('-Y', SX, np.pi / 2),
     ])
     def test_rotation_gate_and_angle(self, pauli, gate_cls, angle):
         gate = prep_rotation(0, pauli)
@@ -494,7 +514,7 @@ class TestPrepRotation:
         assert isinstance(prep_rotation(0, pauli), Id)
 
     def test_lowercase_is_accepted(self):
-        assert isinstance(prep_rotation(0, 'x'), Ry)
+        assert isinstance(prep_rotation(0, 'x'), SY)
 
     def test_invalid_pauli_raises(self):
         with pytest.raises(ValueError, match='Invalid Pauli'):

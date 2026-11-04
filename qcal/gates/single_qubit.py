@@ -116,36 +116,46 @@ def basis_rotation(meas):
     """
     basis_map = {
         'I': Id(meas.qubits[0]),
-        'X': Ry(meas.qubits[0], -np.pi/2),
-        'Y': Rx(meas.qubits[0], np.pi/2),
+        'X': SYdag(meas.qubits[0]),
+        'Y': SX(meas.qubits[0]),
         'Z': Id(meas.qubits[0])
     }
     return basis_map[meas.properties['params']['basis'].upper()]
 
 
 def prep_rotation(qubit: int, pauli: str) -> Gate:
-    """Returns the gate which rotates the qubit to the +1 eigenstate of the
+    """Returns the gate which rotates the qubit to an eigenstate of the
     given Pauli operator.
+
+    An unsigned (or '+') Pauli prepares the +1 eigenstate, and a '-' prefix
+    prepares the -1 eigenstate.
 
     Args:
         qubit (int): qubit label.
-        pauli (str): Pauli operator ('I', 'X', 'Y', or 'Z').
+        pauli (str): Pauli operator ('I', 'X', 'Y', 'Z', '+X', '+Y', '+Z',
+            '-X', '-Y', or '-Z').
 
     Returns:
         Gate: gate object.
     """
-    if pauli.upper() not in ('I', 'X', 'Y', 'Z'):
+    prep_map = {
+        'I':  lambda: Id(qubit),
+        'X':  lambda: SY(qubit),
+        'Y':  lambda: SXdag(qubit),
+        'Z':  lambda: Id(qubit),
+        '+X': lambda: SY(qubit),
+        '+Y': lambda: SXdag(qubit),
+        '+Z': lambda: Id(qubit),
+        '-X': lambda: SYdag(qubit),
+        '-Y': lambda: SX(qubit),
+        '-Z': lambda: X(qubit),
+    }
+    if pauli.upper() not in prep_map:
         raise ValueError(
             f"Invalid Pauli operator: {pauli}. "
-            "Must be one of 'I', 'X', 'Y', or 'Z'."
+            f"Must be one of {', '.join(repr(p) for p in prep_map)}."
         )
-    prep_map = {
-        'I': Id(qubit),
-        'X': Ry(qubit, np.pi/2),
-        'Y': Rx(qubit, -np.pi/2),
-        'Z': Id(qubit)
-    }
-    return prep_map[pauli.upper()]
+    return prep_map[pauli.upper()]()
 
 
 def rn(theta: float, n: Union[List, Tuple, NDArray]) -> NDArray:

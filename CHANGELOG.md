@@ -22,6 +22,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `Circuit.prepare()` method to prepend a cycle which prepares a Pauli
   eigenstate
+- `prep_rotation` accepts signed Paulis ('+X', '-X', '-Y', '-Z', etc.)
+  to prepare -1 eigenstates
+- The PyQuil transpiler's default gate mapper supports `SX` and `SY`
+  (transpiled the same as `X90` and `Y90`)
 - `unitary` property for `Circuit` and `Cycle` classes
 - Native Cycle Benchmarking (CB) implementation
 - Randomized compiling (RC) support for the PyQuil transpiler, via
