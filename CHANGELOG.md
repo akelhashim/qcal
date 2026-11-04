@@ -125,6 +125,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `cbar_label`
 - `draw_circuit` showing the same hover text for different merged gates on
   the same qubits
+- `Gate` equality raising `ValueError` for gates with array-valued params
+  (e.g. `H(0) == H(0)`)
 - PyQuil transpiler raising for phase gates outside the final layer with
   randomized readout and `cycles_to_defcircuits`
 

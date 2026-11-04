@@ -2,6 +2,8 @@
 """
 from __future__ import annotations
 
+from typing import Any
+
 import numpy as np
 import pandas as pd
 from numpy.typing import NDArray
@@ -86,8 +88,10 @@ class Gate:
             self.name == other.name
             and self.qubits == other.qubits
             and self.subspace == other.subspace
-            and self._properties.get('params', {})
-            == other._properties.get('params', {})
+            and _values_equal(
+                self._properties.get('params', {}),
+                other._properties.get('params', {}),
+            )
             and self._matrix_key() == other._matrix_key()
         )
 
@@ -309,3 +313,29 @@ class Gate:
         """
         matrix = np.asarray(self._matrix, dtype=complex) + 0
         return (matrix.shape, matrix.tobytes())
+
+
+def _values_equal(a: Any, b: Any) -> bool:
+    """Compare gate parameter values, including numpy arrays.
+
+    Params may hold arrays (e.g. the rotation axis of ``H`` or ``Rn``),
+    for which ``==`` is elementwise and has no single truth value.
+
+    Args:
+        a (Any): first value.
+        b (Any): second value.
+
+    Returns:
+        bool: True if the values are equal, False otherwise.
+    """
+    if isinstance(a, np.ndarray) or isinstance(b, np.ndarray):
+        return np.array_equal(a, b)
+    if isinstance(a, dict) and isinstance(b, dict):
+        return a.keys() == b.keys() and all(
+            _values_equal(a[k], b[k]) for k in a
+        )
+    if isinstance(a, (list, tuple)) and isinstance(b, (list, tuple)):
+        return type(a) is type(b) and len(a) == len(b) and all(
+            _values_equal(x, y) for x, y in zip(a, b, strict=True)
+        )
+    return bool(a == b)

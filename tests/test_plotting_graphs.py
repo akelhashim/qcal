@@ -7,7 +7,7 @@ import pytest
 from qcal.circuit import Barrier, Circuit, Cycle
 from qcal.compilation.merge import merge_gates
 from qcal.config import Config
-from qcal.gates.single_qubit import MCM, X90, Meas, Reset, X, Y
+from qcal.gates.single_qubit import MCM, X90, H, Meas, Reset, X, Y
 from qcal.gates.two_qubit import CZ
 from qcal.plotting.graphs import (
     MAX_LABELED_NODES,
@@ -300,6 +300,15 @@ class TestDrawCircuitHoverText:
             circuit.cycles[1].gates[0], include_matrix=True
         )
         assert node_text[0] != node_text[1]
+
+    def test_repeated_gates_with_array_params(self):
+        # H stores its axis as an np.ndarray; repeated H gates on a qubit
+        # hit the hover-text cache and must compare without raising.
+        circuit = Circuit([Cycle({H(0)}), Cycle({H(0)})])
+        fig = draw_circuit(circuit, show=False)
+
+        node_text = fig.data[-1].text
+        assert node_text[0] == node_text[1]
 
 
 class TestDrawQpuHeatmap:
