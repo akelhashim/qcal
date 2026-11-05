@@ -849,22 +849,26 @@ def readout_correction(results: Results, confusion_matrix: DataFrame) -> Dict:
             [np.linalg.inv(cmat) for cmat in cmats]
         ).astype(float)
 
-        # Generate all possible dit strings. The levels come from the
+        # Generate all possible dit strings, in the same order as the
+        # Kronecker product. The levels of each qudit come from its own
         # confusion matrix, not the results, which may not contain every
         # level (e.g. if only 0s were measured).
         dtstrs = [
             ''.join(i) for i in itertools.product(
-                [str(j) for j in range(cmats[0].shape[0])],
-                repeat=len(results.states[0])
+                *[[str(j) for j in range(cmat.shape[0])] for cmat in cmats]
             )
         ]
 
         # Probability distribution over all possible dit strings
-        probs = {
-            **dict.fromkeys(dtstrs, 0.0),
-            **dict(results.probabilities.astype(float))
-        }
-        probs = np.array(list(probs.values()))#.reshape(-1, 1)
+        measured = dict(results.probabilities.astype(float))
+        if not measured.keys() <= set(dtstrs):
+            logger.warning(
+                ' Some measured states contain levels outside of the'
+                ' confusion matrices. No readout correction will be'
+                ' performed!'
+            )
+            return results.dict
+        probs = np.array([measured.get(s, 0.0) for s in dtstrs])
 
         # Perform the readout correction
         corr_probs = np.rint(probs @ cmat_inv * results.n_shots).astype(int)

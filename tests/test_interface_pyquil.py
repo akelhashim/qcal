@@ -27,6 +27,7 @@ import types
 import numpy as np
 import pytest
 
+import qcal.interface.pyquil.transpiler as transpiler_module
 from qcal.circuit import Circuit, Cycle
 from qcal.gates.single_qubit import (
     MCM,
@@ -324,7 +325,9 @@ def fake_pyquil(monkeypatch):
 def _gate_mapper():
     """Gate mapper whose handlers return recognizable fake insts."""
     return {
+        'X': lambda q, **kw: _Inst('X', q),
         'X90': lambda q, **kw: _Inst('X90', q),
+        'Y90': lambda q, **kw: _Inst('Y90', q),
         'Rz': lambda q, **kw: _Inst('RZ', kw['phase'], q),
         'CZ': lambda q0, q1, **kw: _Inst('CZ', q0, q1),
         'Meas': lambda q, ref: _Inst('MEASURE', q, ref),
@@ -349,9 +352,19 @@ class TestSingleQubitGateUnitaries:
     """
 
     @pytest.fixture
-    def fake_rx(self, fake_pyquil):
+    def fake_rx(self, fake_pyquil, monkeypatch):
         sys.modules['pyquil.gates'].RX = (
             lambda angle, qubit: _Inst('RX', angle, qubit)
+        )
+        # The EF rotations act on the {e, f} subspace exactly as RX/RZ
+        # act on {g, e}, so record them under the same names.
+        monkeypatch.setattr(
+            transpiler_module, 'RX_F12',
+            lambda angle, qubit: _Inst('RX', angle, qubit),
+        )
+        monkeypatch.setattr(
+            transpiler_module, 'RZ_F12',
+            lambda angle, qubit: _Inst('RZ', angle, qubit),
         )
 
     @staticmethod
@@ -372,8 +385,9 @@ class TestSingleQubitGateUnitaries:
         (add_Y, Y),
         (add_Y90, Y90),
     ])
-    def test_matches_gate_matrix(self, fake_rx, fn, gate_cls):
-        unitary = self._unitary(fn(0, subspace='GE'))
+    @pytest.mark.parametrize('subspace', ['GE', 'EF'])
+    def test_matches_gate_matrix(self, fake_rx, fn, gate_cls, subspace):
+        unitary = self._unitary(fn(0, subspace=subspace))
         target = gate_cls(0).matrix
         overlap = np.trace(target.conj().T @ unitary) / 2
         assert np.isclose(abs(overlap), 1)
@@ -555,3 +569,41 @@ class TestTranspileCircuitRandomizedReadout:
         )
         # Only the final layer's Rz is randomized.
         assert program.readout_source_phases[0] == [0.25, 0.0, 0.0]
+
+    def test_non_zxzxz_gate_in_final_layer_raises(self, fake_pyquil):
+        circuit = Circuit([
+            Cycle({CZ(0, 1)}),
+            Cycle({Y90(0)}),
+            Cycle({Meas(0), Meas(1)}),
+        ])
+        with pytest.raises(ValueError, match="'Y90'.*ZXZXZ"):
+            transpile_circuit(
+                circuit, _gate_mapper(), randomized_readout=True
+            )
+
+    def test_non_zxzxz_gate_outside_final_layer_is_allowed(
+        self, fake_pyquil
+    ):
+        circuit = Circuit([
+            Cycle({Y90(0)}),
+            Cycle({CZ(0, 1)}),
+            Cycle({Rz(0, np.pi / 2)}),
+            Cycle({Meas(0), Meas(1)}),
+        ])
+        _, program = transpile_circuit(
+            circuit, _gate_mapper(), randomized_readout=True
+        )
+        assert _Inst('Y90', 0) in program
+
+    def test_dd_pulse_in_layer_boundary_is_allowed(self, fake_pyquil):
+        # Idle qubits of an RC layer boundary are twirled as identity, so
+        # a DD pulse there is not part of a ZXZXZ template.
+        circuit = Circuit([
+            Cycle({CZ(0, 1), X(2)}),
+            Cycle({Rz(0, np.pi / 2)}),
+            Cycle({Meas(0), Meas(1), Meas(2)}),
+        ])
+        _, program = transpile_circuit(
+            circuit, _gate_mapper(), randomized_readout=True
+        )
+        assert _Inst('X', 2) in program

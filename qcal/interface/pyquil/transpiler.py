@@ -739,13 +739,13 @@ def transpile_circuit(
             tprogram += FENCE(*cycle.qubits)
 
         else:
+            tracked = rc_tracker is not None or i in readout_final_layer
+            if tracked:
+                _check_trackable_cycle(cycle, i)
             # A tracked Cycle's phase gates are rewritten into references
             # specific to its layer, so it can't be a reusable DEFCIRCUIT
             # (see `has_phase_gate`).
-            literal_only = (
-                (rc_tracker is not None or i in readout_final_layer)
-                and has_phase_gate(cycle)
-            )
+            literal_only = tracked and has_phase_gate(cycle)
             # Determine defcircuit name: caller-supplied takes priority,
             # otherwise auto-generate if cycles_to_defcircuits is set.
             if cycle_replacement and cycle in cycle_replacement:
@@ -1099,3 +1099,38 @@ class PyQuilTranspiler(Transpiler):
         tprograms = CircuitSet(circuits=tprograms)
         return tprograms
 
+
+
+def _check_trackable_cycle(cycle: Cycle, index: int) -> None:
+    """Check that a tracked Cycle's single-qubit content is ZXZXZ.
+
+    The RC and readout trackers randomize single-qubit unitaries by
+    rewriting the Rz/VirtualZ angles of their ZXZXZ templates. Gates such
+    as `SY` or `H` emit their own literal frame changes and pulses, which
+    the trackers cannot see, so the randomized unitary would be wrong.
+    RC layer boundaries (two-qubit gates or measurements) are exempt: their
+    idle qubits are twirled as identity (e.g. a dynamical-decoupling
+    sequence).
+
+    Args:
+        cycle (Cycle): qcal Cycle that will be tracked.
+        index (int): position of `cycle` in its circuit, for the error.
+
+    Raises:
+        ValueError: if `cycle` is not an RC layer boundary and contains a
+            gate other than Rz/VirtualZ, X90/SX, or an identity.
+    """
+    if any(
+        len(gate.qubits) == 2 or gate.is_measurement
+        for gate in cycle.gates
+    ):
+        return
+    allowed = (*PHASE_GATES, *PULSE_GATES, 'I', 'Idle')
+    for gate in cycle.gates:
+        if gate.name not in allowed:
+            raise ValueError(
+                f"Cycle {index} contains '{gate.name}' on {gate.qubits}. "
+                'Randomized compiling and randomized readout require '
+                'single-qubit gates to be compiled to ZXZXZ form (Rz/'
+                'VirtualZ and X90/SX pulses).'
+            )

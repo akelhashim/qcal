@@ -400,6 +400,12 @@ class TestMultiQubitReadoutCorrection:
         cmat = _multi_qubit_cmat({0: C0, 1: C1})
         assert readout_correction(results, cmat) is results.dict
 
+    def test_level_outside_cmat_returns_input_unchanged(self):
+        # A leaked '2' outcome cannot be corrected by 2x2 matrices.
+        results = Results({'00': 10, '21': 10})
+        cmat = _multi_qubit_cmat({0: C0, 1: C1})
+        assert readout_correction(results, cmat) is results.dict
+
 
 class TestApplyReadoutCorrection:
 

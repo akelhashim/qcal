@@ -32,7 +32,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `unitary` property for `Circuit` and `Cycle` classes
 - Native Cycle Benchmarking (CB) implementation
 - Randomized compiling (RC) support for the PyQuil transpiler, via
-  `pyquil._qpu.randomized_compiling`
+  `pyquil._qpu.randomized_compiling`. Single-qubit gates in randomized
+  layers must be compiled to ZXZXZ form (`Rz`/`VirtualZ` and `X90`/`SX`);
+  other gates there (e.g. `SY`, `H`, `Y90`) raise a `ValueError`
 - Randomized readout: twirl the final pre-measurement single-qubit
   gates, usable independently or alongside randomized compiling
 - `cycle_replacement` and `cycles_to_defcircuits` can be combined with
@@ -127,15 +129,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- PyQuil transpiler: `Y90` and `SY` were transpiled as Y-90, and `SYdag`
-  as Y90. The RZ signs in `add_Y90` are now correct, which also fixes
-  `SYdag` and `H`
+- PyQuil transpiler: `Y90` was transpiled as Y-90, and `SYdag` as Y90.
+  The RZ signs in `add_Y90` are now correct, which also fixes `SYdag`
 - QubiC transpiler: `Y90` was transpiled as Y-90 (its virtual Z phases
   had the opposite sign from how `Rz` is transpiled)
 - `JAZZ` (ZZ phase estimation) now reports the physical sign of the ZZ
   rate (`ZZ = E11 - E10 - E01 + E00`). With a correct `Y90`, it
-  previously reported the opposite sign; ZZ values measured on PyQuil
-  backends before the `Y90` fix had the correct sign by accident
+  previously reported the opposite sign; ZZ values measured before the
+  `Y90` fix (on PyQuil or QubiC backends) had the correct sign by
+  accident
 - CZ `AmpFreqSweep` computed the conditionality from the `C0_X` circuits
   in place of the `C1_Y` circuits
 - CB analysis no longer fails on 3-level (leakage) readout: Pauli
@@ -160,6 +162,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `Results.plot` failing with plotly 6
 - `readout_correction` truncating instead of rounding corrected counts,
   and skipping results that do not contain every level
+- `readout_correction` raising a shape error when the results contain a
+  level outside of the confusion matrices (e.g. a leaked '2' with 2x2
+  matrices); it now logs a warning and returns the results uncorrected
 - `RandomizedReadout.results` raising before the experiment is run
 - `format_gate_text` ignoring `include_matrix`, so large circuit plots
   still included gate matrices in their hover text
