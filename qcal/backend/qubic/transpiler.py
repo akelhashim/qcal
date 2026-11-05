@@ -585,12 +585,15 @@ def add_single_qubit_gate(
     subspace = gate.subspace
     sq_pulse = []
 
+    # Y90 = Rz(pi/2) X90 Rz(-pi/2) as matrices, i.e. Rz(-pi/2), X90, Rz(pi/2)
+    # in time order, with virtual_z(phase) acting as Rz(phase) (see
+    # add_virtualz_gate).
     if gate.name == 'Y90':
         name = 'X90'
         sq_pulse.append(
                 {'name':  'virtual_z',
                  'freq':  config[f'single_qubit/{qubit}/{subspace}/freq'],
-                 'phase': np.pi/2
+                 'phase': -np.pi/2
                 }
             )
     elif gate.name == 'Y':
@@ -638,7 +641,7 @@ def add_single_qubit_gate(
         sq_pulse.append(
                 {'name':  'virtual_z',
                  'freq':  config[f'single_qubit/{qubit}/{subspace}/freq'],
-                 'phase': -np.pi/2
+                 'phase': np.pi/2
                 }
             )
     elif gate.name == 'Y':

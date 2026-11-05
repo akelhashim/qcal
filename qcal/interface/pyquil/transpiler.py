@@ -93,6 +93,31 @@ def add_CZ(q0: int, q1: int, **kwargs) -> Iterator:
     yield CZ(q0, q1)
 
 
+def add_H(qubit: int, **kwargs) -> Iterator:
+    """Add a Hadamard gate (Z followed by Y90).
+
+    Args:
+        qubit (int): qubit label.
+
+    Yields:
+        Iterator: RZ and RX gates.
+    """
+    try:
+        from pyquil.gates import RZ
+    except ImportError:
+        logger.warning(' Unable to import pyquil!')
+        return
+
+    if kwargs['subspace'] == 'GE':
+        yield RZ(np.pi, qubit)
+        yield from add_Y90(qubit, **kwargs)
+    elif kwargs['subspace'] == 'EF':
+        yield RZ_F12(np.pi, qubit)
+        yield from add_Y90(qubit, **kwargs)
+    else:
+        raise ValueError(f'Invalid subspace: {kwargs["subspace"]}')
+
+
 def add_Idle(qubit: int, duration: float, **kwargs) -> Iterator:
     """Add an idle gate.
 
@@ -302,13 +327,13 @@ def add_Y90(qubit: int, **kwargs) -> Iterator:
         return
 
     if kwargs['subspace'] == 'GE':
-        yield RZ(np.pi/2, qubit)
-        yield RX(np.pi/2, qubit)
         yield RZ(-np.pi/2, qubit)
+        yield RX(np.pi/2, qubit)
+        yield RZ(np.pi/2, qubit)
     elif kwargs['subspace'] == 'EF':
-        yield RZ_F12(np.pi/2, qubit)
-        yield RX_F12(np.pi/2, qubit)
         yield RZ_F12(-np.pi/2, qubit)
+        yield RX_F12(np.pi/2, qubit)
+        yield RZ_F12(np.pi/2, qubit)
     else:
         raise ValueError(f'Invalid subspace: {kwargs["subspace"]}')
 
@@ -943,6 +968,7 @@ DEFAULT_GATEMAPPER: Mapping[str, Callable] = GateMapper(
         'CNOT':     add_CNOT,
         'CX':       add_CNOT,
         'CZ':       add_CZ,
+        'H':        add_H,
         'I':        add_Idle,
         'Idle':     add_Idle,
         'iSWAP':    add_ISWAP,

@@ -97,9 +97,9 @@ def tomography_circuits(
 
     circuit_C0_X = Circuit([
         # Y90 on target qubit
-        Cycle({Rz(p[1], np.pi/2) for p in qubit_pairs}),
-        Cycle({X90(p[1]) for p in qubit_pairs}),
         Cycle({Rz(p[1], -np.pi/2) for p in qubit_pairs}),
+        Cycle({X90(p[1]) for p in qubit_pairs}),
+        Cycle({Rz(p[1], np.pi/2) for p in qubit_pairs}),
         Barrier(qubits)
     ])
     for _ in range(n_gates):
@@ -109,9 +109,9 @@ def tomography_circuits(
         ])
     circuit_C0_X.extend([
         # Y90 on target qubit
-        Cycle({Rz(p[1], np.pi/2) for p in qubit_pairs}),
-        Cycle({X90(p[1]) for p in qubit_pairs}),
         Cycle({Rz(p[1], -np.pi/2) for p in qubit_pairs}),
+        Cycle({X90(p[1]) for p in qubit_pairs}),
+        Cycle({Rz(p[1], np.pi/2) for p in qubit_pairs}),
     ])
     circuit_C0_X.measure()
 
@@ -121,9 +121,9 @@ def tomography_circuits(
         Cycle({X90(p[0]) for p in qubit_pairs}),
         Barrier(qubits),
         # Y90 on target qubit
-        Cycle({Rz(p[1], np.pi/2) for p in qubit_pairs}),
-        Cycle({X90(p[1]) for p in qubit_pairs}),
         Cycle({Rz(p[1], -np.pi/2) for p in qubit_pairs}),
+        Cycle({X90(p[1]) for p in qubit_pairs}),
+        Cycle({Rz(p[1], np.pi/2) for p in qubit_pairs}),
         Barrier(qubits)
     ])
     for _ in range(n_gates):
@@ -133,17 +133,17 @@ def tomography_circuits(
         ])
     circuit_C1_X.extend([
         # Y90 on target qubit
-        Cycle({Rz(p[1], np.pi/2) for p in qubit_pairs}),
-        Cycle({X90(p[1]) for p in qubit_pairs}),
         Cycle({Rz(p[1], -np.pi/2) for p in qubit_pairs}),
+        Cycle({X90(p[1]) for p in qubit_pairs}),
+        Cycle({Rz(p[1], np.pi/2) for p in qubit_pairs}),
     ])
     circuit_C1_X.measure()
 
     circuit_C0_Y = Circuit([
         # Y90 on target qubit
-        Cycle({Rz(p[1], np.pi/2) for p in qubit_pairs}),
-        Cycle({X90(p[1]) for p in qubit_pairs}),
         Cycle({Rz(p[1], -np.pi/2) for p in qubit_pairs}),
+        Cycle({X90(p[1]) for p in qubit_pairs}),
+        Cycle({Rz(p[1], np.pi/2) for p in qubit_pairs}),
         Barrier(qubits)
     ])
     for _ in range(n_gates):
@@ -163,9 +163,9 @@ def tomography_circuits(
         Cycle({X90(p[0]) for p in qubit_pairs}),
         Barrier(qubits),
         # Y90 on target qubit
-        Cycle({Rz(p[1], np.pi/2) for p in qubit_pairs}),
-        Cycle({X90(p[1]) for p in qubit_pairs}),
         Cycle({Rz(p[1], -np.pi/2) for p in qubit_pairs}),
+        Cycle({X90(p[1]) for p in qubit_pairs}),
+        Cycle({Rz(p[1], np.pi/2) for p in qubit_pairs}),
         Barrier(qubits)
     ])
     for _ in range(n_gates):
@@ -408,7 +408,7 @@ def AmpFreqSweep(
 
                     prob_C1_Y = []
                     for circuit in self._circuits._df.loc[
-                        (self._circuits['sequence'] == 'C0_X') &
+                        (self._circuits['sequence'] == 'C1_Y') &
                         (self._circuits[f'param: two_qubit/{pair}/CZ/freq'
                             ] == freq)
                         ].circuit:
@@ -1853,17 +1853,17 @@ def LocalPhases(
 
             circuit_C0_X = Circuit([
                 # Y90 on target qubit
-                Cycle({Rz(p[1], np.pi/2) for p in qubit_pairs}),
-                Cycle({X90(p[1]) for p in qubit_pairs}),
                 Cycle({Rz(p[1], -np.pi/2) for p in qubit_pairs}),
+                Cycle({X90(p[1]) for p in qubit_pairs}),
+                Cycle({Rz(p[1], np.pi/2) for p in qubit_pairs}),
                 # CZ
                 Barrier(qubits),
                 Cycle({CZ(pair) for pair in qubit_pairs}),
                 Barrier(qubits),
                 # Y-90 on target qubit
-                Cycle({Rz(p[1], -np.pi/2) for p in qubit_pairs}),
-                Cycle({X90(p[1]) for p in qubit_pairs}),
                 Cycle({Rz(p[1], np.pi/2) for p in qubit_pairs}),
+                Cycle({X90(p[1]) for p in qubit_pairs}),
+                Cycle({Rz(p[1], -np.pi/2) for p in qubit_pairs}),
             ])
             circuit_C0_X.measure()
 
@@ -1873,33 +1873,33 @@ def LocalPhases(
                 Cycle({X90(p[0]) for p in qubit_pairs}),
                 Barrier(qubits),
                 # Y90 on target qubit
-                Cycle({Rz(p[1], np.pi/2) for p in qubit_pairs}),
-                Cycle({X90(p[1]) for p in qubit_pairs}),
                 Cycle({Rz(p[1], -np.pi/2) for p in qubit_pairs}),
+                Cycle({X90(p[1]) for p in qubit_pairs}),
+                Cycle({Rz(p[1], np.pi/2) for p in qubit_pairs}),
                 # CZ
                 Barrier(qubits),
                 Cycle({CZ(pair) for pair in qubit_pairs}),
                 Barrier(qubits),
                 # Y-90 on target qubit
-                Cycle({Rz(p[1], -np.pi/2) for p in qubit_pairs}),
-                Cycle({X90(p[1]) for p in qubit_pairs}),
                 Cycle({Rz(p[1], np.pi/2) for p in qubit_pairs}),
+                Cycle({X90(p[1]) for p in qubit_pairs}),
+                Cycle({Rz(p[1], -np.pi/2) for p in qubit_pairs}),
             ])
             circuit_C1_X.measure()
 
             circuit_T0_X = Circuit([
                 # Y90 on control qubit
-                Cycle({Rz(p[0], np.pi/2) for p in qubit_pairs}),
-                Cycle({X90(p[0]) for p in qubit_pairs}),
                 Cycle({Rz(p[0], -np.pi/2) for p in qubit_pairs}),
+                Cycle({X90(p[0]) for p in qubit_pairs}),
+                Cycle({Rz(p[0], np.pi/2) for p in qubit_pairs}),
                 # CZ
                 Barrier(qubits),
                 Cycle({CZ(pair) for pair in qubit_pairs}),
                 Barrier(qubits),
                 # Y-90 on control qubit
-                Cycle({Rz(p[0], -np.pi/2) for p in qubit_pairs}),
-                Cycle({X90(p[0]) for p in qubit_pairs}),
                 Cycle({Rz(p[0], np.pi/2) for p in qubit_pairs}),
+                Cycle({X90(p[0]) for p in qubit_pairs}),
+                Cycle({Rz(p[0], -np.pi/2) for p in qubit_pairs}),
             ])
             circuit_T0_X.measure()
 
@@ -1909,17 +1909,17 @@ def LocalPhases(
                 Cycle({X90(p[1]) for p in qubit_pairs}),
                 Barrier(qubits),
                 # Y90 on control qubit
-                Cycle({Rz(p[0], np.pi/2) for p in qubit_pairs}),
-                Cycle({X90(p[0]) for p in qubit_pairs}),
                 Cycle({Rz(p[0], -np.pi/2) for p in qubit_pairs}),
+                Cycle({X90(p[0]) for p in qubit_pairs}),
+                Cycle({Rz(p[0], np.pi/2) for p in qubit_pairs}),
                 # CZ
                 Barrier(qubits),
                 Cycle({CZ(pair) for pair in qubit_pairs}),
                 Barrier(qubits),
                 # Y-90 on control qubit
-                Cycle({Rz(p[0], -np.pi/2) for p in qubit_pairs}),
-                Cycle({X90(p[0]) for p in qubit_pairs}),
                 Cycle({Rz(p[0], np.pi/2) for p in qubit_pairs}),
+                Cycle({X90(p[0]) for p in qubit_pairs}),
+                Cycle({Rz(p[0], -np.pi/2) for p in qubit_pairs}),
             ])
             circuit_T1_X.measure()
 
@@ -2400,17 +2400,17 @@ def SpectatorPhase(
 
             circuit_C0_X = Circuit([
                 # Y90 on spectator qubits
-                Cycle({Rz(q, np.pi/2) for q in self._squbits}),
-                Cycle({X90(q) for q in self._squbits}),
                 Cycle({Rz(q, -np.pi/2) for q in self._squbits}),
+                Cycle({X90(q) for q in self._squbits}),
+                Cycle({Rz(q, np.pi/2) for q in self._squbits}),
                 # CZ
                 Barrier(qubits),
                 Cycle({CZ(pair) for pair in qubit_pairs}),
                 Barrier(qubits),
                 # Y-90 on spectator qubits
-                Cycle({Rz(q, -np.pi/2) for q in self._squbits}),
-                Cycle({X90(q) for q in self._squbits}),
                 Cycle({Rz(q, np.pi/2) for q in self._squbits}),
+                Cycle({X90(q) for q in self._squbits}),
+                Cycle({Rz(q, -np.pi/2) for q in self._squbits}),
             ])
             circuit_C0_X.measure()
 
@@ -2420,17 +2420,17 @@ def SpectatorPhase(
                 Cycle({X90(q) for q in list(set(self._cqubits))}),
                 Barrier(qubits),
                 # Y90 on spectator qubits
-                Cycle({Rz(q, np.pi/2) for q in self._squbits}),
-                Cycle({X90(q) for q in self._squbits}),
                 Cycle({Rz(q, -np.pi/2) for q in self._squbits}),
+                Cycle({X90(q) for q in self._squbits}),
+                Cycle({Rz(q, np.pi/2) for q in self._squbits}),
                 # CZ
                 Barrier(qubits),
                 Cycle({CZ(pair) for pair in qubit_pairs}),
                 Barrier(qubits),
                 # Y-90 on spectator qubits
-                Cycle({Rz(q, -np.pi/2) for q in self._squbits}),
-                Cycle({X90(q) for q in self._squbits}),
                 Cycle({Rz(q, np.pi/2) for q in self._squbits}),
+                Cycle({X90(q) for q in self._squbits}),
+                Cycle({Rz(q, -np.pi/2) for q in self._squbits}),
             ])
             circuit_C1_X.measure()
 

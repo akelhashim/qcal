@@ -537,9 +537,10 @@ def JAZZ(
                     seq_high_x: I_high, seq_high_y: Q_high,
                 }
 
-                # Use complex quadrature signal to resolve frequency sign.
-                z_low  = np.array(I_low)  - 1j * np.array(Q_low)
-                z_high = np.array(I_high) - 1j * np.array(Q_high)
+                # Use complex quadrature signal to resolve frequency sign,
+                # such that a positive Rz rate gives a positive frequency.
+                z_low  = np.array(I_low)  + 1j * np.array(Q_low)
+                z_high = np.array(I_high) + 1j * np.array(Q_high)
                 signed_freq_low  = est_freq_fft(self._times[qp], z_low)
                 signed_freq_high = est_freq_fft(self._times[qp], z_high)
 

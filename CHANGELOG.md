@@ -21,11 +21,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - `Circuit.prepare()` method to prepend a cycle which prepares a Pauli
-  eigenstate
+  eigenstate. Accepts a Pauli string (e.g. 'XYZ') or a sequence of
+  optionally signed Paulis (e.g. ['-X', 'Y', '-Z']) to prepare -1
+  eigenstates
 - `prep_rotation` accepts signed Paulis ('+X', '-X', '-Y', '-Z', etc.)
   to prepare -1 eigenstates
 - The PyQuil transpiler's default gate mapper supports `SX` and `SY`
-  (transpiled the same as `X90` and `Y90`)
+  (transpiled the same as `X90` and `Y90`), and `H` (transpiled as Z
+  followed by `Y90`)
 - `unitary` property for `Circuit` and `Cycle` classes
 - Native Cycle Benchmarking (CB) implementation
 - Randomized compiling (RC) support for the PyQuil transpiler, via
@@ -81,6 +84,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- CZ tomography-based calibrations, `LocalPhases`, and `SpectatorPhase`
+  now use true Y90 rotations where Y90 was intended (previously Y-90).
+  Fitted values are unchanged; the raw `C0_Y`/`C1_Y` populations are
+  inverted (P -> 1 - P)
+- Single-qubit `Phase` calibration (`gate='X90'`) now uses true Y180 and
+  Y90 rotations (previously Y-180 and Y-90). The calibrated phase is
+  unchanged; the slopes of the `Y180_X90` and `X180_Y90` traces are
+  swapped
 - Deferred `Results` DataFrame initialization until first access, to
   avoid unnecessary DataFrame construction for transient results
 - Optimized circuit plotting for large circuits by omitting per-gate
@@ -116,6 +127,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- PyQuil transpiler: `Y90` and `SY` were transpiled as Y-90, and `SYdag`
+  as Y90. The RZ signs in `add_Y90` are now correct, which also fixes
+  `SYdag` and `H`
+- QubiC transpiler: `Y90` was transpiled as Y-90 (its virtual Z phases
+  had the opposite sign from how `Rz` is transpiled)
+- `JAZZ` (ZZ phase estimation) now reports the physical sign of the ZZ
+  rate (`ZZ = E11 - E10 - E01 + E00`). With a correct `Y90`, it
+  previously reported the opposite sign; ZZ values measured on PyQuil
+  backends before the `Y90` fix had the correct sign by accident
+- CZ `AmpFreqSweep` computed the conditionality from the `C0_X` circuits
+  in place of the `C1_Y` circuits
 - CB analysis no longer fails on 3-level (leakage) readout: Pauli
   expectation values are post-selected on unleaked outcomes on each Pauli's
   support

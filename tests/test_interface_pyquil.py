@@ -28,7 +28,18 @@ import numpy as np
 import pytest
 
 from qcal.circuit import Circuit, Cycle
-from qcal.gates.single_qubit import MCM, X90, Meas, Rz
+from qcal.gates.single_qubit import (
+    MCM,
+    X90,
+    Y90,
+    H,
+    Meas,
+    Rz,
+    SXdag,
+    SYdag,
+    X,
+    Y,
+)
 from qcal.gates.two_qubit import CZ
 from qcal.interface.pyquil.transpiler import (
     DEFAULT_GATEMAPPER,
@@ -38,6 +49,7 @@ from qcal.interface.pyquil.transpiler import (
     add_CNOT,
     add_CX,
     add_CZ,
+    add_H,
     add_Idle,
     add_ISWAP,
     add_MCM,
@@ -102,6 +114,7 @@ class TestTranspilerGeneratorsYieldNothing:
         (add_CNOT, (0, 1), {}),
         (add_CX, (0, 1), {}),
         (add_CZ, (0, 1), {}),
+        (add_H, (0,), {'subspace': 'GE'}),
         (add_Idle, (0, 1e-7), {}),
         (add_ISWAP, (0, 1), {}),
         (add_Measure, (0,), {}),
@@ -138,7 +151,7 @@ class TestTranspilerFunctionsReturnNone:
 class TestDefaultGateMapper:
 
     @pytest.mark.parametrize('name, fn', [
-        ('SX', add_X90), ('SXdag', add_SXdag),
+        ('H', add_H), ('SX', add_X90), ('SXdag', add_SXdag),
         ('SY', add_Y90), ('SYdag', add_SYdag),
     ])
     def test_sqrt_paulis_route_to_pulse_gates(self, name, fn):
@@ -328,6 +341,42 @@ class _StubTracker:
     def emit_phase_gate(self, gate, *args):
         self.calls.append((gate, args))
         return _Inst('TRACKED', gate.qubits[0])
+
+
+class TestSingleQubitGateUnitaries:
+    """The emitted RZ/RX sequences (in time order) implement the intended
+    unitaries, up to a global phase, with RZ(t) = exp(-i t Z / 2).
+    """
+
+    @pytest.fixture
+    def fake_rx(self, fake_pyquil):
+        sys.modules['pyquil.gates'].RX = (
+            lambda angle, qubit: _Inst('RX', angle, qubit)
+        )
+
+    @staticmethod
+    def _unitary(insts):
+        from qcal.gates.single_qubit import rx, rz
+        rotation = {'RX': rx, 'RZ': rz}
+        unitary = np.eye(2)
+        for inst in insts:
+            unitary = rotation[inst.name](inst.args[0]) @ unitary
+        return unitary
+
+    @pytest.mark.parametrize('fn, gate_cls', [
+        (add_H, H),
+        (add_SXdag, SXdag),
+        (add_SYdag, SYdag),
+        (add_X, X),
+        (add_X90, X90),
+        (add_Y, Y),
+        (add_Y90, Y90),
+    ])
+    def test_matches_gate_matrix(self, fake_rx, fn, gate_cls):
+        unitary = self._unitary(fn(0, subspace='GE'))
+        target = gate_cls(0).matrix
+        overlap = np.trace(target.conj().T @ unitary) / 2
+        assert np.isclose(abs(overlap), 1)
 
 
 class TestAddMCM:

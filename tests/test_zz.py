@@ -19,8 +19,9 @@ circuit's branch as low ('C0 ...') or high ('C1'/'C2 ...')) and its
 unitary is overwritten with an extra `2*pi*zz_true*t` added only on
 the high branch -- the same "overwrite gate unitaries after
 generate_circuits()" technique used throughout the rest of this suite.
-This makes freq_high - freq_low equal to -zz_true exactly for a 'GE'
-target subspace (confirmed by direct measurement), letting the
+This makes freq_high - freq_low equal to +zz_true exactly for a 'GE'
+target subspace, matching the sign of a physical ZZ coupling
+(ZZ = E11 - E10 - E01 + E00) through the echoed sequence, letting the
 recovered char_values be checked against a known, independently-chosen
 ZZ rate. For a 'GF' target subspace ('12'/'22'), the Rz is embedded
 into the |1>-|2> block of a 3x3 unitary, but the Ramsey coherence
@@ -155,7 +156,7 @@ class TestJAZZSimulatedRun:
         jazz.analyze()
 
         assert jazz._char_values[(0, 1)].n == pytest.approx(
-            -zz_true, abs=5e3
+            zz_true, abs=5e3
         )
 
     def test_final_sets_config_param(self, config):
@@ -175,7 +176,7 @@ class TestJAZZSimulatedRun:
         jazz.final()
 
         assert config['two_qubit/(0, 1)/ZZ11'] == pytest.approx(
-            -zz_true, abs=5e3
+            zz_true, abs=5e3
         )
 
 

@@ -888,7 +888,7 @@ def Phase(
             # Y180_X90
             circuit_Y180_X90.extend([
                 Cycle({
-                    Rz(q, np.pi/2, subspace=level[self._n_levels])
+                    Rz(q, -np.pi/2, subspace=level[self._n_levels])
                     for q in self._qubits
                 }),
                 Cycle({
@@ -901,7 +901,7 @@ def Phase(
                     for q in self._qubits
                 }),
                 Cycle({
-                    Rz(q, -np.pi/2, subspace=level[self._n_levels])
+                    Rz(q, np.pi/2, subspace=level[self._n_levels])
                     for q in self._qubits
                 }),
                 Barrier(self._qubits),
@@ -925,7 +925,7 @@ def Phase(
                 }),
                 Barrier(self._qubits),
                 Cycle({
-                    Rz(q, np.pi/2, subspace=level[self._n_levels])
+                    Rz(q, -np.pi/2, subspace=level[self._n_levels])
                     for q in self._qubits
                 }),
                 Cycle({
@@ -933,7 +933,7 @@ def Phase(
                     for q in self._qubits
                 }),
                 Cycle({
-                    Rz(q, -np.pi/2, subspace=level[self._n_levels])
+                    Rz(q, np.pi/2, subspace=level[self._n_levels])
                     for q in self._qubits
                 }),
             ])
@@ -1029,7 +1029,7 @@ def Phase(
                     }
                     for fit_idx in range(2): # For each of the two linear fits
                         params = fit_df["params"][fit_idx]
-                        params.add('m', value=(-1.)**(fit_idx))
+                        params.add('m', value=(-1.)**(fit_idx + 1))
                         params.add('b', value=0.5)
                         self._fit[q][fit_idx].fit(
                             self._phases[q],
