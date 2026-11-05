@@ -965,17 +965,21 @@ class Circuit:
 
     def prepare(
         self,
-        pauli:  str,
+        pauli:  str | Sequence[str],
         qubits: Sequence[int] | None = None,
     ) -> None:
         """Prepends a preparation cycle to the front of the circuit.
 
         The preparation cycle rotates the qubits from the ground state to
-        the +1 eigenstate of the given Pauli string.
+        the eigenstate of the given Pauli for each qubit: the +1 eigenstate
+        for an unsigned (or '+') Pauli, and the -1 eigenstate for a Pauli
+        with a '-' prefix.
 
         Args:
-            pauli (str): Pauli string defining the eigenstate to prepare
-                (e.g. 'XYZ'), with one character per qubit in `qubits`.
+            pauli (str | Sequence[str]): Paulis defining the eigenstate to
+                prepare, one per qubit in `qubits`. Either an unsigned Pauli
+                string (e.g. 'XYZ'), or a sequence of (optionally signed)
+                Paulis (e.g. ['-X', 'Y', '-Z']).
             qubits (Sequence[int] | None, optional): qubits to prepare.
                 Defaults to None.
         """
@@ -984,13 +988,13 @@ class Circuit:
 
         if len(pauli) != len(qubits):
             raise ValueError(
-                "Length of pauli string must match number of qubits to prepare!"
+                "Number of Paulis must match number of qubits to prepare!"
             )
 
         prep_cycle = Cycle(
             {prep_rotation(q, p) for q, p in zip(qubits, pauli, strict=False)}
         )
-        if not all(p.upper() in ('I', 'Z') for p in pauli):
+        if not all(p.upper() in ('I', 'Z', '+Z') for p in pauli):
             self.prepend(prep_cycle)
 
     def prepend(
