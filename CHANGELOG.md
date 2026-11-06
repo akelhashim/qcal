@@ -8,6 +8,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Breaking
+
+### Added
+
+### Changed
+
+### Deprecated
+
+### Removed
+
+### Fixed
+
+### Security
+
+## [6.0.0] - 2026-11-06
+
+### Breaking
+
 - `optuna`/`optunahub` as a qcal dependency
 - `plot_error_rates` takes a single dict mapping qubit labels to `ufloat`
   error rates, instead of separate `error_rates` and `uncertainties` dicts
@@ -126,8 +143,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - CB samples exactly `n_decays` distinct, non-identity Pauli decays, using
   all of them when `n_decays` is at least the number available
 
-### Deprecated
-
 ### Removed
 
 - `reciprocal_uncertainty`, `uncertainty_of_exp`, `uncertainty_of_product`,
@@ -182,8 +197,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (e.g. `H(0) == H(0)`)
 - PyQuil transpiler raising for phase gates outside the final layer with
   randomized readout and `cycles_to_defcircuits`
-
-### Security
 
 ## [5.0.0] - 2026-11-03
 
@@ -520,7 +533,8 @@ post-processing
 - Single- and two-qubit benchmarking methods
 - Advanced compilation tools
 
-[Unreleased]: https://github.com/akelhashim/qcal/compare/v5.0.0...HEAD
+[Unreleased]: https://github.com/akelhashim/qcal/compare/v6.0.0...HEAD
+[6.0.0]: https://github.com/akelhashim/qcal/releases/tag/v6.0.0
 [5.0.0]: https://github.com/akelhashim/qcal/releases/tag/v5.0.0
 [4.0.1]: https://github.com/akelhashim/qcal/releases/tag/v4.0.1
 [4.0.0]: https://github.com/akelhashim/qcal/releases/tag/v4.0.0
