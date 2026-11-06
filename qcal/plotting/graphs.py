@@ -108,6 +108,11 @@ def draw_circuit(circuit: Circuit, show: bool = True):
         }
     )
 
+    # Parallel multi-qubit gates in the same cycle are colored distinctly
+    # (same palette as the CB Pauli decay plots), since their connecting
+    # lines can overlap.
+    mq_colors = pc.qualitative.Plotly
+
     qubit_index = {q: i for i, q in enumerate(circuit.qubits)}
 
     # Gates drawn independently on each qubit, even when a single gate
@@ -133,6 +138,8 @@ def draw_circuit(circuit: Circuit, show: bool = True):
             n_barriers += 1
         else:
             c -= n_barriers
+            n_mq = sum(not is_per_qubit(gate) for gate in cycle.gates)
+            k_mq = 0
             for gate in cycle.gates:
                 if is_per_qubit(gate):
                     for q in gate.qubits:
@@ -210,7 +217,12 @@ def draw_circuit(circuit: Circuit, show: bool = True):
                                 'showarrow': False
                             },
                         )
-                    marker_colors.extend(['white'] * n_q)
+                    color = (
+                        mq_colors[k_mq % len(mq_colors)] if n_mq > 1
+                        else 'white'
+                    )
+                    k_mq += 1
+                    marker_colors.extend([color] * n_q)
 
     # ms_scale = 200
     node_trace = go.Scatter(

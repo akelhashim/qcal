@@ -30,6 +30,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (transpiled the same as `X90` and `Y90`), and `H` (transpiled as Z
   followed by `Y90`)
 - `unitary` property for `Circuit` and `Cycle` classes
+- `draw_circuit` colors the markers of parallel multi-qubit gates in the
+  same cycle distinctly, so gates with overlapping lines can be told apart
 - Native Cycle Benchmarking (CB) implementation
 - Randomized compiling (RC) support for the PyQuil transpiler, via
   `pyquil._qpu.randomized_compiling`. Single-qubit gates in randomized
