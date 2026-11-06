@@ -8,16 +8,180 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Breaking
+- `optuna`/`optunahub` as a qcal dependency
+- `plot_error_rates` takes a single dict mapping qubit labels to `ufloat`
+  error rates, instead of separate `error_rates` and `uncertainties` dicts
+- Renamed the `noise_model` argument and property of
+  `DensityMatrixSimulator` to `error_model`
+- Renamed the `step()` method of the `Adam`, `CMA`, `LQG`, and `LQR`
+  optimizers to `ask()`
+- `Calibration` and `Characterize` are abstract base classes: subclasses
+  must implement `analyze()` and `generate_circuits()`
 
 ### Added
 
+- `Circuit.prepare()` method to prepend a cycle which prepares a Pauli
+  eigenstate. Accepts a Pauli string (e.g. 'XYZ') or a sequence of
+  optionally signed Paulis (e.g. ['-X', 'Y', '-Z']) to prepare -1
+  eigenstates
+- `prep_rotation` accepts signed Paulis ('+X', '-X', '-Y', '-Z', etc.)
+  to prepare -1 eigenstates
+- The PyQuil transpiler's default gate mapper supports `SX` and `SY`
+  (transpiled the same as `X90` and `Y90`), and `H` (transpiled as Z
+  followed by `Y90`)
+- `unitary` property for `Circuit` and `Cycle` classes
+- `draw_circuit` colors the markers of parallel multi-qubit gates in the
+  same cycle distinctly, so gates with overlapping lines can be told apart
+- Native Cycle Benchmarking (CB) implementation
+- Randomized compiling (RC) support for the PyQuil transpiler, via
+  `pyquil._qpu.randomized_compiling`. Single-qubit gates in randomized
+  layers must be compiled to ZXZXZ form (`Rz`/`VirtualZ` and `X90`/`SX`);
+  other gates there (e.g. `SY`, `H`, `Y90`) raise a `ValueError`
+- Randomized readout: twirl the final pre-measurement single-qubit
+  gates, usable independently or alongside randomized compiling
+- `cycle_replacement` and `cycles_to_defcircuits` can be combined with
+  randomized compiling and randomized readout in the PyQuil transpiler.
+  Cycles of X90/SX pulses, two-qubit gates, mid-circuit measurements, or
+  terminal measurements can be replaced with DEFCIRCUITs; replacing a
+  randomized cycle containing an `Rz`/`VirtualZ` raises a `ValueError`,
+  and `cycles_to_defcircuits` leaves such cycles as literal gates
+- `decompose_to_zxzxz` parameter for Cycle Benchmarking circuit
+  generation
+- `RandomizedReadout.fidelity` property: the all-zero state probability
+  as a `ufloat` with binomial standard error
+- `pauli_to_cycle` utility to convert a Pauli string into a `Circuit`,
+  with ZXZXZ decomposition and caching
+- `local_pauli_options` and `sample_distinct_n_qubit_paulis` in
+  `qcal.benchmarking.utils`, for sampling distinct non-identity Paulis
+  (restricted to Z/I on measured qubits) without enumerating all
+  4^n Paulis
+- `conjugate_pauli` utilities for efficiently tracking Pauli operator
+  transformations under conjugation by Clifford gates, cycles, and
+  circuits
+- `draw_qpu_heatmap` for plotting variable lattice-based values
+- `qp_readout_correction` for applying quasi-probabilistic readout correction
+- Post-processing of ragged measurement results, where qubits in a circuit
+  are measured a different number of times (e.g. ancillas measured
+  mid-circuit every round, but data qubits only at the end), via the
+  `measurement_cycles` argument of `PostProcessor` and
+  `construct_dataframes`
+- `circuit_measurement_cycles` utility to find which read of each qubit is
+  made in each measurement cycle of a circuit
+- `PerShotResults` class for storing the per-shot outcomes of every
+  measurement cycle of a circuit (e.g. for decoding), with
+  `measurement_record()` and `cycle_results` DataFrame views indexed by the
+  original shot numbers
+- `PostProcessor.per_shot_results`, and a `Circuit.per_shot_results`
+  property (with a setter) for recording the per-shot outcomes of a circuit
+- `keep_per_shot_results` argument of `QPU` for keeping the per-shot
+  outcomes of every measurement cycle in each circuit's `per_shot_results`
+  (defaults to False, since they can be large)
+- `aggregate` argument of `PostProcessor` for the pass that aggregates
+  per-shot outcomes into counts (defaults to `compute_counts`)
+- `OptunaHub` optimizer for using any OptunaHub sampler with `Optimize`
+- `global_min` argument of `Optimize` to choose the optimal parameters of
+  all qubit labels jointly, from the iteration with the smallest combined
+  loss, along with the `opt_loss_global` property
+- `Results.expectation_value(idx)` for the expectation value of a Z-type
+  Pauli on a subset of the bitstring indices (same convention as
+  `marginalize`)
+- `Results.post_select(levels)` to discard bitstrings containing levels
+  other than those given (by default, leaked states)
+- `Results.subsample(n_shots, seed)` to randomly subsample shots without
+  replacement from the current (e.g. readout-corrected) counts
+
 ### Changed
+
+- CZ tomography-based calibrations, `LocalPhases`, and `SpectatorPhase`
+  now use true Y90 rotations where Y90 was intended (previously Y-90).
+  Fitted values are unchanged; the raw `C0_Y`/`C1_Y` populations are
+  inverted (P -> 1 - P)
+- Single-qubit `Phase` calibration (`gate='X90'`) now uses true Y180 and
+  Y90 rotations (previously Y-180 and Y-90). The calibrated phase is
+  unchanged; the slopes of the `Y180_X90` and `X180_Y90` traces are
+  swapped
+- Deferred `Results` DataFrame initialization until first access, to
+  avoid unnecessary DataFrame construction for transient results
+- Optimized circuit plotting for large circuits by omitting per-gate
+  text labels and matrix hover-text details above a node-count
+  threshold
+- Replaced storing values and their errors in dictionaries with ufloats.
+- `PostProcessor` runs per-shot `passes` first, then `aggregate`. An
+  aggregation pass at the end of `passes` is moved to `aggregate` for
+  backwards compatibility; one elsewhere in `passes` raises a `ValueError`
+- `QuantumInstrumentGST` passes `compute_conditional_counts` to
+  `PostProcessor` as `aggregate` rather than as the last of its `passes`
+- `QPU` raises a `ValueError` instead of an `AssertionError` for an
+  unsupported `n_levels`
+- `Optimize.run()` only saves the config when
+  `settings.Settings.save_data` is enabled
+- `Results.ev` raises a `ValueError` for empty results or non-binary (e.g.
+  leaked) bitstrings, instead of a `ZeroDivisionError` or counting leaked
+  outcomes as +1
+- The `Emulator` stores each circuit's final simulated state object in a
+  `'state'` column, instead of a pretty-printed string in a `'states'`
+  column; call `.pretty_print()` on an entry for a readable string
+- `Gate` equality and hashing include the gate's matrix, so generic gates
+  (e.g. from `merge_gates`) with different unitaries are no longer equal
+- CB samples exactly `n_decays` distinct, non-identity Pauli decays, using
+  all of them when `n_decays` is at least the number available
 
 ### Deprecated
 
 ### Removed
 
+- `reciprocal_uncertainty`, `uncertainty_of_exp`, `uncertainty_of_product`,
+  and `uncertainty_of_sum` from `qcal.math.utils`; use `ufloat` instead
+
 ### Fixed
+
+- PyQuil transpiler: `Y90` was transpiled as Y-90, and `SYdag` as Y90.
+  The RZ signs in `add_Y90` are now correct, which also fixes `SYdag`
+- QubiC transpiler: `Y90` was transpiled as Y-90 (its virtual Z phases
+  had the opposite sign from how `Rz` is transpiled)
+- `JAZZ` (ZZ phase estimation) now reports the physical sign of the ZZ
+  rate (`ZZ = E11 - E10 - E01 + E00`). With a correct `Y90`, it
+  previously reported the opposite sign; ZZ values measured before the
+  `Y90` fix (on PyQuil or QubiC backends) had the correct sign by
+  accident
+- CZ `AmpFreqSweep` computed the conditionality from the `C0_X` circuits
+  in place of the `C1_Y` circuits
+- CB analysis no longer fails on 3-level (leakage) readout: Pauli
+  expectation values are post-selected on unleaked outcomes on each Pauli's
+  support
+- Parity oscillation (GHZ fidelity) analysis no longer fails on 3-level
+  readout: leaked shots contribute zero to the parity, instead of +1
+
+- PyQuil transpiler internal variable name bug
+- `DensityMatrixSimulator` returning negative probabilities
+- DataFrame concat warning for `config.coherence_times`
+- Circuit plotting bug when `MCM` is interpreted as a multi-qubit gate
+- `compute_conditional_counts` not relabeling mid-circuit measurement
+  outcomes of 2 and 3 (e.g. leakage) as `p2` and `p3`
+- Pauli conjugation and CB depth checks returning cached results for a
+  different merged gate or cycle on the same qubits
+- CB expected signs for cycles whose Pauli conjugation is not an
+  involution (e.g. S followed by H, which maps X → Y → Z)
+- CB keeping an all-identity Pauli in its decays
+- `conjugate_pauli` accepting some non-Clifford gates instead of raising a
+  `ValueError`
+- `Results.plot` failing with plotly 6
+- `readout_correction` truncating instead of rounding corrected counts,
+  and skipping results that do not contain every level
+- `readout_correction` raising a shape error when the results contain a
+  level outside of the confusion matrices (e.g. a leaked '2' with 2x2
+  matrices); it now logs a warning and returns the results uncorrected
+- `RandomizedReadout.results` raising before the experiment is run
+- `format_gate_text` ignoring `include_matrix`, so large circuit plots
+  still included gate matrices in their hover text
+- `draw_qpu_heatmap` node hover text showing the figure title instead of
+  `cbar_label`
+- `draw_circuit` showing the same hover text for different merged gates on
+  the same qubits
+- `Gate` equality raising `ValueError` for gates with array-valued params
+  (e.g. `H(0) == H(0)`)
+- PyQuil transpiler raising for phase gates outside the final layer with
+  randomized readout and `cycles_to_defcircuits`
 
 ### Security
 

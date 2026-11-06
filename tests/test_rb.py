@@ -57,8 +57,8 @@ class TestCRBRun:
         crb.run()
 
         infidelity = crb.process_infidelity[(0, 1)]
-        assert 0. < infidelity['val'] < 0.2
-        assert infidelity['err'] > 0.
+        assert 0. < infidelity.n < 0.2
+        assert infidelity.s > 0.
 
         assert set(crb.fit_params[(0, 1)].keys()) == {'base', 'a', 'b', 'c'}
         assert crb.circuits.n_circuits == 30 * len(crb.circuit_depths)
@@ -79,19 +79,19 @@ class TestCRBWithCustomNoiseModel:
 
     def test_single_qubit_crb_process_infidelity(self, config):
         noise = DepolarizingNoise(single_qubit=0.001)
-        sim = DensityMatrixSimulator(noise_model=noise)
+        sim = DensityMatrixSimulator(error_model=noise)
 
         crb = CRB(
             qpu=Emulator, config=config, qubit_labels=[0], simulator=sim
         )
         crb.run()
 
-        infidelity = crb.process_infidelity[0]['val']
+        infidelity = crb.process_infidelity[0].n
         assert infidelity == pytest.approx(4.50e-3, abs=2e-4)
 
     def test_two_qubit_crb_process_infidelity(self, config):
         noise = DepolarizingNoise(single_qubit=0.001)
-        sim = DensityMatrixSimulator(noise_model=noise)
+        sim = DensityMatrixSimulator(error_model=noise)
 
         crb = CRB(
             qpu=Emulator, config=config, qubit_labels=[(0, 1)],
@@ -99,5 +99,5 @@ class TestCRBWithCustomNoiseModel:
         )
         crb.run()
 
-        infidelity = crb.process_infidelity[(0, 1)]['val']
+        infidelity = crb.process_infidelity[(0, 1)].n
         assert infidelity == pytest.approx(2.82e-2, abs=1e-3)

@@ -11,6 +11,7 @@ import pandas as pd
 from IPython.display import clear_output
 from lmfit import Parameters
 from numpy.typing import NDArray
+from uncertainties import UFloat, ufloat
 
 import qcal.settings as settings
 from qcal.calibration.utils import find_pulse_index
@@ -26,11 +27,7 @@ from qcal.fitting.fit import (
 )
 from qcal.fitting.utils import est_freq_fft
 from qcal.gates.single_qubit import X90, Idle, Rz, X, Z
-from qcal.math.utils import (
-    reciprocal_uncertainty,
-    round_to_order_error,
-    uncertainty_of_sum,
-)
+from qcal.math.utils import round_to_order_error
 from qcal.qpu.qpu import QPU
 from qcal.sequence.dynamical_decoupling import DD_SEQUENCES
 from qcal.units import kHz, us
@@ -249,14 +246,12 @@ def T1(
 
                 # If the fit was successful, write to the config
                 if self._fit[q].fit_success:
-                    val, err = round_to_order_error(
-                        *reciprocal_uncertainty(
-                            self._fit[q].fit_params['b'].value,
-                            self._fit[q].fit_params['b'].stderr
-                        )
+                    b = self._fit[q].fit_params['b']
+                    decay_time = 1 / ufloat(b.value, b.stderr)
+                    decay_time = ufloat(
+                        *round_to_order_error(decay_time.n, decay_time.s)
                     )
-                    self._char_values[q] = val
-                    self._errors[q] = err
+                    self._char_values[q] = decay_time
 
         def save(self):
             """Save all circuits and data."""
@@ -267,10 +262,16 @@ def T1(
             if settings.Settings.save_data:
                 qpu.save(self)
                 self._data_manager.save_to_csv(
-                    pd.DataFrame([self._char_values]), 'T1_values'
+                    pd.DataFrame([{
+                        q: v.n if isinstance(v, UFloat) else v
+                        for q, v in self._char_values.items()
+                    }]), 'T1_values'
                 )
                 self._data_manager.save_to_csv(
-                    pd.DataFrame([self._errors]), 'T1_errors'
+                    pd.DataFrame([{
+                        q: v.s for q, v in self._char_values.items()
+                        if isinstance(v, UFloat)
+                    }]), 'T1_errors'
                 )
 
         def plot(self):
@@ -324,7 +325,7 @@ def T2(
     config:     Config,
     qubits:     Sequence[int],
     t_max:      float = 250*us,
-    detuning:   float = 100 * kHz,
+    detuning:   float = 100*kHz,
     echo:       bool = False,
     subspace:   str = 'GE',
     n_elements: int = 50,
@@ -379,7 +380,7 @@ def T2(
             config:     Config,
             qubits:     Sequence[int],
             t_max:      float = 250*us,
-            detuning:   float = 100 * kHz,
+            detuning:   float = 100*kHz,
             echo:       bool = False,
             subspace:   str = 'GE',
             n_elements: int = 50,
@@ -580,14 +581,12 @@ def T2(
 
                 # If the fit was successful, write to the config
                 if self._fit[q].fit_success:
-                    val, err = round_to_order_error(
-                        *reciprocal_uncertainty(
-                            self._fit[q].fit_params['b'].value,
-                            self._fit[q].fit_params['b'].stderr
-                        )
+                    b = self._fit[q].fit_params['b']
+                    decay_time = 1 / ufloat(b.value, b.stderr)
+                    decay_time = ufloat(
+                        *round_to_order_error(decay_time.n, decay_time.s)
                     )
-                    self._char_values[q] = val
-                    self._errors[q] = err
+                    self._char_values[q] = decay_time
 
         def save(self):
             """Save all circuits and data."""
@@ -598,10 +597,16 @@ def T2(
             if settings.Settings.save_data:
                 qpu.save(self)
                 self._data_manager.save_to_csv(
-                    pd.DataFrame([self._char_values]), 'T2_values'
+                    pd.DataFrame([{
+                        q: v.n if isinstance(v, UFloat) else v
+                        for q, v in self._char_values.items()
+                    }]), 'T2_values'
                 )
                 self._data_manager.save_to_csv(
-                    pd.DataFrame([self._errors]), 'T2_errors'
+                    pd.DataFrame([{
+                        q: v.s for q, v in self._char_values.items()
+                        if isinstance(v, UFloat)
+                    }]), 'T2_errors'
                 )
 
         def plot(self):
@@ -867,14 +872,12 @@ def T2DD(
 
                 # If the fit was successful, write to the config
                 if self._fit[q].fit_success:
-                    val, err = round_to_order_error(
-                        *reciprocal_uncertainty(
-                            self._fit[q].fit_params['b'].value,
-                            self._fit[q].fit_params['b'].stderr
-                        )
+                    b = self._fit[q].fit_params['b']
+                    decay_time = 1 / ufloat(b.value, b.stderr)
+                    decay_time = ufloat(
+                        *round_to_order_error(decay_time.n, decay_time.s)
                     )
-                    self._char_values[q] = val
-                    self._errors[q] = err
+                    self._char_values[q] = decay_time
 
         def save(self):
             """Save all circuits and data."""
@@ -885,10 +888,16 @@ def T2DD(
             if settings.Settings.save_data:
                 qpu.save(self)
                 self._data_manager.save_to_csv(
-                    pd.DataFrame([self._char_values]), 'T2DD_values'
+                    pd.DataFrame([{
+                        q: v.n if isinstance(v, UFloat) else v
+                        for q, v in self._char_values.items()
+                    }]), 'T2DD_values'
                 )
                 self._data_manager.save_to_csv(
-                    pd.DataFrame([self._errors]), 'T2DD_errors'
+                    pd.DataFrame([{
+                        q: v.s for q, v in self._char_values.items()
+                        if isinstance(v, UFloat)
+                    }]), 'T2DD_errors'
                 )
 
         def plot(self):
@@ -996,7 +1005,7 @@ def ParityOscillations(
             return self._evs
 
         @property
-        def fidelity(self) -> Dict:
+        def fidelity(self) -> UFloat | None:
             """Fidelity of the state.
 
             The fidelity is determined from the populations of the |0^n> and
@@ -1007,7 +1016,9 @@ def ParityOscillations(
             oscillations.
 
             Returns:
-                Dict: value and error (uncertainty) of the estimated fidelity.
+                UFloat | None: value and error (uncertainty) of the
+                    estimated fidelity, or None if the cosine fit was
+                    unsuccessful.
             """
             return self._fidelity
 
@@ -1065,7 +1076,17 @@ def ParityOscillations(
             # Parity
             for circuit in self._circuits[1:].circuit:
                 results = circuit.results.marginalize(q_index)
-                self._evs.append(results.ev)
+                # Leaked shots lie outside the qubit subspace, on which the
+                # parity operator acts, so they contribute zero but still
+                # count toward the total, consistent with the populations.
+                # Post-selecting them away would bias the fidelity upward.
+                if any(set(s) <= {'0', '1'} for s in results.states):
+                    binary = results.post_select()
+                    self._evs.append(
+                        binary.ev * binary.n_shots / results.n_shots
+                    )
+                else:
+                    self._evs.append(0.)
 
             try:
                 est_freq = est_freq_fft(self._phases, self._evs)
@@ -1082,11 +1103,10 @@ def ParityOscillations(
                 fidelity = (
                     pop0 + pop1 + abs(self._fit.fit_params['amp'].value)
                 ) / 2
-                error = uncertainty_of_sum(errors)
-                fidelity, error = round_to_order_error(fidelity, error)
-                self._fidelity = {
-                    'val': fidelity, 'err': error
-                }
+                error = np.linalg.norm(errors)
+                self._fidelity = ufloat(
+                    *round_to_order_error(fidelity, error)
+                )
             except Exception as e:
                 logger.warning(f' Could not determine fidelity: {e}')
 
@@ -1101,9 +1121,15 @@ def ParityOscillations(
                 self._data_manager.save_to_csv(
                     pd.DataFrame([self._evs]), 'parity'
                 )
-                self._data_manager.save_to_csv(
-                    pd.DataFrame([self._fidelity]), 'fidelity'
-                )
+                if self._fidelity is not None:
+                    self._data_manager.save_to_csv(
+                        pd.DataFrame(
+                            [{
+                                'val': self._fidelity.n,
+                                'err': self._fidelity.s
+                            }]
+                        ), 'fidelity'
+                    )
 
         def plot(self):
             """Plot the parity oscillations."""
@@ -1164,9 +1190,7 @@ def ParityOscillations(
         def final(self):
             """Final experimental method."""
             if self._fidelity is not None:
-                fidelity = self._fidelity['val']
-                error = self._fidelity['err']
-                print(f'\nFidelity = {fidelity} ({error})')
+                print(f'\nFidelity = {self._fidelity.n} ({self._fidelity.s})')
             print(f"\nRuntime: {repr(self._runtime)[8:]}\n")
 
         def run(self):

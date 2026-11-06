@@ -4,7 +4,16 @@ import pandas as pd
 import pytest
 
 from qcal.circuit import Barrier, Circuit, CircuitSet, Cycle, Layer
-from qcal.gates.single_qubit import Meas, Ry, X, Y, x, y
+from qcal.gates.single_qubit import (
+    SY,
+    Meas,
+    SXdag,
+    SYdag,
+    X,
+    Y,
+    x,
+    y,
+)
 from qcal.gates.two_qubit import CNOT
 from qcal.results import Results
 
@@ -200,9 +209,35 @@ class TestCircuit:
         circuit.measure(qubits=(0,), basis=('X',))
         assert circuit == Circuit([
             Cycle(x0),
-            Cycle({Ry(0, -np.pi / 2)}),
+            Cycle({SYdag(0)}),
             Cycle({Meas(0, 'X')}),
         ])
+
+    def test_prepare_pauli_string(self, x0):
+        circuit = Circuit([Cycle(x0)])
+        circuit.prepare('XY', qubits=(0, 1))
+        assert circuit[0] == Cycle({SY(0), SXdag(1)})
+
+    def test_prepare_signed_paulis(self, x0):
+        circuit = Circuit([Cycle(x0)])
+        circuit.prepare(['-X', '+Y', '-Z'], qubits=(0, 1, 2))
+        assert circuit[0] == Cycle({SYdag(0), SXdag(1), X(2)})
+
+    @pytest.mark.parametrize('pauli', ['ZI', ['Z', '+Z'], ('I', '+Z')])
+    def test_prepare_ground_state_adds_no_cycle(self, x0, pauli):
+        circuit = Circuit([Cycle(x0)])
+        circuit.prepare(pauli, qubits=(0, 1))
+        assert circuit == Circuit([Cycle(x0)])
+
+    def test_prepare_minus_z_adds_cycle(self, x0):
+        circuit = Circuit([Cycle(x0)])
+        circuit.prepare(['-Z'], qubits=(0,))
+        assert circuit == Circuit([Cycle(X(0)), Cycle(x0)])
+
+    def test_prepare_length_mismatch_raises(self, x0):
+        circuit = Circuit([Cycle(x0)])
+        with pytest.raises(ValueError, match='Number of Paulis'):
+            circuit.prepare(['-X'], qubits=(0, 1))
 
     def test_results_setter_and_getter(self, x0):
         circuit = Circuit([Cycle(x0)])

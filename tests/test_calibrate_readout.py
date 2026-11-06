@@ -181,7 +181,7 @@ class TestFidelitySimulatedSweep:
         sweep = np.linspace(0.0, 2.0, 11)
 
         noise = DepolarizingNoise()
-        sim = DensityMatrixSimulator(noise_model=noise, n_shots=256)
+        sim = DensityMatrixSimulator(error_model=noise, n_shots=256)
 
         cal = Fidelity(
             qpu=Emulator, config=config, qubits=[0],

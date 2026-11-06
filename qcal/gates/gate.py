@@ -2,6 +2,8 @@
 """
 from __future__ import annotations
 
+from typing import Any
+
 import numpy as np
 import pandas as pd
 from numpy.typing import NDArray
@@ -10,7 +12,7 @@ from sympy import Matrix
 
 class Gate:
 
-    __slots__ = ['_matrix', '_properties', '_unitary']
+    __slots__ = ['_matrix', '_matrix_key_cache', '_properties', '_unitary']
 
     def __init__(self,
         matrix: NDArray,
@@ -23,6 +25,7 @@ class Gate:
             qubits (int | tuple): qubit label(s).
         """
         self._matrix = matrix
+        self._matrix_key_cache = None
         self._unitary = matrix
         self._properties = {
             'alias':  None,
@@ -69,8 +72,10 @@ class Gate:
     def __eq__(self, other: object) -> bool:
         """Check equality between two gates.
 
-        Two gates are equal if they have the same name, qubits, subspace, and
-        params.
+        Two gates are equal if they have the same name, qubits, subspace,
+        params, and matrix. Comparing the matrix matters for generic gates
+        (e.g. from ``merge_gates``), which all share the name ``'Gate'``
+        and empty params regardless of the unitary they implement.
 
         Args:
             other (object): object to compare against.
@@ -84,17 +89,22 @@ class Gate:
             self.name == other.name
             and self.qubits == other.qubits
             and self.subspace == other.subspace
-            and self._properties.get('params', {})
-            == other._properties.get('params', {})
+            and _values_equal(
+                self._properties.get('params', {}),
+                other._properties.get('params', {}),
+            )
+            and self._matrix_key() == other._matrix_key()
         )
 
     def __hash__(self) -> int:
-        """Hash the gate by its name, qubits, and subspace.
+        """Hash the gate by its name, qubits, subspace, and matrix.
 
         Returns:
             int: hash of the gate.
         """
-        return hash((self.name, self.qubits, self.subspace))
+        return hash(
+            (self.name, self.qubits, self.subspace, self._matrix_key())
+        )
 
     def _repr_html_(self):
         """Returns information about the gate.
@@ -292,3 +302,49 @@ class Gate:
             tuple: qudit label(s).
         """
         return self.qubits
+
+    def _matrix_key(self) -> tuple:
+        """Exact, hashable fingerprint of the gate's matrix.
+
+        Adding 0 maps -0.0 to 0.0, so matrices which compare equal
+        elementwise always produce the same key.
+
+        The key is computed once and cached, since it is used by
+        ``__hash__`` and ``__eq__`` on hot cached paths (e.g. Pauli
+        conjugation). Gate matrices must therefore not be mutated in
+        place after the gate is hashed or compared.
+
+        Returns:
+            tuple: matrix shape and the bytes of its complex entries.
+        """
+        # getattr: gates unpickled from older versions lack this slot.
+        if getattr(self, '_matrix_key_cache', None) is None:
+            matrix = np.asarray(self._matrix, dtype=complex) + 0
+            self._matrix_key_cache = (matrix.shape, matrix.tobytes())
+        return self._matrix_key_cache
+
+
+def _values_equal(a: Any, b: Any) -> bool:
+    """Compare gate parameter values, including numpy arrays.
+
+    Params may hold arrays (e.g. the rotation axis of ``H`` or ``Rn``),
+    for which ``==`` is elementwise and has no single truth value.
+
+    Args:
+        a (Any): first value.
+        b (Any): second value.
+
+    Returns:
+        bool: True if the values are equal, False otherwise.
+    """
+    if isinstance(a, np.ndarray) or isinstance(b, np.ndarray):
+        return np.array_equal(a, b)
+    if isinstance(a, dict) and isinstance(b, dict):
+        return a.keys() == b.keys() and all(
+            _values_equal(a[k], b[k]) for k in a
+        )
+    if isinstance(a, (list, tuple)) and isinstance(b, (list, tuple)):
+        return type(a) is type(b) and len(a) == len(b) and all(
+            _values_equal(x, y) for x, y in zip(a, b, strict=True)
+        )
+    return bool(a == b)

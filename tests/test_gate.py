@@ -150,6 +150,22 @@ class TestEquality:
         assert hash(a) == hash(b)
         assert len({a, b}) == 1
 
+    def test_array_valued_params_compare_without_error(self):
+        # e.g. H and Rn store their rotation axis as an np.ndarray.
+        a = Gate(X2, 0)
+        b = Gate(X2, 0)
+        a._properties['params'] = {'axis': np.array([1, 0, 1])}
+        b._properties['params'] = {'axis': np.array([1, 0, 1])}
+        assert a == b
+        assert len({a, b}) == 1
+        b._properties['params'] = {'axis': np.array([0, 1, 1])}
+        assert a != b
+
+    def test_h_gates_are_equal_and_dict_keys(self):
+        from qcal.gates.single_qubit import H
+        assert H(0) == H(0)
+        assert {H(0): 1}[H(0)] == 1
+
 
 class TestDunderMethods:
 

@@ -11,13 +11,14 @@ import numpy as np
 import pandas as pd
 from IPython.display import clear_output
 from numpy.typing import NDArray
+from uncertainties import ufloat
 
 import qcal.settings as settings
 from qcal.characterization.characterize import Characterize
 from qcal.circuit import Circuit, CircuitSet, Cycle
 from qcal.config import Config
 from qcal.gates.single_qubit import X90, Id
-from qcal.math.utils import round_to_order_error, uncertainty_of_sum
+from qcal.math.utils import round_to_order_error
 from qcal.qpu.qpu import QPU
 
 logger = logging.getLogger(__name__)
@@ -160,15 +161,12 @@ def TruthTable(
                 fidelity = np.trace(
                     np.matmul(self._truth_table.T, self._ideal_unitary)
                 ) / 2**len(self._qubits)
-                error = uncertainty_of_sum(
+                error = np.linalg.norm(
                     [1 / np.sqrt(circuit.results.n_shots)
                      for circuit in self._circuits
                     ]
                 ) / 2**len(self._qubits)
-                fidelity, error = round_to_order_error(fidelity, error)
-                self._fidelity = {
-                    'val': fidelity, 'err': error
-                }
+                self._fidelity = ufloat(*round_to_order_error(fidelity, error))
 
         def save(self):
             """Save all circuits and data."""
@@ -184,7 +182,9 @@ def TruthTable(
                     self._truth_table
                 )
                 self._data_manager.save_to_csv(
-                    pd.DataFrame([self._fidelity]), 'fidelity'
+                    pd.DataFrame(
+                        [{'val': self._fidelity.n, 'err': self._fidelity.s}]
+                    ), 'fidelity'
                 )
 
         def plot(self):
@@ -247,9 +247,10 @@ def TruthTable(
         def final(self):
             """Final experimental method."""
             if self._fidelity is not None:
-                fidelity = self._fidelity['val']
-                error = self._fidelity['err']
-                print(f'\nTruth table fidelity = {fidelity} ({error})')
+                print(
+                    '\nTruth table fidelity = '
+                    f'{self._fidelity.n} ({self._fidelity.s})'
+                )
 
             print(f"\nRuntime: {repr(self._runtime)[8:]}\n")
 

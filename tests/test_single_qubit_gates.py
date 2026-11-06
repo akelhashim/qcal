@@ -4,11 +4,15 @@ Covers the raw rotation-matrix helper functions, every concrete gate
 class (unitary matrix, subspace, params, aliases), the
 SINGLE_QUBIT_GATES registry, and the basis_rotation() helper.
 """
+import itertools
+import re
+
 import numpy as np
 import pytest
 
 from qcal.gates.single_qubit import (
     MCM,
+    SINGLE_QUBIT_CLIFFORDS,
     SINGLE_QUBIT_GATES,
     SX,
     SY,
@@ -42,6 +46,7 @@ from qcal.gates.single_qubit import (
     basis_rotation,
     h,
     id,
+    prep_rotation,
     rn,
     rx,
     ry,
@@ -286,17 +291,17 @@ class TestMeasurementAndNonUnitaryGates:
 
 class TestBasisRotation:
 
-    def test_x_basis_returns_ry_minus_half_pi(self):
+    def test_x_basis_returns_sydag(self):
         gate = basis_rotation(Meas(3, basis='X'))
-        assert isinstance(gate, Ry)
+        assert isinstance(gate, SYdag)
         assert gate.qubits == (3,)
         assert gate.properties['params']['angle'] == pytest.approx(
             -np.pi / 2
         )
 
-    def test_y_basis_returns_rx_half_pi(self):
+    def test_y_basis_returns_sx(self):
         gate = basis_rotation(Meas(3, basis='Y'))
-        assert isinstance(gate, Rx)
+        assert isinstance(gate, SX)
         assert gate.properties['params']['angle'] == pytest.approx(
             np.pi / 2
         )
@@ -307,7 +312,7 @@ class TestBasisRotation:
 
     def test_lowercase_basis_is_accepted(self):
         gate = basis_rotation(Meas(3, basis='x'))
-        assert isinstance(gate, Ry)
+        assert isinstance(gate, SYdag)
 
     def test_unsupported_basis_raises(self):
         with pytest.raises(KeyError):
@@ -328,3 +333,198 @@ class TestRegistry:
             SINGLE_QUBIT_GATES['bogus']
             == 'Gate not currently supported!'
         )
+
+
+def _clifford_matrices():
+    return [SINGLE_QUBIT_CLIFFORDS[i](0).matrix for i in range(24)]
+
+
+def _clifford_index(matrix, cliffords):
+    """Indices of every Clifford equal to `matrix` up to global phase."""
+    return [
+        i for i, c in enumerate(cliffords)
+        if _equal_up_to_phase(c, matrix)
+    ]
+
+
+class TestCliffordGates:
+
+    @pytest.mark.parametrize('index', range(24))
+    def test_registered_by_index_and_name(self, index):
+        gate_cls = SINGLE_QUBIT_CLIFFORDS[index]
+        gate = gate_cls(4)
+
+        assert gate.name == f'Cliff{index}'
+        assert gate.qubits == (4,)
+        assert gate.subspace == 'GE'
+        assert SINGLE_QUBIT_GATES[f'Cliff{index}'] is gate_cls
+
+    @pytest.mark.parametrize('index', range(24))
+    def test_is_single_qubit_unitary(self, index):
+        gate = SINGLE_QUBIT_CLIFFORDS[index](0)
+
+        assert gate.matrix.shape == (2, 2)
+        assert gate.is_single_qubit
+        assert _is_unitary(gate.matrix)
+
+    def test_pairwise_distinct_up_to_phase(self):
+        cliffords = _clifford_matrices()
+        for i, j in itertools.combinations(range(24), 2):
+            assert not _equal_up_to_phase(cliffords[i], cliffords[j]), (
+                f'Cliff{i} == Cliff{j} up to phase'
+            )
+
+    def test_closed_under_multiplication(self):
+        cliffords = _clifford_matrices()
+        for a, b in itertools.product(cliffords, repeat=2):
+            assert len(_clifford_index(a @ b, cliffords)) == 1
+
+    def test_closed_under_inversion(self):
+        cliffords = _clifford_matrices()
+        for c in cliffords:
+            assert len(_clifford_index(c.conj().T, cliffords)) == 1
+
+    @pytest.mark.parametrize('index', range(24))
+    def test_maps_paulis_to_signed_paulis(self, index):
+        c = SINGLE_QUBIT_CLIFFORDS[index](0).matrix
+        images = []
+        for pauli in (x, y, z):
+            image = c @ pauli @ c.conj().T
+            matches = [
+                k for k, p in enumerate((x, y, z))
+                if np.allclose(image, p) or np.allclose(image, -p)
+            ]
+            assert len(matches) == 1
+            images.append(matches[0])
+        # Distinct Paulis must map to distinct Paulis.
+        assert sorted(images) == [0, 1, 2]
+
+    @pytest.mark.parametrize('index, expected', [
+        (0, id), (1, x), (2, y), (3, z), (14, h),
+    ])
+    def test_named_cliffords_match_exact_matrix(self, index, expected):
+        np.testing.assert_allclose(
+            SINGLE_QUBIT_CLIFFORDS[index](0).matrix, expected, atol=1e-12
+        )
+
+    @pytest.mark.parametrize('index, expected', [
+        (4, rx(np.pi / 2)), (5, rx(-np.pi / 2)),
+        (6, ry(np.pi / 2)), (7, ry(-np.pi / 2)),
+        (8, rz(np.pi / 2)), (9, rz(-np.pi / 2)),
+    ])
+    def test_half_pi_rotations(self, index, expected):
+        np.testing.assert_allclose(
+            SINGLE_QUBIT_CLIFFORDS[index](0).matrix, expected, atol=1e-12
+        )
+
+    @pytest.mark.parametrize('index', range(10, 24))
+    def test_matrix_matches_params_rotation(self, index):
+        gate = SINGLE_QUBIT_CLIFFORDS[index](0)
+        params = gate.properties['params']
+        assert _equal_up_to_phase(
+            gate.matrix, rn(params['angle'], params['axis'])
+        )
+
+    def test_cliff16_cycles_x_to_y_to_z(self):
+        c = SINGLE_QUBIT_CLIFFORDS[16](0).matrix
+
+        np.testing.assert_allclose(c @ x @ c.conj().T, y, atol=1e-12)
+        np.testing.assert_allclose(c @ y @ c.conj().T, z, atol=1e-12)
+        np.testing.assert_allclose(c @ z @ c.conj().T, x, atol=1e-12)
+
+    @pytest.mark.parametrize('index, inverse', [
+        (4, 5), (6, 7), (8, 9), (16, 17), (18, 19), (20, 21), (22, 23),
+    ])
+    def test_inverse_pairs(self, index, inverse):
+        a = SINGLE_QUBIT_CLIFFORDS[index](0).matrix
+        b = SINGLE_QUBIT_CLIFFORDS[inverse](0).matrix
+        assert _equal_up_to_phase(a @ b, np.eye(2))
+
+    @pytest.mark.parametrize('index', [0, 1, 2, 3, 10, 11, 12, 13, 14, 15])
+    def test_involutions_square_to_identity(self, index):
+        c = SINGLE_QUBIT_CLIFFORDS[index](0).matrix
+        assert _equal_up_to_phase(c @ c, np.eye(2))
+
+    @pytest.mark.parametrize('name', [
+        'C', 'H', 'Id', 'S', 'Sdag', 'SX', 'SXdag', 'SY', 'SYdag', 'V',
+        'Vdag', 'X', 'X90', 'Y', 'Y90', 'Z', 'Z90',
+    ])
+    def test_cliff_alias_matches_clifford_matrix(self, name):
+        gate = SINGLE_QUBIT_GATES[name](0)
+        indices = [int(k) for k in re.findall(r'Cliff(\d+)', gate.alias)]
+
+        assert len(indices) == 1
+        assert _equal_up_to_phase(
+            gate.matrix, SINGLE_QUBIT_CLIFFORDS[indices[0]](0).matrix
+        )
+
+
+class TestPrepRotation:
+
+    @pytest.mark.parametrize('pauli, operator', [
+        ('X', x), ('Y', y), ('Z', z),
+    ])
+    def test_prepares_plus_one_eigenstate(self, pauli, operator):
+        gate = prep_rotation(2, pauli)
+        state = gate.matrix @ np.array([1, 0])
+
+        assert gate.qubits == (2,)
+        np.testing.assert_allclose(operator @ state, state, atol=1e-12)
+
+    @pytest.mark.parametrize('pauli, operator', [
+        ('-X', x), ('-Y', y), ('-Z', z),
+    ])
+    def test_prepares_minus_one_eigenstate(self, pauli, operator):
+        gate = prep_rotation(2, pauli)
+        state = gate.matrix @ np.array([1, 0])
+
+        assert gate.qubits == (2,)
+        np.testing.assert_allclose(operator @ state, -state, atol=1e-12)
+
+    @pytest.mark.parametrize('pauli', ['+X', '+Y', '+Z', '-x', '-y', '-z'])
+    def test_signed_paulis_accepted(self, pauli):
+        sign = -1 if pauli[0] == '-' else 1
+        operator = {'X': x, 'Y': y, 'Z': z}[pauli[1].upper()]
+        state = prep_rotation(0, pauli).matrix @ np.array([1, 0])
+        np.testing.assert_allclose(
+            operator @ state, sign * state, atol=1e-12
+        )
+
+    @pytest.mark.parametrize('pauli, expected', [
+        ('X', np.array([1, 1]) / np.sqrt(2)),
+        ('Y', np.array([1, 1j]) / np.sqrt(2)),
+        ('Z', np.array([1, 0])),
+    ])
+    def test_prepared_state_vectors(self, pauli, expected):
+        state = prep_rotation(0, pauli).matrix @ np.array([1, 0])
+        assert np.isclose(abs(np.vdot(expected, state)), 1)
+
+    @pytest.mark.parametrize('pauli, gate_cls, angle', [
+        ('X', SY, np.pi / 2), ('Y', SXdag, -np.pi / 2),
+        ('-X', SYdag, -np.pi / 2), ('-Y', SX, np.pi / 2),
+    ])
+    def test_rotation_gate_and_angle(self, pauli, gate_cls, angle):
+        gate = prep_rotation(0, pauli)
+
+        assert isinstance(gate, gate_cls)
+        assert gate.properties['params']['angle'] == pytest.approx(angle)
+
+    @pytest.mark.parametrize('pauli', ['I', 'Z'])
+    def test_identity_for_i_and_z(self, pauli):
+        assert isinstance(prep_rotation(0, pauli), Id)
+
+    def test_lowercase_is_accepted(self):
+        assert isinstance(prep_rotation(0, 'x'), SY)
+
+    def test_invalid_pauli_raises(self):
+        with pytest.raises(ValueError, match='Invalid Pauli'):
+            prep_rotation(0, 'W')
+
+    @pytest.mark.parametrize('basis', ['X', 'Y', 'Z'])
+    def test_inverts_basis_rotation(self, basis):
+        # Preparing the +1 eigenstate and rotating back into the
+        # measurement basis lands on |0>.
+        prep = prep_rotation(0, basis).matrix
+        meas = basis_rotation(Meas(0, basis=basis)).matrix
+        state = meas @ prep @ np.array([1, 0])
+        assert np.isclose(abs(state[0]), 1)

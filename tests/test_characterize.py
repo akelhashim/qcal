@@ -6,14 +6,15 @@ that needs an instance goes through a trivial concrete subclass
 instead. final()/plot()/set_param() and the shared state they operate
 on are implemented directly on the base class, so they're tested here
 rather than through a real characterization protocol: the per-qubit
-dicts they read (`_param_sweep`, `_results`, `_fit`, `_char_values`,
-`_errors`) and `_params`/`_qubits` are set directly on the instance,
+dicts they read (`_param_sweep`, `_results`, `_fit`, `_char_values`)
+and `_params`/`_qubits` are set directly on the instance,
 exactly as a real subclass's generate_circuits()/analyze() would
 populate them. `_fit[q]` only needs `.fit_success` and `.predict(x)`,
 so a minimal stand-in is used instead of a real Fit subclass.
 """
 import numpy as np
 import pytest
+from uncertainties import ufloat
 
 from qcal.characterization.characterize import Characterize
 
@@ -103,6 +104,16 @@ class TestFinal:
 
         assert config['single_qubit/0/GE/freq'] == 555.0
 
+    def test_ufloat_char_value_writes_nominal_value(self, char, config):
+        char._qubits = [0]
+        char._params = {0: 'single_qubit/0/GE/freq'}
+        char._fit = {0: _FakeFit(fit_success=True)}
+        char._char_values[0] = ufloat(5.1e9, 2e3)
+
+        char.final()
+
+        assert config['single_qubit/0/GE/freq'] == 5.1e9
+
     def test_leaves_config_unchanged_without_fit_or_char_value(
         self, char, config
     ):
@@ -122,8 +133,7 @@ class TestPlot:
         char._param_sweep = {0: np.linspace(0, 1, 10)}
         char._results = {0: np.linspace(0, 1, 10) ** 2}
         char._fit = {0: _FakeFit(fit_success=True)}
-        char._char_values[0] = 2e-6
-        char._errors = {0: 1e-7}
+        char._char_values[0] = ufloat(2e-6, 1e-7)
 
         char.plot()
 
@@ -144,7 +154,6 @@ class TestPlot:
         char._results = {q: np.linspace(0, 1, 10) for q in qubits}
         char._fit = {q: _FakeFit(fit_success=True) for q in qubits}
         for q in qubits:
-            char._char_values[q] = 1e-6
-        char._errors = dict.fromkeys(qubits, 1e-08)
+            char._char_values[q] = ufloat(1e-6, 1e-8)
 
         char.plot()

@@ -114,7 +114,7 @@ class TestT1SimulatedRun:
     def test_recovers_known_t1_with_x90_prep(self, config):
         t1_true = 20 * us
         noise = _DurationAwareRelaxation(t1=t1_true, tphi=1000 * t1_true)
-        sim = DensityMatrixSimulator(noise_model=noise)
+        sim = DensityMatrixSimulator(error_model=noise)
 
         np.random.seed(0)
         exp = T1(
@@ -126,14 +126,14 @@ class TestT1SimulatedRun:
         exp.analyze()
 
         assert exp._fit[0].fit_success
-        assert exp.characterized_values[0] == pytest.approx(
+        assert exp.characterized_values[0].n == pytest.approx(
             t1_true, rel=0.1
         )
 
     def test_recovers_known_t1_with_x_prep(self, config):
         t1_true = 20 * us
         noise = _DurationAwareRelaxation(t1=t1_true, tphi=1000 * t1_true)
-        sim = DensityMatrixSimulator(noise_model=noise)
+        sim = DensityMatrixSimulator(error_model=noise)
 
         np.random.seed(5)
         exp = T1(
@@ -144,14 +144,14 @@ class TestT1SimulatedRun:
         Emulator.run(exp, exp.circuits, auto_save=False)
         exp.analyze()
 
-        assert exp.characterized_values[0] == pytest.approx(
+        assert exp.characterized_values[0].n == pytest.approx(
             t1_true, rel=0.1
         )
 
     def test_final_sets_config_param(self, config):
         t1_true = 20 * us
         noise = _DurationAwareRelaxation(t1=t1_true, tphi=1000 * t1_true)
-        sim = DensityMatrixSimulator(noise_model=noise)
+        sim = DensityMatrixSimulator(error_model=noise)
 
         np.random.seed(0)
         exp = T1(
@@ -193,7 +193,7 @@ class TestT2SimulatedRun:
         noise = _DurationAwareRelaxation(
             t1=1000 * tphi_true, tphi=tphi_true
         )
-        sim = DensityMatrixSimulator(noise_model=noise)
+        sim = DensityMatrixSimulator(error_model=noise)
 
         np.random.seed(1)
         exp = T2(
@@ -206,7 +206,7 @@ class TestT2SimulatedRun:
         exp.analyze()
 
         assert exp._fit[0].fit_success
-        assert exp.characterized_values[0] == pytest.approx(
+        assert exp.characterized_values[0].n == pytest.approx(
             tphi_true, rel=0.15
         )
 
@@ -215,7 +215,7 @@ class TestT2SimulatedRun:
         noise = _DurationAwareRelaxation(
             t1=1000 * tphi_true, tphi=tphi_true
         )
-        sim = DensityMatrixSimulator(noise_model=noise)
+        sim = DensityMatrixSimulator(error_model=noise)
 
         np.random.seed(2)
         exp = T2(
@@ -226,7 +226,7 @@ class TestT2SimulatedRun:
         Emulator.run(exp, exp.circuits, auto_save=False)
         exp.analyze()
 
-        assert exp.characterized_values[0] == pytest.approx(
+        assert exp.characterized_values[0].n == pytest.approx(
             tphi_true, rel=0.15
         )
 
@@ -252,7 +252,7 @@ class TestT2DDSimulatedRun:
         noise = _DurationAwareRelaxation(
             t1=1000 * tphi_true, tphi=tphi_true
         )
-        sim = DensityMatrixSimulator(noise_model=noise)
+        sim = DensityMatrixSimulator(error_model=noise)
 
         np.random.seed(3)
         exp = T2DD(
@@ -264,7 +264,7 @@ class TestT2DDSimulatedRun:
         exp.analyze()
 
         assert exp._fit[0].fit_success
-        assert exp.characterized_values[0] == pytest.approx(
+        assert exp.characterized_values[0].n == pytest.approx(
             tphi_true, rel=0.15
         )
 
@@ -301,7 +301,7 @@ class TestParityOscillationsSimulatedRun:
         po.analyze()
 
         assert po._fit.fit_success
-        assert po.fidelity['val'] == pytest.approx(1.0, abs=1e-3)
+        assert po.fidelity.n == pytest.approx(1.0, abs=1e-3)
 
     def test_plot_runs_with_sparse_populations(self, config, bell_circuit):
         # A noiseless Bell state only ever measures '00'/'11' -- never

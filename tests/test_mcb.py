@@ -240,7 +240,7 @@ class TestMCBCapabilityRegions:
     @pytest.fixture(scope='class')
     def capability_regions():
         simulator = DensityMatrixSimulator(
-            noise_model=DepolarizingNoise(
+            error_model=DepolarizingNoise(
                 single_qubit=0.01, two_qubit=0.08
             )
         )

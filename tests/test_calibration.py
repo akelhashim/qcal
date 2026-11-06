@@ -1,9 +1,9 @@
 """Unit tests for qcal.calibration.calibration.Calibration.
 
-Calibration is meant to be subclassed (analyze/generate_circuits raise
-NotImplementedError here), but final()/plot()/set_param() and the
-shared state they operate on are implemented directly on the base
-class, so they're tested here rather than through a subclass.
+Calibration is an ABC (analyze() and generate_circuits() are abstract),
+but final()/plot()/set_param() and the shared state they operate on are
+implemented directly on the base class, so they're tested here through
+a trivial concrete subclass.
 """
 import logging
 
@@ -28,12 +28,15 @@ class _FakeFit:
 class _ConcreteCalibration(Calibration):
     """Minimal concrete subclass for exercising base-class behavior.
 
-    Calibration is an ABC (analyze() is abstract), so it can't be
-    instantiated directly -- every test below that needs an instance
-    goes through this trivial subclass instead.
+    Calibration is an ABC (analyze() and generate_circuits() are
+    abstract), so it can't be instantiated directly -- every test below
+    that needs an instance goes through this trivial subclass instead.
     """
 
     def analyze(self) -> None:
+        pass
+
+    def generate_circuits(self) -> None:
         pass
 
 
@@ -90,19 +93,28 @@ class TestInit:
 
 class TestAbstractness:
 
-    def test_cannot_instantiate_without_analyze(self, config):
+    def test_cannot_instantiate_base_class(self, config):
         with pytest.raises(TypeError):
             Calibration(config)
 
-    def test_subclass_implementing_analyze_is_instantiable(self, config):
+    def test_subclass_missing_generate_circuits_is_abstract(self, config):
+        class _OnlyAnalyze(Calibration):
+            def analyze(self) -> None:
+                pass
+
+        with pytest.raises(TypeError):
+            _OnlyAnalyze(config)
+
+    def test_subclass_missing_analyze_is_abstract(self, config):
+        class _OnlyGenerate(Calibration):
+            def generate_circuits(self) -> None:
+                pass
+
+        with pytest.raises(TypeError):
+            _OnlyGenerate(config)
+
+    def test_subclass_implementing_both_is_instantiable(self, config):
         _ConcreteCalibration(config)  # should not raise
-
-
-class TestUnimplementedMethods:
-
-    def test_generate_circuits_raises_not_implemented(self, cal):
-        with pytest.raises(NotImplementedError):
-            cal.generate_circuits()
 
 
 class TestSetParam:

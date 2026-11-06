@@ -33,7 +33,7 @@ Example::
     from qcal.simulation.error_models import DepolarizingNoise
 
     noise = DepolarizingNoise(single_qubit=0.001, two_qubit=0.01)
-    sim = DensityMatrixSimulator(noise_model=noise)
+    sim = DensityMatrixSimulator(error_model=noise)
     sim.run(circuit)
 """
 from __future__ import annotations
@@ -488,9 +488,15 @@ class ErrorModel(ABC):
     ) -> Optional['quax.QuantumInstrument']:
         """Build a noisy ``QuantumInstrument`` from a stored confusion matrix.
 
-        Uses ``quax.instrument_from_confusion_and_transition`` with an
-        identity transition matrix (post-measurement state = actual
-        pre-measurement state; classical bit-flip model only).
+        Uses ``quax.instrument_from_confusion_and_transition`` with the
+        confusion matrix as the transition matrix too, so a misreported
+        outcome carries real backaction: the physical post-measurement
+        population is redistributed with the same statistics as the
+        reported outcome, not just the classical label. This matters
+        for a mid-circuit measurement (the only place this instrument
+        is used), since the qudit continues to evolve afterward — a
+        backaction-free (identity-transition) instrument would leave
+        readout error with no effect on anything measured later.
 
         Args:
             qudit (str): qudit label, e.g. ``'Q0'``.
@@ -504,10 +510,9 @@ class ErrorModel(ABC):
         arr = self._confusion_matrices.get(qudit)
         if arr is None:
             return None
-        transition = np.eye(d, dtype=float)
         return quax.instrument_from_confusion_and_transition(
             jnp.array(arr),
-            jnp.array(transition),
+            jnp.array(arr),
             dims=(d,),
         )
 
@@ -563,7 +568,7 @@ class DepolarizingNoise(ErrorModel):
     Example::
 
         noise = DepolarizingNoise(single_qubit=0.001, two_qubit=0.01)
-        sim = DensityMatrixSimulator(noise_model=noise)
+        sim = DensityMatrixSimulator(error_model=noise)
 
         # qutrit circuit
         noise = DepolarizingNoise(
@@ -638,7 +643,7 @@ class AmplitudeDamping(ErrorModel):
     Example::
 
         noise = AmplitudeDamping(single_qubit=0.005, two_qubit=0.02)
-        sim = DensityMatrixSimulator(noise_model=noise)
+        sim = DensityMatrixSimulator(error_model=noise)
 
         # qutrit circuit
         noise = AmplitudeDamping(single_qutrit=0.005, two_qutrit=0.02)
@@ -739,7 +744,7 @@ class DephasingNoise(ErrorModel):
         noise = DephasingNoise(
             single_qubit=0.003, single_qutrit=0.006,
         )
-        sim = DensityMatrixSimulator(noise_model=noise)
+        sim = DensityMatrixSimulator(error_model=noise)
 
     Args:
         single_qubit (float): GE dephasing rate for single-qubit
@@ -816,7 +821,7 @@ class BitFlipNoise(ErrorModel):
     Example::
 
         noise = BitFlipNoise(single_qubit=0.01, two_qubit=0.02)
-        sim = DensityMatrixSimulator(noise_model=noise)
+        sim = DensityMatrixSimulator(error_model=noise)
 
         # qutrit circuit
         noise = BitFlipNoise(single_qutrit=0.01, two_qutrit=0.02)
@@ -896,7 +901,7 @@ class PhaseFlipNoise(ErrorModel):
     Example::
 
         noise = PhaseFlipNoise(single_qubit=0.01, two_qubit=0.02)
-        sim = DensityMatrixSimulator(noise_model=noise)
+        sim = DensityMatrixSimulator(error_model=noise)
 
         # qutrit circuit
         noise = PhaseFlipNoise(single_qutrit=0.01, two_qutrit=0.02)
@@ -997,7 +1002,7 @@ class RelaxationNoise(ErrorModel):
             single_qubit=RelaxationParams(t1=50e-6, tphi=30e-6, t=20e-9),
             two_qubit=RelaxationParams(t1=50e-6, tphi=30e-6, t=60e-9),
         )
-        sim = DensityMatrixSimulator(noise_model=noise)
+        sim = DensityMatrixSimulator(error_model=noise)
 
         # qutrit: GE from single_qubit, EF from single_qutrit
         noise = RelaxationNoise(
@@ -1080,7 +1085,7 @@ class LeakageNoise(ErrorModel):
     Example::
 
         noise = LeakageNoise(single_qutrit=0.005, two_qutrit=0.01)
-        sim = DensityMatrixSimulator(noise_model=noise)
+        sim = DensityMatrixSimulator(error_model=noise)
 
     Args:
         single_qutrit (float): leakage rate for single-qutrit gates.
@@ -1135,7 +1140,7 @@ class SeepageNoise(ErrorModel):
     Example::
 
         noise = SeepageNoise(single_qutrit=0.005, two_qutrit=0.01)
-        sim = DensityMatrixSimulator(noise_model=noise)
+        sim = DensityMatrixSimulator(error_model=noise)
 
     Args:
         single_qutrit (float): seepage rate for single-qutrit gates.
@@ -1271,7 +1276,7 @@ class UnitaryError(ErrorModel):
         theta = 0.05  # radians
         Rz = np.array([
             [np.exp(-0.5j * theta), 0],
-            [0,                     np.exp(0.5j * theta)],
+            [0, np.exp(0.5j * theta)],
         ])
         noise = UnitaryError(single_qubit=Rz)
 
@@ -1597,7 +1602,7 @@ class CustomErrorModel(ErrorModel):
             ),
         )
         noise.add_readout_noise('Q0', cmat)
-        sim = DensityMatrixSimulator(noise_model=noise)
+        sim = DensityMatrixSimulator(error_model=noise)
 
     Args:
         *error_models (ErrorModel): sub-models to compose. Accepts zero or
@@ -1671,6 +1676,9 @@ class CustomErrorModel(ErrorModel):
 
         Uses :meth:`confusion_matrix_for` (own dict + sub-model fall-through)
         so that sub-model confusion matrices are picked up automatically.
+        As in the base class, the confusion matrix also serves as the
+        transition matrix, so the instrument carries real backaction
+        (see :meth:`ErrorModel.instrument_for`).
 
         Args:
             qudit (str): qudit label, e.g. ``'Q0'``.
@@ -1683,9 +1691,8 @@ class CustomErrorModel(ErrorModel):
         arr = self.confusion_matrix_for(qudit)
         if arr is None:
             return None
-        transition = np.eye(d, dtype=float)
         return quax.instrument_from_confusion_and_transition(
-            jnp.array(arr), jnp.array(transition), dims=(d,),
+            jnp.array(arr), jnp.array(arr), dims=(d,),
         )
 
     def channel_for_gate(
@@ -1741,7 +1748,7 @@ class CustomErrorModel(ErrorModel):
             # Identity-like error on X(0) (slightly depolarised)
             ptm = np.diag([1, 0.99, 0.99, 0.99])
             noise = CustomErrorModel.from_PTM({gates.X(0): ptm})
-            sim = DensityMatrixSimulator(noise_model=noise)
+            sim = DensityMatrixSimulator(error_model=noise)
 
         Args:
             gate_ptm_dict (dict): mapping from gate instance to PTM array.
@@ -1790,7 +1797,7 @@ class CustomErrorModel(ErrorModel):
                 sq.X(0):      {'Z': 0.002, 'X': 0.001},
                 tq.CZ((0,1)): {'ZI': 0.005, 'IZ': 0.003, 'ZZ': 0.001},
             })
-            sim = DensityMatrixSimulator(noise_model=noise)
+            sim = DensityMatrixSimulator(error_model=noise)
 
         Args:
             gate_pauli_dict (dict): mapping from gate instance to a

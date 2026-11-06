@@ -12,6 +12,7 @@ import ast
 import copy
 import io
 import logging
+import pathlib
 from collections import defaultdict
 from typing import Any, Dict, List, Tuple
 
@@ -26,7 +27,14 @@ from qcal.math.utils import round_sig_figures
 logger = logging.getLogger(__name__)
 
 
-__all__ = ['Config']
+__all__ = ('EXAMPLE_CONFIG_PATH', 'Config')
+
+
+# Path to the example config shipped with the repository
+EXAMPLE_CONFIG_PATH = (
+    pathlib.Path(__file__).resolve().parent.parent
+    / 'examples' / 'config' / 'config.yaml'
+)
 
 
 def nested_index(dictionary: Dict, n_levels: int = 2) -> List[List]:
@@ -187,7 +195,7 @@ class Config:
         Returns:
             pd.DataFrame: DataFrame of coherences times.
         """
-        df = pd.DataFrame(columns=['Qubit', 'Coherence Time', 'Coherence Type'])
+        dfs = []
         for c in ['T1', 'T2*', 'T2e', 'T2DD']:
             coh = []
             qs = []
@@ -206,17 +214,22 @@ class Config:
                     qs.append(q)
                     label.append(c + ' EF')
 
-            df = pd.concat([
-                df,
-                pd.DataFrame(
-                    {'Qubit': qs,
-                     'Coherence Time': coh,
-                     'Coherence Type': label
-                    }
+            if coh:
+                dfs.append(
+                    pd.DataFrame(
+                        {'Qubit': qs,
+                         'Coherence Time': coh,
+                         'Coherence Type': label
+                        }
+                    )
                 )
-            ])
 
-        return df
+        if not dfs:
+            return pd.DataFrame(
+                columns=['Qubit', 'Coherence Time', 'Coherence Type']
+            )
+
+        return pd.concat(dfs, ignore_index=True)
 
     @property
     def filename(self) -> str:

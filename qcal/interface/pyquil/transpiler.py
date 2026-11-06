@@ -12,6 +12,20 @@ from typing import Any, Dict, Iterable, List
 import numpy as np
 
 from qcal.circuit import Barrier, Circuit, CircuitSet, Cycle
+from qcal.interface.pyquil.randomized_compiling import (
+    _READOUT_PAULI_PHASES,
+    PHASE_GATES,
+    PULSE_GATES,
+    RCLayerTracker,
+    ReadoutLayerTracker,
+    _U2Randomization,
+    build_rc_configuration,
+    effective_layer_period,
+    final_layer_cycle_indices,
+    has_phase_gate,
+    has_trailing_single_qubit_layer,
+    is_rc_layer,
+)
 from qcal.transpilation.transpiler import Transpiler
 from qcal.transpilation.utils import GateMapper
 from qcal.units import ns
@@ -79,6 +93,31 @@ def add_CZ(q0: int, q1: int, **kwargs) -> Iterator:
     yield CZ(q0, q1)
 
 
+def add_H(qubit: int, **kwargs) -> Iterator:
+    """Add a Hadamard gate (Z followed by Y90).
+
+    Args:
+        qubit (int): qubit label.
+
+    Yields:
+        Iterator: RZ and RX gates.
+    """
+    try:
+        from pyquil.gates import RZ
+    except ImportError:
+        logger.warning(' Unable to import pyquil!')
+        return
+
+    if kwargs['subspace'] == 'GE':
+        yield RZ(np.pi, qubit)
+        yield from add_Y90(qubit, **kwargs)
+    elif kwargs['subspace'] == 'EF':
+        yield RZ_F12(np.pi, qubit)
+        yield from add_Y90(qubit, **kwargs)
+    else:
+        raise ValueError(f'Invalid subspace: {kwargs["subspace"]}')
+
+
 def add_Idle(qubit: int, duration: float, **kwargs) -> Iterator:
     """Add an idle gate.
 
@@ -140,6 +179,34 @@ def add_Measure(
         return
 
     yield MEASURE(qubit, classical_ref)
+
+
+def add_MCM(
+    qubits: Iterable[int],
+    classical_refs: Iterable[
+        pyquil.quilatom.MemoryReference | None  # type: ignore # noqa: F821
+    ],
+    **kwargs
+) -> Iterator:
+    """Add a mid-circuit measurement, possibly over multiple qubits.
+
+    Args:
+        qubits (Iterable[int]): qubit label(s).
+        classical_refs (Iterable[pyquil.quilatom.MemoryReference | None]):
+            classical memory reference(s) to store the measurement
+            result(s), one per qubit in `qubits`.
+
+    Yields:
+        Iterator: Measurement(s).
+    """
+    try:
+        from pyquil.gates import MEASURE
+    except ImportError:
+        logger.warning(' Unable to import pyquil!')
+        return
+
+    for qubit, classical_ref in zip(qubits, classical_refs, strict=True):
+        yield MEASURE(qubit, classical_ref)
 
 
 def add_SXdag(qubit: int, **kwargs) -> Iterator:
@@ -260,13 +327,13 @@ def add_Y90(qubit: int, **kwargs) -> Iterator:
         return
 
     if kwargs['subspace'] == 'GE':
-        yield RZ(np.pi/2, qubit)
-        yield RX(np.pi/2, qubit)
         yield RZ(-np.pi/2, qubit)
+        yield RX(np.pi/2, qubit)
+        yield RZ(np.pi/2, qubit)
     elif kwargs['subspace'] == 'EF':
-        yield RZ_F12(np.pi/2, qubit)
-        yield RX_F12(np.pi/2, qubit)
         yield RZ_F12(-np.pi/2, qubit)
+        yield RX_F12(np.pi/2, qubit)
+        yield RZ_F12(np.pi/2, qubit)
     else:
         raise ValueError(f'Invalid subspace: {kwargs["subspace"]}')
 
@@ -365,6 +432,9 @@ def to_pyquil(
     circuit_for_loop:      bool = False,
     cycles_to_defcircuits: bool = False,
     fence_between_cycles:  bool = True,
+    randomized_compiling:  bool = False,
+    randomized_readout:    bool = False,
+    rc_kwargs:             Dict | None = None,
 ) -> Program:  # type: ignore # noqa: F821
     """Transpile a qcal circuit to a PyQuil Program.
 
@@ -373,14 +443,28 @@ def to_pyquil(
         gate_mapper (GateMapper): map between qcal to quil gates.
         cycle_replacement (Dict[Cycle, str] | None, optional): mapping from
                 qcal Cycles to PyQuil DEFCIRCUIT name, used to replace entire
-                cycle with a single DEFCIRCUIT call. Defaults to ``None``.
+                cycle with a single DEFCIRCUIT call. With randomized
+                compiling or readout, a randomized Cycle containing a phase
+                gate (Rz/VirtualZ) cannot be replaced. Defaults to
+                ``None``.
         circuit_for_loop (bool, optional): loops over circuit partitions for
                 circuits with repeated structures. Defaults to ``False``.
         cycles_to_defcircuits (bool, optional): whether to write each
             distinct cycle as a DEFCIRCUIT definition and invoke it by name.
-            Defaults to ``False``.
+            With randomized compiling or readout, randomized Cycles
+            containing a phase gate are left as literal gates. Defaults to
+            ``False``.
         fence_between_cycles (bool, optional): whether to add a fence
             between every cycle. Defaults to ``True``.
+        randomized_compiling (bool, optional): whether to randomly compile
+            the circuit. Defaults to ``False``.
+        randomized_readout (bool, optional): whether to randomize the readout.
+            Defaults to ``False``.
+        rc_kwargs (Dict | None, optional): keyword arguments forwarded to
+            `RandomizedCompilingConfiguration` when `randomized_compiling`
+            is ``True`` (e.g. `invert_random_paulis`,
+            `shots_per_randomization`, `base_cycle_repetitions`,
+            `layer_period`). Defaults to ``None``.
 
     Returns:
         Program: PyQuil Program.
@@ -398,7 +482,12 @@ def to_pyquil(
         q: declarations.declare(f'ro{q}', 'BIT', 1)
         for q in circuit.qubits
     }
-    if circuit_for_loop:
+    if circuit_for_loop and not randomized_compiling:
+        if randomized_readout:
+            logger.warning(
+                'Randomized readout is not compatible with repeated '
+                'sub-circuits!'
+            )
         for sub_circuit, n_reps in circuit.partitions:
             if n_reps == 1:
                 _declarations, _tprogram = transpile_circuit(
@@ -408,7 +497,8 @@ def to_pyquil(
                         cycle_replacement=cycle_replacement,
                         qubit_to_cref=qubit_to_cref,
                         cycles_to_defcircuits=cycles_to_defcircuits,
-                        fence_between_cycles=fence_between_cycles
+                        fence_between_cycles=fence_between_cycles,
+                        randomized_readout=randomized_readout
                 )
                 declarations += _declarations
                 tprogram += _tprogram
@@ -424,7 +514,8 @@ def to_pyquil(
                     cycle_replacement=cycle_replacement,
                     qubit_to_cref=qubit_to_cref,
                     cycles_to_defcircuits=cycles_to_defcircuits,
-                    fence_between_cycles=fence_between_cycles
+                    fence_between_cycles=fence_between_cycles,
+                    # randomized_readout=randomized_readout
                 )
                 declarations += _declarations
 
@@ -440,6 +531,32 @@ def to_pyquil(
 
         tprogram.resolve_label_placeholders()
 
+    elif randomized_compiling and not circuit_for_loop:
+        _declarations, _tprogram = transpile_circuit(
+            circuit=circuit,
+            gate_mapper=gate_mapper,
+            cycle_replacement=cycle_replacement,
+            qubit_to_cref=qubit_to_cref,
+            cycles_to_defcircuits=cycles_to_defcircuits,
+            fence_between_cycles=fence_between_cycles,
+            randomized_compiling=randomized_compiling,
+            randomized_readout=randomized_readout,
+            rc_kwargs=rc_kwargs,
+        )
+        rc_configuration = _tprogram.rc_configuration
+        rc_source_phases = _tprogram.source_phases
+        if randomized_readout:
+            readout_configuation = _tprogram.readout_configuation
+            readout_source_phases = _tprogram.readout_source_phases
+        declarations += _declarations
+        tprogram += _tprogram
+
+    elif randomized_compiling and circuit_for_loop:
+        raise ValueError(
+            'Randomized compiling builds for-loops internally, ' \
+            'so cannot be used with circuit_for_loop.'
+        )
+
     else:
         _declarations, _tprogram = transpile_circuit(
             circuit=circuit,
@@ -447,12 +564,29 @@ def to_pyquil(
             cycle_replacement=cycle_replacement,
             qubit_to_cref=qubit_to_cref,
             cycles_to_defcircuits=cycles_to_defcircuits,
-            fence_between_cycles=fence_between_cycles
+            fence_between_cycles=fence_between_cycles,
+            randomized_readout=randomized_readout,
+            # Only `layer_period` is used without randomized compiling, to
+            # find a single-qubit-only circuit's final template.
+            rc_kwargs=rc_kwargs,
         )
+        if randomized_readout:
+            readout_configuation = _tprogram.readout_configuation
+            readout_source_phases = _tprogram.source_phases
         declarations += _declarations
         tprogram += _tprogram
 
-    return declarations + tprogram
+    final_program = declarations + tprogram
+    if randomized_compiling:
+        final_program.rc_configuration = rc_configuration
+        final_program.source_phases = rc_source_phases
+    if randomized_readout:
+        final_program.readout_configuation = readout_configuation
+        final_program.readout_source_phases = readout_source_phases
+        if not randomized_compiling:
+            final_program.source_phases = readout_source_phases
+
+    return final_program
 
 
 def transpile_circuit(
@@ -465,6 +599,9 @@ def transpile_circuit(
     ) = None,
     cycles_to_defcircuits: bool = False,
     fence_between_cycles:  bool = True,
+    randomized_compiling:  bool = False,
+    randomized_readout:    bool = False,
+    rc_kwargs:             Dict | None = None,
 ):
     """Transpile a qcal circuit to a PyQuil Program.
 
@@ -478,26 +615,43 @@ def transpile_circuit(
             which case the qubits in the partition may be a subset of the qubits
             in the entire circuit.
         cycle_replacement (Dict[Cycle, str] | None, optional): mapping from
-                qcal Cycles to PyQuil DEFCIRCUIT name, used to replace entire
-                cycle with a single DEFCIRCUIT call. Defaults to ``None``.
+            qcal Cycles to PyQuil DEFCIRCUIT name, used to replace entire cycle
+            with a single DEFCIRCUIT call. With randomized compiling or readout,
+            a randomized Cycle containing a phase gate (Rz/VirtualZ) cannot be
+            replaced. Defaults to ``None``.
         qubit_to_cref (Dict[int, pyquil.quilatom.MemoryReference] | None,
             optional): mapping from qubit index to classical memory reference.
             When ``None``, a fresh ``ro`` register is declared and the mapping
             is built from ``circuit.qubits``. Defaults to ``None``.
         cycles_to_defcircuits (bool, optional): whether to write each
             distinct cycle as a DEFCIRCUIT definition and invoke it by name.
-            Defaults to ``False``.
+            With randomized compiling or readout, randomized Cycles
+            containing a phase gate are left as literal gates. Defaults to
+            ``False``.
         fence_between_cycles (bool, optional): whether to add a fence
             between every cycle. Defaults to ``True``.
+        randomized_compiling (bool, optional): whether to randomly compile
+            the circuit. Defaults to ``False``.
+        randomized_readout (bool, optional): whether to randomize the readout.
+            Defaults to ``False``.
+        rc_kwargs (Dict | None, optional): keyword arguments forwarded to
+            `RandomizedCompilingConfiguration` when `randomized_compiling`
+            is ``True`` (e.g. `invert_random_paulis`,
+            `shots_per_randomization`, `base_cycle_repetitions`,
+            `layer_period`). Defaults to ``None``.
 
     Returns:
         Program: PyQuil Program.
+
+    Raises:
+        ValueError: if `cycle_replacement` replaces a randomized Cycle
+            containing a phase gate (see `has_phase_gate`).
     """
     try:
         from pyquil.gates import FENCE
         from pyquil.quil import Program
         from pyquil.quilatom import FormalArgument
-        from pyquil.quilbase import DefCircuit
+        from pyquil.quilbase import Declare, DefCircuit
     except ImportError:
         logger.warning(' Unable to import pyquil!')
         return
@@ -512,20 +666,99 @@ def transpile_circuit(
             for q in circuit.qubits
         }
 
+    layer_period = effective_layer_period(
+        circuit, (rc_kwargs or {}).get('layer_period')
+    )
+    # Non-barrier Cycles excluding terminal measurements, matching
+    # `is_rc_layer`'s `n_cycles`.
+    n_interior_cycles = sum(
+        not cycle.is_barrier for cycle in circuit.cycles[:-1]
+    )
+
+    rc_tracker = None
+    if randomized_compiling:
+        rc_kwargs = dict(rc_kwargs or {})
+        reserve_final_layer = has_trailing_single_qubit_layer(
+            circuit, layer_period
+        )
+        if randomized_readout:
+            # The final layer's phases are written into the readout
+            # destination register instead (see
+            # `RCLayerTracker.emit_phase_gate`), and the accumulated Pauli
+            # frame is undone there via `apply_pauli_pair` below, so RC's
+            # own final-layer twirl would never be read.
+            rc_kwargs.setdefault('skip_final_layer', True)
+        elif rc_kwargs.get('skip_final_layer') and reserve_final_layer:
+            raise ValueError(
+                'skip_final_layer=True requires randomized_readout: '
+                'without it, the final pre-measurement layer reads RC\'s '
+                'twirled unitary memory, which skip_final_layer leaves '
+                'unallocated.'
+            )
+        rc_configuration = build_rc_configuration(
+            circuit, qubits, **rc_kwargs
+        )
+        rc_tracker = RCLayerTracker(
+            rc_configuration,
+            reserve_final_layer=reserve_final_layer,
+        )
+        # RandomizedCompilingConfiguration.build_quil_program() only
+        # declares its twirled destination registers (`unitaries_q{n}`);
+        # the separate source-angle registers this tracker writes into
+        # (`source_phases_q{n}`, since build_rc_configuration overrides
+        # unitaries_prefix) are never declared elsewhere, so declare them
+        # here, sized to what the tracker already fixed at construction.
+        for key, values in rc_tracker.source_phases.items():
+            declarations += Declare(key, 'REAL', len(values))
+
+    readout_tracker = None
+    readout_final_layer = frozenset()
+    if randomized_readout:
+        readout_configuation = _U2Randomization(
+            qubits=qubits,
+            destination_names=lambda qubit: f"measurement_unitary_q{qubit}",
+            seed_names=lambda qubit: f"measurement_seed_q{qubit}",
+            source_names=lambda qubit: f"measurement_source_unitaries_q{qubit}",
+            source_unitary_phases=_READOUT_PAULI_PHASES,
+        )
+        # With RC, RCLayerTracker emits the final layer's gates but
+        # records their phases into this tracker (see
+        # RCLayerTracker.emit_phase_gate).
+        readout_tracker = ReadoutLayerTracker(readout_configuation)
+        readout_final_layer = final_layer_cycle_indices(
+            circuit, layer_period
+        )
+
+    non_barrier_idx = 0
     cycle_defs = {}
     for i, cycle in enumerate(circuit):
         if fence_between_cycles:
-            tprogram += FENCE(*qubits)
+            tprogram += FENCE()
 
         if isinstance(cycle, Barrier):
             tprogram += FENCE(*cycle.qubits)
 
         else:
+            tracked = rc_tracker is not None or i in readout_final_layer
+            if tracked:
+                _check_trackable_cycle(cycle, i)
+            # A tracked Cycle's phase gates are rewritten into references
+            # specific to its layer, so it can't be a reusable DEFCIRCUIT
+            # (see `has_phase_gate`).
+            literal_only = tracked and has_phase_gate(cycle)
             # Determine defcircuit name: caller-supplied takes priority,
             # otherwise auto-generate if cycles_to_defcircuits is set.
             if cycle_replacement and cycle in cycle_replacement:
+                if literal_only:
+                    raise ValueError(
+                        f'Cycle {i} ({cycle_replacement[cycle]!r}) '
+                        'contains a phase gate (Rz/VirtualZ) that is '
+                        'randomized per layer, so cannot be replaced '
+                        'with a DEFCIRCUIT under randomized compiling or '
+                        'randomized readout.'
+                    )
                 cycle_key = cycle_replacement[cycle]
-            elif cycles_to_defcircuits:
+            elif cycles_to_defcircuits and not literal_only:
                 cycle_key = next(
                     (k for k, c in cycle_defs.items() if c == cycle),
                     f'Cycle_{i}'
@@ -536,11 +769,24 @@ def transpile_circuit(
             if cycle_key is not None:
                 if cycle_key not in cycle_defs:
                     cycle_defs[cycle_key] = cycle
+                    # The trackers only add per-qubit FENCEs after
+                    # X90/SX pulses here, since phase gates never reach
+                    # this branch while tracked. The readout tracker is
+                    # passed regardless of `readout_final_layer`, so the
+                    # body is the same wherever its key first appears. A
+                    # cycle with a phase gate only reaches this branch
+                    # outside the randomized final layer, so its phases
+                    # are left untracked (literal).
                     tcycle = transpile_cycle(
                         cycle=cycle,
                         gate_mapper=gate_mapper,
                         qubit_to_cref=qubit_to_cref,
-                        cycles_to_defcircuits=True
+                        cycles_to_defcircuits=True,
+                        rc_tracker=rc_tracker,
+                        readout_tracker=(
+                            None if has_phase_gate(cycle)
+                            else readout_tracker
+                        ),
                     )
                     declarations += DefCircuit(
                         name=cycle_key,
@@ -559,10 +805,66 @@ def transpile_circuit(
                     cycle=cycle,
                     gate_mapper=gate_mapper,
                     qubit_to_cref=qubit_to_cref,
-                    cycles_to_defcircuits=False
+                    cycles_to_defcircuits=False,
+                    rc_tracker=rc_tracker,
+                    readout_tracker=(
+                        readout_tracker if i in readout_final_layer
+                        else None
+                    ),
                 )
 
-    # tprogram += tprogram_body
+            if rc_tracker is not None and is_rc_layer(
+                cycle, non_barrier_idx, layer_period, n_interior_cycles
+            ):
+                rc_tracker.close_layer()
+            non_barrier_idx += 1
+
+    if randomized_compiling:
+        rc_program = rc_configuration.build_quil_program()
+        if randomized_readout:
+            rc_program += readout_configuation.build_quil_program()
+            for qubit in qubits:
+                call = rc_configuration.apply_pauli_pair(
+                    qubit,
+                    rc_configuration.cycle_count,
+                    source_unitaries=(
+                        readout_configuation.destination_names(qubit)
+                    ),
+                    target_unitaries=(
+                        readout_configuation.destination_names(qubit)
+                    ),
+                    unitary_offset=0,
+                )
+                if call is not None:
+                    rc_program += call
+
+        tprogram = rc_program + tprogram
+        tprogram.rc_configuration = rc_configuration
+        tprogram.source_phases = rc_tracker.source_phases
+        if randomized_readout:
+            tprogram.readout_configuation = readout_configuation
+            tprogram.readout_source_phases = readout_tracker.source_phases
+
+    elif randomized_readout:
+        # Without RC, nothing else declares the extern that
+        # `_U2Randomization` CALLs (pyquil's RC `build_quil_program` declares
+        # every extern, so only add it here to avoid a duplicate PRAGMA).
+        from pyquil._qpu._classical_computations import (
+            build_extern_function_signatures,
+        )
+        tprogram = (
+            Program(
+                build_extern_function_signatures()[
+                    'choose_random_real_sub_regions'
+                ]
+            )
+            + readout_configuation.build_quil_program()
+            + tprogram
+        )
+        tprogram.readout_configuation = readout_configuation
+        tprogram.source_phases = readout_tracker.source_phases
+        tprogram.readout_source_phases = readout_tracker.source_phases
+
     return (declarations, tprogram)
 
 
@@ -571,6 +873,8 @@ def transpile_cycle(
     gate_mapper:           GateMapper,
     qubit_to_cref:         Dict[int, pyquil.quilatom.MemoryReference],  # type: ignore # noqa: F821
     cycles_to_defcircuits: bool = False,
+    rc_tracker:            RCLayerTracker | None = None,
+    readout_tracker:       ReadoutLayerTracker | None = None,
 ) -> Program:  # type: ignore # noqa: F821
     """Transpile a single qcal Cycle to a PyQuil Program.
 
@@ -583,36 +887,78 @@ def transpile_cycle(
         cycles_to_defcircuits (bool, optional): whether to write each
             distinct cycle as a DEFCIRCUIT definition and invoke it by name.
             Defaults to ``False``.
+        rc_tracker (RCLayerTracker | None, optional): when randomized
+            compiling, the tracker whose `emit_phase_gate` replaces the
+            literal Rz gates this Cycle would otherwise emit; X90/SX
+            gates still go through `gate_mapper` but get an extra
+            per-qubit FENCE. Defaults to ``None``.
+        readout_tracker (ReadoutLayerTracker | None, optional): when
+            randomizing readout without randomized compiling, the
+            tracker whose `emit_phase_gate` replaces the literal Rz
+            gates of this Cycle (X90/SX handled as with `rc_tracker`).
+            Only ever passed for the final pre-measurement Cycle (see
+            `final_layer_cycle_indices`), or for a DEFCIRCUIT body.
+            Defaults to ``None``.
 
     Returns:
         Program: PyQuil Program for this cycle.
+
+    Raises:
+        ValueError: if `cycles_to_defcircuits` is ``True``, a tracker is
+            passed, and `cycle` contains a phase gate.
     """
     try:
+        from pyquil.gates import FENCE
         from pyquil.quil import Program
         from pyquil.quilatom import FormalArgument
     except ImportError:
         logger.warning(' Unable to import pyquil!')
         return
 
+    tracking = rc_tracker is not None or readout_tracker is not None
+    if cycles_to_defcircuits and tracking and has_phase_gate(cycle):
+        raise ValueError(
+            'A DEFCIRCUIT body is reused at every occurrence, so cannot '
+            'contain phase gates (Rz/VirtualZ) whose randomized memory '
+            'reference differs per layer.'
+        )
+
     tprogram = Program()
     for gate in cycle:
-        if gate.name in ['Meas', 'MCM']:
+        if cycles_to_defcircuits:
+            qubits = [FormalArgument(f'q{i}') for i in gate.qubits]
+        else:
+            qubits = gate.qubits
+
+        if gate.name == 'Meas':
             tprogram += gate_mapper[gate.name](
-                gate.qubits[0],
+                qubits[0],
                 qubit_to_cref[gate.qubits[0]]
             )
+        elif gate.name == 'MCM':
+            tprogram += gate_mapper[gate.name](
+                qubits,
+                [qubit_to_cref[q] for q in gate.qubits]
+            )
+        elif rc_tracker is not None and gate.name in PHASE_GATES:
+            tprogram += rc_tracker.emit_phase_gate(gate, readout_tracker)
+        elif readout_tracker is not None and gate.name in PHASE_GATES:
+            tprogram += readout_tracker.emit_phase_gate(gate)
         else:
-            if cycles_to_defcircuits:
-                qubits = [FormalArgument(f'q{i}') for i in gate.qubits]
-            else:
-                qubits = gate.qubits
-
             tprogram += gate_mapper[gate.name](
                 *qubits, **{
                     **{'subspace': gate.properties.get('subspace', 'GE')},
                     **gate.properties.get('params', {})
                 }
             )
+            # A tracker is only ever handed the final layer of a ZXZXZ
+            # template (RC's layer boundaries, or the pre-measurement
+            # layer -- see final_layer_cycle_indices), so fence its
+            # X90/SX pulses per-qubit to preserve that template's
+            # ordering when fence_between_cycles is off.
+            if tracking and gate.name in PULSE_GATES:
+                tprogram += FENCE(*qubits)
+
     return tprogram
 
 
@@ -622,13 +968,16 @@ DEFAULT_GATEMAPPER: Mapping[str, Callable] = GateMapper(
         'CNOT':     add_CNOT,
         'CX':       add_CNOT,
         'CZ':       add_CZ,
+        'H':        add_H,
         'I':        add_Idle,
         'Idle':     add_Idle,
         'iSWAP':    add_ISWAP,
-        'MCM':      add_Measure,
+        'MCM':      add_MCM,
         'Meas':     add_Measure,
         'VirtualZ': add_Rz,
+        'SX':       add_X90,
         'SXdag':    add_SXdag,
+        'SY':       add_Y90,
         'SYdag':    add_SYdag,
         'Rz':       add_Rz,
         'X':        add_X,
@@ -651,6 +1000,9 @@ class PyQuilTranspiler(Transpiler):
         circuit_for_loop:      bool = False,
         cycles_to_defcircuits: bool = False,
         fence_between_cycles:  bool = True,
+        randomized_compiling:  bool = False,
+        randomized_readout:    bool = False,
+        rc_kwargs:             Dict | None = None,
     ) -> None:
         """Initialize with a GateMapper.
 
@@ -659,14 +1011,29 @@ class PyQuilTranspiler(Transpiler):
                 maps qcal gates to pyquil gates. Defaults to ``None``.
             cycle_replacement (Dict[Cycle, str] | None, optional): mapping from
                 qcal Cycles to PyQuil DEFCIRCUIT name, used to replace entire
-                cycle with a single DEFCIRCUIT call. Defaults to ``None``.
+                cycle with a single DEFCIRCUIT call. With randomized
+                compiling or readout, a randomized Cycle containing a phase
+                gate (Rz/VirtualZ) cannot be replaced. Defaults to ``None``.
             circuit_for_loop (bool, optional): loops over circuit partitions for
                 circuits with repeated structures. Defaults to ``False``.
             cycles_to_defcircuits (bool, optional): whether to write each
                 distinct cycle as a DEFCIRCUIT definition and invoke it by name.
-                Defaults to ``False``.
+                With randomized compiling or readout, randomized Cycles
+                containing a phase gate are left as literal gates. Defaults
+                to ``False``.
             fence_between_cycles (bool, optional): whether to add a fence
                 between every cycle. Defaults to ``True``.
+            randomized_compiling (bool, optional): whether to randomly
+                compile the circuit. Defaults to ``False``.
+            randomized_readout (bool, optional): whether to randomize the
+                readout. Defaults to ``False``.
+            rc_kwargs (Dict | None, optional): keyword arguments forwarded to
+                `RandomizedCompilingConfiguration` when
+                `randomized_compiling` is ``True`` (e.g.
+                `invert_random_paulis`, `shots_per_randomization`,
+                `base_cycle_repetitions`, `layer_period`). Defaults to
+                ``None``, in which case `invert_random_paulis=True` and
+                `shots_per_randomization=None` are used.
         """
         try:
             import pyquil  # noqa: F401
@@ -681,8 +1048,18 @@ class PyQuilTranspiler(Transpiler):
 
         self._cycle_replacement = cycle_replacement
         self._circuit_for_loop = circuit_for_loop
-        self._cycle_to_defcircuits = cycles_to_defcircuits
+        self._cycles_to_defcircuits = cycles_to_defcircuits
         self._fence_between_cycles = fence_between_cycles
+        self._randomized_compiling = randomized_compiling
+        self._randomized_readout = randomized_readout
+        self._rc_kwargs = rc_kwargs if rc_kwargs is not None else {
+            'invert_random_paulis': True,
+            # Defaults to 1 if None, but can be set to > 1 for more shots per
+            # randomization.
+            'shots_per_randomization': None,
+            'base_cycle_repetitions': None,
+            'layer_period': 5
+        }
 
         super().__init__(gate_mapper=gate_mapper)
 
@@ -708,8 +1085,11 @@ class PyQuilTranspiler(Transpiler):
                     gate_mapper=self._gate_mapper,
                     cycle_replacement=self._cycle_replacement,
                     circuit_for_loop=self._circuit_for_loop,
-                    cycles_to_defcircuits=self._cycle_to_defcircuits,
-                    fence_between_cycles=self._fence_between_cycles
+                    cycles_to_defcircuits=self._cycles_to_defcircuits,
+                    fence_between_cycles=self._fence_between_cycles,
+                    randomized_compiling=self._randomized_compiling,
+                    randomized_readout=self._randomized_readout,
+                    rc_kwargs=self._rc_kwargs,
                 )
             )
 
@@ -718,3 +1098,39 @@ class PyQuilTranspiler(Transpiler):
 
         tprograms = CircuitSet(circuits=tprograms)
         return tprograms
+
+
+
+def _check_trackable_cycle(cycle: Cycle, index: int) -> None:
+    """Check that a tracked Cycle's single-qubit content is ZXZXZ.
+
+    The RC and readout trackers randomize single-qubit unitaries by
+    rewriting the Rz/VirtualZ angles of their ZXZXZ templates. Gates such
+    as `SY` or `H` emit their own literal frame changes and pulses, which
+    the trackers cannot see, so the randomized unitary would be wrong.
+    RC layer boundaries (two-qubit gates or measurements) are exempt: their
+    idle qubits are twirled as identity (e.g. a dynamical-decoupling
+    sequence).
+
+    Args:
+        cycle (Cycle): qcal Cycle that will be tracked.
+        index (int): position of `cycle` in its circuit, for the error.
+
+    Raises:
+        ValueError: if `cycle` is not an RC layer boundary and contains a
+            gate other than Rz/VirtualZ, X90/SX, or an identity.
+    """
+    if any(
+        len(gate.qubits) == 2 or gate.is_measurement
+        for gate in cycle.gates
+    ):
+        return
+    allowed = (*PHASE_GATES, *PULSE_GATES, 'I', 'Idle')
+    for gate in cycle.gates:
+        if gate.name not in allowed:
+            raise ValueError(
+                f"Cycle {index} contains '{gate.name}' on {gate.qubits}. "
+                'Randomized compiling and randomized readout require '
+                'single-qubit gates to be compiled to ZXZXZ form (Rz/'
+                'VirtualZ and X90/SX pulses).'
+            )

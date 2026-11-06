@@ -155,7 +155,7 @@ class TestAmplitudeDamping:
         circuit = qc.Circuit([qc.Cycle({qc.X(0)})])
         circuit.measure()
         noise = AmplitudeDamping(single_qubit=0.2)
-        sim = DensityMatrixSimulator(noise_model=noise)
+        sim = DensityMatrixSimulator(error_model=noise)
         sim.run(circuit)
         results = dict(circuit.results.dict)
         assert 0.0 < results['1'] < 1.0
@@ -179,7 +179,7 @@ class TestDephasingNoise:
         circuit = qc.Circuit([qc.Cycle({qc.X(0)})])
         circuit.measure()
         noise = DephasingNoise(single_qubit=0.5)
-        sim = DensityMatrixSimulator(noise_model=noise)
+        sim = DensityMatrixSimulator(error_model=noise)
         sim.run(circuit)
         # Pure dephasing kills coherence but not populations: X(0)
         # deterministically prepares |1>, so P(1) stays 1 regardless.
@@ -223,7 +223,7 @@ class TestPhaseFlipNoise:
         circuit = qc.Circuit([qc.Cycle({qc.X(0)})])
         circuit.measure()
         noise = PhaseFlipNoise(single_qubit=0.5)
-        sim = DensityMatrixSimulator(noise_model=noise)
+        sim = DensityMatrixSimulator(error_model=noise)
         sim.run(circuit)
         assert dict(circuit.results.dict) == pytest.approx({'1': 1.0})
 
@@ -251,7 +251,7 @@ class TestRelaxationNoise:
         circuit.measure()
         params = RelaxationParams(t1=20e-9, tphi=30e-6, t=50e-9)
         noise = RelaxationNoise(single_qubit=params)
-        sim = DensityMatrixSimulator(noise_model=noise)
+        sim = DensityMatrixSimulator(error_model=noise)
         sim.run(circuit)
         assert dict(circuit.results.dict)['1'] < 1.0
 
@@ -318,7 +318,7 @@ class TestUnitaryError:
         )
         circuit = qc.Circuit([qc.Cycle({qc.X(0)})])
         circuit.measure()
-        sim = DensityMatrixSimulator(noise_model=noise)
+        sim = DensityMatrixSimulator(error_model=noise)
         sim.run(circuit)
         assert dict(circuit.results.dict) == pytest.approx({'1': 1.0})
 
@@ -366,7 +366,7 @@ class TestCustomErrorModel:
             noise = CustomErrorModel(*models)
             circuit = qc.Circuit([qc.Cycle({qc.X(0)})])
             circuit.measure()
-            sim = DensityMatrixSimulator(noise_model=noise)
+            sim = DensityMatrixSimulator(error_model=noise)
             sim.run(circuit)
             return dict(circuit.results.dict)
 
@@ -417,7 +417,7 @@ class TestCustomErrorModelFromPTM:
         noise = CustomErrorModel.from_PTM({qc.X(0): ptm_identity})
         circuit = qc.Circuit([qc.Cycle({qc.X(0)})])
         circuit.measure()
-        sim = DensityMatrixSimulator(noise_model=noise)
+        sim = DensityMatrixSimulator(error_model=noise)
         sim.run(circuit)
         assert dict(circuit.results.dict) == pytest.approx({'1': 1.0})
 
@@ -439,7 +439,7 @@ class TestCustomErrorModelFromPNR:
         noise = CustomErrorModel.from_PNR({qc.X(0): {'Z': 1.0}})
         circuit = qc.Circuit([qc.Cycle({qc.X(0)})])
         circuit.measure()
-        sim = DensityMatrixSimulator(noise_model=noise)
+        sim = DensityMatrixSimulator(error_model=noise)
         sim.run(circuit)
         assert dict(circuit.results.dict) == pytest.approx({'1': 1.0})
 
@@ -447,7 +447,7 @@ class TestCustomErrorModelFromPNR:
         noise = CustomErrorModel.from_PNR({qc.X(0): {'X': 1.0}})
         circuit = qc.Circuit([qc.Cycle({qc.X(0)})])
         circuit.measure()
-        sim = DensityMatrixSimulator(noise_model=noise)
+        sim = DensityMatrixSimulator(error_model=noise)
         sim.run(circuit)
         assert dict(circuit.results.dict) == pytest.approx({'0': 1.0})
 

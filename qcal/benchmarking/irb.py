@@ -207,7 +207,7 @@ def IRB(qpu:                  QPU,
                         ax.tick_params(
                             axis='both', which='major', labelsize=12
                         )
-                        ax.legend(prop=dict(size=12))
+                        ax.legend(prop={"size": 12})
                         ax.grid(True)
 
                     else:
@@ -238,7 +238,7 @@ def IRB(qpu:                  QPU,
             ax.tick_params(
                 axis='both', which='major', labelsize=12
             )
-            ax.legend(prop=dict(size=12))
+            ax.legend(prop={"size": 12})
             ax.grid(True)
 
             fig.set_tight_layout(True)
