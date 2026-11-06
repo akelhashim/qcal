@@ -146,10 +146,16 @@ class TestExpectationValue:
         results = Results({'0': 110, '1': -10})
         assert results.expectation_value() == pytest.approx(1.2)
 
-    @pytest.mark.parametrize('idx', [(0, 0), (2,), -1])
-    def test_invalid_indices_raise(self, idx):
+    @pytest.mark.parametrize('idx', [(0, 0), (0, -2)])
+    def test_repeated_indices_raise(self, idx):
         results = Results({'00': 50, '11': 50})
         with pytest.raises(ValueError, match='distinct'):
+            results.expectation_value(idx)
+
+    @pytest.mark.parametrize('idx', [(2,), (-3,), 2])
+    def test_out_of_range_indices_raise(self, idx):
+        results = Results({'00': 50, '11': 50})
+        with pytest.raises(ValueError, match='must be in'):
             results.expectation_value(idx)
 
 

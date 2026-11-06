@@ -51,6 +51,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   as a `ufloat` with binomial standard error
 - `pauli_to_cycle` utility to convert a Pauli string into a `Circuit`,
   with ZXZXZ decomposition and caching
+- `local_pauli_options` and `sample_distinct_n_qubit_paulis` in
+  `qcal.benchmarking.utils`, for sampling distinct non-identity Paulis
+  (restricted to Z/I on measured qubits) without enumerating all
+  4^n Paulis
 - `conjugate_pauli` utilities for efficiently tracking Pauli operator
   transformations under conjugation by Clifford gates, cycles, and
   circuits
