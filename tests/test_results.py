@@ -187,6 +187,95 @@ class TestMarginalize:
         assert marginal.n_shots == results.n_shots
 
 
+class TestPostSelect:
+
+    def test_discards_leaked_states_by_default(self):
+        results = Results({'00': 50, '01': 30, '02': 5, '21': 15})
+        selected = results.post_select()
+        assert isinstance(selected, Results)
+        assert dict(selected.dict) == {'00': 50, '01': 30}
+
+    def test_custom_levels(self):
+        results = Results({'00': 50, '01': 30, '02': 5, '21': 15})
+        assert dict(results.post_select('02').dict) == {'00': 50, '02': 5}
+
+    def test_binary_results_are_unchanged(self):
+        results = Results({'0': 90, '1': 10})
+        assert dict(results.post_select().dict) == {'0': 90, '1': 10}
+
+    def test_does_not_modify_original(self):
+        results = Results({'0': 90, '2': 10})
+        results.post_select()
+        assert dict(results.dict) == {'0': 90, '2': 10}
+
+    def test_after_marginalize_only_checks_kept_bits(self):
+        # Leakage on bit 1 is ignored once bit 1 is marginalized out.
+        results = Results({'02': 10, '12': 20, '20': 5})
+        selected = results.marginalize(0).post_select()
+        assert dict(selected.dict) == {'0': 10, '1': 20}
+
+    def test_enables_expectation_value_of_leaked_results(self):
+        results = Results({'0': 60, '1': 20, '2': 20})
+        with pytest.raises(ValueError, match='binary'):
+            _ = results.ev
+        assert results.post_select().ev == pytest.approx(0.5)
+
+    def test_nothing_remaining_raises(self):
+        with pytest.raises(ValueError, match='No bitstrings remain'):
+            Results({'2': 10, '22': 5}).post_select()
+
+
+class TestSubsample:
+
+    def test_returns_requested_number_of_shots(self):
+        results = Results({'00': 500, '01': 300, '11': 200})
+        sub = results.subsample(100, seed=0)
+        assert isinstance(sub, Results)
+        assert sub.n_shots == 100
+
+    def test_only_contains_existing_states_within_counts(self):
+        counts = {'00': 500, '01': 3, '11': 200}
+        sub = Results(counts).subsample(400, seed=1)
+        assert all(
+            0 < c <= counts[state] for state, c in sub.dict.items()
+        )
+
+    def test_all_shots_returns_original_counts(self):
+        counts = {'00': 500, '01': 3, '11': 200}
+        sub = Results(counts).subsample(703, seed=2)
+        assert dict(sub.dict) == counts
+
+    def test_seed_is_reproducible(self):
+        results = Results({'00': 500, '01': 300, '11': 200})
+        assert (
+            dict(results.subsample(50, seed=7).dict)
+            == dict(results.subsample(50, seed=7).dict)
+        )
+
+    def test_is_unbiased_on_average(self):
+        results = Results({'0': 750, '1': 250})
+        draws = [
+            results.subsample(100, seed=s).dict.get('0', 0)
+            for s in range(200)
+        ]
+        assert np.mean(draws) == pytest.approx(75, abs=1)
+
+    @pytest.mark.parametrize('n_shots', [0, 1001])
+    def test_n_shots_out_of_range_raises(self, n_shots):
+        results = Results({'0': 600, '1': 400})
+        with pytest.raises(ValueError, match='must be in'):
+            results.subsample(n_shots)
+
+    def test_non_integer_counts_raise(self):
+        with pytest.raises(ValueError, match='non-negative integers'):
+            Results({'0': 10.5, '1': 4.5}).subsample(5)
+
+    def test_negative_counts_raise(self):
+        # e.g. after readout correction
+        with pytest.raises(ValueError, match='non-negative integers'):
+            Results({'0': 12, '1': -2}).subsample(5)
+
+
 class TestTVD:
 
     def test_tvd_of_identical_distributions_is_zero(self):
