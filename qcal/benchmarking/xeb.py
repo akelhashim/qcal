@@ -1,8 +1,10 @@
-"""Submodule for cross-entropy benchmarking.
+"""Cross-entropy benchmarking (XEB) protocol.
 
+Provides :func:`XEB`, which wraps the SupermarQ (Superstaq) implementation
+of cross-entropy benchmarking.
 """
 import logging
-from typing import Any, Callable, Dict, Iterable
+from typing import Any, Dict, Iterable
 
 from IPython.display import clear_output
 
@@ -22,27 +24,30 @@ def XEB(
     circuit_depths:    Iterable[int],
     n_circuits:        int = 30,
     **kwargs
-) -> Callable:
-    """Cross-Entropy Benchmarking
+) -> QPU:
+    """Cross-Entropy Benchmarking.
 
-    This is a SupermarQ protocol. See:
-    https://github.com/Infleqtion/client-superstaq/blob/main/
-    supermarq-benchmarks/supermarq/qcvv/xeb.py
+    This is a SupermarQ protocol. See the `SupermarQ XEB implementation
+    <https://github.com/Infleqtion/client-superstaq/blob/main/
+    supermarq-benchmarks/supermarq/qcvv/xeb.py>`_.
 
     Args:
-        qpu (QPU): custom QPU object.
-        api_key (str): Superstaq API key.
+        qpu (QPU): custom QPU class (not an instance). The returned
+            protocol object inherits from this class.
         config (Config): qcal Config object.
-        interleaved_layer (cirq.Gate | cirq.Moment | cirq.Circuit): gate,
-            moment, or subcircuit to benchmark.
+        api_key (str): Superstaq API key.
+        interleaved_layer (Any): gate, moment, or subcircuit to benchmark
+            (a ``cirq.Gate``, ``cirq.Moment``, or ``cirq.Circuit``).
         circuit_depths (Iterable[int]): a list of positive integers
             specifying how many interleaved cycles of the target layer and
-            random SU(2) gates to generate, for example, [4, 16, 64].
+            random SU(2) gates to generate, for example, ``[4, 16, 64]``.
         n_circuits (int, optional): the number of circuits for each circuit
             depth. Defaults to 30.
+        **kwargs: additional keyword arguments passed to the ``qpu``
+            constructor (e.g. ``n_shots``, ``compiler``, ``transpiler``).
 
     Returns:
-        Callable: XEB class instance.
+        QPU: XEB protocol instance (a subclass of ``qpu``).
     """
 
     class XEB(qpu):
@@ -143,12 +148,14 @@ def XEB(
                 )
             }
             self._results = self._xeb.results_from_records(self._records)
-            self._qubit_subsets = self._circuits[0].get_independent_qubit_sets()
+            self._qubit_subsets = (
+                self._circuits[0].get_independent_qubit_sets()
+            )
 
             print('')
             try:
                 for qs in self._qubit_subsets:
-                    results = self._results[list(list(qs))]
+                    results = self._results[list(qs)]
                     qubits = [q.x for q in list(qs)]
                     results.analyze(
                         plot_filename=self._data_manager._save_path +

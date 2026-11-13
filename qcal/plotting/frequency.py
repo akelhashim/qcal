@@ -1,6 +1,4 @@
-"""Submodule for frequency plots.
-
-"""
+"""Submodule for frequency plots."""
 import logging
 from typing import List, Tuple
 
@@ -206,7 +204,8 @@ def plot_freq_spectrum(
             'filename': 'frequency_plot',
             'height': 500,
             'width': 1000,
-            'scale': 10 # Multiply title/legend/axis/canvas sizes by this factor
+            # Multiply title/legend/axis/canvas sizes by this factor
+            'scale': 10
         }
     }
 

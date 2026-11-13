@@ -1,6 +1,30 @@
 """Submodule for storing single-qubit gate definitions.
 
+This module provides the matrix definitions of common single-qubit
+operations (e.g. :func:`rx`, :func:`ry`, :func:`rz`, :func:`rn`,
+:func:`u3`) and the corresponding :class:`~qcal.gates.gate.Gate`
+subclasses, including Paulis (:class:`X`, :class:`Y`, :class:`Z`),
+square-root gates (:class:`X90`, :class:`Y90`, :class:`Z90`), the 24
+single-qubit Cliffords (:class:`Cliff0` - :class:`Cliff23`), parametrized
+rotations (:class:`Rx`, :class:`Ry`, :class:`Rz`, :class:`Rn`,
+:class:`U3`), and non-unitary operations (:class:`Meas`, :class:`MCM`,
+:class:`Reset`). Many gates accept a ``subspace`` argument (``'GE'`` or
+``'EF'``) specifying the qutrit subspace within which they act.
+
 See https://threeplusone.com/pubs/on_gates.pdf for relevant definitions.
+
+Example:
+    >>> import numpy as np
+    >>> from qcal.gates.single_qubit import Meas, Rz, X90
+    >>> x90 = X90(0)
+    >>> x90.name, x90.qubits
+    ('X90', (0,))
+    >>> X90(1, subspace='EF').unitary.shape
+    (3, 3)
+    >>> Rz(0, np.pi / 4).params['phase']
+    0.7853981633974483
+    >>> Meas(0).is_measurement
+    True
 """
 from __future__ import annotations
 
@@ -124,8 +148,7 @@ def basis_rotation(meas):
 
 
 def prep_rotation(qubit: int, pauli: str) -> Gate:
-    """Returns the gate which rotates the qubit to an eigenstate of the
-    given Pauli operator.
+    """Returns the gate which prepares an eigenstate of a Pauli operator.
 
     An unsigned (or '+') Pauli prepares the +1 eigenstate, and a '-' prefix
     prepares the -1 eigenstate.
@@ -252,6 +275,7 @@ class C(Gate):
 
         Args:
             qubit (int): qubit label.
+            **kwargs: unused; accepted for interface compatibility.
         """
         super().__init__(rn(2*np.pi/3, (1, 1, 1)/np.sqrt(3)), qubit)
         self._properties['alias'] = 'Cliff16'
@@ -270,6 +294,7 @@ class Cliff0(Gate):
 
         Args:
             qubit (int): qubit label.
+            **kwargs: unused; accepted for interface compatibility.
         """
         super().__init__(id, qubit)
         self._properties['alias'] = 'I'
@@ -285,6 +310,7 @@ class Cliff1(Gate):
 
         Args:
             qubit (int): qubit label.
+            **kwargs: unused; accepted for interface compatibility.
         """
         super().__init__(x, qubit)
         self._properties['alias'] = 'X'
@@ -300,6 +326,7 @@ class Cliff2(Gate):
 
         Args:
             qubit (int): qubit label.
+            **kwargs: unused; accepted for interface compatibility.
         """
         super().__init__(y, qubit)
         self._properties['alias'] = 'Y'
@@ -315,6 +342,7 @@ class Cliff3(Gate):
 
         Args:
             qubit (int): qubit label.
+            **kwargs: unused; accepted for interface compatibility.
         """
         super().__init__(z, qubit)
         self._properties['alias'] = 'Z'
@@ -330,6 +358,7 @@ class Cliff4(Gate):
 
         Args:
             qubit (int): qubit label.
+            **kwargs: unused; accepted for interface compatibility.
         """
         super().__init__(rx(np.pi / 2), qubit)
         self._properties['alias'] = 'X90'
@@ -345,6 +374,7 @@ class Cliff5(Gate):
 
         Args:
             qubit (int): qubit label.
+            **kwargs: unused; accepted for interface compatibility.
         """
         super().__init__(rx(-np.pi / 2), qubit)
         self._properties['alias'] = 'X-90'
@@ -360,6 +390,7 @@ class Cliff6(Gate):
 
         Args:
             qubit (int): qubit label.
+            **kwargs: unused; accepted for interface compatibility.
         """
         super().__init__(ry(np.pi / 2), qubit)
         self._properties['alias'] = 'Y90'
@@ -375,6 +406,7 @@ class Cliff7(Gate):
 
         Args:
             qubit (int): qubit label.
+            **kwargs: unused; accepted for interface compatibility.
         """
         super().__init__(ry(-np.pi / 2), qubit)
         self._properties['alias'] = 'Y-90'
@@ -390,6 +422,7 @@ class Cliff8(Gate):
 
         Args:
             qubit (int): qubit label.
+            **kwargs: unused; accepted for interface compatibility.
         """
         super().__init__(rz(np.pi / 2), qubit)
         self._properties['alias'] = 'S, Z90'
@@ -405,6 +438,7 @@ class Cliff9(Gate):
 
         Args:
             qubit (int): qubit label.
+            **kwargs: unused; accepted for interface compatibility.
         """
         super().__init__(rz(-np.pi / 2), qubit)
         self._properties['alias'] = 'Sdag, Z-90'
@@ -423,6 +457,7 @@ class Cliff10(Gate):
 
         Args:
             qubit (int): qubit label.
+            **kwargs: unused; accepted for interface compatibility.
         """
         _axis = np.array([1, 1, 0]) / np.sqrt(2)
         super().__init__(rn(np.pi, _axis), qubit)
@@ -441,6 +476,7 @@ class Cliff11(Gate):
 
         Args:
             qubit (int): qubit label.
+            **kwargs: unused; accepted for interface compatibility.
         """
         _axis = np.array([1, -1, 0]) / np.sqrt(2)
         super().__init__(rn(np.pi, _axis), qubit)
@@ -459,6 +495,7 @@ class Cliff12(Gate):
 
         Args:
             qubit (int): qubit label.
+            **kwargs: unused; accepted for interface compatibility.
         """
         _axis = np.array([0, 1, 1]) / np.sqrt(2)
         super().__init__(rn(np.pi, _axis), qubit)
@@ -477,6 +514,7 @@ class Cliff13(Gate):
 
         Args:
             qubit (int): qubit label.
+            **kwargs: unused; accepted for interface compatibility.
         """
         _axis = np.array([0, 1, -1]) / np.sqrt(2)
         super().__init__(rn(np.pi, _axis), qubit)
@@ -495,6 +533,7 @@ class Cliff14(Gate):
 
         Args:
             qubit (int): qubit label.
+            **kwargs: unused; accepted for interface compatibility.
         """
         super().__init__(h, qubit)
         self._properties['alias'] = 'H'
@@ -516,6 +555,7 @@ class Cliff15(Gate):
 
         Args:
             qubit (int): qubit label.
+            **kwargs: unused; accepted for interface compatibility.
         """
         _axis = np.array([1, 0, -1]) / np.sqrt(2)
         super().__init__(rn(np.pi, _axis), qubit)
@@ -534,6 +574,7 @@ class Cliff16(Gate):
 
         Args:
             qubit (int): qubit label.
+            **kwargs: unused; accepted for interface compatibility.
         """
         _axis = np.array([1, 1, 1]) / np.sqrt(3)
         super().__init__(rn(2 * np.pi / 3, _axis), qubit)
@@ -553,6 +594,7 @@ class Cliff17(Gate):
 
         Args:
             qubit (int): qubit label.
+            **kwargs: unused; accepted for interface compatibility.
         """
         _axis = np.array([1, 1, 1]) / np.sqrt(3)
         super().__init__(rn(-2 * np.pi / 3, _axis), qubit)
@@ -572,6 +614,7 @@ class Cliff18(Gate):
 
         Args:
             qubit (int): qubit label.
+            **kwargs: unused; accepted for interface compatibility.
         """
         _axis = np.array([1, 1, -1]) / np.sqrt(3)
         super().__init__(rn(2 * np.pi / 3, _axis), qubit)
@@ -590,6 +633,7 @@ class Cliff19(Gate):
 
         Args:
             qubit (int): qubit label.
+            **kwargs: unused; accepted for interface compatibility.
         """
         _axis = np.array([1, 1, -1]) / np.sqrt(3)
         super().__init__(rn(-2 * np.pi / 3, _axis), qubit)
@@ -608,6 +652,7 @@ class Cliff20(Gate):
 
         Args:
             qubit (int): qubit label.
+            **kwargs: unused; accepted for interface compatibility.
         """
         _axis = np.array([1, -1, 1]) / np.sqrt(3)
         super().__init__(rn(2 * np.pi / 3, _axis), qubit)
@@ -626,6 +671,7 @@ class Cliff21(Gate):
 
         Args:
             qubit (int): qubit label.
+            **kwargs: unused; accepted for interface compatibility.
         """
         _axis = np.array([1, -1, 1]) / np.sqrt(3)
         super().__init__(rn(-2 * np.pi / 3, _axis), qubit)
@@ -644,6 +690,7 @@ class Cliff22(Gate):
 
         Args:
             qubit (int): qubit label.
+            **kwargs: unused; accepted for interface compatibility.
         """
         _axis = np.array([-1, 1, 1]) / np.sqrt(3)
         super().__init__(rn(2 * np.pi / 3, _axis), qubit)
@@ -662,6 +709,7 @@ class Cliff23(Gate):
 
         Args:
             qubit (int): qubit label.
+            **kwargs: unused; accepted for interface compatibility.
         """
         _axis = np.array([-1, 1, 1]) / np.sqrt(3)
         super().__init__(rn(-2 * np.pi / 3, _axis), qubit)
@@ -677,6 +725,7 @@ class H(Gate):
 
         Args:
             qubit (int): qubit label.
+            **kwargs: unused; accepted for interface compatibility.
         """
         super().__init__(h, qubit)
         self._properties['alias'] = 'QFT, Cliff14'
@@ -691,6 +740,7 @@ class Id(Gate):
 
         Args:
             qubit (int): qubit label.
+            **kwargs: unused; accepted for interface compatibility.
         """
         super().__init__(id, qubit)
         self._properties['alias'] = 'Cliff0'
@@ -710,6 +760,7 @@ class Idle(Gate):
         Args:
             qubit (int): qubit label.
             duration (float): idle duration. Defaults to 0 ns.
+            **kwargs: unused; accepted for interface compatibility.
         """
         super().__init__(id, qubit)
         self._properties['alias'] = 'I'
@@ -729,6 +780,7 @@ class Meas(Gate):
         Args:
             qubit (int): qubit label.
             basis (str): measurement basis. Defaults to Z.
+            **kwargs: unused; accepted for interface compatibility.
         """
         super().__init__(meas, qubit)
         self._properties['name'] = 'Meas'
@@ -768,12 +820,13 @@ class MCM(Gate):
             basis (str): measurement basis. Defaults to Z.
             apply (Dict[str, Cycle | Circuit] | None): conditional gates to
                 apply to another qubit depending on the outcomes of the
-                mid-circuit measurement. Defaults to None.
-                Example: apply = {'0': Cycle({Id(1)}), '1': Cycle({X(1)})}.
+                mid-circuit measurement. Defaults to None. For example,
+                ``apply = {'0': Cycle({Id(1)}), '1': Cycle({X(1)})}``.
             dd_qubits (Sequence[int] | None, optional): which qubits to
                 dynamical decouple during a mid-circuit measurement.
                 Defaults to None.
-            dd_method (str): dynamical decoupling protocol. Defaults to 'XY'.
+            dd_method (str): dynamical decoupling protocol. Defaults to
+                'XY_N'.
             n_dd_pulses (int): number of pulses for dd protocol. Defaults to 8.
         """
         apply = {} if apply is None else apply
@@ -798,6 +851,7 @@ class MCM(Gate):
 
     @property
     def unitary(self) -> None:
+        """Mid-circuit measurement operations are non-unitary."""
         return None
 
     @property
@@ -827,17 +881,18 @@ class Reset(Gate):
         Args:
             qubit (int): qubit label.
             measure_first (bool, optional): whether to measure before the
-                reset. Defauls to True. This is unnecessary if a previous
+                reset. Defaults to True. This is unnecessary if a previous
                 measurement was already made for a mid-circuit operation.
             method (Sequence[str] | None, optional): what method to use for
-                resetting the
-                qubit in the middle of the circuit. Defaults to None.
-                Accepts `['active']` for active reset, or `['unconditional']`
+                resetting the qubit in the middle of the circuit. Defaults
+                to None, which is interpreted as ``['active']``. Accepts
+                ``['active']`` for active reset, or ``['unconditional']``
                 for unconditional reset, or both in the same sequence.
             dd_qubits (Sequence[int] | None, optional): which qubits to
                 dynamical decouple during a mid-circuit measurement.
                 Defaults to None.
-            dd_method (str): dynamical decoupling protocol. Defaults to 'XY'.
+            dd_method (str): dynamical decoupling protocol. Defaults to
+                'XY_N'.
             n_dd_pulses (int): number of pulses for dd protocol. Defaults to 8.
         """
         method = ['active'] if method is None else method
@@ -870,6 +925,7 @@ class RandSU2(Gate):
 
         Args:
             qubit (int): qubit label.
+            **kwargs: unused; accepted for interface compatibility.
         """
         vec = [gauss(0, 1) for i in range(3)]
         mag = sum(x**2 for x in vec) ** .5
@@ -885,12 +941,16 @@ class RandSU2(Gate):
 class Rn(Gate):
     """Class for parametrized n rotations.
 
-    Basic example usage:
+    Example:
+        .. code-block:: python
 
-        n = (1, 0, 0)  # x-axis
-        rn = Rn(theta, n)
-        rn()       # Symbolic python view of the matrix
-        rn.matrix  # Numpy array of the matrix
+            import numpy as np
+            from qcal.gates.single_qubit import Rn
+
+            n = (1, 0, 0)  # x-axis
+            rn = Rn(0, np.pi, n)
+            rn()       # Symbolic (sympy) view of the matrix
+            rn.matrix  # Numpy array of the matrix
     """
 
     def __init__(
@@ -917,11 +977,15 @@ class Rn(Gate):
 class Rx(Gate):
     """Class for parametrized x rotations.
 
-    Basic example usage:
+    Example:
+        .. code-block:: python
 
-        rx = Rx(theta)
-        rx()       # Symbolic python view of the matrix
-        rx.matrix  # Numpy array of the matrix
+            import numpy as np
+            from qcal.gates.single_qubit import Rx
+
+            rx = Rx(0, np.pi / 2)
+            rx()       # Symbolic (sympy) view of the matrix
+            rx.matrix  # Numpy array of the matrix
     """
 
     def __init__(self, qubit: int, theta: float, **kwargs) -> None:
@@ -930,6 +994,7 @@ class Rx(Gate):
         Args:
             qubit (int):   qubit label.
             theta (float): angle of rotation.
+            **kwargs: unused; accepted for interface compatibility.
         """
         super().__init__(rx(theta), qubit)
         self._properties['name'] = 'Rx'
@@ -942,11 +1007,15 @@ class Rx(Gate):
 class Ry(Gate):
     """Class for parametrized y rotations.
 
-    Basic example usage:
+    Example:
+        .. code-block:: python
 
-        ry = Ry(theta)
-        ry()       # Symbolic python view of the matrix
-        ry.matrix  # Numpy array of the matrix
+            import numpy as np
+            from qcal.gates.single_qubit import Ry
+
+            ry = Ry(0, np.pi / 2)
+            ry()       # Symbolic (sympy) view of the matrix
+            ry.matrix  # Numpy array of the matrix
     """
 
     def __init__(self, qubit: int, theta: float, **kwargs) -> None:
@@ -955,6 +1024,7 @@ class Ry(Gate):
         Args:
             qubit (int):   qubit label.
             theta (float): angle of rotation.
+            **kwargs: unused; accepted for interface compatibility.
         """
         super().__init__(ry(theta), qubit)
         self._properties['name'] = 'Ry'
@@ -967,11 +1037,15 @@ class Ry(Gate):
 class Rz(Gate):
     """Class for parametrized z rotations.
 
-    Basic example usage:
+    Example:
+        .. code-block:: python
 
-        rz = Rz(theta)
-        rz()       # Symbolic python view of the matrix
-        rz.matrix  # Numpy array of the matrix
+            import numpy as np
+            from qcal.gates.single_qubit import Rz
+
+            rz = Rz(0, np.pi / 2)
+            rz()       # Symbolic (sympy) view of the matrix
+            rz.matrix  # Numpy array of the matrix
     """
 
     def __init__(
@@ -984,6 +1058,7 @@ class Rz(Gate):
             theta (float):  angle of rotation.
             subspace (str): subspace within which the gate acts. Defaults to
                 GE.
+            **kwargs: unused; accepted for interface compatibility.
         """
         super().__init__(rz(theta), qubit)
         self._properties['name'] = 'Rz'
@@ -1002,6 +1077,7 @@ class S(Gate):
 
         Args:
             qubit (int): qubit label.
+            **kwargs: unused; accepted for interface compatibility.
         """
         super().__init__(rz(np.pi/2), qubit)
         self._properties['alias'] = 'sqrt(Z)\nZ90, Cliff8'
@@ -1020,6 +1096,7 @@ class SX(Gate):
 
         Args:
             qubit (int): qubit label.
+            **kwargs: unused; accepted for interface compatibility.
         """
         super().__init__(rx(np.pi/2), qubit)
         self._properties['alias'] = 'V, X90, Cliff4'
@@ -1038,6 +1115,7 @@ class SY(Gate):
 
         Args:
             qubit (int): qubit label.
+            **kwargs: unused; accepted for interface compatibility.
         """
         super().__init__(ry(np.pi/2), qubit)
         self._properties['alias'] = 'Y90, Cliff6'
@@ -1056,6 +1134,7 @@ class Sdag(Gate):
 
         Args:
             qubit (int): qubit label.
+            **kwargs: unused; accepted for interface compatibility.
         """
         super().__init__(rz(-np.pi/2), qubit)
         self._properties['alias'] = 'SqrtZdag\nZ-90, Cliff9'
@@ -1074,6 +1153,7 @@ class SXdag(Gate):
 
         Args:
             qubit (int): qubit label.
+            **kwargs: unused; accepted for interface compatibility.
         """
         super().__init__(rx(-np.pi/2), qubit)
         self._properties['alias'] = 'Vdag, X-90, Cliff5'
@@ -1092,6 +1172,7 @@ class SYdag(Gate):
 
         Args:
             qubit (int): qubit label.
+            **kwargs: unused; accepted for interface compatibility.
         """
         super().__init__(ry(-np.pi/2), qubit)
         self._properties['alias'] = 'Y-90, Cliff7'
@@ -1110,6 +1191,7 @@ class T(Gate):
 
         Args:
             qubit (int): qubit label.
+            **kwargs: unused; accepted for interface compatibility.
         """
         super().__init__(t, qubit)
         self._properties['alias'] = 'Z^(1/4)'
@@ -1128,6 +1210,7 @@ class Tdag(Gate):
 
         Args:
             qubit (int): qubit label.
+            **kwargs: unused; accepted for interface compatibility.
         """
         super().__init__(tdag, qubit)
         self._properties['alias'] = 'Z^(1/4)dag'
@@ -1156,6 +1239,7 @@ class U3(Gate):
             theta (float): angle of rotation.
             phi (float):   first phase angle.
             gamma (float): second phase angle.
+            **kwargs: unused; accepted for interface compatibility.
         """
         super().__init__(u3(theta, phi, gamma), qubit)
         self._properties['name'] = 'U3'
@@ -1174,6 +1258,7 @@ class V(Gate):
 
         Args:
             qubit (int): qubit label.
+            **kwargs: unused; accepted for interface compatibility.
         """
         super().__init__(rx(np.pi/2), qubit)
         self._properties['alias'] = 'SX, X90, Cliff4'
@@ -1192,6 +1277,7 @@ class Vdag(Gate):
 
         Args:
             qubit (int): qubit label.
+            **kwargs: unused; accepted for interface compatibility.
         """
         super().__init__(rx(-np.pi/2), qubit)
         self._properties['alias'] = 'SXdag, X-90, Cliff5'
@@ -1219,6 +1305,7 @@ class VirtualZ(Gate):
             theta (float):  angle of rotation.
             subspace (str): subspace within which the gate acts. Defaults to
                 GE.
+            **kwargs: unused; accepted for interface compatibility.
         """
         super().__init__(rz(theta), qubit)
         self._properties['name'] = 'VirtualZ'
@@ -1239,6 +1326,7 @@ class X(Gate):
             qubit (int):    qubit label.
             subspace (str): subspace within which the gate acts. Defaults to
                 GE.
+            **kwargs: unused; accepted for interface compatibility.
         """
         super().__init__(x, qubit)
         self._properties['alias'] = 'Cliff1'
@@ -1260,6 +1348,7 @@ class X90(Gate):
             qubit (int):    qubit label.
             subspace (str): subspace within which the gate acts. Defaults to
                 GE.
+            **kwargs: unused; accepted for interface compatibility.
         """
         super().__init__(rx(np.pi/2), qubit)
         self._properties['alias'] = 'V, Cliff4'
@@ -1281,6 +1370,7 @@ class Y(Gate):
             qubit (int):    qubit label.
             subspace (str): subspace within which the gate acts. Defaults to
                 GE.
+            **kwargs: unused; accepted for interface compatibility.
         """
         super().__init__(y, qubit)
         self._properties['alias'] = 'Cliff2'
@@ -1302,6 +1392,7 @@ class Y90(Gate):
             qubit (int): qubit label.
             subspace (str): subspace within which the gate acts. Defaults to
                 GE.
+            **kwargs: unused; accepted for interface compatibility.
         """
         super().__init__(ry(np.pi/2), qubit)
         self._properties['alias'] = 'Cliff6'
@@ -1323,6 +1414,7 @@ class Z(Gate):
             qubit (int): qubit label.
             subspace (str): subspace within which the gate acts. Defaults to
                 GE.
+            **kwargs: unused; accepted for interface compatibility.
         """
         super().__init__(z, qubit)
         self._properties['alias'] = 'Cliff3'
@@ -1342,6 +1434,9 @@ class Z90(Gate):
 
         Args:
             qubit (int): qubit label.
+            subspace (str): subspace within which the gate acts. Defaults to
+                GE.
+            **kwargs: unused; accepted for interface compatibility.
         """
         super().__init__(rz(np.pi/2), qubit)
         self._properties['alias'] = 'sqrt(Z)\nS, Cliff8'

@@ -1,9 +1,7 @@
-"""Submodule for qubit spectroscopy.
-
-"""
+"""Generic two-dimensional parameter sweeps for spectroscopy."""
 import logging
 from collections.abc import Iterable
-from typing import Callable, Dict
+from typing import Dict
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -34,27 +32,40 @@ def Sweep2D(
     xlabel:   str = '',
     ylabel:   str = '',
     **kwargs
-) -> Callable:
+) -> Characterize:
     """2D sweep for qubit spectroscopy.
 
     Args:
         qpu (QPU): custom QPU object.
         config (Config): qcal Config object.
-        qubits (List[int] | Tuple[int]): qubits to measure.
+        qubits (Iterable[int]): qubits to measure.
         sweep1 (NDArray | Dict[int, NDArray]): first value to sweep over for
-            each qubit.
+            each qubit. If an array is given, the same sweep is used for all
+            qubits.
         sweep2 (NDArray | Dict[int, NDArray]): second value to sweep over for
-            each qubit.
+            each qubit. If an array is given, the same sweep is used for all
+            qubits.
         params (Dict[int, Iterable[str]]): dictionary mapping qubit label to
-            sweep parameters in the config. Defaults to None.
+            the two config parameters swept by ``sweep1`` and ``sweep2``,
+            respectively.
         prepulse (Cycle | Circuit, optional): optional pre-pulse to add before
             the normal spectroscopy circuit. Defaults to None.
+        xlabel (str, optional): x-axis label for the plot. Defaults to ''.
+        ylabel (str, optional): y-axis label for the plot. Defaults to ''.
+        **kwargs: additional keyword arguments passed to the ``qpu``
+            constructor (e.g. ``n_shots``, ``n_circs_per_seq``).
 
     Returns:
-        Callable: Sweep2D
+        Characterize: an instance of the Sweep2D class, which inherits from
+            ``qpu`` and :class:`Characterize`.
     """
 
     class Sweep2D(qpu, Characterize):
+        """2D spectroscopy sweep class.
+
+        This class inherits a custom QPU from the Sweep2D characterization
+        function.
+        """
 
         def __init__(
             self,
@@ -68,9 +79,7 @@ def Sweep2D(
             ylabel:   str = '',
             **kwargs
         ) -> None:
-            """
-            Instantiate the Sweep2D class within the function.
-            """
+            """Instantiate the Sweep2D class within the function."""
             qpu.__init__(self, config=config, **kwargs)
             Characterize.__init__(self, config)
 

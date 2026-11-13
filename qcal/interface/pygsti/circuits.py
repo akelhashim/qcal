@@ -1,6 +1,4 @@
-"""Submodule for handling pyGSTi circuits.
-
-"""
+"""Submodule for handling pyGSTi circuits."""
 import logging
 from typing import List
 

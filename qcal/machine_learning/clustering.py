@@ -1,6 +1,7 @@
-"""Submodule for supervised and unsupervised clustering methods.
+"""Supervised and unsupervised clustering methods.
 
-
+Provides :class:`GMM`, a Gaussian Mixture Model built on scikit-learn
+that is used for classifying single-shot readout data.
 """
 from __future__ import annotations
 
@@ -16,6 +17,13 @@ logger = logging.getLogger(__name__)
 
 
 class GMM(GaussianMixture):
+    """Gaussian Mixture Model for classifying readout data.
+
+    This class inherits from scikit-learn's
+    :class:`~sklearn.mixture.GaussianMixture` class, and additionally stores
+    the fit data and computes the signal-to-noise ratio between each pair
+    of clusters.
+    """
 
     def __init__(
         self,
@@ -23,15 +31,15 @@ class GMM(GaussianMixture):
         covariance_type: str = 'spherical',
         **kwargs
     ) -> None:
-        """Gaussian Mixture Model
-
-        This class inherits from scikit-learn's GaussianMixture class.
+        """Initialize a Gaussian Mixture Model.
 
         Args:
             n_components (int, optional): The number of mixture components.
                 Defaults to 2.
             covariance_type (str, optional): String describing the type of
-                covariance parameters to use. Defaults to 'spherical'.
+                covariance parameters to use. Defaults to ``'spherical'``.
+            **kwargs: additional keyword arguments passed to
+                :class:`~sklearn.mixture.GaussianMixture`.
         """
         super().__init__(
             n_components=n_components,
@@ -57,7 +65,7 @@ class GMM(GaussianMixture):
         """Signal to noise ratio.
 
         Returns:
-            Dict: SNR for each pair of states..
+            Dict: SNR for each pair of states.
         """
         return self._snr
 
@@ -80,13 +88,14 @@ class GMM(GaussianMixture):
         return self.__y
 
     def fit(self, X: ArrayLike, y: ArrayLike = None) -> None:
-        """Fit a Guassian Mixture Model to the input data.
+        """Fit a Gaussian Mixture Model to the input data.
 
         Args:
             X (ArrayLike): array-like of shape (n_samples, n_features). List of
                 n_features-dimensional data points. Each row corresponds to a
                 single data point.
-            y (ArrayLike): fit labels for each data point. Defaults to None.
+            y (ArrayLike, optional): fit labels for each data point. Defaults
+                to None.
         """
         super().fit(X)
         self.__X = X
@@ -96,7 +105,7 @@ class GMM(GaussianMixture):
         self.calculate_snr()
 
     def relabel(self, permutation: List[int]) -> None:
-        """Relable the clusters.
+        """Relabel the clusters.
 
         Args:
             permutation (List[int]): list of index labels specifying the new
@@ -144,6 +153,9 @@ class GMM(GaussianMixture):
 
         Args:
             filename (str): filename of the saved model.
+
+        Returns:
+            GMM: GMM with the loaded parameters.
         """
         model = np.load(filename, allow_pickle=True)
         params = model['params'].item()

@@ -1,6 +1,4 @@
-"""Helper functions for sequencer.
-
-"""
+"""Helper functions for pulse sequences and FAST pulse design."""
 import logging
 from typing import List
 
@@ -40,10 +38,15 @@ logger = logging.getLogger(__name__)
 #     term1 = theta_dddot * np.cos(theta_t) / (8 * omega_eff**2)
 
 #     # Term 2: Mixed derivative term
-#     term2 = -3 * theta_dot * theta_ddot * np.cos(theta_t) / (4 * omega_eff**3)
+#     term2 = (
+#         -3 * theta_dot * theta_ddot * np.cos(theta_t) / (4 * omega_eff**3)
+#     )
 
 #     # Term 3: Velocity-cubed term
-#     term3 = theta_dot**3 * np.sin(theta_t) * np.cos(theta_t) / (2 * omega_eff**3)
+#     term3 = (
+#         theta_dot**3 * np.sin(theta_t) * np.cos(theta_t)
+#         / (2 * omega_eff**3)
+#     )
 
 #     # Term 4: Correction from second-order back-transformation
 #     term4 = -theta_ddot * theta_dot * np.sin(theta_t) / (4 * omega_eff**2)
@@ -60,12 +63,13 @@ def clip_amplitude(
     """Clip the amplitude of a pulse to a maximum value.
 
     Args:
-        amp (float | NDArray): amplitude value or pulse arrray.
+        amp (float | NDArray): amplitude value or pulse array.
         min_amp (float, optional): minimum amplitude. Defaults to -1.0.
         max_amp (float, optional): maximum amplitude. Defaults to 1.0.
 
     Returns:
-        NDArray: pulse array with clipped amplitude.
+        float | NDArray: amplitude value or pulse array with clipped
+            amplitude.
     """
     return np.clip(amp, min_amp, max_amp)
     # return (
@@ -77,14 +81,17 @@ def clip_amplitude(
 def compute_matrix_A(
     N: int, freq_intervals: List, weights: List, t_p: float
 ) -> NDArray:
-    """Compute matrix A for the optimization problem
-    A_nm = sum_j w_j * integral(g_hat_n(f) * g_hat_m*(f) df)
+    """Compute matrix A for the FAST optimization problem.
+
+    The matrix elements are
+    ``A_nm = sum_j w_j * integral(g_hat_n(f) * g_hat_m*(f) df)``,
+    where the integral runs over the j-th frequency interval.
 
     Args:
-        N (int): number of Fourier terms
-        freq_intervals (List): list of [f_low, f_high] pairs
-        weights (List): weights for each frequency interval
-        t_p (float): pulse duration
+        N (int): number of Fourier terms.
+        freq_intervals (List): list of ``[f_low, f_high]`` pairs.
+        weights (List): weights for each frequency interval.
+        t_p (float): pulse duration.
 
     Returns:
         NDArray: A matrix.
@@ -113,7 +120,9 @@ def compute_matrix_A(
                     integrand = g_n_hat * np.conj(g_m_hat)
 
                     # Numerical integration (trapezoidal rule)
-                    integral_sum += weight * np.trapezoid(integrand.real, dx=df)
+                    integral_sum += weight * np.trapezoid(
+                        integrand.real, dx=df
+                    )
 
             A[n, m] = integral_sum
 
@@ -121,8 +130,10 @@ def compute_matrix_A(
 
 
 def cosine_basis_function(n: int, t: NDArray, t_p: float) -> NDArray:
-    """Basis function g_n(t) = [1 - cos(2πnt/t_p)] * Π(t/t_p - 1/2) for a
-    cosine series.
+    """Basis function of a cosine series.
+
+    The basis function is ``g_n(t) = [1 - cos(2πnt/t_p)] * Π(t/t_p - 1/2)``,
+    where ``Π`` is a rectangular window.
 
     Args:
         n (int): basis function index.
@@ -142,7 +153,7 @@ def cosine_basis_function(n: int, t: NDArray, t_p: float) -> NDArray:
 
 
 def fourier_transform_basis(n: int, f: NDArray, t_p: float) -> NDArray:
-    """Analytical Fourier transform of basis function g_n(t).
+    """Analytical Fourier transform of basis function ``g_n(t)``.
 
     Args:
         n (int): basis function index.
@@ -173,7 +184,9 @@ def fourier_transform_basis(n: int, f: NDArray, t_p: float) -> NDArray:
         delta_pos = np.sinc((f_nz - n/t_p) * t_p)
         delta_neg = np.sinc((f_nz + n/t_p) * t_p)
 
-        result[nonzero_mask] = t_p * (sinc_term - 0.5 * (delta_pos + delta_neg))
+        result[nonzero_mask] = t_p * (
+            sinc_term - 0.5 * (delta_pos + delta_neg)
+        )
 
     return result
 
@@ -191,7 +204,7 @@ def solve_coefficients(
         N (int): number of Fourier terms.
         t_p (float): pulse duration.
         theta (float): rotation angle.
-        freq_intervals (List): list of [f_low, f_high] pairs.
+        freq_intervals (List): list of ``[f_low, f_high]`` pairs.
         weights (List): weights for each frequency interval.
 
     Returns:

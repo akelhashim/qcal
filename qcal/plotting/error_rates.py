@@ -1,6 +1,4 @@
-"""Submodule for plotting error rates.
-
-"""
+"""Submodule for plotting error rates."""
 import logging
 
 import matplotlib.pyplot as plt
@@ -20,9 +18,11 @@ def plot_error_rates(
     Args:
         error_rates (dict): dictionary mapping qubit label to a
             ``uncertainties.ufloat`` error rate (e.g., process infidelity).
-        ylabel (str, optional): y-axis label. Defaults to 'Error Rate'.
-        save_path (str | None, optional): save path for figure. Defaults to
-            None.
+        ylabel (str, optional): y-axis label. Defaults to ``'Error Rate'``.
+        save_path (str | None, optional): save path (directory prefix)
+            for the figure. If given, the figure is also saved as
+            ``error_rates.png``, ``.pdf``, and ``.svg`` with this prefix.
+            Defaults to None.
     """
     qlabels = sorted(error_rates.keys())
     uncertainties = [error_rates[ql].s for ql in qlabels]

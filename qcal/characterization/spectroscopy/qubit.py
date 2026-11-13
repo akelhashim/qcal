@@ -1,9 +1,39 @@
-"""Submodule for qubit spectroscopy.
+"""Qubit spectroscopy.
 
+This module provides :func:`TwoTone`, a two-tone spectroscopy experiment
+which sweeps the drive frequency of a train of X90 gates while monitoring
+the readout signal, in order to locate the qubit transition frequency. The
+qubit frequency is identified from the dip in the magnitude of the readout
+signal and written back to the config.
+
+Example:
+    .. code-block:: python
+
+        import numpy as np
+
+        from qcal.backend.qubic.qpu import QubicQPU
+        from qcal.characterization.spectroscopy.qubit import TwoTone
+        from qcal.config import Config
+        from qcal.units import MHz
+
+        config = Config('config.yaml')
+        qubits = [0, 1]
+
+        # Sweep +/- 50 MHz around each expected qubit frequency
+        freqs = {
+            q: np.linspace(-50, 50, 101) * MHz
+            + config[f'single_qubit/{q}/GE/freq']
+            for q in qubits
+        }
+
+        spec = TwoTone(
+            QubicQPU, config, qubits, freqs, n_gates=100, n_shots=2048
+        )
+        spec.run()
 """
 import logging
 from collections.abc import Iterable
-from typing import Callable, Dict
+from typing import Dict
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -35,25 +65,41 @@ def TwoTone(
     n_gates: int = 10,
     params:  Dict | None = None,
     **kwargs
-) -> Callable:
-    """Two-Tone Spectroscopy.
+) -> Characterize:
+    """Two-tone spectroscopy.
 
     Args:
         qpu (QPU): custom QPU object.
         config (Config): qcal Config object.
-        qubits (List[int] | Tuple[int]): qubits to measure.
-        freqs (NDArray | Dict[int, NDArray]): frequencies to sweep over for each
-            qubit.
-        n_gates(int): number of X90 gates to use to drive the qubit. Defaults to
-            10.
-        params (Dict | None, optional): dictionary mapping qubit label to sweep
-            parameter in the config. Defaults to None.
+        qubits (Iterable[int]): qubits to measure.
+        freqs (NDArray | Dict[int, NDArray]): frequencies to sweep over for
+            each qubit. If an array is given, the same sweep is used for
+            all qubits.
+        n_gates (int, optional): number of X90 gates to use to drive the
+            qubit. Defaults to 10.
+        params (Dict | None, optional): dictionary mapping qubit label to
+            sweep parameter in the config. If None, defaults to
+            ``'single_qubit/{q}/GE/freq'`` for each qubit. Defaults to None.
+        **kwargs: additional keyword arguments passed to the ``qpu``
+            constructor (e.g. ``n_shots``, ``n_circs_per_seq``).
 
     Returns:
-        Callable: TwoTone
+        Characterize: an instance of the TwoTone class, which inherits from
+            ``qpu`` and :class:`Characterize`.
+
+    Example:
+        .. code-block:: python
+
+            spec = TwoTone(CustomQPU, config, qubits=[0, 1], freqs=freqs)
+            spec.run()
     """
 
     class TwoTone(qpu, Characterize):
+        """Two-tone spectroscopy class.
+
+        This class inherits a custom QPU from the TwoTone characterization
+        function.
+        """
 
         def __init__(
             self,
@@ -64,9 +110,7 @@ def TwoTone(
             params:  Dict | None = None,
             **kwargs
         ) -> None:
-            """
-            Instantiate the TwoTone spectroscopy class within the function.
-            """
+            """Instantiate the TwoTone class within the function."""
             qpu.__init__(self, config=config, **kwargs)
             Characterize.__init__(self, config)
 
@@ -202,7 +246,8 @@ def TwoTone(
             """Save all circuits and data."""
             clear_output(wait=True)
             self._data_manager._exp_id += (
-                f'_twotone_spectroscopy_Q{"".join(str(q) for q in self._qubits)}'
+                '_twotone_spectroscopy_Q'
+                f'{"".join(str(q) for q in self._qubits)}'
             )
             if settings.Settings.save_data:
                 qpu.save(self)

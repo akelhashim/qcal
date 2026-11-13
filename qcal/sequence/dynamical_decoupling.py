@@ -1,5 +1,16 @@
-"""Submodule for handling dynamical decoupling sequences.
+"""Dynamical decoupling (DD) sequences as qcal circuits.
 
+This module provides functions that build DD subcircuits from native
+``X90`` / ``Y90`` gates and ``Idle`` gates:
+
+- :func:`XY_N` — XY-type sequences (e.g. XY4, XY8, ...).
+- :func:`XX_N` — XX-type (CPMG-like) sequences.
+
+When both even- and odd-labeled qubits are given, the sequences are
+*syncopated*: pulses on even and odd qubits are interleaved in time
+(assuming even and odd qubits are nearest neighbors), which also
+suppresses static ZZ crosstalk between them. :data:`DD_SEQUENCES` maps
+sequence names to these functions.
 
 Two-qubit syncopation matrix — Table I of Evert et al., "Syncopated
 Dynamical Decoupling for Suppressing Crosstalk in Quantum Circuits",
@@ -11,13 +22,15 @@ applied to one qubit and the column-labeled sequence to the other,
 both spanning the same total idle time t. X / Y in sequence names
 refer to pi_x / pi_y pulses.
 
-Pulse-time conventions:
+Pulse-time conventions::
+
     Length-2 sequence  P1P2:           (t/2, t)
     Length-2 CPMG      P1P2-CPMG:      (t/4, 3t/4)
     Length-4 sequence  P1P2P3P4:       (t/4, t/2, 3t/4, t)
     Length-4 CPMG      P1P2P3P4-CPMG:  (t/8, 3t/8, 5t/8, 7t/8)
 
-Cell codes (subset of {XX, YY, ZZ} that is decoupled):
+Cell codes (subset of {XX, YY, ZZ} that is decoupled)::
+
     .   none -- diagonal: identical synchronized sequences
     Z   ZZ
     XY  XX, YY
@@ -25,7 +38,8 @@ Cell codes (subset of {XX, YY, ZZ} that is decoupled):
     YZ  YY, ZZ
     *   all three (XX, YY, ZZ)
 
-Sequence index legend:
+Sequence index legend::
+
     1  XX            7  YXYX
     2  XX-CPMG       8  YXYX-CPMG
     3  XXXX          9  YY
@@ -33,23 +47,26 @@ Sequence index legend:
     5  XYXY         11  YYYY
     6  XYXY-CPMG    12  YYYY-CPMG
 
-                            Qubit 1
-            1   2   3   4   5   6   7   8   9  10  11  12
-        +-----------------------------------------------------
-      1 |   .  YZ  YZ  YZ   *  XZ  XZ  XZ  XY   *   *   *
-      2 |  YZ   .  YZ  YZ  XZ  XZ   *  XZ   *  XY   *   *
-      3 |  YZ  YZ   .  YZ  XY   *  XY   *   *   *  XY   *
-      4 |  YZ  YZ  YZ   .   *  XY   *  XY   *   *   *  XY
-Qubit 5 |   *  XZ  XY   *   .   Z  XY   Z  YZ   *  XY   *
-  0   6 |  XZ  XZ   *  XY   Z   .   Z  XY  YZ  YZ   *  XY
-      7 |  XZ   *  XY   *  XY   Z   .   Z   *  YZ  XY   *
-      8 |  XZ  XZ   *  XY   Z  XY   Z   .  YZ  YZ   *  XY
-      9 |  XY   *   *   *  YZ  YZ   *  YZ   .  XZ  XZ  XZ
-     10 |   *  XY   *   *   *  YZ  YZ  YZ  XZ   .  XZ  XZ
-     11 |   *   *  XY   *  XY   *  XY   *  XZ  XZ   .  XZ
-     12 |   *   *   *  XY   *  XY   *  XY  XZ  XZ  XZ   .
+Syncopation matrix::
+
+                                Qubit 1
+                1   2   3   4   5   6   7   8   9  10  11  12
+            +-----------------------------------------------------
+          1 |   .  YZ  YZ  YZ   *  XZ  XZ  XZ  XY   *   *   *
+          2 |  YZ   .  YZ  YZ  XZ  XZ   *  XZ   *  XY   *   *
+          3 |  YZ  YZ   .  YZ  XY   *  XY   *   *   *  XY   *
+          4 |  YZ  YZ  YZ   .   *  XY   *  XY   *   *   *  XY
+    Qubit 5 |   *  XZ  XY   *   .   Z  XY   Z  YZ   *  XY   *
+      0   6 |  XZ  XZ   *  XY   Z   .   Z  XY  YZ  YZ   *  XY
+          7 |  XZ   *  XY   *  XY   Z   .   Z   *  YZ  XY   *
+          8 |  XZ  XZ   *  XY   Z  XY   Z   .  YZ  YZ   *  XY
+          9 |  XY   *   *   *  YZ  YZ   *  YZ   .  XZ  XZ  XZ
+         10 |   *  XY   *   *   *  YZ  YZ  YZ  XZ   .  XZ  XZ
+         11 |   *   *  XY   *  XY   *  XY   *  XZ  XZ   .  XZ
+         12 |   *   *   *  XY   *  XY   *  XY  XZ  XZ  XZ   .
 
 Headline takeaways from the paper:
+
 - ZZ coupling can ONLY be cancelled when the two sequences are
   syncopated -- either timing-shifted (one is the -CPMG variant of
   the other, e.g. (XX, XX-CPMG)) or frequency-doubled (one has twice
@@ -61,6 +78,21 @@ Headline takeaways from the paper:
 - Operator-alternation alone (e.g. (XYXY, YXYX)) cancels XX and YY
   but NOT ZZ -- timing or frequency syncopation is required for ZZ.
 - The matrix is symmetric in (Q0, Q1).
+
+Example:
+    .. code-block:: python
+
+        from qcal.sequence.dynamical_decoupling import XX_N, XY_N
+        from qcal.units import ns, us
+
+        # Syncopated XY-type DD on neighboring qubits 0 and 1, filling
+        # a 2 us idle window with as many XY4 blocks as fit
+        dd = XY_N(qubits=[0, 1], total_time=2 * us, gate_time=20 * ns)
+
+        # A single XX2 block on qubit 0 over a 1 us idle window
+        dd = XX_N(
+            qubits=[0], total_time=1 * us, gate_time=20 * ns, n_pulses=2
+        )
 """
 import logging
 from collections import defaultdict
@@ -89,23 +121,28 @@ def XY_N(
     This circuit implements a syncopated XY-type DD sequence for more than one
     qubit, but assumes even and odd qubits are nearest neighbors.
 
-    See:
-    https://aws.amazon.com/blogs/quantum-computing/suppressing-errors-with-
-    dynamical-decoupling-using-pulse-control-on-amazon-braket/
+    See `Suppressing errors with dynamical decoupling using pulse control
+    on Amazon Braket
+    <https://aws.amazon.com/blogs/quantum-computing/suppressing-errors-
+    with-dynamical-decoupling-using-pulse-control-on-amazon-braket/>`_.
 
     Args:
         qubits (Sequence[int]): qubit labels.
         total_time (float): total time over which to perform the DD.
         gate_time (float): time of the native X90 gate.
-        n_pulses (int | None, optional): number of pulses. Defaults to None. For
-            example, for n_pulses = 4, this performs an XY4 DD sequence. If
-            None, the number of pulses is set to the maximum number of pulses
-            that can fit within the specified time, with a minimum of 4.
-        subspace (str, optional): qubit subspace for the DD sequence. Defaults
-            to 'GE'. 'EF' is also supported.
+        n_pulses (int | None, optional): number of pulses. Defaults to
+            ``None``. For example, for ``n_pulses = 4``, this performs an
+            XY4 DD sequence. If ``None``, the number of pulses is set to
+            the maximum number of pulses that can fit within the specified
+            time, with a minimum of 4.
+        subspace (str, optional): qubit subspace for the DD sequence.
+            Defaults to ``'GE'``. ``'EF'`` is also supported.
 
     Returns:
         Circuit: qcal Circuit.
+
+    Raises:
+        ValueError: if ``n_pulses`` is not a multiple of 4.
     """
     qubits_even = [q for q in qubits if q % 2 == 0]
     qubits_odd = [q for q in qubits if q % 2 == 1]
@@ -368,15 +405,19 @@ def XX_N(
         qubits (Sequence[int]): qubit labels.
         total_time (float): total time over which to perform the DD.
         gate_time (float): time of the native X90 gate.
-        n_pulses (int | None, optional): number of pulses. Defaults to None. For
-            example, for n_pulses = 2, this performs an XX2 DD sequence. If
-            None, the number of pulses is set to the maximum number of pulses
-            that can fit within the specified time, with a minimum of 2.
-        subspace (str, optional): qubit subspace for the DD sequence. Defaults
-            to 'GE'. 'EF' is also supported.
+        n_pulses (int | None, optional): number of pulses. Defaults to
+            ``None``. For example, for ``n_pulses = 2``, this performs an
+            XX2 DD sequence. If ``None``, the number of pulses is set to
+            the maximum number of pulses that can fit within the specified
+            time, with a minimum of 2.
+        subspace (str, optional): qubit subspace for the DD sequence.
+            Defaults to ``'GE'``. ``'EF'`` is also supported.
 
     Returns:
         Circuit: qcal Circuit.
+
+    Raises:
+        ValueError: if ``n_pulses`` is not a multiple of 2.
     """
     qubits_even = [q for q in qubits if q % 2 == 0]
     qubits_odd = [q for q in qubits if q % 2 == 1]

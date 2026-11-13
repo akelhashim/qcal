@@ -1,5 +1,30 @@
-"""Submodule handling the main characterization class.
+"""Abstract base class for characterization protocols.
 
+This module defines :class:`Characterize`, the base class shared by the
+characterization protocols in :mod:`qcal.characterization` (e.g. coherence
+measurements and spectroscopy). Subclasses implement
+:meth:`~Characterize.generate_circuits` and :meth:`~Characterize.analyze`;
+the base class provides common properties, plotting, and the
+:meth:`~Characterize.final` step that writes characterized values back to
+the :class:`~qcal.config.Config`.
+
+Characterization protocols are typically created via factory functions
+(e.g. :func:`qcal.characterization.coherence.T1`) which return an instance
+of a protocol class that subclasses both a :class:`~qcal.qpu.qpu.QPU`
+backend and :class:`Characterize`.
+
+Example:
+    .. code-block:: python
+
+        from qcal.backend.qubic.qpu import QubicQPU
+        from qcal.characterization.coherence import T1
+        from qcal.config import Config
+        from qcal.units import us
+
+        config = Config('config.yaml')
+        t1 = T1(QubicQPU, config, qubits=[0, 1], t_max=300 * us)
+        t1.run()  # generate, execute, analyze, save, plot, and final
+        print(t1.characterized_values)  # {0: T1 of Q0, 1: T1 of Q1}
 """
 import logging
 from abc import ABC, abstractmethod
@@ -24,7 +49,7 @@ class Characterize(ABC):
     """
 
     def __init__(self, config: Config) -> None:
-        """Initialize the main Calibration class.
+        """Initialize the main Characterize class.
 
         Args:
             config (Config): qcal Config object.
@@ -52,7 +77,7 @@ class Characterize(ABC):
 
     @property
     def gate(self) -> str:
-        """Gate being calibration.
+        """Gate being characterized.
 
         Returns:
             str: name of gate.
@@ -97,7 +122,7 @@ class Characterize(ABC):
 
     @property
     def qubits(self) -> List | Tuple:
-        """Qubits in the calibration.
+        """Qubits in the characterization.
 
         Returns:
             List | Tuple: qubit labels.
@@ -135,6 +160,11 @@ class Characterize(ABC):
         Args:
             xlabel (str, optional): x-axis label. Defaults to 'Value Sweep'.
             ylabel (str, optional): y-axis label. Defaults to 'Results'.
+            flabel (str, optional): label of the fitted quantity used in
+                the legend. Defaults to 'Fit'.
+            save_path (str, optional): directory prefix used when saving
+                the figure (only if ``settings.Settings.save_data`` is
+                ``True``). Defaults to ''.
         """
         nrows, ncols = calculate_nrows_ncols(len(self._qubits))
         figsize = (5 * ncols, 4 * nrows)

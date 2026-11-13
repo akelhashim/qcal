@@ -1,11 +1,61 @@
 """Submodule for readout calibration.
 
+This module provides factory functions that build readout calibration
+classes on top of a user-supplied :class:`~qcal.qpu.qpu.QPU` class:
+
+- :func:`ReadoutCalibration`: measure the raw IQ readout data for each
+  prepared state and train a per-qubit classifier, stored in a
+  :class:`~qcal.managers.classification_manager.ClassificationManager`.
+- :func:`Fidelity`: sweep a readout parameter and pick the value that
+  maximizes the readout fidelity.
+- :func:`Separation`: sweep a readout parameter and pick the value that
+  maximizes the separation between the IQ blobs.
+
+Readout calibration requires raw (unclassified) IQ data, so it is meant to
+be run on a hardware backend such as
+:class:`~qcal.backend.qubic.qpu.QubicQPU`.
+
+Example:
+    .. code-block:: python
+
+        import numpy as np
+
+        import qcal as qc
+        from qcal.backend.qubic.qpu import QubicQPU
+        from qcal.calibration.readout import ReadoutCalibration, Separation
+        from qcal.units import MHz
+
+        config = qc.Config()
+
+        # Train the readout classifiers
+        cal = ReadoutCalibration(
+            QubicQPU,
+            config,
+            qubits=config.qubits,
+            n_shots=10000,
+        )
+        cal.run()
+
+        # Optimize the readout frequency of each qubit
+        params = {q: f'readout/{q}/freq' for q in config.qubits}
+        param_sweep = {
+            q: np.linspace(-0.5, 0.5, 31) * MHz + config[params[q]]
+            for q in config.qubits
+        }
+        cal = Separation(
+            QubicQPU,
+            config,
+            qubits=config.qubits,
+            params=params,
+            param_sweep=param_sweep,
+        )
+        cal.run()
 """
 import inspect
 import logging
 import os
 from concurrent.futures import ThreadPoolExecutor
-from typing import Callable, Dict, List, Tuple
+from typing import Dict, List, Tuple
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -45,35 +95,40 @@ def ReadoutCalibration(
     classifier: ClassificationManager = None,
     n_levels:   int = 2,
     **kwargs
-) -> Callable:
-    """Readout calibration
+) -> Calibration:
+    """Readout calibration.
 
-    Basic example useage for initial calibration:
+    Example:
+        Initial calibration:
 
-    ```
-    cal = ReadoutCalibration(
-        CustomQPU,
-        config,
-        qubits=[0, 1, 2]
-    )
-    cal.run()
-    ```
+        .. code-block:: python
+
+            cal = ReadoutCalibration(
+                CustomQPU,
+                config,
+                qubits=[0, 1, 2]
+            )
+            cal.run()
 
     Args:
         qpu (QPU): custom QPU object.
         config (Config): qcal Config object.
         qubits (List | Tuple): qubits to calibrate.
-        method (str, optional): calibration method. Must be one of ('pi_pulse',
-            'rabi').
+        method (str, optional): calibration method. Must be one of
+            ``'pi_pulse'`` or ``'rabi'``. Defaults to ``'pi_pulse'``.
         gate (str, optional): native gate to calibrate. Defaults to 'X90'.
         model (str, optional): classification algorithm. Defaults to 'gmm'.
         classifier (ClassificationManager, optional): manager used for
             classifying raw data. Defaults to None.
         n_levels (int, optional): number of energy levels to classify.
             Defaults to 2.
+        **kwargs: additional keyword arguments. Those matching the QPU
+            constructor are passed to the QPU (e.g. ``n_shots``); those
+            matching the classifier constructor are passed to the
+            classifier.
 
     Returns:
-        Callable: ReadoutCalibration class.
+        Calibration: ReadoutCalibration class.
     """
 
     class ReadoutCalibration(qpu, Calibration):
@@ -93,8 +148,7 @@ def ReadoutCalibration(
             n_levels:   int = 2,
             **kwargs
         ) -> None:
-            """Initialize the readout calibration class within the function.
-            """
+            """Initialize the ReadoutCalibration class."""
             qpu_args = list(inspect.signature(qpu).parameters)
             qpu_kwargs = {
                 k: kwargs.pop(k) for k in dict(kwargs) if k in qpu_args
@@ -346,7 +400,8 @@ def ReadoutCalibration(
                         # )
 
                         # # Plot the decision boundary by assigning a color to
-                        # # each point in the mesh [x_min, x_max]x[y_min, y_max].
+                        # # each point in the mesh
+                        # # [x_min, x_max]x[y_min, y_max].
                         # Z = self._classifier[q].predict(
                         #     np.c_[xx.ravel(), yy.ravel()]
                         # )
@@ -354,7 +409,9 @@ def ReadoutCalibration(
                         # if raw:
                         #     ax.contourf(xx, yy, Z, cmap=cmap, alpha=0.15)
                         # else:
-                        #     cs = ax.contourf(xx, yy, Z, cmap=cmap, alpha=0.15)
+                        #     cs = ax.contourf(
+                        #         xx, yy, Z, cmap=cmap, alpha=0.15
+                        #     )
                         #     self._cs = cs
 
                         ax.set_xlim([x_min, x_max])
@@ -378,7 +435,9 @@ def ReadoutCalibration(
                         #     handles = []
                         #     for l in range(self._n_levels):
                         #         if l*3 < len(cs.legend_elements()[0]):
-                        #             handles.append(cs.legend_elements()[0][l*3])
+                        #             handles.append(
+                        #                 cs.legend_elements()[0][l*3]
+                        #             )
                         #     leg = ax.legend(
                         #         handles=handles,
                         #         labels=range(0, self._n_levels),
@@ -386,7 +445,9 @@ def ReadoutCalibration(
                         #         loc=0
                         #     )
                             handles = [
-                                Patch(color=cmap(i/(self._n_levels-1)), alpha=1)
+                                Patch(
+                                    color=cmap(i/(self._n_levels-1)), alpha=1
+                                )
                                 for i in range(self._n_levels)
                             ]
                             leg = ax.legend(
@@ -477,27 +538,27 @@ def Fidelity(
     gate:        str = 'X90',
     n_levels:    int = 2,
     **kwargs
-) -> Callable:
+) -> Calibration:
     """Fidelity calibration.
 
-    Basic example useage:
-    ```
-    qubits = [0, 1, 2, 3, 4, 5, 6, 7]
-    params = {q: f'readout/{q}/amp' for q in qubits}
-    param_sweep = {
-        q: np.linspace(-0.005, 0.005, 21)
-        + cfg[f'readout/{q}/amp'] for q in qubits
-    }
+    Example:
+        .. code-block:: python
 
-    cal = Fidelity(
-        CustomQPU,
-        config,
-        qubits=qubits,
-        params=params,
-        param_sweep=param_sweep
-    )
-    cal.run()
-    ```
+            qubits = [0, 1, 2, 3, 4, 5, 6, 7]
+            params = {q: f'readout/{q}/amp' for q in qubits}
+            param_sweep = {
+                q: np.linspace(-0.005, 0.005, 21)
+                + config[f'readout/{q}/amp'] for q in qubits
+            }
+
+            cal = Fidelity(
+                CustomQPU,
+                config,
+                qubits=qubits,
+                params=params,
+                param_sweep=param_sweep
+            )
+            cal.run()
 
     Args:
         qpu (QPU): custom QPU object.
@@ -507,13 +568,16 @@ def Fidelity(
             sweep over.
         param_sweep (ArrayLike | Dict[int, ArrayLike]): value sweep for each
             qubit.
-        gate (str, optional): native gate to used to prepare states. Defaults
+        gate (str, optional): native gate used to prepare states. Defaults
             to 'X90'.
         n_levels (int, optional): number of energy levels to classify.
             Defaults to 2.
+        **kwargs: additional keyword arguments passed to
+            :func:`~qcal.benchmarking.readout.ReadoutFidelity` (e.g.
+            ``n_shots``).
 
     Returns:
-        Callable: Fidelity class.
+        Calibration: Fidelity class.
     """
 
     class Fidelity(qpu, Calibration):
@@ -532,8 +596,7 @@ def Fidelity(
             n_levels:    int = 2,
             **kwargs
         ) -> None:
-            """Initialize the Fidelity calibration class within the function.
-            """
+            """Initialize the Fidelity calibration class."""
             self._rcal = ReadoutFidelity(
                 qpu=qpu,
                 config=config,
@@ -706,29 +769,28 @@ def Separation(
     model:       str = 'gmm',
     n_levels:    int = 2,
     **kwargs
-) -> Callable:
+) -> Calibration:
     """Separation calibration.
 
-    Basic example useage:
+    Example:
+        .. code-block:: python
 
-    ```
-    qubits = [0, 1, 2, 3, 4, 5, 6, 7]
-    params = {q: f'readout/{q}/freq' for q in qubits}
-    # +/- 500 kHz sweep around the current frequency
-    param_sweep = { # +/- 500 kHz sweep around the current frequency
-        q: np.linspace(-0.5, 0.5, 31) * MHz
-        + cfg[f'readout/{q}/freq'] for q in qubits
-    }
+            qubits = [0, 1, 2, 3, 4, 5, 6, 7]
+            params = {q: f'readout/{q}/freq' for q in qubits}
+            # +/- 500 kHz sweep around the current frequency
+            param_sweep = {
+                q: np.linspace(-0.5, 0.5, 31) * MHz
+                + config[f'readout/{q}/freq'] for q in qubits
+            }
 
-    cal = Separation(
-        CustomQPU,
-        config,
-        qubits=qubits,
-        params=params,
-        param_sweep=param_sweep
-    )
-    cal.run()
-    ```
+            cal = Separation(
+                CustomQPU,
+                config,
+                qubits=qubits,
+                params=params,
+                param_sweep=param_sweep
+            )
+            cal.run()
 
     Args:
         qpu (QPU): custom QPU object.
@@ -738,16 +800,18 @@ def Separation(
             sweep over.
         param_sweep (ArrayLike | Dict[int, ArrayLike]): value sweep for each
             qubit.
-        method (str, optional): calibration method. Must be one of ('pi_pulse',
-            'rabi').
+        method (str, optional): calibration method. Must be one of
+            ``'pi_pulse'`` or ``'rabi'``. Defaults to ``'pi_pulse'``.
         gate (str, optional): native gate used for state preparation. Defaults
             to 'X90'.
         model (str, optional): classification algorithm. Defaults to 'gmm'.
         n_levels (int, optional): number of energy levels to classify.
             Defaults to 2.
+        **kwargs: additional keyword arguments passed to
+            :func:`ReadoutCalibration` (e.g. ``n_shots``).
 
     Returns:
-        Callable: Separation class.
+        Calibration: Separation class.
     """
 
     class Separation(qpu, Calibration):
@@ -768,8 +832,7 @@ def Separation(
             n_levels:    int = 2,
             **kwargs
         ) -> None:
-            """Initialize the Amplitude calibration class within the function.
-            """
+            """Initialize the Separation calibration class."""
             self._rcal = ReadoutCalibration(
                 qpu=qpu,
                 config=config,

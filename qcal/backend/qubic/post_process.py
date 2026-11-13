@@ -1,6 +1,4 @@
-"""Submodule for post-processing results measured on QubiC.
-
-"""
+"""Submodule for post-processing results measured on QubiC."""
 import logging
 from typing import Any, List
 
@@ -14,11 +12,11 @@ from qcal.managers.classification_manager import ClassificationManager
 logger = logging.getLogger(__name__)
 
 
-__all__ = ('post_process')
+__all__ = ('post_process',)
 
 
 def find_herald_idx(config: Config) -> int:
-    """Finds the herald index for the number of reads in a measurement.
+    """Find the herald index for the number of reads in a measurement.
 
     The herald index is taken to be the 0th read unless there is active reset.
 
@@ -61,20 +59,20 @@ def post_process(
             will be extracted from the measurements.
         n_reads_per_shot (int | dict | None, optional): number of reads per
             shot per circuit. Defaults to None.
-        classifier (ClassificationManager, None): manager used for classifying
-            raw data. Defaults to None.
+        classifier (ClassificationManager | None, optional): manager used
+            for classifying raw data. Defaults to None.
         raster_circuits (bool, optional): whether to raster through all
             circuits in a batch during measurement. Defaults to False. By
-            default, all circuits in a batch will be measured n_shots times
-            one by one. If True, all circuits in a batch will be measured
-            back-to-back one shot at a time. This can help average out the
-            effects of drift on the timescale of a measurement.
+            default, all circuits in a batch will be measured ``n_shots``
+            times one by one. If True, all circuits in a batch will be
+            measured back-to-back one shot at a time. This can help average
+            out the effects of drift on the timescale of a measurement.
         rcorr_cmat (pd.DataFrame | None, optional): confusion matrix for
             readout correction. Defaults to None. If passed, the readout
             correction will be applied to the raw bit strings in
             post-processing.
         save_raw_data (bool, optional): whether to save raw IQ data for each
-                qubit in the CircuitSet. Defaults to False.
+            qubit in the CircuitSet. Defaults to False.
     """
     from qubic.results.tools import pack_s11_results
 
@@ -182,7 +180,9 @@ def post_process(
             )
 
             # Write results to a dictionary mapping bitstrings to counts
-            results = dict(zip(results.bitstring, results.counts, strict=False))
+            results = dict(
+                zip(results.bitstring, results.counts, strict=False)
+            )
 
             # Assign results as a circuit attribute
             try:

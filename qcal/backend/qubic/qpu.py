@@ -1,5 +1,39 @@
-"""Custom QPU submodule for QubiC
+"""Custom QPU submodule for QubiC.
 
+This module provides :class:`QubicQPU`, the :class:`~qcal.qpu.qpu.QPU`
+backend for the `QubiC <https://gitlab.com/LBL-QubiC>`_ control system. It
+transpiles qcal circuits to QubiC programs, compiles and assembles them,
+runs them on the FPGA through an RPC server, and post-processes the
+measured data into :class:`~qcal.results.Results`. Requires the ``qubic``
+package (and its dependencies) to be installed.
+
+Example:
+    .. code-block:: python
+
+        import qcal as qc
+        from qcal.backend.qubic.qpu import QubicQPU
+        from qcal.circuit import Circuit, Cycle
+        from qcal.gates.single_qubit import Meas, X90
+
+        config = qc.Config()  # loads settings.Settings.config_path
+
+        circuit = Circuit([
+            Cycle({X90(0), X90(1)}),
+            Cycle({Meas(0), Meas(1)}),
+        ])
+
+        qpu = QubicQPU(
+            config,
+            n_shots=1000,
+            ip_address='ip.address.for.board',  # RPC server address
+            port=port,  # RPC server port (int)
+        )
+        qpu.run(circuit)
+        print(circuit.results.counts)
+
+    :class:`QubicQPU` can also be passed to any calibration factory, e.g.
+    ``Amplitude(QubicQPU, config, ...)``, with QubiC-specific settings
+    (such as ``ip_address`` and ``port``) given as keyword arguments.
 """
 import logging
 import os
@@ -20,16 +54,15 @@ from .utils import calculate_n_reads
 logger = logging.getLogger(__name__)
 
 
-__all__ = ('QubicQPU')
+__all__ = ('QubicQPU',)
 
 
 class QubicQPU(QPU):
-    """Qubic Quantum Processing Unit.
+    """QubiC Quantum Processing Unit.
 
-    QubicQPU inherents from the main QPU class, but overwrites certain methods.
-
-    Args:
-        QPU: main QPU class.
+    QubicQPU inherits from the main :class:`~qcal.qpu.qpu.QPU` class, but
+    overwrites the hardware-specific methods
+    (:meth:`generate_sequence`, :meth:`acquire`, and :meth:`process`).
     """
     from qubic.state_disc import GMMManager
 
@@ -61,7 +94,7 @@ class QubicQPU(QPU):
             ip_address:          str = None,
             port:                int = None
     ) -> None:
-        """Initialize a instance of a QPU for QubiC.
+        """Initialize an instance of a QPU for QubiC.
 
         Args:
             config (Config): qcal config object.
@@ -80,35 +113,37 @@ class QubicQPU(QPU):
             n_levels (int, optional): number of energy levels to be measured.
                 Defaults to 2. If n_levels = 3, this assumes that the
                 measurement supports qutrit classification.
-            outputs (List[str]): what output data is desired for each
-                measurement. Defaults to ['s11', 'shots', 'counts']. 's11'
-                is to the integrated IQ data; 'shots' is the classified data
-                for each read; and 'counts' is the accumulated statistics
-                for each read.
+            outputs (List[str], optional): what output data is desired for
+                each measurement. Defaults to ``['s11']``. ``'s11'`` is the
+                integrated IQ data; ``'shots'`` is the classified data for
+                each read; and ``'counts'`` is the accumulated statistics for
+                each read.
             hardware_vz_qubits (List[str], optional): list of qubit labels
                 specifying for which qubits should the virtualz gates be done
-                on hardware (as opposed to software). Defaults to None. This is
-                necessary if doing conditional phase shifts using mid-
-                circuit measurements. Example: ```measure_qubits = ['Q0', 'Q1',
-                'Q3']```.
+                on hardware (as opposed to software). Defaults to ``[]``.
+                This is necessary if doing conditional phase shifts using
+                mid-circuit measurements. Example:
+                ``hardware_vz_qubits = ['Q0', 'Q1', 'Q3']``.
             measure_qubits (List[str] | None, optional): list of qubit labels
                 for post-processing measurements. Defaults to None. This will
                 overwrite the measurement qubits listed in the measurement
-                objects. Example: ```measure_qubits = ['Q0', 'Q1', 'Q3']```.
+                objects. Example: ``measure_qubits = ['Q0', 'Q1', 'Q3']``.
             rcorr_cmat (pd.DataFrame | None, optional): confusion matrix for
                 readout correction. Defaults to None. If passed, the readout
                 correction will be applied to the raw bit strings in
                 post-processing.
-            circuit_for_loop (bool): loops over circuit partitions for circuits
-                with repeated structures. Defaults to False.
+            circuit_for_loop (bool, optional): loops over circuit
+                partitions for circuits with repeated structures. Defaults to
+                False.
             raster_circuits (bool, optional): whether to raster through all
                 circuits in a batch during measurement. Defaults to False. By
-                default, all circuits in a batch will be measured n_shots times
-                one by one. If True, all circuits in a batch will be measured
-                back-to-back one shot at a time. This can help average out the
-                effects of drift on the timescale of a measurement.
-            reload_pulse (bool): reloads the stored pulses when compiling each
-                circuit. Defaults to True.
+                default, all circuits in a batch will be measured
+                ``n_shots`` times one by one. If True, all circuits in a batch
+                will be measured back-to-back one shot at a time. This can
+                help average out the effects of drift on the timescale of a
+                measurement.
+            reload_pulse (bool, optional): reloads the stored pulses when
+                compiling each circuit. Defaults to True.
             barrier_between_cycles (bool, optional): insert a global
                 barrier before every circuit cycle during QubiC
                 transpilation. Defaults to True (historical behavior).
@@ -129,16 +164,16 @@ class QubicQPU(QPU):
                 buffers before loading a new circuit. Defaults to True. If all
                 of the circuits in a batch use the same qubits, this can be set
                 to False to save execution time.
-            save_raw_data (bool, optional): whether to save raw IQ data for each
-                qubit in the CircuitSet. Defaults to False.
+            save_raw_data (bool, optional): whether to save raw IQ data for
+                each qubit in the CircuitSet. Defaults to False.
             gmm_manager (GMMManager, optional): QubiC GMMManager object.
                 Defaults to None. If None, this is loaded from a previously
-                saved manager object: 'gmm_manager.pkl'.
+                saved manager object: ``'gmm_manager.pkl'``.
             sd_param (Dict | None, optional): this kwarg is unused and only
-                included for compatiblity with qcal-pro. Defaults to None.
+                included for compatibility with qcal-pro. Defaults to None.
             ip_address (str, optional): IP address for RPC server. Defaults to
                 None.
-            port (int, option): port for RPC server. Defaults to None.
+            port (int, optional): port for RPC server. Defaults to None.
         """
         QPU.__init__(self,
             config=config,
@@ -265,14 +300,14 @@ class QubicQPU(QPU):
     def active_n_reads_per_shot(self) -> dict:
         """Read-count for the sequence currently being acquired.
 
-        Derived from self.active_sequence rather than stored
-        separately: generate_sequence() already embeds each channel's
+        Derived from :attr:`active_sequence` rather than stored
+        separately: :meth:`generate_sequence` already embeds each channel's
         read count onto the sequence object itself
-        (result_channels[ch].reads_per_shot), so reading it back off
-        self.active_sequence (QPU's race-safe snapshot of
-        self._sequence -- see its docstring) gives the same
+        (``result_channels[ch].reads_per_shot``), so reading it back off
+        :attr:`active_sequence` (QPU's race-safe snapshot of
+        ``self._sequence``; see its docstring) gives the same
         protection without needing a second snapshot of
-        self._n_reads_per_shot.
+        ``self._n_reads_per_shot``.
 
         Returns:
             dict: number of reads per channel.
@@ -286,10 +321,11 @@ class QubicQPU(QPU):
         """Generate a QubiC sequence.
 
         This occurs in two steps:
-        1) Generate the compiled program, which takes into accoun the FPGA
-            config and the qchip layout.
-        2) Generate the raw ASM code. This is what we are calling the
-            "sequence."
+
+        1. Generate the compiled program, which takes into account the FPGA
+           config and the qchip layout.
+        2. Generate the raw ASM code. This is what we are calling the
+           "sequence."
         """
         from distproc.compiler import proc_grouping_from_channelconfig
         from qubic.toolchain import run_assemble_stage, run_compile_stage
@@ -374,7 +410,9 @@ class QubicQPU(QPU):
 
         if len(self._transpiled_circuits) > 0:
             if isinstance(self._circuits, CircuitSet):
-                self._transpiled_circuits['results'] = self._circuits['results']
+                self._transpiled_circuits['results'] = (
+                    self._circuits['results']
+                )
                 for i, results in enumerate(self._circuits['results']):
                     self._transpiled_circuits[i].results = results
             else:

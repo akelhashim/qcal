@@ -1,10 +1,14 @@
-"""Submodule for purity benchmarking routines.
+"""Purity benchmarking protocols.
 
-For XRB, see:
-https://trueq.quantumbenchmark.com/guides/error_diagnostics/xrb.html
+Provides :func:`XRB`, the True-Q implementation of extended randomized
+benchmarking (requires a valid True-Q license).
+
+References:
+    `True-Q XRB guide
+    <https://trueq.quantumbenchmark.com/guides/error_diagnostics/xrb.html>`_
 """
 import logging
-from typing import Any, Callable, List, Tuple
+from typing import Any, List, Tuple
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -29,21 +33,22 @@ def XRB(qpu:             QPU,
         include_rcal:    bool = False,
         include_srb:     bool = True,
         **kwargs
-    ) -> Callable:
-    """eXtended Randomized Benchmarking.
+    ) -> QPU:
+    """Extended Randomized Benchmarking (XRB).
 
     This is a True-Q protocol and requires a valid True-Q license.
 
     Args:
-        qpu (QPU): custom QPU object.
+        qpu (QPU): custom QPU class (not an instance). The returned
+            protocol object inherits from this class.
         config (Config): qcal Config object.
         qubit_labels (List[int | Tuple[int]]): a list specifying sets of
             system labels to be twirled together by Clifford gates in each
-            circuit. For example, [0, 1, (2, 3)] would perform single-qubit RB
-            on 0 and 1, and two-qubit RB on (2, 3).
+            circuit. For example, ``[0, 1, (2, 3)]`` would perform
+            single-qubit RB on 0 and 1, and two-qubit RB on (2, 3).
         circuit_depths (List[int] | Tuple[int]): a list of positive integers
-            specifying how many cycles of random Clifford gates to generate for
-            RB, for example, [4, 64, 256].
+            specifying how many cycles of random Clifford gates to generate
+            for RB, for example, ``[4, 64, 256]``.
         n_circuits (int, optional): the number of circuits for each circuit
             depth. Defaults to 30.
         tq_config (str | Any, optional): True-Q config yaml file or config
@@ -52,16 +57,18 @@ def XRB(qpu:             QPU,
             Pauli gate for each qubit in the cycle preceding a measurement
             operation. Defaults to True. This is only used in SRB, if included.
         include_rcal (bool, optional): whether to measure RCAL circuits in the
-            same circuit collection as the SRB circuit. Defaults to False. If
-            True, readout correction will be apply to the fit results
+            same circuit collection as the XRB circuits. Defaults to False.
+            If True, readout correction will be applied to the fit results
             automatically.
         include_srb (bool, optional): whether to measure SRB circuits in
             addition to XRB circuits. Defaults to True. Together, XRB and SRB
             can be used to estimate the fraction of the total error due to
             coherent and stochastic errors in the gate set.
+        **kwargs: additional keyword arguments passed to the ``qpu``
+            constructor (e.g. ``n_shots``, ``compiler``, ``transpiler``).
 
     Returns:
-        Callable: XRB class instance.
+        QPU: XRB protocol instance (a subclass of ``qpu``).
     """
 
     class XRB(qpu):
@@ -155,7 +162,6 @@ def XRB(qpu:             QPU,
 
         def plot(self) -> None:
             """Plot the XRB fit results."""
-
             # Plot the raw curves
             nrows, ncols = calculate_nrows_ncols(len(self._qubit_labels))
             figsize = (5 * ncols, 4 * nrows)

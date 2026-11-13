@@ -1,6 +1,7 @@
 """Submodule for decomposing pyGSTi circuits.
 
-Optimized version:
+This is an optimized version that:
+
 - precomputes Clifford update table for 1-qubit Clifford + Pauli dressing
 - avoids repeated qubit index linear searches
 - avoids constructing temporary Pauli Label layers in update_clifford_labels
@@ -61,7 +62,8 @@ def decompose_X90(phases: Dict[int, List]) -> List[List[Label | tuple]]:
                 ('Gxpi2', q) for q in qubits if (i // 2) < (len(phases[q]) - 1)
             ])
 
-    # Remove any empty layers (in case some qubits have fewer phase corrections)
+    # Remove any empty layers (in case some qubits have fewer phase
+    # corrections)
     layers = [layer for layer in layers if layer]
 
     return layers
@@ -102,11 +104,11 @@ def get_clifford_from_unitary(U: NDArray) -> str:
     Args:
         U (NDArray): unitary matrix.
 
+    Returns:
+        str: name of the Clifford gate.
+
     Raises:
         ValueError: if it fails to look up a Clifford gate from the unitary.
-
-    Returns:
-        str: Name of the Clifford gate.
     """
     for k, v in CLIFFORD_UNITARIES.items():
         for phase in (1, -1, 1j, -1j):
@@ -177,9 +179,9 @@ def pauli_randomize_clifford_circuit(
         circuit (pygsti.circuits.Circuit): Clifford circuit.
 
     Returns:
-        Circuit: Pauli randomized Clifford circuit.
-        str: bitstring of measurement bitflips.
-        NDArray: random Pauli string.
+        Tuple[pygsti.circuits.Circuit, str, NDArray]: the Pauli randomized
+            Clifford circuit, the bitstring of measurement bitflips, and the
+            random Pauli string.
     """
     d = circuit.depth
     n = circuit.width
@@ -212,7 +214,9 @@ def pauli_randomize_clifford_circuit(
                     c_idx = qubit_to_idx[control]
                     t_idx = qubit_to_idx[target]
                     p_vec[c_idx] = (p_vec[c_idx] + p_vec[t_idx]) % 4
-                    p_vec[n + t_idx] = (p_vec[n + c_idx] + p_vec[n + t_idx]) % 4
+                    p_vec[n + t_idx] = (
+                        p_vec[n + c_idx] + p_vec[n + t_idx]
+                    ) % 4
 
                 elif g.name == 'Gcphase':
                     control, target = g.qubits
@@ -238,8 +242,8 @@ def pauli_randomize_clifford_circuit(
                         "and/or Iz gates in layers!"
                     )
 
-    # Final measurement bitstring is determined by whether an X gate was applied
-    # pre-measurement
+    # Final measurement bitstring is determined by whether an X gate was
+    # applied pre-measurement
     bs = ''.join(measurement_bitflips + [str(b // 2) for b in q_vec[n:]])
     rc_circ.done_editing()
 
@@ -250,8 +254,8 @@ def pauli_vector_to_clifford_layer(p_vec: NDArray, qubits: list[int]) -> Label:
     """Convert a Pauli vector to a layer of Clifford gates.
 
     Args:
-        p_vec (NDArray): Pauli vector
-        qubits (list[int]): qubit labels
+        p_vec (NDArray): Pauli vector.
+        qubits (list[int]): qubit labels.
 
     Returns:
         Label: Clifford layer.
@@ -279,8 +283,8 @@ def update_clifford_labels(
         p_vec (NDArray): Pauli vector for left side.
         q_vec (NDArray): Pauli vector for right side.
         qubits (list[int]): qubit labels.
-        qubit_to_idx (dict[int, int] | None): optional precomputed qubit->index
-            map.
+        qubit_to_idx (dict[int, int] | None, optional): precomputed
+            qubit-to-index map. Defaults to ``None``.
 
     Returns:
         Label: updated layer with Clifford labels.

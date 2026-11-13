@@ -1,5 +1,8 @@
-"""Submodule for analyzing leakage.
+r"""Analysis of leakage out of the computational subspace.
 
+Provides :func:`analyze_leakage`, which fits the population of the
+:math:`|2\rangle` state versus circuit depth to an exponential model to
+extract leakage and seepage rates.
 """
 import logging
 from typing import Any, Dict
@@ -22,18 +25,29 @@ logger = logging.getLogger(__name__)
 
 
 def analyze_leakage(circuits: Any, filename: str | None = None) -> Dict:
-    """Analyze leakage results for a set of circuits.
+    r"""Analyze leakage results for a set of circuits.
 
-    Relevant paper:
-    - https://arxiv.org/abs/1509.05470
+    For each qubit, the mean :math:`|2\rangle` state population is fit to
+    an exponential versus circuit depth. The decay constant gives the total
+    rate :math:`\Gamma = \gamma_\uparrow + \gamma_\downarrow`, and the
+    leakage rate per gate is :math:`\gamma_\uparrow = \Gamma p_\infty`,
+    where :math:`p_\infty` is the asymptotic population. The results are
+    plotted interactively with plotly.
 
     Args:
-        circuits (Any): set of circuits.
+        circuits (Any): set of circuits (e.g. a
+            :class:`~qcal.circuit.CircuitSet`) with measured results. Each
+            circuit must have ``labels`` and ``results`` attributes.
         filename (str | None, optional): filename where to save the results.
             Defaults to None.
 
     Returns:
-        Dict: dictionary of leakage counts per circuit depth for each qubit.
+        Dict: dictionary of leakage populations per circuit depth for each
+        qubit.
+
+    References:
+        `Wood and Gambetta, Phys. Rev. A 97, 032306 (2018)
+        <https://arxiv.org/abs/1509.05470>`_.
     """
     qubits = circuits[0].labels
     q_index = [qubits.index(q) for q in qubits]

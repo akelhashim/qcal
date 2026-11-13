@@ -1,4 +1,21 @@
-"""Submodule for storing basic qcal settings for experiments."""
+"""Submodule for storing basic qcal settings for experiments.
+
+This module exposes a single, module-level :data:`Settings` object (an
+instance of :class:`_Settings`) which stores global options used
+throughout qcal, such as the path to the config file, whether data
+should be saved automatically, where it should be saved, and which
+plotly renderer to use for figures.
+
+Example:
+    .. code-block:: python
+
+        from qcal.settings import Settings
+
+        Settings.config_path = '/path/to/configs/'
+        Settings.save_data = True
+        Settings.data_save_path = '/path/to/data/'
+        Settings.plot_renderer = 'browser'  # or None for plotly's default
+"""
 import plotly.io as pio
 
 __all__ = ['Settings']
@@ -6,6 +23,12 @@ __all__ = ['Settings']
 _DEFAULT_PLOT_RENDERER = pio.renderers.default
 
 class _Settings:
+    """Container for global qcal settings.
+
+    A single instance of this class is created at import time and exposed
+    as :data:`qcal.settings.Settings`. Each setting is a property whose
+    setter validates the type of the assigned value.
+    """
 
     def __init__(self) -> None:
         """Initialize the settings attributes."""
@@ -51,8 +74,9 @@ class _Settings:
         """Plotly renderer used to display figures.
 
         Returns:
-            str | None: renderer name (e.g. 'browser', 'notebook',
-                'vscode', 'colab', 'iframe', 'png'), or ``None`` to use
+            str | None: renderer name (e.g. ``'browser'``, ``'notebook'``,
+                ``'vscode'``, ``'colab'``, ``'iframe'``, ``'png'``), or
+                ``None`` to use
                 plotly's own auto-detected default for the current
                 environment. Defaults to ``None``.
         """
@@ -60,28 +84,28 @@ class _Settings:
 
     @config_path.setter
     def config_path(self, value: str):
-        """Setter for config_path."""
+        """Setter for ``config_path``."""
         if not isinstance(value, str):
             raise TypeError("The passed value must be a string!")
         self._config_path = value
 
     @save_data.setter
     def save_data(self, value: bool):
-        """Setter for save_data."""
+        """Setter for ``save_data``."""
         if not isinstance(value, bool):
             raise TypeError("The passed value must be a boolean!")
         self._save_data = value
 
     @data_save_path.setter
     def data_save_path(self, value: str):
-        """Setter for data_save_path."""
+        """Setter for ``data_save_path``."""
         if not isinstance(value, str):
             raise TypeError("The passed value must be a string!")
         self._data_save_path = value
 
     @plot_renderer.setter
     def plot_renderer(self, value: str | None) -> None:
-        """Setter for plot_renderer.
+        """Setter for ``plot_renderer``.
 
         Args:
             value (str | None): a valid plotly renderer name (see

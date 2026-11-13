@@ -1,13 +1,17 @@
-"""Submodule for Mirror Circuit Benchmarking.
+"""Mirror circuit benchmarking (MCB) protocol.
 
-Relevant papers:
-- https://www.nature.com/articles/s41567-021-01409-7,
-- https://arxiv.org/abs/2008.11294
+Provides :func:`MCB`, a pyGSTi-based volumetric benchmark that runs random
+and periodic mirror circuits over a range of circuit widths and depths.
+
+References:
+    - `Proctor et al., Measuring the capabilities of quantum computers,
+      Nat. Phys. 18, 75 (2022)
+      <https://www.nature.com/articles/s41567-021-01409-7>`_
+    - `arXiv:2008.11294 <https://arxiv.org/abs/2008.11294>`_
 """
 import logging
 from collections.abc import Sequence
 from concurrent.futures import ThreadPoolExecutor
-from typing import Callable
 
 import numpy as np
 import pandas as pd
@@ -55,17 +59,15 @@ def MCB(
     qubit_subsets_per_width: dict[int, Sequence[int]] | None = None,
     pspec:                   QubitProcessorSpec | None = None,
     **kwargs
-) -> Callable:
+) -> QPU:
     """Mirror Circuit Benchmarking.
 
-    This is a pyGSTi protocol.
-
-    Relevant papers:
-    - https://www.nature.com/articles/s41567-021-01409-7,
-    - https://arxiv.org/abs/2008.11294
+    This is a pyGSTi protocol. See the references in
+    :mod:`qcal.benchmarking.mcb`.
 
     Args:
-        qpu (QPU): custom QPU object.
+        qpu (QPU): custom QPU class (not an instance). The returned
+            protocol object inherits from this class.
         config (Config): qcal Config object.
         qubits (Sequence[int] | None, optional): sequence of qubits to
             benchmark. Defaults to None, in which case all qubits in the config
@@ -81,20 +83,22 @@ def MCB(
         qubit_subsets_per_width (dict[int, Sequence[int]] | None, optional):
             dictionary mapping each width to a sequence of qubit subsets to
             benchmark at that width. Defaults to None, in which case a single
-            subset of the first `width` qubits is used for each width.
+            subset of the first ``width`` qubits is used for each width.
         two_qubit_gate_density (float, optional): density of two-qubit gates in
             the random mirror circuits. Defaults to 0.125 (1/8).
-        estimated_qubit_error_rate (float, optional): estimated per-qubit error
-            rate used to trim depths. Defaults to ESTIMATED_QUBIT_ERROR_RATE
-            (0.005).
-        target_polarization (float, optional): target polarization at which to
-            cut off depths. Defaults to TARGET_POLARIZATION (0.01).
+        est_qubit_error_rate (float, optional): estimated per-qubit error
+            rate used to trim depths. Defaults to
+            ``ESTIMATED_QUBIT_ERROR_RATE`` (0.005).
+        target_polarization (float, optional): target polarization at which
+            to cut off depths. Defaults to ``TARGET_POLARIZATION`` (0.01).
         pspec (QubitProcessorSpec | None, optional): pyGSTi processor spec.
             Defaults to None, in which case a processor spec is automatically
             generated from the config.
+        **kwargs: additional keyword arguments passed to the ``qpu``
+            constructor (e.g. ``n_shots``, ``compiler``, ``transpiler``).
 
     Returns:
-        Callable: MCB class instance.
+        QPU: MCB protocol instance (a subclass of ``qpu``).
     """
 
     class MCB(qpu):
@@ -289,7 +293,9 @@ def MCB(
                 edesigns.update(result)
 
             self._edesign = CombinedExperimentDesign(edesigns)
-            self._circuits = CircuitSet(self._edesign.all_circuits_needing_data)
+            self._circuits = CircuitSet(
+                self._edesign.all_circuits_needing_data
+            )
             self._circuits['pygsti_circuit'] = [
                 circ.str for circ in self._edesign.all_circuits_needing_data
             ]
@@ -318,7 +324,7 @@ def MCB(
                 qpu.save(self, create_data_path=False)
 
         def analyze(self):
-            """Analyze the CRB results."""
+            """Analyze the MCB results."""
             logger.info(' Analyzing the results...')
             self._dataset = generate_pygsti_dataset(
                 self._circuits,
@@ -348,7 +354,8 @@ def MCB(
             # Will not work if the `keys` in the
             # edesign are changed to not include `RMCs` or `PMCs`.
             self._summary['CircuitType'] = [
-               'RMC' if 'RMCS' in p[0] else 'PMC' for p in self._summary['Path']
+               'RMC' if 'RMCS' in p[0] else 'PMC'
+               for p in self._summary['Path']
             ]
 
             # Redefines "depth" as twice what is in the Depth column, because
@@ -409,11 +416,11 @@ def MCB(
                     self._data_manager._save_path + 'volumetric.svg'
                 )
 
-            # Creates a plot like those in Fig. 1d of arXiv:2008.11294. But note
-            # that these RMCs don't have the same sampling as those in Fig. 1d:
-            # this is just the same type of plot from RMC data, not the same
-            # type of RMCs. To get the same color map as in Fig. 1d, set
-            # cmap=None
+            # Creates a plot like those in Fig. 1d of arXiv:2008.11294. But
+            # note that these RMCs don't have the same sampling as those in
+            # Fig. 1d: this is just the same type of plot from RMC data, not
+            # the same type of RMCs. To get the same color map as in Fig. 1d,
+            # set cmap=None
             vbdf2 = vbdf.select_column_value('CircuitType', 'RMC')
             fig, ax = pygsti.report.volumetric_distribution_plot(
                 vbdf2, figsize=(5.5,8), cmap=None
@@ -752,7 +759,9 @@ def _build_mcb_edesigns_for_qubit_subset(
             ] for cl in rmcs.circuit_lists
         ][1:]
     )
-    logger.info(f' Interacting qubit density for {qs} RMCs: {rmcs_density:.3f}')
+    logger.info(
+        f' Interacting qubit density for {qs} RMCs: {rmcs_density:.3f}'
+    )
 
     pmcs = PeriodicMirrorCircuitDesign(
         pspec=pspec,
@@ -771,7 +780,9 @@ def _build_mcb_edesigns_for_qubit_subset(
             ] for cl in pmcs.circuit_lists
         ][1:]
     )
-    logger.info(f' Interacting qubit density for {qs} PMCs: {pmcs_density:.3f}')
+    logger.info(
+        f' Interacting qubit density for {qs} PMCs: {pmcs_density:.3f}'
+    )
 
     return {(qs, 'RMCS'): rmcs, (qs, 'PMCS'): pmcs}
 
@@ -789,15 +800,15 @@ def _trim_depths(
     and the runtime will be unnecessarily long.
 
     Args:
-        depths (List): list of circuit depths to trim
-        width (int): circuit width
-        estimated_qubit_error_rate (float): estimated per-qubit error rate.
-            Defaults to ESTIMATED_QUBIT_ERROR_RATE.
-        target_polarization (float): target polarization at which to cut off
-            depths. Defaults to TARGET_POLARIZATION.
+        depths (list): list of circuit depths to trim.
+        width (int): circuit width.
+        estimated_qubit_error_rate (float, optional): estimated per-qubit
+            error rate. Defaults to ``ESTIMATED_QUBIT_ERROR_RATE``.
+        target_polarization (float, optional): target polarization at which
+            to cut off depths. Defaults to ``TARGET_POLARIZATION``.
 
     Returns:
-        list: trimmed circuit depths
+        list: trimmed circuit depths.
     """
     max_depth = np.log(target_polarization) / (
             width * np.log(1 - estimated_qubit_error_rate)

@@ -1,6 +1,4 @@
-"""Helper functions for post-processing measurement results.
-
-"""
+"""Helper functions for post-processing measurement results."""
 from __future__ import annotations
 
 import logging
@@ -73,13 +71,13 @@ def construct_dataframes(
     circuit, so that each DataFrame contains the results of the qubits
     measured in a single cycle.
 
-    Without ``measurement_cycles``, the n-th read of every qubit is taken to be
-    in the n-th cycle, which requires every qubit in a circuit to have the same
-    number of reads. With ``measurement_cycles`` (see
-    ``circuit_measurement_cycles``), qubits can be measured a different number
-    of times (e.g. ancillas measured mid-circuit but not at the end), and each
-    DataFrame only contains the qubits measured in that cycle. Cycles measuring
-    none of the qubits in ``results`` are dropped.
+    Without ``measurement_cycles``, the n-th read of every qubit is taken to
+    be in the n-th cycle, which requires every qubit in a circuit to have the
+    same number of reads. With ``measurement_cycles`` (see
+    :func:`circuit_measurement_cycles`), qubits can be measured a different
+    number of times (e.g. ancillas measured mid-circuit but not at the end),
+    and each DataFrame only contains the qubits measured in that cycle.
+    Cycles measuring none of the qubits in ``results`` are dropped.
 
     Args:
         results (List[dict[int, Array2D]]): all circuit results. Each array
@@ -104,7 +102,8 @@ def construct_dataframes(
             if len(set(n_reads.values())) > 1:
                 raise ValueError(
                     f"Qubits in circuit {i} have a different number of "
-                    f"reads {n_reads}; pass `measurement_cycles` to align them."
+                    f"reads {n_reads}; pass `measurement_cycles` to align "
+                    "them."
                 )
             n = next(iter(n_reads.values()), start_idx)
             circuit_results.append([
@@ -148,7 +147,7 @@ def construct_dataframes(
 
 
 def find_herald_idx(config: Config) -> int:
-    """Finds the herald index for the number of reads in a measurement.
+    """Find the herald index for the number of reads in a measurement.
 
     The herald index is taken to be the 0th read unless there is active reset.
 

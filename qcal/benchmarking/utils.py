@@ -1,6 +1,4 @@
-"""Helper functions for benchmarking protocols.
-
-"""
+"""Helper functions for benchmarking protocols."""
 import logging
 import math
 import random
@@ -19,9 +17,10 @@ class PauliMeasurementGroup:
     """Container for a set of co-measurable Pauli strings.
 
     Attributes:
-        measurement_basis: The combined Pauli string that defines the
-            measurement basis for the entire group.
-        paulis: The original Pauli strings that can be measured in this basis.
+        measurement_basis (PauliString): The combined Pauli string that
+            defines the measurement basis for the entire group.
+        paulis (list[PauliString]): The original Pauli strings that can be
+            measured in this basis.
     """
     measurement_basis: PauliString
     paulis: list[PauliString]
@@ -38,12 +37,12 @@ def local_pauli_options(
 
     Args:
         qubits (Sequence[int]): sequence of qubit labels.
-        measured_qubits (Iterable[int] | None): iterable of measured qubit
-            labels. Defaults to None.
+        measured_qubits (Iterable[int] | None, optional): iterable of
+            measured qubit labels. Defaults to None.
 
     Returns:
         list[list[str]]: allowed local Paulis for each qubit, in the order
-            of `qubits`. 'I' is always the first option.
+            of ``qubits``. 'I' is always the first option.
     """
     measured = set(measured_qubits) if measured_qubits is not None else set()
     return [
@@ -63,11 +62,11 @@ def generate_n_qubit_paulis(
 
     Args:
         qubits (Sequence[int]): sequence of qubits labels.
-        measured_qubits (Iterable[int] | None): iterable of measured qubit
-            labels. Defaults to None.
+        measured_qubits (Iterable[int] | None, optional): iterable of
+            measured qubit labels. Defaults to None.
 
     Returns:
-        list[tuple[str, ...]]: list of groupings of n-qubit Paulis
+        list[tuple[str, ...]]: list of groupings of n-qubit Paulis.
     """
     paulis = list(product(*local_pauli_options(qubits, measured_qubits)))
     return paulis
@@ -83,18 +82,19 @@ def generate_n_qubit_paulis_up_to_weight_k(
 
     Args:
         qubits (Sequence[int]): sequence of qubits labels.
-        measured_qubits (Iterable[int] | None): iterable of measured qubit
-            labels. Defaults to None.
-        weight_k (int): maximum number of non-identity entries allowed in each
-            Pauli string. Defaults to 1.
-        connectivity (list[tuple[int, int]] | None): list of edges (pairs of
-            qubit labels) defining the qubit connectivity graph. When provided,
-            weight-k Pauli strings (k > 1) are only generated for qubit subsets
-            that form a connected subgraph of size k. Defaults to None.
+        measured_qubits (Iterable[int] | None, optional): iterable of
+            measured qubit labels. Defaults to None.
+        weight_k (int, optional): maximum number of non-identity entries
+            allowed in each Pauli string. Defaults to 1.
+        connectivity (list[tuple[int, int]] | None, optional): list of edges
+            (pairs of qubit labels) defining the qubit connectivity graph.
+            When provided, weight-k Pauli strings (k > 1) are only generated
+            for qubit subsets that form a connected subgraph of size k.
+            Defaults to None.
 
     Returns:
-        list[tuple[str, ...]]: a list of groupings of n-qubit Paulis with weight
-            <= weight_k.
+        list[tuple[str, ...]]: a list of groupings of n-qubit Paulis with
+        weight <= ``weight_k``.
     """
     qubits = list(qubits)
     measured = set(measured_qubits) if measured_qubits else set()
@@ -134,10 +134,10 @@ def generate_random_n_qubit_paulis(
 
     Args:
         qubits (Sequence[int]): sequence of qubits labels.
-        measured_qubits (Iterable[int] | None): iterable of measured qubit
-            labels. Defaults to None.
-        n_random_paulis (int): number of random Pauli strings to generate.
-            Defaults to 1.
+        measured_qubits (Iterable[int] | None, optional): iterable of
+            measured qubit labels. Defaults to None.
+        n_random_paulis (int, optional): number of random Pauli strings to
+            generate. Defaults to 1.
 
     Returns:
         list[tuple[str, ...]]: a list of randomly generated n-qubit Pauli
@@ -157,23 +157,23 @@ def sample_distinct_n_qubit_paulis(
 ) -> list[PauliString]:
     """Samples distinct, non-identity n-qubit Pauli strings.
 
-    Paulis are drawn uniformly without replacement. If `n_paulis` exceeds
+    Paulis are drawn uniformly without replacement. If ``n_paulis`` exceeds
     the number of available non-identity Paulis, all of them are returned.
 
     Each Pauli is identified by its index in the mixed-radix enumeration
-    of `local_pauli_options` (index 0 is the identity), so the full set of
+    of ``local_pauli_options`` (index 0 is the identity), so the full set of
     up to 4^n Paulis is never built.
 
     Args:
         qubits (Sequence[int]): sequence of qubit labels.
-        measured_qubits (Iterable[int] | None): iterable of measured qubit
-            labels. Defaults to None.
-        n_paulis (int): number of distinct Pauli strings to sample.
-            Defaults to 1.
+        measured_qubits (Iterable[int] | None, optional): iterable of
+            measured qubit labels. Defaults to None.
+        n_paulis (int, optional): number of distinct Pauli strings to
+            sample. Defaults to 1.
 
     Returns:
         list[PauliString]: the sampled Pauli strings, ordered by
-            `qubits`.
+            ``qubits``.
     """
     options = local_pauli_options(qubits, measured_qubits)
     n_available = math.prod(len(opts) for opts in options) - 1
@@ -202,7 +202,8 @@ def generate_n_qubit_pauli_measurement_groups(
     simultaneously under a single product-basis measurement.
 
     Args:
-        paulis (list[tuple[str, ...]]): list of n-qubit Pauli strings to group.
+        paulis (list[tuple[str, ...]]): list of n-qubit Pauli strings to
+            group.
 
     Returns:
         list[PauliMeasurementGroup]: a list of PauliMeasurementGroup objects.
@@ -216,12 +217,13 @@ def generate_n_qubit_pauli_measurement_map(
     """Generates a mapping from measurement bases to original Pauli strings.
 
     Args:
-        paulis (list[tuple[str, ...]]): list of n-qubit Pauli strings to group.
-
+        paulis (list[tuple[str, ...]]): list of n-qubit Pauli strings to
+            group.
 
     Returns:
         dict[PauliString, List[PauliString]]: a dictionary mapping
-            measurement_basis -> list of Pauli strings measured in that basis.
+            ``measurement_basis`` -> list of Pauli strings measured in that
+            basis.
     """
     groups = generate_n_qubit_pauli_measurement_groups(paulis)
     return {g.measurement_basis: g.paulis for g in groups}
@@ -263,10 +265,10 @@ def _group_paulis_for_simultaneous_measurement(
         paulis (list[PauliString]): list of Pauli strings to group.
 
     Returns:
-        list[PauliMeasurementGroup]: A list of PauliMeasurementGroup objects.
-            Each group contains:
-                - measurement_basis: The basis needed to measure the group.
-                - paulis: The original Pauli strings assigned to the group.
+        list[PauliMeasurementGroup]: A list of PauliMeasurementGroup
+        objects. Each group contains a ``measurement_basis`` (the basis
+        needed to measure the group) and ``paulis`` (the original Pauli
+        strings assigned to the group).
     """
     groups: list[PauliMeasurementGroup] = []
 
@@ -301,15 +303,15 @@ def _group_paulis_for_simultaneous_measurement(
 def _index_to_pauli(index: int, options: list[list[str]]) -> PauliString:
     """Decode a mixed-radix index into a Pauli string.
 
-    Uses the same ordering as `itertools.product(*options)`, i.e. the last
+    Uses the same ordering as ``itertools.product(*options)``, i.e. the last
     qubit varies fastest.
 
     Args:
-        index (int): index into the product of `options`.
+        index (int): index into the product of ``options``.
         options (list[list[str]]): allowed local Paulis for each qubit.
 
     Returns:
-        PauliString: the Pauli string at `index`.
+        PauliString: the Pauli string at ``index``.
     """
     pauli = []
     for opts in reversed(options):
@@ -355,14 +357,14 @@ def _pad_pauli(
 
     Args:
         local_pattern (PauliString): the Pauli characters for a
-            subsystem, ordered the same way as `positions`.
+            subsystem, ordered the same way as ``positions``.
         positions (Sequence[int]): the subsystem's qubit positions
             within the full n-qubit register.
         n_qubits (int): total number of qubits in the register.
 
     Returns:
-        PauliString: a length-n_qubits tuple that is `local_pattern` at
-            `positions` and 'I' everywhere else.
+        PauliString: a length-n_qubits tuple that is ``local_pattern`` at
+            ``positions`` and 'I' everywhere else.
     """
     padded = ['I'] * n_qubits
     for pos, val in zip(positions, local_pattern, strict=True):
@@ -375,8 +377,9 @@ def _qwc_compatible(p1: PauliString, p2: PauliString) -> bool:
 
     Two Pauli strings are qubit-wise commuting if, on every qubit,
     either:
-      - at least one is identity, or
-      - both are the same Pauli.
+
+    - at least one is identity, or
+    - both are the same Pauli.
 
     Args:
         p1 (PauliString): First Pauli string.

@@ -1,6 +1,4 @@
-"""Submodule for plotting pulses and sequences.
-
-"""
+"""Submodule for plotting pulses and sequences."""
 from __future__ import annotations
 
 import logging
@@ -38,11 +36,12 @@ def plot_pulse(
         config (Config): qcal Config object.
         pulse_duration (float): duration of pulse in seconds.
         pulse_envelope (NDArray[np.complex64]): pulse envelope.
-        pulse_qubit (int): qubit on which the pulse is to be played. Defaults to
-            None. If not None, the qubit's frequencies will be plotted.
-        neighbor_qubits (List[int] | None): neighboring qubits on which the
-            pulse is not being played. Defaults to None. If not None, the
-            frequencies of the qubits will be plotted.
+        pulse_qubit (int | None, optional): qubit on which the pulse is to
+            be played. Defaults to None. If not None, the qubit's
+            frequencies will be plotted.
+        neighbor_qubits (List[int] | None, optional): neighboring qubits on
+            which the pulse is not being played. Defaults to None. If not
+            None, the frequencies of the qubits will be plotted.
     """
     pio.templates.default = 'plotly'
 
@@ -200,7 +199,8 @@ def plot_pulse(
             'filename': 'pulse_time_frequency_domain',
             'height': 800,
             'width': 1000,
-            'scale': 10 # Multiply title/legend/axis/canvas sizes by this factor
+            # Multiply title/legend/axis/canvas sizes by this factor
+            'scale': 10
         }
     }
 
@@ -223,12 +223,12 @@ def plot_mock_sequence(
 
     Args:
         circuit (Circuit): qcal Circuit to plot.
-        single_qubit_gate_time (float): duration of a single-qubit gate in
-            seconds. Defaults to 20 ns.
-        two_qubit_gate_time (float): duration of a two-qubit gate in seconds.
-            Defaults to 100 ns.
-        measurement_time (float): duration of a measurement in seconds. Defaults
-            to 1 us.
+        single_qubit_gate_time (float, optional): duration of a single-qubit
+            gate in seconds. Defaults to 20 ns.
+        two_qubit_gate_time (float, optional): duration of a two-qubit gate
+            in seconds. Defaults to 100 ns.
+        measurement_time (float, optional): duration of a measurement in
+            seconds. Defaults to 1 us.
     """
     pio.templates.default = 'plotly'
 
@@ -242,7 +242,8 @@ def plot_mock_sequence(
     n_qubits = len(all_qudits)
     qudit_row   = {q: i + 1 for i, q in enumerate(all_qudits)}
     qudit_color = {
-        q: QUDIT_COLORS[i % len(QUDIT_COLORS)] for i, q in enumerate(all_qudits)
+        q: QUDIT_COLORS[i % len(QUDIT_COLORS)]
+        for i, q in enumerate(all_qudits)
     }
 
     vertical_spacing = min(0.08, 0.6 / max(1, n_qubits - 1))

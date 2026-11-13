@@ -36,3 +36,8 @@ htmlcov/
 .pytest_cache/
 
 stderr.log
+
+# Sphinx documentation build
+docs/_build/
+docs/api/generated/
+jupyter_execute/

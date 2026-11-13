@@ -1,6 +1,4 @@
-"""Submodule for SuperstaQ compiler.
-
-"""
+"""Submodule for Superstaq compilers for Cirq and Qiskit circuits."""
 from __future__ import annotations
 
 import logging
@@ -64,11 +62,11 @@ class CirqCompiler:
         Args:
             api_key (str): Superstaq API key.
             config (Config): qcal Config object.
-            gateset (Dict): gateset for superstaq compiler. Defaults to None. If
-                None, it is generated automatically from the native gates in the
-                Config object.
-            gate_defs (Dict): gate definitions for nonstandard multi-qubit gates
-                in the gateset. Defaults to None.
+            gateset (Dict, optional): gateset for superstaq compiler.
+                Defaults to ``None``. If ``None``, it is generated
+                automatically from the native gates in the Config object.
+            gate_defs (Dict, optional): gate definitions for nonstandard
+                multi-qubit gates in the gateset. Defaults to ``None``.
         """
         import cirq_superstaq as css
         self._service = css.Service(api_key=api_key)
@@ -101,7 +99,7 @@ class CirqCompiler:
 
     @property
     def config(self) -> Config:
-        """qcal config.
+        """The qcal Config object.
 
         Returns:
             Config: qcal Config object.
@@ -187,11 +185,11 @@ class QiskitCompiler:
         Args:
             api_key (str): Superstaq API key.
             config (Config): qcal Config object.
-            gateset (Dict): gateset for superstaq compiler. Defaults to None. If
-                None, it is generated automatically from the native gates in the
-                Config object.
-            gate_defs (Dict): gate definitions for nonstandard multi-qubit gates
-                in the gateset. Defaults to None.
+            gateset (Dict, optional): gateset for superstaq compiler.
+                Defaults to ``None``. If ``None``, it is generated
+                automatically from the native gates in the Config object.
+            gate_defs (Dict, optional): gate definitions for nonstandard
+                multi-qubit gates in the gateset. Defaults to ``None``.
         """
         import qiskit_superstaq as qss
         self._provider = qss.SuperstaqProvider(api_key=api_key)
@@ -225,7 +223,7 @@ class QiskitCompiler:
 
     @property
     def config(self) -> Config:
-        """qcal config.
+        """The qcal Config object.
 
         Returns:
             Config: qcal Config object.

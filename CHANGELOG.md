@@ -9,15 +9,54 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Breaking
 
+- `NodeStatus.COMPLETED.value` is now `'COMPLETED'` (the trailing space was
+  removed). Code that compared against the old string value must be updated
+- `qcal.interface.pygsti.transpiler.__all__` now exports
+  `PyGSTiTranspiler` instead of the base `Transpiler` class
+
 ### Added
+
+- Sphinx documentation (`docs/`) with a Read the Docs configuration
+  (`.readthedocs.yaml`); build locally with
+  `sphinx-build -b html docs docs/_build/html`
+- `Fit.fit_function` property
+- `qcal.utils.pop_deprecated_kwarg` helper for renamed keyword arguments
 
 ### Changed
 
+- Calibration, characterization, and benchmarking factory functions are
+  annotated as returning `Calibration`, `Characterize`, or `QPU` instances
+  instead of `Callable`
+- Renamed `DataMananger` to `DataManager`
+- Renamed the `propogate_correction` argument of `CB1`, `SC`, `IRB`, and
+  `KNR` to `propagate_correction`
+- `docs` optional dependencies use `myst-nb` instead of `nbsphinx`
+
 ### Deprecated
+
+- `DataMananger` (alias of `DataManager`)
+- `Fit.fit_fuction` (use `Fit.fit_function`)
+- The `propogate_correction` keyword argument (use `propagate_correction`)
 
 ### Removed
 
 ### Fixed
+
+- `cz.Amplitude` raised `IndexError` in `final()` when a fit succeeded but
+  was rejected (positive curvature or out of range); it now falls back to
+  the amplitude that maximizes the conditionality
+- `CustomErrorModel` failed on two-qubit gates when combining a joint
+  two-qubit channel with a per-qubit channel; single-qubit channels are
+  now lifted to the gate's qudit count before composition
+- `__all__` in `qcal.backend.qubic.qpu` and
+  `qcal.backend.qubic.post_process` was a string instead of a tuple
+- `save_to_pickle` wrote DataFrames twice
+- `optimize_FAST_DRAG` is annotated as returning `None`, and
+  `Config.qubits`, `qubits_even`, and `qubits_odd` as returning tuples
+- Tutorials used the nonexistent `Settings.data_path` (now
+  `data_save_path`) and `_EXAMPLE_CONFIG` (now `EXAMPLE_CONFIG_PATH`)
+- Added missing `__init__.py` files to
+  `qcal.characterization.phase_estimation` and `qcal.interface.pyquil`
 
 ### Security
 

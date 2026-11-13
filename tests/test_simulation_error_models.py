@@ -409,6 +409,62 @@ class TestCustomErrorModel:
         outer = CustomErrorModel(inner)
         assert outer.channel_for('X') is not None
 
+    @pytest.mark.parametrize('order', ['joint_first', 'local_first'])
+    def test_composes_joint_and_per_qubit_two_qubit_channels(self, order):
+        """Joint (2, 2) and per-qubit (2,) channels compose correctly.
+
+        Regression test: composing these used to raise a matmul shape
+        error. The composed channel must match applying each channel in
+        sequence the way the simulator does (per-qubit channels applied
+        independently to each qudit of the gate).
+        """
+        joint = DepolarizingNoise(two_qubit=0.05)
+        local = RelaxationNoise(
+            two_qubit=RelaxationParams(t1=20e-6, tphi=10e-6, t=200e-9)
+        )
+        models = (joint, local) if order == 'joint_first' else (
+            local, joint
+        )
+        assert len(joint.channel_for('CZ').dims[0]) == 2
+        assert len(local.channel_for('CZ').dims[0]) == 1
+
+        composed = CustomErrorModel(*models).channel_for('CZ')
+        assert composed.dims == ((2, 2), (2, 2))
+
+        rng = np.random.default_rng(0)
+        a = rng.normal(size=(4, 4)) + 1j * rng.normal(size=(4, 4))
+        r = a @ a.conj().T
+        rho = quax.DensityMatrix.from_matrix(
+            jnp.array(r / np.trace(r)), dims=(2, 2)
+        )
+        sim = DensityMatrixSimulator()
+        expected = rho
+        for m in models:
+            expected = sim._apply_channel(
+                m.channel_for('CZ'), expected, (0, 1)
+            )
+        actual = sim._apply_channel(composed, rho, (0, 1))
+        np.testing.assert_allclose(
+            np.asarray(actual.matrix), np.asarray(expected.matrix),
+            atol=1e-6,
+        )
+
+    def test_end_to_end_joint_and_per_qubit_noise(self):
+        noise = CustomErrorModel(
+            DepolarizingNoise(single_qubit=0.01, two_qubit=0.05),
+            RelaxationNoise(
+                two_qubit=RelaxationParams(t1=35e-6, tphi=20e-6, t=200e-9)
+            ),
+        )
+        circuit = qc.Circuit([
+            qc.Cycle({qc.H(0)}), qc.Cycle({qc.CNOT(0, 1)})
+        ])
+        circuit.measure()
+        DensityMatrixSimulator(error_model=noise).run(circuit)
+        probs = circuit.results.dict
+        assert sum(probs.values()) == pytest.approx(1.0, abs=1e-5)
+        assert probs['00'] + probs['11'] > 0.9
+
 
 class TestCustomErrorModelFromPTM:
 

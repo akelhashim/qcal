@@ -1,6 +1,4 @@
-""""Submodule for generating RPE circuits.
-
-"""
+"""Circuit generation for RPE experiments."""
 import logging
 from typing import List, Optional, Sequence, Tuple
 
@@ -8,7 +6,6 @@ import numpy as np
 from pygsti import remove_duplicates
 from pygsti.circuits import Circuit as PyGSTiCircuit
 
-from qcal.gates import gate
 from qcal.utils import flatten
 
 GateLayer = Optional[List[List[tuple]]]
@@ -17,7 +14,8 @@ logger = logging.getLogger(__name__)
 
 
 # Centralizer of ZZ in the 2-qubit Pauli group: all P⊗Q that commute with Z⊗Z.
-# Commutation holds when both qubits commute with Z, or both anticommute with Z:
+# Commutation holds when both qubits commute with Z, or both anticommute
+# with Z:
 #
 #   Operator | Qubit 0 vs Z | Qubit 1 vs Z
 #   ---------+--------------+--------------
@@ -35,7 +33,8 @@ ZZ_CENTRALIZER = frozenset({
 _ZZ_CENTRALIZER_SORTED = sorted(ZZ_CENTRALIZER)
 _N_CENTRALIZERS: int = len(ZZ_CENTRALIZER)  # 8
 _PAULI_GATE = {'X': 'Gxpi2', 'Y': 'Gypi2', 'Z': 'Gzpi2', 'I': 'Gi'}
-# Single-qubit Pauli multiplication, modulo global phase (phases cancel in RPE).
+# Single-qubit Pauli multiplication, modulo global phase (phases cancel in
+# RPE).
 _PAULI_PRODUCT = {
     ('I', 'I'): 'I', ('I', 'X'): 'X', ('I', 'Y'): 'Y', ('I', 'Z'): 'Z',
     ('X', 'I'): 'X', ('X', 'X'): 'I', ('X', 'Y'): 'Z', ('X', 'Z'): 'Y',
@@ -122,7 +121,7 @@ def make_idle_cos_circ(
             interest. Defaults to None.
 
     Returns:
-       PyGSTiCircuit: pyGSTi circuit.
+        PyGSTiCircuit: pyGSTi circuit.
     """
     Gi_prep = PyGSTiCircuit(
         [[('Gypi2', q) for q in qubits]], line_labels=qubits
@@ -150,7 +149,7 @@ def make_idle_sin_circ(
             interest. Defaults to None.
 
     Returns:
-       PyGSTiCircuit: pyGSTi circuit.
+        PyGSTiCircuit: pyGSTi circuit.
     """
     Gi_prep = PyGSTiCircuit(
         [[('Gxpi2', q) for q in qubits]], line_labels=qubits
@@ -204,7 +203,7 @@ def make_x90_cos_circ(
             interest. Defaults to None.
 
     Returns:
-       PyGSTiCircuit: pyGSTi circuit.
+        PyGSTiCircuit: pyGSTi circuit.
     """
     return PyGSTiCircuit(
             gate_layer if gate_layer else [[('Gxpi2', q) for q in qubits]],
@@ -224,7 +223,7 @@ def make_x90_sin_circ(
             interest. Defaults to None.
 
     Returns:
-       PyGSTiCircuit: pyGSTi circuit.
+        PyGSTiCircuit: pyGSTi circuit.
     """
     return PyGSTiCircuit(
             gate_layer if gate_layer else [[('Gxpi2', q) for q in qubits]],
@@ -244,7 +243,7 @@ def make_X90_icos_circ(
             interest. Defaults to None.
 
     Returns:
-       PyGSTiCircuit: pyGSTi circuit.
+        PyGSTiCircuit: pyGSTi circuit.
     """
     Gz_layer = PyGSTiCircuit(
         [[('Gzpi2', q) for q in qubits]], line_labels=qubits
@@ -272,7 +271,7 @@ def make_X90_isin_circ(
             interest. Defaults to None.
 
     Returns:
-       PyGSTiCircuit: pyGSTi circuit.
+        PyGSTiCircuit: pyGSTi circuit.
     """
     Gz_layer = PyGSTiCircuit(
         [[('Gzpi2', q) for q in qubits]], line_labels=qubits
@@ -346,7 +345,7 @@ def make_cz_cos_circ(
             interest. Defaults to None.
 
     Returns:
-       PyGSTiCircuit: pyGSTi circuit.
+        PyGSTiCircuit: pyGSTi circuit.
     """
     line_labels = []
     for qubit_pair in qubit_pairs:
@@ -443,7 +442,7 @@ def make_cz_sin_circ(
             interest. Defaults to None.
 
     Returns:
-       PyGSTiCircuit: pyGSTi circuit.
+        PyGSTiCircuit: pyGSTi circuit.
     """
     line_labels = []
     for qubit_pair in qubit_pairs:
@@ -579,9 +578,11 @@ def make_twirled_zz_subcircuit(
     At each gate repetition j, applies the Pauli frame P·gate·P where P is
     drawn from the pre-shuffled permutation at index (offset + j) % 8. This
     ensures two properties simultaneously:
-      - Within a circuit: each depth step uses a different centralizer element.
-      - Across 8 randomizations (offsets 0-7): every centralizer element
-        appears exactly once at each depth position.
+
+    - Within a circuit: each depth step uses a different centralizer
+      element.
+    - Across 8 randomizations (offsets 0-7): every centralizer element
+      appears exactly once at each depth position.
 
     Args:
         depth (int): number of gate repetitions.
@@ -594,7 +595,7 @@ def make_twirled_zz_subcircuit(
             interest. Defaults to None.
 
     Returns:
-        List: raw circuit layers for use as a gate_layer argument.
+        List: raw circuit layers for use as a ``gate_layer`` argument.
     """
     sub_circuit = []
     paulis_prev = None

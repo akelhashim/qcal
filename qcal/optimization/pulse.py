@@ -1,12 +1,14 @@
-"""Submodule for optimizing pulse envelopes.
+"""Optimization of pulse envelopes.
 
+Provides :func:`optimize_FAST_DRAG`, which tunes the hyperparameters of a
+FAST DRAG pulse to suppress its spectral weight at the EF transition
+frequency (i.e. to reduce leakage).
 """
 import logging
 from typing import Callable, Dict
 
 import numpy as np
 from IPython.display import clear_output
-from numpy.typing import NDArray
 
 import qcal.settings as settings
 from qcal.config import Config
@@ -20,21 +22,31 @@ def optimize_FAST_DRAG(
     pulse_param:          str,
     pulse_envelope_func:  Callable,
     param_sweep:          Dict | None = None
-) -> NDArray:
-    """Optimize the hyperparameters for the FAST DRAG pulse for reducing
-    leakage.
+) -> None:
+    """Optimize the FAST DRAG pulse hyperparameters for reducing leakage.
+
+    The hyperparameters are optimized by minimizing the magnitude of the
+    pulse's frequency spectrum at the EF transition frequency. First, the
+    number of Fourier components ``N`` is swept and set to the value which
+    minimizes the spectral magnitude; then, each weight in ``weights`` is
+    swept in turn. The optimized values are written to the config (under
+    ``{pulse_param}/kwargs``), the optimized pulse is plotted, and the
+    config is saved if ``settings.Settings.save_data`` is True.
 
     Args:
         config (Config): qcal Config object.
-        pulse_param (str): config parameter for the pulse to optimize
-        pulse_duration (float): duration of pulse in seconds.
-        pulse_envelope (NDArray[np.complex64]): pulse envelope.
-        pulse_qubit (int): qubit on which the pulse is to be played. Defaults to
-            None. If not None, the qubit's frequencies will be plotted.
-        neighbor_qubits (List[int] | None): neighboring qubits on which the
-            pulse is not being played. Defaults to None. If not None, the
-            frequencies of the qubits will be plotted. This is currently
-            unused.
+        pulse_param (str): config parameter for the pulse to optimize, e.g.
+            ``'single_qubit/0/GE/FAST_DRAG'``. The qubit label is parsed
+            from the second element of the path.
+        pulse_envelope_func (Callable): function which generates the pulse
+            envelope. It is called as
+            ``pulse_envelope_func(config, config[pulse_param])`` and must
+            return the complex pulse envelope as an array.
+        param_sweep (Dict | None, optional): dictionary with keys ``'N'``
+            and ``'w'`` specifying the values of ``N`` and of each weight to
+            sweep. Defaults to None, in which case ``N`` is swept from 2 to
+            10 and each weight over
+            ``[0.1, 0.3, 1.0, 2.0, ..., 10.0]``.
     """
     qubit = int(pulse_param.split('/')[1])
     freq_GE = config[f'single_qubit/{qubit}/GE/freq']

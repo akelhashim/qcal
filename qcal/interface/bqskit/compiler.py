@@ -1,6 +1,26 @@
-"""Submodule for handling compilation of BQSKit circuits.
+"""Submodule for handling compilation of circuits with BQSKit.
 
-See: https://github.com/BQSKit/bqskit
+Provides :class:`BQSKitCompiler`, which compiles qcal (or BQSKit) circuits
+to the native gate set defined in a qcal
+:class:`~qcal.config.Config` using the
+`BQSKit <https://github.com/BQSKit/bqskit>`_ compiler. qcal circuits are
+transpiled to BQSKit, compiled, and transpiled back to qcal.
+
+Example:
+    .. code-block:: python
+
+        from qcal.circuit import Circuit, Cycle
+        from qcal.config import Config
+        from qcal.gates.single_qubit import H
+        from qcal.gates.two_qubit import CNOT
+        from qcal.interface.bqskit.compiler import BQSKitCompiler
+
+        config = Config('examples/config/config.yaml')
+        compiler = BQSKitCompiler(config, optimization_level=2, seed=1)
+
+        circuit = Circuit([Cycle({H(0)}), Cycle({CNOT(0, 1)})])
+        compiled = compiler.compile(circuit)  # CircuitSet
+        compiled_circuit = compiled[0]  # native-gate qcal Circuit
 """
 import logging  # noqa: I001
 from typing import Any, Dict
@@ -23,7 +43,21 @@ logger = logging.getLogger(__name__)
 class BQSKitCompiler:
     """BQSKit compiler.
 
-    The compiler is created from a qcal Config object.
+    The compiler is created from a qcal :class:`~qcal.config.Config`
+    object, whose native gate set and qubit connectivity define the BQSKit
+    ``MachineModel`` (unless a model is passed explicitly).
+
+    Example:
+        .. code-block:: python
+
+            from qcal.circuit import Circuit, Cycle
+            from qcal.config import Config
+            from qcal.gates.single_qubit import H
+            from qcal.interface.bqskit.compiler import BQSKitCompiler
+
+            config = Config('examples/config/config.yaml')
+            compiler = BQSKitCompiler(config)
+            compiled = compiler.compile(Circuit([Cycle({H(0)})]))
     """
 
     def __init__(
@@ -46,22 +80,24 @@ class BQSKitCompiler:
 
         Args:
             config (Config): qcal Config object.
-            model (MachineModel | None): a model of the target machine.
-                Defaults to an all-to-all connected hardware with CNOTs and U3s
-                as native gates. See :class:`MachineModel` for information
-                on loading a preset model or creating a custom one.
-            gate_mapper (Dict, optional): dictionary mapping the names of the
-                natives gates in config.native_gates['set'] to the equivalent
-                BQSKit gates. This is only used if a :class:`MachineModel`
-                instance is not passed. Defaults to {'Rz': RZGate(),
-                'X': XGate(), 'X90': SqrtXGate(), 'CNOT': CNOTGate(),
-                'CX': CNOTGate(), 'CZ': CZGate(), 'iSWAP': ISwapGate()}.
-            optimization_level (int): the degree of optimization in the
-                workflow. The workflow will produce shorter depth circuits at
-                the cost of performance with a higher number. An
-                optimization_level of 0 is not supported due to inherit
-                optimization in any workflow containing synthesis. Valid inputs
-                are 1, 2, 3, or 4. Defaults to 1.
+            model (MachineModel | None, optional): a model of the target
+                machine. Defaults to ``None``, in which case a model is built
+                from the qubits, qubit pairs, and native gates in
+                ``config``. See ``bqskit.MachineModel`` for information on
+                loading a preset model or creating a custom one.
+            gate_mapper (Dict | None, optional): dictionary mapping the names
+                of the natives gates in ``config.native_gates['set']`` to the
+                equivalent BQSKit gates. This is only used if a
+                ``MachineModel`` instance is not passed. Defaults to
+                ``None``, in which case ``{'Rz': RZGate(), 'X': XGate(),
+                'X90': SqrtXGate(), 'CNOT': CNOTGate(), 'CX': CNOTGate(),
+                'CZ': CZGate(), 'iSWAP': ISwapGate()}`` is used.
+            optimization_level (int, optional): the degree of optimization
+                in the workflow. The workflow will produce shorter depth
+                circuits at the cost of performance with a higher number. An
+                ``optimization_level`` of 0 is not supported due to inherent
+                optimization in any workflow containing synthesis. Valid
+                inputs are 1, 2, 3, or 4. Defaults to 1.
             max_synthesis_size (int, optional): the maximum size of a unitary
                 to synthesize or instantiate. Larger circuits will be
                 partitioned. Increasing this will most likely lead to better
@@ -71,34 +107,37 @@ class BQSKitCompiler:
                 synthesis algorithms. Defaults to 1e-3.
             error_threshold (float | None, optional): this parameter controls
                 the verification mechanism in this compile function. By
-                default, it is set to None, so no verification is done. If you
-                set this to a float, the upper bound on compilation error is
-                calculated. If the upper bound is larger than this number, a
-                warning will be logged. Defaults to None.
-            error_sim_size (int, optional): if an `error_threshold` is set, the
-                error upper bound is calculated by simulating blocks of this
-                size. As you increase `error_sim_size`, the upper bound on
-                error becomes more accurate. This setting is ignored with
+                default, it is set to ``None``, so no verification is done.
+                If you set this to a float, the upper bound on compilation
+                error is calculated. If the upper bound is larger than this
+                number, a warning will be logged. Defaults to ``None``.
+            error_sim_size (int, optional): if an ``error_threshold`` is set,
+                the error upper bound is calculated by simulating blocks of
+                this size. As you increase ``error_sim_size``, the upper bound
+                on error becomes more accurate. This setting is ignored with
                 direct synthesis compilations, i.e., when a state, system, or
                 unitary are given as input. Defaults to 8.
-            compiler (Compiler | None, optional): pass a :class:`Compiler` to
-                prevent creating one. Save on startup time by passing a
-                compiler in when calling `compile` multiple times. Defaults to
-                None.
+            compiler (Compiler | None, optional): pass a
+                ``bqskit.compiler.Compiler`` to prevent creating one. Save on
+                startup time by passing a compiler in when calling
+                ``compile`` multiple times. Defaults to ``None``.
             seed (int | None, optional): set a seed for the compile function
-                for better reproducibility. If left as None, will not set seed.
-                Defaults to None.
-            with_mapping (bool, optional): if True, three values will be
+                for better reproducibility. If left as ``None``, will not set
+                seed. Defaults to ``None``.
+            with_mapping (bool, optional): if ``True``, three values will be
                 returned instead of just the compiled circuit. The first value
                 is the compiled circuit, the second value is the initial
                 mapping, and the third value is the final mapping. The initial
-                mapping is a tuple where `initial_mapping[i] = j` implies that
-                logical qudit `i` in the input system starts on the physical
-                qudit `j` in the output circuit. Likewise, the final mapping
-                describes where the logical qudits are in the physical circuit
-                at the end of execution. Defaults to False.
+                mapping is a tuple where ``initial_mapping[i] = j`` implies
+                that logical qudit ``i`` in the input system starts on the
+                physical qudit ``j`` in the output circuit. Likewise, the
+                final mapping describes where the logical qudits are in the
+                physical circuit at the end of execution. Defaults to
+                ``False``.
             justify (bool, optional): whether to left justify all of the gates
-                in the circuit after compilation. Defaults to False.
+                in the circuit after compilation. Defaults to ``False``.
+            **compiler_kwargs (Any): additional keyword arguments forwarded
+                to ``bqskit.compile``.
         """
         self._config = config
 
@@ -143,11 +182,7 @@ class BQSKitCompiler:
 
     @property
     def config(self) -> Config:
-        """qcal config.
-
-        Returns:
-            Config: qcal Config object.
-        """
+        """The qcal Config object used to build the compiler."""
         return self._config
 
     def compile(

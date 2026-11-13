@@ -30,9 +30,9 @@ X = np.linspace(0, 10, 50)
 
 class TestFitBase:
 
-    def test_fit_fuction_property_returns_constructor_function(self):
+    def test_fit_function_property_returns_constructor_function(self):
         fit = Fit(linear)
-        assert fit.fit_fuction is linear
+        assert fit.fit_function is linear
 
     def test_defaults_before_any_fit(self):
         fit = Fit(linear)
@@ -130,7 +130,7 @@ class TestFitAbsoluteValue:
 class TestFitExponential:
 
     def test_default_fit_function_is_exponential(self):
-        assert FitExponential().fit_fuction is exponential
+        assert FitExponential().fit_function is exponential
 
     def test_recovers_known_params(self):
         y = 4.0 * np.exp(-0.5 * X) + 1.0

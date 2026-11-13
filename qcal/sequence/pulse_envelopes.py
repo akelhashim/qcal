@@ -1,5 +1,48 @@
-"""Submodule for storing various definitions of pulse envelopes.
+"""Definitions of pulse envelopes.
 
+Each envelope function takes a pulse ``length`` (in seconds) and a
+``sample_rate`` (in Hz) as its first two arguments, plus
+envelope-specific keyword arguments, and returns a ``complex64``
+numpy array of ``round(length * sample_rate)`` samples. The
+``pulse_envelopes`` dictionary maps envelope names (e.g.
+``'gaussian'``, ``'DRAG'``, ``'cosine_square'``) to these functions,
+which is how envelopes specified by name in a
+:class:`~qcal.config.Config` are resolved.
+
+Composite envelopes (:func:`IPM`, :func:`RAP`, :func:`STARAP`) take the
+name of an underlying envelope via ``env`` and forward any additional
+keyword arguments to it.
+
+Example:
+    .. code-block:: python
+
+        from qcal.sequence.pulse_envelopes import (
+            DRAG,
+            gaussian,
+            pulse_envelopes,
+        )
+        from qcal.units import GHz, MHz, ns
+
+        sample_rate = 2 * GHz
+
+        # 32 ns Gaussian pulse (64 complex samples)
+        env = gaussian(32 * ns, sample_rate, amp=0.5, n_sigma=3)
+
+        # DRAG pulse for a qubit with -250 MHz anharmonicity
+        drag = DRAG(
+            32 * ns, sample_rate, alpha=0.5, amp=0.5, anh=-250 * MHz
+        )
+
+        # Envelopes can also be looked up by name
+        flat_top = pulse_envelopes['cosine_square'](
+            100 * ns, sample_rate, amp=0.3, ramp_fraction=0.2
+        )
+
+        # Frequency-swept (RAP) pulse with a Gaussian amplitude envelope
+        rap = pulse_envelopes['RAP'](
+            100 * ns, sample_rate, env='gaussian',
+            f0=-10 * MHz, f1=10 * MHz,
+        )
 """
 import logging
 from collections import defaultdict
@@ -121,7 +164,7 @@ def CW(
         phase (float, optional): pulse phase. Defaults to 0.0.
 
     Returns:
-        str: 'cw'
+        str: the string ``'cw'``.
     """
     return 'cw'
 
@@ -153,9 +196,9 @@ def DRAG(
     """Derivative Removal by Adiabatic Gate (DRAG) pulse envelope.
 
     References:
-    https://journals.aps.org/prl/abstract/10.1103/PhysRevLett.103.110501
-    https://journals.aps.org/pra/abstract/10.1103/PhysRevA.83.012308
-    https://journals.aps.org/prl/abstract/10.1103/PhysRevLett.116.020501
+        - https://journals.aps.org/prl/abstract/10.1103/PhysRevLett.103.110501
+        - https://journals.aps.org/pra/abstract/10.1103/PhysRevA.83.012308
+        - https://journals.aps.org/prl/abstract/10.1103/PhysRevLett.116.020501
 
     Args:
         length (float): pulse length in seconds.
@@ -197,16 +240,18 @@ def FAST(
 ) -> NDArray[np.complex64]:
     """Fourier Ansatz Spectrum Tuning (FAST) pulse envelope.
 
-    Reference:
-    https://journals.aps.org/prxquantum/abstract/10.1103/PRXQuantum.5.030353
+    References:
+        `PRX Quantum 5, 030353
+        <https://journals.aps.org/prxquantum/abstract/10.1103/
+        PRXQuantum.5.030353>`_
 
     Args:
         length (float): pulse length in seconds.
         sample_rate (float): sample rate in Hz.
-        freq_intervals (List): list of [f_low, f_high] pairs.
+        freq_intervals (List): list of ``[f_low, f_high]`` pairs.
         weights (List): weights for each frequency interval.
         amp (float, optional): pulse amplitude. Defaults to 1.0.
-        N (int, optional): number of Fourier terms.
+        N (int, optional): number of Fourier terms. Defaults to 4.
         phase (float, optional): pulse phase. Defaults to 0.0.
         theta (float, optional): rotation angle. Defaults to pi/2.
 
@@ -250,21 +295,27 @@ def FAST_DRAG(
 ) -> NDArray[np.complex64]:
     """Fourier Ansatz Spectrum Tuning (FAST) DRAG pulse envelope.
 
-    Reference:
-    https://journals.aps.org/prxquantum/abstract/10.1103/PRXQuantum.5.030353
+    References:
+        `PRX Quantum 5, 030353
+        <https://journals.aps.org/prxquantum/abstract/10.1103/
+        PRXQuantum.5.030353>`_
 
     Args:
         length (float): pulse length in seconds.
         sample_rate (float): sample rate in Hz.
-        freq_intervals (List): list of [f_low, f_high] pairs.
-        weights (List): weights for each frequency interval.
+        freq_intervals (List, optional): list of ``[f_low, f_high]``
+            pairs. Defaults to ``None``, in which case intervals around
+            the EF transition (0.9-1.1 x ``|anh|``) and a high-frequency
+            cutoff (2-5 x ``|anh|``) are used.
+        weights (List, optional): weights for each frequency interval.
+            Defaults to ``None``, in which case ``[1.0, 0.1]`` is used.
         alpha (float, optional): DRAG parameter. Defaults to 0.0. For phase
             errors, alpha should be 0.5. For leakage errors, alpha should be 1.
         amp (float, optional): pulse amplitude. Defaults to 1.0.
         anh (float, optional): qubit anharmonicity. Defaults to -200e6.
-        N (int, optional): number of Fourier terms.
+        N (int, optional): number of Fourier terms. Defaults to 4.
         phase (float, optional): pulse phase. Defaults to 0.0.
-        theta (float): rotation angle. Defaults to pi/2.
+        theta (float, optional): rotation angle. Defaults to pi/2.
 
     Returns:
         NDArray[np.complex64]: FAST DRAG envelope.
@@ -284,7 +335,7 @@ def FAST_DRAG(
         weights = [1.0, 0.1]  # Higher weight for ef-transition suppression
 
     # Generate I component using FAST
-    I = FAST(
+    I = FAST(  # noqa: E741 (in-phase component)
         length=length,
         sample_rate=sample_rate,
         freq_intervals=freq_intervals,
@@ -386,6 +437,8 @@ def IPM(
         freq (float): beat frequency in Hz.
         amp2 (float, optional): amplitude of the beat tone. Defaults to 1.0.
         phase2 (float, optional): phase of the beat tone. Defaults to 0.0.
+        **kwargs: additional keyword arguments passed to the underlying
+            ``env`` envelope function.
 
     Returns:
         NDArray[np.complex64]: IPM pulse.
@@ -412,7 +465,7 @@ def linear(
 ) -> NDArray[np.complex64]:
     """Linear ramp pulse envelope.
 
-    The linear ramp starts at 0, and ends at amp.
+    The linear ramp starts at 0, and ends at ``amp``.
 
     Args:
         length (float): pulse length in seconds.
@@ -421,7 +474,7 @@ def linear(
         phase (float, optional): pulse phase. Defaults to 0.0.
 
     Returns:
-        NDArray[np.complex64]: linear ramp envelop.
+        NDArray[np.complex64]: linear ramp envelope.
     """
     n_points = int(round(length * sample_rate))
     return np.array(
@@ -444,6 +497,8 @@ def RAP(
         env (str): envelope of the underlying pulse.
         f0 (float): start frequency in Hz.
         f1 (float): end frequency in Hz.
+        **kwargs: additional keyword arguments passed to the underlying
+            ``env`` envelope function.
 
     Returns:
         NDArray[np.complex64]: RAP pulse.
@@ -483,9 +538,12 @@ def STARAP(
         env (str): envelope of the underlying pulse.
         f0 (float): start frequency in Hz.
         f1 (float): end frequency in Hz.
-        omega0: Rabi frequency in Hz. Defaults to 10 MHz.
-        cd_weight: weight of counter-diabatic term. Defaults to 1.0, which is
-            the theoretical optimum.
+        omega0 (float, optional): Rabi frequency in Hz. Defaults to
+            100 MHz.
+        cd_weight (float, optional): weight of counter-diabatic term.
+            Defaults to 1.0, which is the theoretical optimum.
+        **kwargs: additional keyword arguments passed to the underlying
+            ``env`` envelope function.
 
     Returns:
         NDArray[np.complex64]: STA-RAP pulse.
@@ -544,8 +602,8 @@ def STARAP(
 
     sta_pulse = (Omega_t/2 - cd_weight * 1j * theta_dot/2) * np.exp(1j * phi_t)
     # sta_pulse = (
-    #     Omega_t/2 - cd_weight * 1j * theta_dot/2) * np.exp(1j * (phi_t + phi_c)
-    # )
+    #     Omega_t/2 - cd_weight * 1j * theta_dot/2
+    # ) * np.exp(1j * (phi_t + phi_c))
     # sta_pulse = (Omega_t/2 - cd_weight * 1j * theta_dot/2)
     # sta_pulse *= np.abs(sta_pulse) * np.exp(1j * Beta_t)
     # sta_pulse *= np.exp(1j * phi_t)
@@ -571,9 +629,9 @@ def STARAP(
 #     ) -> NDArray[np.complex64]:
 #     """SuperAdiabatic Transitionless Driving (SATD).
 
-#     This is a superadiabatic shortcut to adiabaticity enhanced RAP pulse. This
-#     pulse implements a frequency sweep with higher-order counter-diabatic
-#     corrections for even faster adiabatic evolution.
+#     This is a superadiabatic shortcut to adiabaticity enhanced RAP pulse.
+#     This pulse implements a frequency sweep with higher-order
+#     counter-diabatic corrections for even faster adiabatic evolution.
 
 #     Args:
 #         length (float): pulse length in seconds.
@@ -583,7 +641,8 @@ def STARAP(
 #         f1 (float): end frequency in Hz.
 #         omega0: Rabi frequency in Hz. Defaults to 10 MHz.
 #         cd_weight: weight of counter-diabatic term. Defaults to 0.5.
-#         order: order of superadiabatic corrections (1, 2, or 3). Defaults to 2.
+#         order: order of superadiabatic corrections (1, 2, or 3). Defaults
+#             to 2.
 
 #     Returns:
 #         NDArray[np.complex64]: SATD pulse.
@@ -639,13 +698,15 @@ def STARAP(
 
 #     # # Add second-order superadiabatic correction
 #     # if order >= 2:
-#     #     # Second-order terms involve combinations of theta_ddot and theta_dot^2
+#     #     # Second-order terms involve combinations of theta_ddot and
+#     #     # theta_dot^2
 #     #     # In the eigenbasis of H0, the second-order correction includes:
 #     #     # - A term proportional to theta_ddot / omega_eff
 #     #     # - A term proportional to theta_dot^2 / omega_eff
 
 #     #     # Calculate second-order amplitudes
-#     #     # Note: These formulas are simplified; full expressions are more complex
+#     #     # Note: These formulas are simplified; full expressions are more
+#     #     # complex
 #     #     cd2_amplitude = theta_ddot / (4 * omega_eff)
 #     #     cd2_phase_correction = -theta_dot**2 / (2 * omega_eff)
 
@@ -655,14 +716,17 @@ def STARAP(
 #     #     cd2_z = cd2_amplitude * np.cos(theta_t) * cd_weight**2
 
 #     #     # Add to pulse
-#     #     satd_pulse += (cd2_x + 1j * cd2_phase_correction) * np.exp(1j * phi_t)
+#     #     satd_pulse += (
+#     #         (cd2_x + 1j * cd2_phase_correction) * np.exp(1j * phi_t)
+#     #     )
 
 #     # Add second-order superadiabatic correction
 #     if order >= 2:
 #          # The X-component of second-order correction
 #         cd2_x = theta_ddot * np.sin(theta_t) / (4 * omega_eff) * cd_weight**2
 
-#         # The Z-component can be absorbed into a time-dependent frame rotation
+#         # The Z-component can be absorbed into a time-dependent frame
+#         # rotation
 #         cd2_z = theta_ddot * np.cos(theta_t) / (4 * omega_eff) * cd_weight**2
 
 #         # This Z-term contributes an additional phase
@@ -746,7 +810,7 @@ def super_gaussian(
         length (float): pulse length in seconds.
         sample_rate (float): sample rate in Hz.
         amp (float, optional): pulse amplitude. Defaults to 1.0.
-        n_sigma (int, optional): number of standard deviations. Defaults to 3.
+        n_sigma (int, optional): number of standard deviations. Defaults to 2.
         phase (float, optional): pulse phase. Defaults to 0.0.
 
     Returns:
@@ -814,10 +878,10 @@ def virtualz(
     """Virtual-z phase.
 
     Args:
-        length (float): pulse length in seconds. Defaults to 0. Unused, but
-            included for consistency.
-        sample_rate (float): sample rate in Hz. Defaults to 0. Unused, but
-            included for consistency.
+        length (float, optional): pulse length in seconds. Defaults to 0.
+            Unused, but included for consistency.
+        sample_rate (float, optional): sample rate in Hz. Defaults to 0.
+            Unused, but included for consistency.
         amp (float, optional): pulse amplitude. Defaults to 1.0. Unused, but
             included for consistency.
         phase (float, optional): pulse phase. Defaults to 0.0.

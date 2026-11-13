@@ -1,19 +1,20 @@
 """Submodule for hardware-level randomized compiling via PyQuil.
 
 Circuits reaching this module are assumed to already be compiled to the
-Rz/X90/two-qubit-gate native gate set (see `qcal.interface.bqskit`), i.e.
+Rz/X90/two-qubit-gate native gate set (see ``qcal.interface.bqskit``), i.e.
 every single-qubit layer is already expressed as the ZXZXZ template
 (Rz-X90-Rz-X90-Rz). This module does not re-derive that decomposition; it
-provides the pieces specific to randomized compiling -- `base_cycles`
+provides the pieces specific to randomized compiling -- ``base_cycles``
 extraction and (layer_index, angle_index) tracking -- that
-`qcal.interface.pyquil.transpiler.transpile_circuit`/`transpile_cycle`
+``qcal.interface.pyquil.transpiler.transpile_circuit``/``transpile_cycle``
 call into while doing their own single walk of the circuit, merging
 random Pauli twirls into the existing Rz phases at pulse-execution time
-via `pyquil._qpu.randomized_compiling` instead of compiling a distinct
+via ``pyquil._qpu.randomized_compiling`` instead of compiling a distinct
 circuit per randomization.
 
-NOTE: we do not use TYPE_CHECKING for PyQuil types because this might fail
-if PyQuil is not installed when building docs.
+Note:
+    We do not use ``TYPE_CHECKING`` for PyQuil types because this might
+    fail if PyQuil is not installed when building docs.
 """
 from __future__ import annotations
 
@@ -78,20 +79,21 @@ _READOUT_PAULI_FLIPS = np.array([False, True, True, False])
 
 
 def has_phase_gate(cycle: Cycle) -> bool:
-    """Whether a Cycle contains a phase gate (see `PHASE_GATES`).
+    """Whether a Cycle contains a phase gate (see ``PHASE_GATES``).
 
     Phase gates are the only gates a tracker rewrites (see
-    `RCLayerTracker.emit_phase_gate`/`ReadoutLayerTracker.
-    emit_phase_gate`), into a memory reference specific to the layer
-    they sit in. A tracked Cycle containing one therefore cannot be
-    written once as a DEFCIRCUIT and reused, whereas a Cycle of only
-    X90/SX pulses, two-qubit gates, or measurements can.
+    :meth:`RCLayerTracker.emit_phase_gate`/
+    :meth:`ReadoutLayerTracker.emit_phase_gate`), into a memory
+    reference specific to the layer they sit in. A tracked Cycle
+    containing one therefore cannot be written once as a DEFCIRCUIT and
+    reused, whereas a Cycle of only X90/SX pulses, two-qubit gates, or
+    measurements can.
 
     Args:
         cycle (Cycle): qcal Cycle.
 
     Returns:
-        bool: True if any gate in `cycle` is in `PHASE_GATES`.
+        bool: True if any gate in ``cycle`` is in ``PHASE_GATES``.
     """
     return any(gate.name in PHASE_GATES for gate in cycle.gates)
 
@@ -105,25 +107,25 @@ def is_rc_layer(
     """Whether a Cycle is a randomized-compiling layer boundary.
 
     A Cycle advances the RC layer index if it contains a two-qubit gate
-    (an edge to twirl) or a mid-circuit measurement (`Meas`/`MCM`). MCM
-    layers must still be represented as their own `base_cycles` entry --
+    (an edge to twirl) or a mid-circuit measurement (``Meas``/``MCM``). MCM
+    layers must still be represented as their own ``base_cycles`` entry --
     a tuple of bare ints for every qubit, including the measured ones --
-    so `RCLayerTracker.layer_index` stays aligned with `base_cycles`.
-    This is used both to filter `base_cycles` in `build_rc_configuration`
-    and to decide when `RCLayerTracker.close_layer` fires in
-    `qcal.interface.pyquil.transpiler.transpile_circuit`; both call
+    so ``RCLayerTracker.layer_index`` stays aligned with ``base_cycles``.
+    This is used both to filter ``base_cycles`` in ``build_rc_configuration``
+    and to decide when ``RCLayerTracker.close_layer`` fires in
+    ``qcal.interface.pyquil.transpiler.transpile_circuit``; both call
     sites must agree.
 
-    `index`/`layer_period` add a purely positional fallback boundary,
+    ``index``/``layer_period`` add a purely positional fallback boundary,
     for circuits with no two-qubit gates or measurements to key off of
     (e.g. a run of single-qubit ZXZXZ templates with no natural RC
-    layer boundary between them). `index` counts non-barrier cycles
-    from the start of the circuit; every `layer_period`-th such cycle
-    is treated as a boundary, as if a `base_cycle` of identities sat
+    layer boundary between them). ``index`` counts non-barrier cycles
+    from the start of the circuit; every ``layer_period``-th such cycle
+    is treated as a boundary, as if a ``base_cycle`` of identities sat
     there, without requiring any change to the circuit itself. Both
-    call sites must pass the same `index` numbering (non-barrier
-    cycles only), `layer_period` and `n_cycles` for this to stay
-    consistent with `base_cycles`.
+    call sites must pass the same ``index`` numbering (non-barrier
+    cycles only), ``layer_period`` and ``n_cycles`` for this to stay
+    consistent with ``base_cycles``.
 
     Positional boundaries are only placed *between* templates, never
     after the last one: pyquil's RC engine always plays a final layer
@@ -131,23 +133,23 @@ def is_rc_layer(
     the last template must be that final layer. A boundary after it
     would leave the final layer with no gates -- the frame would never
     be undone, and its twirled-unitary register (sized for
-    `cycle_count + 1` layers) would be longer than the source phases.
+    ``cycle_count + 1`` layers) would be longer than the source phases.
 
     Args:
         cycle (Cycle): qcal Cycle.
-        index (int | None, optional): position of `cycle` among the
-            circuit's non-barrier cycles. Defaults to `None`, which
+        index (int | None, optional): position of ``cycle`` among the
+            circuit's non-barrier cycles. Defaults to ``None``, which
             disables the positional fallback.
         layer_period (int | None, optional): close a layer every this
             many non-barrier cycles, regardless of content. Defaults
-            to `None`, which disables the positional fallback.
+            to ``None``, which disables the positional fallback.
         n_cycles (int | None, optional): number of non-barrier cycles
             in the circuit's interior (excluding terminal
-            measurements). Defaults to `None`, which disables the
+            measurements). Defaults to ``None``, which disables the
             positional fallback.
 
     Returns:
-        bool: True if `cycle` should count as an RC layer.
+        bool: True if ``cycle`` should count as an RC layer.
     """
     if any(
         len(gate.qubits) == 2 or gate.is_measurement
@@ -164,7 +166,7 @@ def is_rc_layer(
 
 
 def _interior_cycles(circuit: Circuit) -> List[Cycle]:
-    """Non-barrier Cycles of `circuit`, excluding terminal measurements."""
+    """Non-barrier Cycles of ``circuit``, excluding terminal measurements."""
     return [
         cycle
         for cycle in circuit.cycles[:-1]  # Exclude terminal measurements
@@ -175,33 +177,33 @@ def _interior_cycles(circuit: Circuit) -> List[Cycle]:
 def effective_layer_period(
     circuit: Circuit, layer_period: int | None
 ) -> int | None:
-    """Resolve `layer_period` to `None` when it isn't actually needed.
+    """Resolve ``layer_period`` to ``None`` when it isn't actually needed.
 
-    `layer_period` (see `is_rc_layer`) is a purely positional fallback
+    ``layer_period`` (see ``is_rc_layer``) is a purely positional fallback
     for circuits with no two-qubit gates or measurements to key off
     of. It is unsafe to combine with real content-based boundaries:
     the period is tuned for an uninterrupted run of same-length
     ZXZXZ templates, so once a two-qubit gate or measurement shows up
     anywhere in the circuit, the same period can land mid-template
-    elsewhere (e.g. on an `X90` cycle), splitting a single unitary's
+    elsewhere (e.g. on an ``X90`` cycle), splitting a single unitary's
     phase tracking across two layer indices instead of leaving it
     alone. Resolving here lets a caller leave a single default (e.g.
-    always passing `layer_period=5`) in place across every circuit it
+    always passing ``layer_period=5``) in place across every circuit it
     transpiles, regardless of whether that particular circuit has
-    real two-qubit content -- `build_rc_configuration`, `has_
-    trailing_single_qubit_layer`, and `qcal.interface.pyquil.
-    transpiler.transpile_circuit` all call this once per circuit so
-    they agree on the same resolved value.
+    real two-qubit content -- ``build_rc_configuration``,
+    ``has_trailing_single_qubit_layer``, and
+    :func:`qcal.interface.pyquil.transpiler.transpile_circuit` all call
+    this once per circuit so they agree on the same resolved value.
 
     Args:
         circuit (Circuit): compiled qcal circuit to twirl.
         layer_period (int | None): caller-supplied value, as passed to
-            `build_rc_configuration`.
+            ``build_rc_configuration``.
 
     Returns:
-        int | None: `layer_period` unchanged if `circuit`'s
+        int | None: ``layer_period`` unchanged if ``circuit``'s
             non-barrier interior has no content-based RC-layer
-            boundary (see `is_rc_layer`); `None` otherwise.
+            boundary (see ``is_rc_layer``); ``None`` otherwise.
     """
     if layer_period is None:
         return None
@@ -219,17 +221,17 @@ def cycle_to_base_cycle(
     """Convert a qcal Cycle into a PyQuil RC 'base cycle' entry.
 
     Two-qubit gates become edges ``(q0, q1)``. Every other qubit in
-    `qubits` becomes a bare int, since ``pyquil._qpu.randomized_compiling``
+    ``qubits`` becomes a bare int, since ``pyquil._qpu.randomized_compiling``
     only distinguishes "edge" from "identity" for Pauli-propagation
     bookkeeping. This function is only called on RC-layer-boundary cycles
-    (see `is_rc_layer`), so any non-edge qubit here is assumed to be
+    (see ``is_rc_layer``), so any non-edge qubit here is assumed to be
     truly idle or running an identity-equivalent operation (e.g., a
     dynamical-decoupling sequence during a 2-qubit gate or MCM). Real
     single-qubit content lives in the separate ZXZXZ-template cycles
     between boundaries, which are not RC layers and never reach this function;
-    those angles are tracked instead via `RCLayerTracker`'s source-unitary
+    those angles are tracked instead via ``RCLayerTracker``'s source-unitary
     phases. A Meas/MCM gate is deliberately treated the same as an idle
-    qubit here (see the `gate.is_measurement` check below, which just
+    qubit here (see the ``gate.is_measurement`` check below, which just
     skips the edge/degree check for it): its qubit(s) fall through to
     the bare-int branch below, so pyquil's RC engine twirls it as an
     identity op like any other idle qubit, whether the gate spans one
@@ -237,7 +239,7 @@ def cycle_to_base_cycle(
 
     Args:
         cycle (Cycle): qcal Cycle containing at least one two-qubit gate,
-            or a mid-circuit measurement layer (see `is_rc_layer`).
+            or a mid-circuit measurement layer (see ``is_rc_layer``).
         qubits (Sequence[int]): full qubit register to twirl.
 
     Returns:
@@ -245,7 +247,7 @@ def cycle_to_base_cycle(
             an MCM layer, ``(0, 1, 2)``.
 
     Raises:
-        ValueError: if a non-measurement gate in `cycle` acts on more
+        ValueError: if a non-measurement gate in ``cycle`` acts on more
             than two qubits.
     """
     entries: List[Tuple[int, int] | int] = []
@@ -280,42 +282,43 @@ def build_rc_configuration(
 ) -> pyquil._qpu.randomized_compiling.RandomizedCompilingConfiguration: # type: ignore  # noqa: F821
     """Build a RandomizedCompilingConfiguration from a compiled Circuit.
 
-    `circuit` is the fully unrolled sequence to run. Its RC-layer
-    Cycles (see `is_rc_layer`) are walked in order into a flat
+    ``circuit`` is the fully unrolled sequence to run. Its RC-layer
+    Cycles (see ``is_rc_layer``) are walked in order into a flat
     per-cycle layer sequence, which must tile exactly into
-    `base_cycle_repetitions` repetitions of an equal-length unit --
-    that unit becomes `base_cycles`. E.g. a repetition code's two
+    ``base_cycle_repetitions`` repetitions of an equal-length unit --
+    that unit becomes ``base_cycles``. E.g. a repetition code's two
     entangling cycles plus an MCM cycle, repeated N times, collapses
-    to a 3-cycle `base_cycles` with `base_cycle_repetitions=N`; a
-    circuit with no repeated structure yields `base_cycle_repetitions
-    == 1` and `base_cycles` equal to the full layer sequence.
+    to a 3-cycle ``base_cycles`` with ``base_cycle_repetitions=N``; a
+    circuit with no repeated structure yields
+    ``base_cycle_repetitions == 1`` and ``base_cycles`` equal to the
+    full layer sequence.
 
     Args:
         circuit (Circuit): compiled qcal circuit to twirl.
         qubits (Sequence[int]): full qubit register to twirl.
         base_cycle_repetitions (int | None, optional): number of times
-            `base_cycles` repeats in `circuit`. Defaults to `None`,
+            ``base_cycles`` repeats in ``circuit``. Defaults to ``None``,
             which auto-detects the smallest repeating unit (and its
             repeat count) from the circuit's actual RC-layer sequence
-            (see `_minimal_period`). Positional `layer_period` layers
+            (see ``_minimal_period``). Positional ``layer_period`` layers
             are all identical, so they always collapse to a single
             base cycle repeated once per layer. Pass an explicit value
             to require a specific repeat count instead -- a mismatch
-            raises `ValueError`.
-        layer_period (int | None, optional): forwarded to `is_rc_layer`
+            raises ``ValueError``.
+        layer_period (int | None, optional): forwarded to ``is_rc_layer``
             as a positional fallback boundary, for circuits with no
             two-qubit gates or measurements to key off of (e.g. a run
-            of single-qubit ZXZXZ templates). Defaults to `None`,
+            of single-qubit ZXZXZ templates). Defaults to ``None``,
             which disables the fallback and relies solely on content
             (two-qubit gates/measurements) to detect layer boundaries.
-        **rc_kwargs: forwarded to `RandomizedCompilingConfiguration`
-            (e.g. `invert_random_paulis`, `shots_per_randomization`).
+        **rc_kwargs: forwarded to ``RandomizedCompilingConfiguration``
+            (e.g. ``invert_random_paulis``, ``shots_per_randomization``).
 
     Returns:
         RandomizedCompilingConfiguration: PyQuil RC configuration.
 
     Raises:
-        ValueError: if an explicit `base_cycle_repetitions` does not
+        ValueError: if an explicit ``base_cycle_repetitions`` does not
             evenly divide the circuit's RC-layer count, or the layer
             sequence turns out not to actually be that many
             repetitions of the resulting unit.
@@ -383,23 +386,23 @@ def has_trailing_single_qubit_layer(
 ) -> bool:
     """Whether a single-qubit layer follows the last RC-layer boundary.
 
-    `RCLayerTracker` reserves one extra layer (see its `n_layers`) for
+    ``RCLayerTracker`` reserves one extra layer (see its ``n_layers``) for
     the ZXZXZ template that ordinarily sits between the last RC-layer
-    boundary (see `is_rc_layer`) and the circuit's terminal
+    boundary (see ``is_rc_layer``) and the circuit's terminal
     measurement -- e.g. the final single-qubit layer right before
     measurement in a normal two-qubit-gate circuit. That reservation
     is only actually exercised when such trailing content exists: if
     the last boundary instead falls on the very last non-barrier
     interior cycle (e.g. the last cycle of the last base-cycle
-    repetition when using `layer_period` -- see `build_rc_
-    configuration`), the reserved layer is never written to and stays
-    at its `0.0` initialization.
+    repetition when using ``layer_period`` -- see
+    ``build_rc_configuration``), the reserved layer is never written to
+    and stays at its ``0.0`` initialization.
 
     Args:
         circuit (Circuit): compiled qcal circuit to twirl.
         layer_period (int | None, optional): forwarded to
-            `is_rc_layer`, matching the value passed to
-            `build_rc_configuration`. Defaults to `None`.
+            ``is_rc_layer``, matching the value passed to
+            ``build_rc_configuration``. Defaults to ``None``.
 
     Returns:
         bool: True if at least one non-boundary cycle follows the last
@@ -418,19 +421,19 @@ def has_trailing_single_qubit_layer(
 class RCLayerTracker:
     """Tracks (layer_index, angle_index) state for randomized compiling.
 
-    `qcal.interface.pyquil.transpiler.transpile_circuit` owns the actual
+    ``qcal.interface.pyquil.transpiler.transpile_circuit`` owns the actual
     circuit/cycle walk; it calls into this tracker only for the piece
     specific to randomized compiling -- swapping a Rz/VirtualZ gate's
     literal phase for a memory-reference-parametrized one (recording the
-    original phase into `source_phases`) -- and advances to the
+    original phase into ``source_phases``) -- and advances to the
     next layer once a Cycle's two-qubit gates have been emitted.
-    X90/SX pulses are still emitted through the ordinary `gate_mapper`
-    (see `transpile_cycle`), which additionally fences them per-qubit
+    X90/SX pulses are still emitted through the ordinary ``gate_mapper``
+    (see ``transpile_cycle``), which additionally fences them per-qubit
     while a tracker is active.
 
-    `layer_index` is a single counter shared by every qubit. `angle_index`
+    ``layer_index`` is a single counter shared by every qubit. ``angle_index``
     (0, 1, 2) is a per-qubit counter that resets to 0 whenever
-    `close_layer` is called.
+    ``close_layer`` is called.
     """
 
     def __init__(
@@ -440,15 +443,16 @@ class RCLayerTracker:
 
         Args:
             configuration (RandomizedCompilingConfiguration): from
-                `build_rc_configuration`.
+                ``build_rc_configuration``.
             reserve_final_layer (bool, optional): whether to allocate
-                an extra layer beyond `base_cycle_repetitions *
-                len(base_cycles)` for a trailing single-qubit template
-                between the last RC-layer boundary and the terminal
-                measurement. Defaults to `True` (the historical
-                behavior). Pass `has_trailing_single_qubit_layer(
-                circuit, layer_period)` when that trailing content is
-                not guaranteed to exist (e.g. a `layer_period`-tiled
+                an extra layer beyond
+                ``base_cycle_repetitions * len(base_cycles)`` for a
+                trailing single-qubit template between the last
+                RC-layer boundary and the terminal measurement.
+                Defaults to ``True`` (the historical behavior). Pass
+                ``has_trailing_single_qubit_layer(circuit, layer_period)``
+                when that trailing content is not guaranteed to exist
+                (e.g. a ``layer_period``-tiled
                 circuit whose last boundary falls on the circuit's
                 last interior cycle), to avoid reserving a layer that
                 is never written to.
@@ -484,8 +488,8 @@ class RCLayerTracker:
     ) -> 'Program':  # type: ignore  # noqa: F821
         """Replace a Rz/VirtualZ gate with its twirled memory reference.
 
-        Records the gate's original phase into `source_phases` at
-        (layer_index, angle_index) and advances angle_index for `gate`'s
+        Records the gate's original phase into ``source_phases`` at
+        (layer_index, angle_index) and advances angle_index for ``gate``'s
         qubit.
 
         Args:
@@ -493,9 +497,9 @@ class RCLayerTracker:
             readout_tracker (ReadoutLayerTracker | None, optional): when
                 randomized readout is also active, the readout tracker
                 for the final pre-measurement layer; the phase is
-                recorded into its `source_phases` and its destination
+                recorded into its ``source_phases`` and its destination
                 register is referenced, instead of the RC ones.
-                Defaults to `None`.
+                Defaults to ``None``.
 
         Returns:
             Program: single-instruction PyQuil Program.
@@ -544,25 +548,25 @@ def final_layer_cycle_indices(
     The final layer is the full ZXZXZ template -- however many Cycles
     it spans (up to 5: Rz-X90-Rz-X90-Rz) -- immediately preceding a
     circuit's terminal measurement(s): every non-barrier Cycle after
-    the last RC-layer boundary (see `is_rc_layer`), excluding the
+    the last RC-layer boundary (see ``is_rc_layer``), excluding the
     boundary cycles themselves (barriers and the terminal Meas/MCM
-    cycle(s)). This is the layer `ReadoutLayerTracker` should be
+    cycle(s)). This is the layer ``ReadoutLayerTracker`` should be
     scoped to when randomizing readout without randomized compiling
-    (RC's own `RCLayerTracker` already tracks every layer, including
-    this one, via its reserved final layer -- see `RCLayerTracker.
-    __init__`'s `n_layers = ... + 1` -- so this is only needed when RC
-    is off).
+    (RC's own ``RCLayerTracker`` already tracks every layer, including
+    this one, via its reserved final layer -- see
+    ``RCLayerTracker.__init__``'s ``n_layers = ... + 1`` -- so this is
+    only needed when RC is off).
 
     Args:
         circuit (Circuit): qcal circuit.
         layer_period (int | None, optional): forwarded to
-            `is_rc_layer`, matching the (already resolved, see
-            `effective_layer_period`) value randomized compiling uses,
-            so that a `layer_period`-tiled circuit's final layer is
-            just its last template. Defaults to `None`.
+            ``is_rc_layer``, matching the (already resolved, see
+            ``effective_layer_period``) value randomized compiling uses,
+            so that a ``layer_period``-tiled circuit's final layer is
+            just its last template. Defaults to ``None``.
 
     Returns:
-        FrozenSet[int]: indices into `circuit`, possibly empty (e.g. a
+        FrozenSet[int]: indices into ``circuit``, possibly empty (e.g. a
             circuit with no single-qubit content before its terminal
             measurement(s), or with no measurement at all).
     """
@@ -600,23 +604,24 @@ def final_layer_cycle_indices(
 
 
 class ReadoutLayerTracker:
-    """Tracks and sets the final pre-measurement phases for readout
-    randomization when randomized compiling is not also active.
+    """Tracks the final pre-measurement phases for readout randomization.
 
-    Mirrors `RCLayerTracker`'s "record the literal phase, then emit a
+    Used when randomized compiling is not also active.
+
+    Mirrors ``RCLayerTracker``'s "record the literal phase, then emit a
     memory-reference-parametrized gate in its place" pattern, but is
     scoped to the single ZXZXZ template immediately preceding each
-    qubit's measurement (see `final_layer_cycle_indices`) -- there is
-    exactly one layer, so, unlike `RCLayerTracker`, there is no
-    `layer_index`/`close_layer` to advance. X90/SX pulses are still
-    emitted through the ordinary `gate_mapper` (see `transpile_cycle`),
+    qubit's measurement (see ``final_layer_cycle_indices``) -- there is
+    exactly one layer, so, unlike ``RCLayerTracker``, there is no
+    ``layer_index``/``close_layer`` to advance. X90/SX pulses are still
+    emitted through the ordinary ``gate_mapper`` (see ``transpile_cycle``),
     which additionally fences them per-qubit while this tracker is
     active.
 
-    When randomized compiling *is* active, `RCLayerTracker` already
+    When randomized compiling *is* active, ``RCLayerTracker`` already
     tracks this same final layer on its own, so this tracker is unused
-    in that case (see `qcal.interface.pyquil.transpiler.
-    transpile_circuit`).
+    in that case (see
+    :func:`qcal.interface.pyquil.transpiler.transpile_circuit`).
     """
 
     def __init__(self, configuration: _U2Randomization) -> None:
@@ -624,7 +629,7 @@ class ReadoutLayerTracker:
 
         Args:
             configuration (_U2Randomization): built in
-                `transpile_circuit` when `randomized_readout` is True.
+                ``transpile_circuit`` when ``randomized_readout`` is True.
         """
         self.configuration = configuration
         self.angle_index: Dict[int, int] = dict.fromkeys(
@@ -637,8 +642,8 @@ class ReadoutLayerTracker:
     def emit_phase_gate(self, gate: Rz | VirtualZ) -> 'Program':  # type: ignore  # noqa: F821
         """Replace a Rz/VirtualZ gate with its readout-randomized ref.
 
-        Records the gate's original phase into `source_phases` and
-        advances `angle_index` for `gate`'s qubit.
+        Records the gate's original phase into ``source_phases`` and
+        advances ``angle_index`` for ``gate``'s qubit.
 
         Args:
             gate (Rz | VirtualZ): qcal Rz or VirtualZ gate.
@@ -661,22 +666,22 @@ class ReadoutLayerTracker:
 
 
 def _minimal_period(layers: Sequence[object]) -> int:
-    """Length of the smallest unit that exactly tiles `layers`.
+    """Length of the smallest unit that exactly tiles ``layers``.
 
-    Used to auto-detect `base_cycle_repetitions` when the caller
+    Used to auto-detect ``base_cycle_repetitions`` when the caller
     doesn't specify one: the returned period, and
-    `len(layers) // period` repetitions of it, always reconstruct
-    `layers` exactly.
+    ``len(layers) // period`` repetitions of it, always reconstruct
+    ``layers`` exactly.
 
     Args:
         layers (Sequence[object]): a circuit's full per-cycle RC-layer
-            sequence (see `build_rc_configuration`).
+            sequence (see ``build_rc_configuration``).
 
     Returns:
-        int: smallest `p` dividing `len(layers)` such that
-            `layers == layers[:p] * (len(layers) // p)`. Equals
-            `len(layers)` if no smaller unit tiles it exactly (or if
-            `layers` is empty).
+        int: smallest ``p`` dividing ``len(layers)`` such that
+            ``layers == layers[:p] * (len(layers) // p)``. Equals
+            ``len(layers)`` if no smaller unit tiles it exactly (or if
+            ``layers`` is empty).
     """
     n = len(layers)
     if n == 0:
@@ -695,6 +700,24 @@ def _minimal_period(layers: Sequence[object]) -> int:
 @final
 @dataclass(frozen=True, kw_only=True)
 class _U2Randomization:
+    """Per-qubit random single-qubit unitary configuration.
+
+    Describes the PyQuil memory registers used to choose a random
+    ZXZXZ unitary per qubit at pulse-execution time (e.g. for
+    randomized readout).
+
+    Attributes:
+        qubits (Sequence[int]): qubits to randomize.
+        destination_names (Callable[[int], str]): maps a qubit to the
+            name of its destination (active phases) register.
+        seed_names (Callable[[int], str]): maps a qubit to the name of
+            its PRNG seed register.
+        source_names (Callable[[int], str]): maps a qubit to the name
+            of its source (candidate unitary phases) register.
+        source_unitary_phases (list[float]): flat list of ZXZXZ phases
+            (in turns), three per candidate unitary.
+    """
+
     qubits: Sequence[int]
     destination_names: Callable[[int], str]
     seed_names: Callable[[int], str]
@@ -703,9 +726,18 @@ class _U2Randomization:
 
     @property
     def source_unitary_count(self) -> int:
+        """Number of candidate unitaries in ``source_unitary_phases``."""
         return len(self.source_unitary_phases) // _ANGLES_PER_UNITARY
 
     def build_quil_program(self) -> 'Program': # type: ignore  # noqa: F821
+        """Build the register declarations and random-choice calls.
+
+        Returns:
+            Program: PyQuil Program declaring the destination, source,
+                and seed registers for each qubit and calling
+                ``choose_random_real_sub_regions`` on them, or ``None``
+                if PyQuil cannot be imported.
+        """
         try:
             from pyquil import Program
             from pyquil.quilbase import Call, Declare
@@ -743,6 +775,14 @@ class _U2Randomization:
         return program
 
     def generate_seeds(self, rng: np.random.Generator) -> Mapping[int, int]:
+        """Draw a random PRNG seed for each qubit.
+
+        Args:
+            rng (np.random.Generator): random number generator.
+
+        Returns:
+            Mapping[int, int]: qubit to seed value.
+        """
         return {
             qubit: rng.integers(
                 0, 2**47 - 1, dtype=np.int64
@@ -757,19 +797,20 @@ class _U2Randomization:
         """Build the per-qubit memory map for unitary randomization.
 
         Each qubit gets its own destination, seed, and source register
-        (`source_names(qubit)`). If `phases_by_qubit` is given, each
+        (``source_names(qubit)``). If ``phases_by_qubit`` is given, each
         qubit's ZXZXZ phases are pre-merged into every source unitary
         (provided applied first, then random), so source registers differ
-        per qubit; otherwise every qubit gets `source_unitary_phases`.
+        per qubit; otherwise every qubit gets ``source_unitary_phases``.
 
         All phases are in turns (fractions of 2π), matching
-        `emit_phase_gate`; they are converted to/from radians around
-        `zxzxz_to_unitary`/`unitary_to_zxzxz`.
+        ``emit_phase_gate``; they are converted to/from radians around
+        ``zxzxz_to_unitary``/``unitary_to_zxzxz``.
 
         Args:
             seeds (Mapping[int, int]): PRNG seed per qubit.
-            phases_by_qubit (Mapping[int, tuple[float, float, float]] |
-                None): ZXZXZ phases (turns) to merge, per qubit.
+            phases_by_qubit (Mapping[int, tuple] | None, optional): ZXZXZ
+                phases (turns) to merge, per qubit, each a
+                ``tuple[float, float, float]``. Defaults to ``None``.
 
         Returns:
             Mapping[str, list[float] | list[int]]: register name to values.
@@ -795,7 +836,7 @@ class _U2Randomization:
                     )
                     source_unitary_phases_by_qubit[qubit].extend(
                         float(angle) / (2 * np.pi)
-                        for angle in 
+                        for angle in
                         unitary_to_zxzxz(provided_unitary_randomized)
                     )
         else:
@@ -815,6 +856,16 @@ class _U2Randomization:
     def generate_indices( # Qubit index to seed value
             self, shot_count: int, seeds: Mapping[int, int]
     ) -> NDArray[np.int8]:
+        """Reproduce the per-shot random unitary indices for each qubit.
+
+        Args:
+            shot_count (int): number of shots.
+            seeds (Mapping[int, int]): PRNG seed per qubit.
+
+        Returns:
+            NDArray[np.int8]: array of shape ``(shot_count, n_qubits)``
+                with the index of the source unitary chosen per shot.
+        """
         from qcs_sdk.qpu.experimental.random import (
             PrngSeedValue,
             choose_random_real_sub_region_indices,

@@ -1,5 +1,48 @@
-"""Submodule for optimizing config parameters based on some objective function.
+"""Optimization of config parameters with respect to a cost function.
 
+This module provides two optimization loops that tune config parameters by
+repeatedly running a cost function:
+
+- :class:`Optimize`: a generic ask-tell optimization loop which can be
+  driven by any optimizer in :mod:`qcal.optimization.optimizers` (e.g.
+  :class:`~qcal.optimization.optimizers.Adam` or
+  :class:`~qcal.optimization.optimizers.CMA`).
+- :class:`LinearResponse`: perturbs the parameters in fixed steps, fits the
+  loss to a line, and sets the parameters to the zero crossing.
+
+The cost function must be an instance of a protocol class whose
+``__init__`` is decorated with :func:`qcal.utils.save_init` (so that it can
+be re-instantiated with the updated config), which has a ``run()`` method,
+and which exposes a ``loss`` property mapping each qubit label to a
+sequence of loss values (e.g. the RPE protocols in
+:mod:`qcal.characterization.phase_estimation.rpe`).
+
+Example:
+    Optimize an X90 amplitude using RPE as the cost function:
+
+    .. code-block:: python
+
+        from qcal.backend.emulator import Emulator
+        from qcal.characterization.phase_estimation.rpe import X90RPE
+        from qcal.config import EXAMPLE_CONFIG_PATH, Config
+        from qcal.optimization.optimize import Optimize
+        from qcal.optimization.optimizers import Adam
+
+        config = Config(EXAMPLE_CONFIG_PATH)
+        param = 'single_qubit/0/GE/X90/pulse/1/kwargs/amp'
+        rpe = X90RPE(Emulator, config, qubit_labels=[0], loss_angle='X')
+
+        opt = Optimize(
+            config=config,
+            params={0: param},
+            optimizer=Adam,
+            cost_func=rpe,
+            opt_kwargs={0: {'lr': 0.001}},
+            delta=0.001,
+            n_iters=10,
+        )
+        opt.run()
+        opt.opt_params  # optimized (unscaled) value of ``param``
 """
 import logging
 from collections.abc import Iterable
@@ -19,10 +62,11 @@ logger = logging.getLogger(__name__)
 
 
 class NoScaler:
-    """This is a dummy class that returns the same values that are input.
+    """Dummy scaler that returns the same values that are input.
 
-    It has the same methods as MinMaxScalar for compatibility with the Optimize
-    class, but no rescaling is performed.
+    It has the same methods as :class:`~sklearn.preprocessing.MinMaxScaler`
+    for compatibility with the :class:`Optimize` class, but no rescaling is
+    performed.
     """
 
     def __init__(self):
@@ -52,6 +96,15 @@ class NoScaler:
 
 
 class LinearResponse:
+    r"""Linear-response optimization of config parameters.
+
+    Starting from the current config values, the parameters for each qubit
+    label are perturbed by ``delta`` per iteration and the loss is measured
+    with the cost function. The loss is then fit to a line, and the
+    optimal parameter value is taken to be the zero crossing of the fit.
+    If the fit is poor (:math:`R^2 \le 0.8`), the perturbation with the
+    smallest absolute loss is used instead.
+    """
 
     def __init__(
         self,
@@ -64,7 +117,29 @@ class LinearResponse:
         x_label:      str = 'Param Value',
         y_label:      str = 'Loss'
     ) -> None:
+        """Initialize a linear-response optimization.
 
+        Args:
+            config (Config): qcal Config object.
+            qubit_labels (Iterable[int | Tuple[int]]): qubit labels for which
+                to optimize parameters.
+            params (Dict[int | tuple[int], str | list[str]]): dictionary
+                mapping qubit labels to the config parameter(s) to optimize.
+                If a list of parameters is given for a qubit label, they are
+                all perturbed and set together.
+            cost_func (Any): cost function. This should be a class which,
+                once run, has a ``loss`` property for each qubit label (see
+                :mod:`qcal.optimization.optimize`).
+            delta (float | Dict[int | tuple, float]): parameter perturbation
+                per iteration, either for all qubit labels or per qubit
+                label.
+            n_iters (int, optional): number of iterations (perturbations)
+                used to fit the linear curve. Defaults to 3.
+            x_label (str, optional): x-axis label for the plot. Defaults to
+                ``'Param Value'``.
+            y_label (str, optional): y-axis label for the plot. Defaults to
+                ``'Loss'``.
+        """
         self._config = config
         self._qubit_labels = qubit_labels
         self._params = params
@@ -158,7 +233,7 @@ class LinearResponse:
 
     @property
     def y_intercept(self) -> Dict:
-        """y-intercept of each linear fit."""
+        """The y-intercept of each linear fit."""
         b = {}
         for ql in self._qubit_labels:
             if self._fit[ql].fit_success:
@@ -288,6 +363,16 @@ class LinearResponse:
 
 
 class Optimize:
+    """Generalized ask-tell optimization of config parameters.
+
+    For each qubit label, an optimizer proposes new parameter values
+    (``ask``), which are written to the config. The cost function is then
+    re-instantiated with the updated config and run, and the resulting loss
+    is passed back to the optimizer (``tell``). If both ``lbounds`` and
+    ``ubounds`` are given, the parameters are rescaled to between 0 and 1
+    with a :class:`~sklearn.preprocessing.MinMaxScaler` before being passed
+    to the optimizer.
+    """
 
     def __init__(
         self,
@@ -303,15 +388,19 @@ class Optimize:
         tol:        float = 0.1,
         global_min: bool = False
     ) -> None:
-        """Generalized optimization class.
+        """Initialize a generalized optimization.
 
         Args:
-            config (Config): qcal config object
+            config (Config): qcal config object.
             params (Dict[int | tuple[int], str | list[str]]): dictionary
                 mapping qubit labels to config parameters to optimize.
-            optimizer (Callable): optimizer.
-            cost_func (Any): cost function. This should be a class which, once
-                run, should have a `loss` class property for each qubit label.
+            optimizer (Callable): optimizer class (e.g.
+                :class:`~qcal.optimization.optimizers.Adam`), which is
+                instantiated for each qubit label with the initial parameter
+                values and the corresponding ``opt_kwargs``.
+            cost_func (Any): cost function. This should be a class which,
+                once run, should have a ``loss`` class property for each
+                qubit label (see :mod:`qcal.optimization.optimize`).
             opt_kwargs (Dict[int | tuple[int], Dict] | None, optional): dict
                 mapping qubit labels to optional kwargs for the optimizer.
                 Defaults to None.
@@ -321,8 +410,8 @@ class Optimize:
             ubounds (Dict[float | tuple, list] | None, optional): dictionary
                 mapping qubit labels to the upper bounds for each parameter
                 value specified for those labels. Defaults to None.
-            delta (float | Dict[float | tuple, float] | None, optional): this
-                kwarg can be used to specify a small initial pertubation for
+            delta (float | Dict[int | tuple, float] | None, optional): this
+                kwarg can be used to specify a small initial perturbation for
                 gradient-based optimizations. Defaults to None.
             n_iters (int, optional): number of iterations. Defaults to 10.
             tol (float, optional): tolerance, i.e., convergence threshold.
@@ -494,7 +583,7 @@ class Optimize:
         """Smallest combined loss found across all qubit labels.
 
         This is the norm of the losses of all qubit labels at the iteration
-        used to select the optimal parameters when `global_min` is True.
+        used to select the optimal parameters when ``global_min`` is True.
 
         Returns:
             float: smallest combined loss.
@@ -530,7 +619,7 @@ class Optimize:
 
     @property
     def params_history(self) -> Dict:
-        """History of the (unscaled) paramters values for each qubit label.
+        """History of the (unscaled) parameter values for each qubit label.
 
         Returns:
             Dict: history of parameter values.

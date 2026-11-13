@@ -1,9 +1,15 @@
 """Submodule for calibrating leakage parameters, such as DRAG.
 
+The :func:`Leakage` factory builds a calibration class on top of a
+user-supplied :class:`~qcal.qpu.qpu.QPU` class. It sweeps one or more
+config parameters while measuring a leakage-amplifying circuit and sets
+each parameter to the value that minimizes (or maximizes) the population
+of the ``|2>`` state on the corresponding qubit. Measuring the ``|2>``
+state requires a QPU that supports qutrit readout (``n_levels=3``).
 """
 import logging
 from collections.abc import Iterable
-from typing import Callable, Dict
+from typing import Dict
 
 import numpy as np
 import pandas as pd
@@ -27,44 +33,46 @@ def Leakage(
     param_sweep: Dict,
     maximize:    bool = False,
     **kwargs
-) -> Callable:
+) -> Calibration:
     """Leakage calibration.
 
-    This calibration finds the param value for which the leakage on
-    `leakage_qubit` is minimized.
+    This calibration finds the param value for which the leakage (i.e. the
+    ``|2>`` state population) on each qubit in ``params`` is minimized.
 
-    Basic example useage:
-    ```
-    # Amplify the leakage in an X90 gate
-    circuit = Circuit([Cycle({X90(0)}) for _ in range(102)])
-    circuit.measure()
+    Example:
+        .. code-block:: python
 
-    cal = Leakage(
-        CustomQPU,
-        config,
-        circuit=circuit,
-        params={0: 'single_qubit/0/GE/X90/pulse/1/kwargs/alpha'},
-        param_sweep={0: np.linspace(0.5, 1.5, 21)}
-    )
-    cal.run()
-    ```
+            # Amplify the leakage in an X90 gate
+            circuit = Circuit([Cycle({X90(0)}) for _ in range(102)])
+            circuit.measure()
+
+            cal = Leakage(
+                CustomQPU,
+                config,
+                circuit=circuit,
+                params={0: 'single_qubit/0/GE/X90/pulse/1/kwargs/alpha'},
+                param_sweep={0: np.linspace(0.5, 1.5, 21)}
+            )
+            cal.run()
 
     Args:
         qpu (QPU): custom QPU object.
         config (Config): qcal Config object.
         circuit (Circuit): circuit which amplifies leakage on some qubit.
-        leakage_qubit (int): qubit on which leakage should be minimized.
         params (Dict): dictionary mapping the qubits on which leakage occurs to
             the config parameter which is causing the leakage.
         param_sweep (Dict): dictionary mapping the qubits on which leakage
             occurs to sweep values for the parameter to be optimized.
         maximize (bool, optional): whether to select the parameter that
-            maximizes leakage, instead of minimze. Defaults to False. This can
-            be used to find gate parameters that amplify leakage, such that one
-            can better tune other parameters to cancel leakage.
+            maximizes leakage, instead of minimizing it. Defaults to False.
+            This can be used to find gate parameters that amplify leakage,
+            such that one can better tune other parameters to cancel
+            leakage.
+        **kwargs: additional keyword arguments passed to the QPU
+            constructor (e.g. ``n_shots``, ``n_levels``).
 
     Returns:
-        Callable: Leakage calibration class.
+        Calibration: Leakage calibration class.
     """
 
     class Leakage(qpu, Calibration):
@@ -83,7 +91,7 @@ def Leakage(
             maximize:    bool = False,
             **kwargs
         ) -> None:
-            """Initialize the Leakage class within the function."""
+            """Initialize the Leakage calibration class."""
             qpu.__init__(self, config=config, **kwargs)
             Calibration.__init__(self, config)
 
@@ -106,7 +114,7 @@ def Leakage(
 
         @property
         def params(self) -> Dict:
-            """Parameters which are optimized to reducing leakage.
+            """Parameters which are optimized to reduce leakage.
 
             Returns:
                 Dict: dictionary mapping leakage qubits to parameters.
@@ -124,7 +132,7 @@ def Leakage(
 
         @property
         def loss(self) -> Dict:
-            """Loss for each qubit in terms of the |2> state population.
+            """Loss for each qubit in terms of the ``|2>`` state population.
 
             This property can be used for parameter optimization.
 
@@ -170,9 +178,15 @@ def Leakage(
                         val2 = 0
                         for q in ql:
                             i = self._circuit.qubits.index(q)
-                            # val0 += circ.results.marginalize(i).populations['0']
-                            # val1 += circ.results.marginalize(i).populations['1']
-                            val2 += circ.results.marginalize(i).populations['2']
+                            # val0 += (
+                            #     circ.results.marginalize(i).populations['0']
+                            # )
+                            # val1 += (
+                            #     circ.results.marginalize(i).populations['1']
+                            # )
+                            val2 += (
+                                circ.results.marginalize(i).populations['2']
+                            )
                         # pop0.append(val0)
                         # pop1.append(val1)
                         pop2.append(val2)
@@ -224,7 +238,7 @@ def Leakage(
                 )
 
         def plot(self) -> None:
-            """Plot the sweep results"""
+            """Plot the sweep results."""
             Calibration.plot(self,
                 # ylabel=r'$|2\rangle$ Population',
                 ylabel='Probability',

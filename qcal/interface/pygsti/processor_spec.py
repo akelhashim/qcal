@@ -1,8 +1,10 @@
 """Submodule for generating a qubit processor spec for pyGSTi.
 
-See:
-https://github.com/sandialabs/pyGSTi/blob/master/jupyter_notebooks/Tutorials/objects/ProcessorSpec.ipynb
-https://github.com/sandialabs/pyGSTi/blob/master/pygsti/processors/processorspec.py
+See Also:
+    `ProcessorSpec tutorial
+    <https://github.com/sandialabs/pyGSTi/blob/master/jupyter_notebooks/Tutorials/objects/ProcessorSpec.ipynb>`_
+    and `processorspec.py
+    <https://github.com/sandialabs/pyGSTi/blob/master/pygsti/processors/processorspec.py>`_.
 """
 import itertools
 import logging
@@ -40,21 +42,24 @@ def pygsti_pspec(
     nonstd_gate_unitaries: Dict | None = None,
     **kwargs
 ) -> QubitProcessorSpec:
-    """Generates a pyGSTi qubit processor spec.
+    """Generate a pyGSTi qubit processor spec.
 
     Args:
-        config (Config): qcal ```Config``` object.
+        config (Config): qcal :class:`~qcal.config.Config` object.
         qubits (Sequence[int]): qubit labels.
         native_gates (Sequence[str], optional): native gates. Defaults to
-            ['X90', 'Y90']. These can be formatted in qcal or pyGSTi
+            ``('X90', 'Y90')``. These can be formatted in qcal or pyGSTi
             format.
         availability (Dict | None, optional): a dictionary whose keys are gate
             names and whose values are a tuple of the qubit labels on which the
-            gates act. Defaults to None. If None, this will be automatically
-            generated based on the ```config.native_gates``` object.
+            gates act. Defaults to ``None``. If ``None``, this will be
+            automatically generated based on the ``config.native_gates``
+            object.
         nonstd_gate_unitaries (Dict | None, optional): a dictionary whose keys
             are custom gate names and whose values are unitary matrices.
-            Defaults to None.
+            Defaults to ``None``.
+        **kwargs: additional keyword arguments forwarded to
+            ``pygsti.processors.QubitProcessorSpec``.
 
     Returns:
         QubitProcessorSpec: pyGSTi qubit processor spec object.
@@ -81,7 +86,9 @@ def pygsti_pspec(
                         qubit_pair in pairings
                         or qubit_pair[::-1] in pairings
                     ):
-                        if gate in config.native_gates['two_qubit'][qubit_pair]:
+                        if gate in (
+                            config.native_gates['two_qubit'][qubit_pair]
+                        ):
                             qubit_pairs.append(
                                 tuple(f'Q{q}' for q in qubit_pair)
                             )

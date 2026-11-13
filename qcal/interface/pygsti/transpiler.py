@@ -1,6 +1,4 @@
-"""Submodule for handling transpilation from pyGSTi to qcal circuits.
-
-"""
+"""Submodule for handling transpilation from pyGSTi to qcal circuits."""
 import logging
 from collections import defaultdict
 from collections.abc import Iterator
@@ -19,7 +17,7 @@ from qcal.units import ns
 
 logger = logging.getLogger(__name__)
 
-__all__ = ('Transpiler',)
+__all__ = ('PyGSTiTranspiler',)
 
 
 def add_Clifford_C0(qubit: int) -> List:
@@ -341,7 +339,7 @@ def add_global_identity(qubits: Tuple[int]) -> None:
         qubits (Tuple[int]): qubit labels.
 
     Returns:
-        None: No cycle is returned.
+        set: an empty set (no gates are added).
     """
     return set()
 
@@ -468,7 +466,8 @@ def to_qcal(
                 elif isinstance(out, Circuit):
                     tcircuit.extend(out)
 
-            # Add a barrier between each layer to prevent compression via compilation
+            # Add a barrier between each layer to prevent compression via
+            # compilation
             tcircuit.append(Barrier(qubits))
 
         tcircuit.measure(qubits=qubits)
@@ -477,7 +476,7 @@ def to_qcal(
 
 
 class PyGSTiTranspiler(Transpiler):
-    """pyGSTi to qcal Transpiler."""
+    """Transpiler from pyGSTi circuits to qcal circuits."""
 
     # __slots__ = ('_gate_mapper',)
 
@@ -489,7 +488,7 @@ class PyGSTiTranspiler(Transpiler):
 
         Args:
             gate_mapper (Dict | GateMapper | None, optional): dictionary which
-                maps pyGSTi gates to qcal gates. Defaults to None.
+                maps pyGSTi gates to qcal gates. Defaults to ``None``.
         """
         if gate_mapper is None:
             gate_mapper = GateMapper(

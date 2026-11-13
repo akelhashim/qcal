@@ -1,7 +1,8 @@
 """Submodule for handling transpilation from True-Q to qcal circuits.
 
-NOTE: we do not use TYPE_CHECKING for trueq types because this might fail if
-trueq is not installed when building docs.
+Note:
+    We do not use ``TYPE_CHECKING`` for trueq types because this might fail
+    if trueq is not installed when building docs.
 """
 from __future__ import annotations
 
@@ -75,12 +76,13 @@ def to_qcal(
     Args:
         circuit (trueq.Circuit): True-Q circuit.
         gate_mapper (GateMapper): map between True-Q to qcal gates.
-        cycle_replacement (Cycle | Circuit | Dict | None, optional): dictionary
-            which specifies how a marked cycle should be transpiled.
-            Defaults to None. For example, ```cycle_replacement = {'marker':
-            1, 'cycle': qc.Cycle({qc.MCM(0)})}```.
+        cycle_replacement (Cycle | Circuit | Dict | None, optional):
+            dictionary which specifies how a marked cycle should be
+            transpiled. Defaults to ``None``. For example,
+            ``cycle_replacement = {'marker': 1, 'cycle':
+            qc.Cycle({qc.MCM(0)})}``.
         barrier_between_all (bool, optional): whether to place a barrier
-            between all cycles. Defaults to False. This is useful for
+            between all cycles. Defaults to ``False``. This is useful for
             benchmarking circuits to ensure that the circuit structure is
             preserved.
 
@@ -133,9 +135,11 @@ def to_qcal(
 
 
 class TrueqTranspiler(Transpiler):
-    """True-Q to qcal Transpiler."""
+    """Transpiler from True-Q circuits to qcal circuits."""
 
-    # __slots__ = ('_gate_mapper', '_barrier_between_all', '_cycle_replacement')
+    # __slots__ = (
+    #     '_gate_mapper', '_barrier_between_all', '_cycle_replacement'
+    # )
 
     def __init__(
             self,
@@ -147,13 +151,13 @@ class TrueqTranspiler(Transpiler):
 
         Args:
             gate_mapper (Dict | GateMapper | None, optional): dictionary which
-                maps TrueQ gates to Qubic gates. Defaults to None.
+                maps True-Q gates to qcal gates. Defaults to ``None``.
             cycle_replacement (Cycle | Circuit | Dict | None, optional):
                 dictionary which specifies how a marked cycle should be
-                transpiled. Defaults to None. For example, ```cycle_replacement
-                = {1: qc.Cycle({qc.MCM(0)})}```.
+                transpiled. Defaults to ``None``. For example,
+                ``cycle_replacement = {1: qc.Cycle({qc.MCM(0)})}``.
             barrier_between_all (bool, optional): whether to place a barrier
-                between all cycles. Defaults to False. This is useful for
+                between all cycles. Defaults to ``False``. This is useful for
                 benchmarking circuits to ensure that the circuit structure is
                 preserved.
         """

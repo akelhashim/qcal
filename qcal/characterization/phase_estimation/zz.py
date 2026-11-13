@@ -1,6 +1,4 @@
-"""Submodule for estimating the ZZ phase (i.e. rate) between qubits.
-
-"""
+"""Submodule for estimating the ZZ phase (i.e. rate) between qubits."""
 import logging
 from typing import Callable, Dict, List, Sequence, Tuple
 
@@ -56,17 +54,19 @@ def make_JAZZ_circuits(
             pairs.
         times (Dict): dict mapping qubit pair -> time array.
         detuning (float): virtual detuning frequency in Hz.
-        target_subspace (str): subspace of the target qubit Ramsey ('GE',
-            'GF', or 'EF').
-        conditional_subspace (str): subspace used to define the two
-            conditional control states ('GE', 'GF', or 'EF').
-        mq_gate (Callable | None): uninstantiated two-qubit gate class (e.g.
-            ``CZ``). When provided it replaces the BIRD echo — the gate is
-            instantiated as ``mq_gate(qp)`` for each qubit pair. Defaults to
-            ``None`` (use BIRD echo).
+        target_subspace (str, optional): subspace of the target qubit
+            Ramsey (``'GE'``, ``'GF'``, or ``'EF'``). Defaults to ``'GE'``.
+        conditional_subspace (str, optional): subspace used to define the
+            two conditional control states (``'GE'``, ``'GF'``, or
+            ``'EF'``). Defaults to ``'GE'``.
+        mq_gate (Callable | None, optional): uninstantiated two-qubit gate
+            class (e.g. ``CZ``). When provided it replaces the BIRD echo —
+            the gate is instantiated as ``mq_gate(qp)`` for each qubit pair.
+            Defaults to ``None`` (use BIRD echo).
 
     Returns:
-        CircuitSet: circuits with 'sequence' and 'phase' metadata columns.
+        CircuitSet: circuits with ``'sequence'`` and ``'phase'`` metadata
+            columns.
     """
     all_qubits = sorted(flatten(qubit_pairs))
 
@@ -171,8 +171,14 @@ def make_JAZZ_circuits(
         ]
     elif cs == 'GE' and ts == 'EF':
         echo = [
-            Cycle({X90(p[0], 'GE') for p in qp} | {X90(p[1], 'EF') for p in qp}),
-            Cycle({X90(p[0], 'GE') for p in qp} | {X90(p[1], 'EF') for p in qp}),
+            Cycle(
+                {X90(p[0], 'GE') for p in qp}
+                | {X90(p[1], 'EF') for p in qp}
+            ),
+            Cycle(
+                {X90(p[0], 'GE') for p in qp}
+                | {X90(p[1], 'EF') for p in qp}
+            ),
         ]
     elif cs == 'GF' and ts == 'GE':
         echo = [
@@ -194,8 +200,14 @@ def make_JAZZ_circuits(
         ]
     elif cs == 'GF' and ts == 'EF':
         echo = [
-            Cycle({X90(p[0], 'GE') for p in qp} | {X90(p[1], 'EF') for p in qp}),
-            Cycle({X90(p[0], 'GE') for p in qp} | {X90(p[1], 'EF') for p in qp}),
+            Cycle(
+                {X90(p[0], 'GE') for p in qp}
+                | {X90(p[1], 'EF') for p in qp}
+            ),
+            Cycle(
+                {X90(p[0], 'GE') for p in qp}
+                | {X90(p[1], 'EF') for p in qp}
+            ),
             Cycle({X90(p[0], 'EF') for p in qp}),
             Cycle({X90(p[0], 'EF') for p in qp}),
             Cycle({X90(p[0], 'GE') for p in qp}),
@@ -203,13 +215,25 @@ def make_JAZZ_circuits(
         ]
     elif cs == 'EF' and ts == 'GE':
         echo = [
-            Cycle({X90(p[0], 'EF') for p in qp} | {X90(p[1], 'GE') for p in qp}),
-            Cycle({X90(p[0], 'EF') for p in qp} | {X90(p[1], 'GE') for p in qp}),
+            Cycle(
+                {X90(p[0], 'EF') for p in qp}
+                | {X90(p[1], 'GE') for p in qp}
+            ),
+            Cycle(
+                {X90(p[0], 'EF') for p in qp}
+                | {X90(p[1], 'GE') for p in qp}
+            ),
         ]
     elif cs == 'EF' and ts == 'GF':
         echo = [
-            Cycle({X90(p[1], 'GE') for p in qp} | {X90(p[0], 'EF') for p in qp}),
-            Cycle({X90(p[1], 'GE') for p in qp} | {X90(p[0], 'EF') for p in qp}),
+            Cycle(
+                {X90(p[1], 'GE') for p in qp}
+                | {X90(p[0], 'EF') for p in qp}
+            ),
+            Cycle(
+                {X90(p[1], 'GE') for p in qp}
+                | {X90(p[0], 'EF') for p in qp}
+            ),
             Cycle({X90(p[1], 'EF') for p in qp}),
             Cycle({X90(p[1], 'EF') for p in qp}),
             Cycle({X90(p[1], 'GE') for p in qp}),
@@ -301,56 +325,60 @@ def JAZZ(
     mq_gate_params:    Dict[Tuple[int, int], str] | str | None = None,
     params:            Dict[Tuple[int, int], str] | str | None = None,
     **kwargs
-) -> Callable:
+) -> Characterize:
     """Joint Amplification of ZZ (JAZZ).
 
-    This characterization measures the ZZ rotation angle/phase between qubits.
-    To do so, we perform a Ramsey on the target qubit when the control qubit is
-    in |0> and |1>, while echoing both qubits with a pi pulse in the middle. The
-    difference in frequency between the two Ramsey experiments corresponds to
-    the ZZ coupling strength between the two qubits.
+    This characterization measures the ZZ rotation angle/phase between
+    qubits. To do so, we perform a Ramsey on the target qubit when the
+    control qubit is in ``|0>`` and ``|1>``, while echoing both qubits with
+    a pi pulse in the middle. The difference in frequency between the two
+    Ramsey experiments corresponds to the ZZ coupling strength between the
+    two qubits.
 
     JAZZ is based on Bilinear Rotational Decoupling (BIRD) sequences:
     https://www.sciencedirect.com/science/article/pii/0009261482832296
 
     The ``conditional_phase`` argument selects which ZZ coupling to measure:
 
-    * ``'11'`` — conditional GE, target GE (control in |0⟩ vs |1⟩)
-    * ``'21'`` — conditional GF, target GE (control in |0⟩ vs |2⟩)
-    * ``'12'`` — conditional GE, target GF (control in |0⟩ vs |1⟩)
-    * ``'22'`` — conditional GF, target GF (control in |0⟩ vs |2⟩)
-
-    Basic example usage:
-    ```
-    cal = JAZZ(
-        CustomQPU,
-        config,
-        qubit_pairs=[(0, 1), (2, 3)])
-    cal.run()
-    ```
+    * ``'11'`` — conditional GE, target GE (control in ``|0>`` vs ``|1>``)
+    * ``'21'`` — conditional GF, target GE (control in ``|0>`` vs ``|2>``)
+    * ``'12'`` — conditional GE, target GF (control in ``|0>`` vs ``|1>``)
+    * ``'22'`` — conditional GF, target GF (control in ``|0>`` vs ``|2>``)
 
     Args:
         qpu (QPU): custom QPU object.
         config (Config): qcal Config object.
         qubit_pairs (List[Tuple[int, int]]): pairs of qubit labels for the
-            ZZ characterization (e.g. [(0, 1), (2, 3)]).
-        t_max (float): maximum free-evolution time. Defaults to 5 µs.
-        detuning (float): virtual detuning frequency. Defaults to 1 MHz.
-        conditional_phase (str): which ZZ coupling to measure. Must be one of
-            '11', '12', '21', '22'. Defaults to '11'.
-        n_elements (int): number of time points. Defaults to 50.
-        mq_gate (Callable | None): uninstantiated two-qubit gate class (e.g.
-            ``CZ``) to use in place of the BIRD echo. Instantiated as
+            ZZ characterization (e.g. ``[(0, 1), (2, 3)]``).
+        t_max (float, optional): maximum free-evolution time. Defaults to
+            5 µs.
+        detuning (float, optional): virtual detuning frequency. Defaults to
+            1 MHz.
+        conditional_phase (str, optional): which ZZ coupling to measure.
+            Must be one of ``'11'``, ``'12'``, ``'21'``, ``'22'``. Defaults
+            to ``'11'``.
+        n_elements (int, optional): number of time points. Defaults to 50.
+        mq_gate (Gate | None, optional): uninstantiated two-qubit gate class
+            (e.g. ``CZ``) to use in place of the BIRD echo. Instantiated as
             ``mq_gate(qp)`` per qubit pair. Defaults to None.
-        mq_gate_params (Dict[Tuple[int, int], str] | str | None): if using
-            ``mq_gate``, the config parameter paths for the two-qubit gate time.
-            Defaults to None.
-        params (Dict[Tuple[int, int], str] | str | None): config parameter paths
-            to write the ZZ results to. Defaults to None, which uses
-            'two_qubit/{qp}/ZZ{conditional_phase}'.
+        mq_gate_params (Dict[Tuple[int, int], str] | str | None, optional):
+            if using ``mq_gate``, the config parameter paths for the
+            two-qubit gate time. Defaults to None.
+        params (Dict[Tuple[int, int], str] | str | None, optional): config
+            parameter paths to write the ZZ results to. Defaults to None,
+            which uses ``'two_qubit/{qp}/ZZ{conditional_phase}'``.
+        **kwargs: additional keyword arguments passed to the ``qpu``
+            constructor (e.g. ``n_shots``).
 
     Returns:
-        Callable: JAZZ characterization class.
+        Characterize: an instance of the JAZZ characterization class, which
+            inherits from ``qpu`` and :class:`Characterize`.
+
+    Example:
+        .. code-block:: python
+
+            cal = JAZZ(CustomQPU, config, qubit_pairs=[(0, 1), (2, 3)])
+            cal.run()
     """
 
     class JAZZ(qpu, Characterize):
@@ -460,7 +488,8 @@ def JAZZ(
             """Time arrays for each qubit pair.
 
             Returns:
-                Dict[Tuple[int, int], NDArray]: time arrays keyed by qubit pair.
+                Dict[Tuple[int, int], NDArray]: time arrays keyed by qubit
+                    pair.
             """
             return self._times
 
@@ -558,7 +587,8 @@ def JAZZ(
                     self._times[qp], I_high, freq_hint=signed_freq_high
                 )
                 self._fit[qp][seq_high_x].fit(
-                    self._times[qp], I_high, params=params_high, weights=weights
+                    self._times[qp], I_high, params=params_high,
+                    weights=weights
                 )
 
                 if self._fit[qp][seq_low_x].fit_success:

@@ -88,7 +88,7 @@ def cp3(theta: float) -> NDArray:
     """Generalized controlled-phase gate for qutrits.
 
     Applies phase e^(i·j·k·theta) to computational basis state
-    |j⟩|k⟩. When theta = 2π/3 this reduces to CZ3.
+    ``|j⟩|k⟩``. When theta = 2π/3 this reduces to CZ3.
 
     Args:
         theta (float): phase angle per unit of j·k.
@@ -110,7 +110,14 @@ def cp3(theta: float) -> NDArray:
 def _normalize_qudits(qudits: tuple) -> tuple:
     """Normalize variadic qudit args to a (q0, q1) tuple.
 
-    Handles both GATE((q0, q1)) and GATE(q0, q1) call forms.
+    Handles both ``GATE((q0, q1))`` and ``GATE(q0, q1)`` call forms.
+
+    Args:
+        qudits (tuple): variadic qudit arguments, either ``((q0, q1),)``
+            or ``(q0, q1)``.
+
+    Returns:
+        tuple: qudit labels (q0, q1).
     """
     return qudits[0] if len(qudits) == 1 else qudits
 
@@ -122,7 +129,7 @@ def _normalize_qudits(qudits: tuple) -> tuple:
 class CP3(Gate):
     """Class for the generalized two-qutrit controlled-phase gate.
 
-    Applies phase e^(i·j·k·theta) to |j⟩|k⟩. At theta = 2π/3 this
+    Applies phase e^(i·j·k·theta) to ``|j⟩|k⟩``. At theta = 2π/3 this
     gate is equivalent to CZ3.
     """
 
@@ -138,6 +145,7 @@ class CP3(Gate):
             *qudits (int | Tuple[int, int]): qudit labels as a tuple
                 (q0, q1) or two separate ints.
             theta (float): phase angle per unit of j·k.
+            **kwargs: unused; accepted for interface compatibility.
         """
         super().__init__(cp3(theta), _normalize_qudits(qudits))
         self._properties['name'] = 'CP3'
@@ -148,7 +156,7 @@ class CP3(Gate):
 class CSUM(Gate):
     """Class for the two-qutrit CSUM (controlled-SUM) gate.
 
-    The qutrit analog of the CNOT gate. Maps |j⟩|k⟩ → |j⟩|k+j mod 3⟩,
+    The qutrit analog of the CNOT gate. Maps ``|j⟩|k⟩ → |j⟩|k+j mod 3⟩``,
     entangling the two qutrits via modular addition.
     """
 
@@ -162,6 +170,7 @@ class CSUM(Gate):
         Args:
             *qudits (int | Tuple[int, int]): qudit labels as a tuple
                 (q0, q1) or two separate ints.
+            **kwargs: unused; accepted for interface compatibility.
         """
         super().__init__(csum, _normalize_qudits(qudits))
         self._properties['name'] = 'CSUM'
@@ -171,7 +180,7 @@ class CSUM(Gate):
 class CSUMdag(Gate):
     """Class for the two-qutrit CSUM† (inverse controlled-SUM) gate.
 
-    Maps |j⟩|k⟩ → |j⟩|k-j mod 3⟩.
+    Maps ``|j⟩|k⟩ → |j⟩|k-j mod 3⟩``.
     """
 
     def __init__(
@@ -184,6 +193,7 @@ class CSUMdag(Gate):
         Args:
             *qudits (int | Tuple[int, int]): qudit labels as a tuple
                 (q0, q1) or two separate ints.
+            **kwargs: unused; accepted for interface compatibility.
         """
         super().__init__(csumd, _normalize_qudits(qudits))
         self._properties['name'] = 'CSUMdag'
@@ -194,7 +204,7 @@ class CZ3(Gate):
     """Class for the two-qutrit CZ3 gate.
 
     Applies phase ω^(j·k) to the two-qutrit computational basis state
-    |j⟩|k⟩, where ω = exp(2πi/3). This generalizes the qubit CZ gate
+    ``|j⟩|k⟩``, where ω = exp(2πi/3). This generalizes the qubit CZ gate
     to the qutrit setting.
 
     Reference: arXiv:2206.07216 (Goss et al.)
@@ -210,6 +220,7 @@ class CZ3(Gate):
         Args:
             *qudits (int | Tuple[int, int]): qudit labels as a tuple
                 (q0, q1) or two separate ints.
+            **kwargs: unused; accepted for interface compatibility.
         """
         super().__init__(cz3, _normalize_qudits(qudits))
         self._properties['name'] = 'CZ3'
@@ -220,7 +231,7 @@ class CZ3dag(Gate):
     """Class for the two-qutrit CZ3† (dagger) gate.
 
     The Hermitian conjugate of CZ3; applies phase ω^(-j·k) = ω^(2j·k)
-    to |j⟩|k⟩, where ω = exp(2πi/3).
+    to ``|j⟩|k⟩``, where ω = exp(2πi/3).
 
     Reference: arXiv:2206.07216 (Goss et al.)
     """
@@ -235,6 +246,7 @@ class CZ3dag(Gate):
         Args:
             *qudits (int | Tuple[int, int]): qudit labels as a tuple
                 (q0, q1) or two separate ints.
+            **kwargs: unused; accepted for interface compatibility.
         """
         super().__init__(cz3dag, _normalize_qudits(qudits))
         self._properties['name'] = 'CZ3dag'
@@ -244,7 +256,7 @@ class CZ3dag(Gate):
 class SWAP3(Gate):
     """Class for the two-qutrit SWAP gate.
 
-    Maps |j⟩|k⟩ → |k⟩|j⟩, exchanging the states of the two qutrits.
+    Maps ``|j⟩|k⟩`` → ``|k⟩|j⟩``, exchanging the states of the two qutrits.
     """
 
     def __init__(
@@ -257,6 +269,7 @@ class SWAP3(Gate):
         Args:
             *qudits (int | Tuple[int, int]): qudit labels as a tuple
                 (q0, q1) or two separate ints.
+            **kwargs: unused; accepted for interface compatibility.
         """
         super().__init__(swap3, _normalize_qudits(qudits))
         self._properties['name'] = 'SWAP3'

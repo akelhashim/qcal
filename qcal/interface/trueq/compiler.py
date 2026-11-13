@@ -1,7 +1,8 @@
 """Submodule for True-Q compiler based on qcal config and the basis gates.
 
-NOTE: we do not use TYPE_CHECKING for trueq types because this might fail if
-trueq is not installed when building docs.
+Note:
+    We do not use ``TYPE_CHECKING`` for trueq types because this might fail
+    if trueq is not installed when building docs.
 """
 from __future__ import annotations
 
@@ -34,11 +35,11 @@ class TrueqCompiler:
         """Initialize a True-Q compiler.
 
         Args:
-            config (Config | trueq.Config | str): qcal Config object or True-Q
-                yaml.
+            config (Config | trueq.Config | str): qcal Config object, True-Q
+                Config object, or path to a True-Q yaml config file.
             passes (trueq.Compiler.passes, optional): True-Q compiler passes.
-                Defaults to None. If None, this will default to the
-                HARDWARE_PASSES.
+                Defaults to ``None``. If ``None``, this will default to
+                ``trueq.Compiler.HARDWARE_PASSES``.
         """
         try:
             import trueq as tq
@@ -75,7 +76,7 @@ class TrueqCompiler:
 
     @property
     def config(self) -> Config:
-        """qcal config.
+        """The qcal Config object (``None`` if built from a True-Q config).
 
         Returns:
             Config: qcal Config object.
@@ -93,7 +94,7 @@ class TrueqCompiler:
 
     @staticmethod
     def from_config(config: Config):
-        """Generate a True-Q compiler from a qcal config.
+        """Generate a True-Q config from a qcal config.
 
         Args:
             config (Config): qcal Config object.
@@ -136,16 +137,18 @@ class TrueqCompiler:
 
     @staticmethod
     def from_generators(generators: Dict[int, Dict]):
-        """Generates a compiler which decomposes single-qubit gates based on the
-        true native gate.
+        """Generate a compiler decomposing single-qubit gates into natives.
 
-        See: trueq.Gate.from_generators
+        Single-qubit gates are decomposed based on the true native gate
+        of each qubit, built from its generators. See
+        ``trueq.Gate.from_generators``.
 
         Args:
-            generators (dict): Dictionary of gate generators for each qubit.
+            generators (Dict[int, Dict]): dictionary of gate generators for
+                each qubit, with ``'X'`` and ``'Z'`` keys.
 
         Returns:
-            trueq.Compiler: True-Q compiler object
+            trueq.Compiler: True-Q compiler object.
         """
         try:
             import trueq as tq
@@ -154,6 +157,7 @@ class TrueqCompiler:
             return
 
         class SqCycleDecomp(tq.compilation.base.NCyclePass):
+            """Decompose single-qubit gates in a cycle into native gates."""
 
             n_input_cycles = 1
             def __init__(self, native_cycle):
@@ -230,18 +234,21 @@ class QuditCompiler:
             return
 
         class DecompEFZ(tq.compilation.base.OperationReplacement):
-            r"""
-            Decomposes diagonal qutrit unitaries. Assumes that one of the
-            factories produces gates of the form diag(e^{-i phi}, 1, 1) and
-            that another produces gates of the form diag(1, 1, e^{-i phi}).
-            phi _must_ be in radians.
+            r"""Decompose diagonal qutrit unitaries.
+
+            Assumes that one of the factories produces gates of the form
+            :math:`\mathrm{diag}(e^{-i\phi}, 1, 1)` and that another
+            produces gates of the form
+            :math:`\mathrm{diag}(1, 1, e^{-i\phi})`.
+            :math:`\phi` *must* be in radians.
             """
 
             def __init__(self, factories):
-                """_summary_
+                """Find the GE and EF Z-rotation factories.
 
                 Args:
-                    factories (_type_): _description_
+                    factories (list): True-Q gate factories, which must
+                        include a GE and an EF Z-rotation factory.
                 """
                 def _IS_Z(x):
                     return tq.math.proc_infidelity(
@@ -266,13 +273,13 @@ class QuditCompiler:
 
             @staticmethod
             def is_diag(gate: trueq.Gate) -> bool:  # noqa: F821 # type: ignore
-                """Determine whether the given gate is unitary.
+                """Determine whether the given gate is diagonal.
 
                 Args:
-                    gate (trueq.Gate): True-Q gate
+                    gate (trueq.Gate): True-Q gate.
 
                 Returns:
-                    bool: unitary or not.
+                    bool: diagonal or not.
                 """
                 return np.all(
                     np.abs(gate.mat[np.triu_indices(gate.width, k=1)]) < 1e-12

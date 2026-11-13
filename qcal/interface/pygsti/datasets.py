@@ -1,6 +1,4 @@
-"""Submodule for handling pyGSTi reports.
-
-"""
+"""Submodule for generating pyGSTi datasets from qcal results."""
 import logging
 
 # import pandas as pd
@@ -22,11 +20,15 @@ def generate_pygsti_dataset(
     """Generate a pyGSTi dataset from circuit results.
 
     Args:
-        circuits (CircuitSet): measured circuits
-        save_path (str): location where to save the results. Defaults to None.
+        circuits (CircuitSet): measured circuits.
+        save_path (str | None, optional): location where to save the
+            results. Defaults to ``None``.
 
     Returns:
         DataSet: pyGSTi dataset.
+
+    Raises:
+        ValueError: if ``circuits`` does not have a ``'results'`` column.
     """
     if 'results' not in circuits._df.columns:
         raise ValueError("CircuitSet must have a 'results' column!")

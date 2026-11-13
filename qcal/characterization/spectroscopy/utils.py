@@ -1,6 +1,4 @@
-"""Submodule for helper spectroscopy functions.
-
-"""
+"""Submodule for helper spectroscopy functions."""
 import logging
 
 import numpy as np

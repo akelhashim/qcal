@@ -1,6 +1,4 @@
-"""Submodule for transpiler from cirq and qiskit circuits.
-
-"""
+"""Submodule for transpilers from Cirq and Qiskit circuits to qcal."""
 import logging
 from collections import defaultdict
 from typing import Dict, List
@@ -79,7 +77,11 @@ def qiskit_to_qcal(circuit, gate_mapper: defaultdict) -> Circuit:
 
 
 def transpilation_error(*args):
-    """Generic transpilation error.
+    """Raise a generic transpilation error.
+
+    Args:
+        *args: arguments describing the non-native gate, included in the
+            error message.
 
     Raises:
         Exception: transpilation error for non-native gate.
@@ -90,7 +92,7 @@ def transpilation_error(*args):
 
 
 class CirqTranspiler(Transpiler):
-    """Cirq Transpiler."""
+    """Transpiler from Cirq circuits to qcal circuits."""
 
     __slots__ = ('_gate_mapper',)
 
@@ -99,7 +101,8 @@ class CirqTranspiler(Transpiler):
 
         Args:
             gate_mapper (defaultdict | Dict | None, optional): dictionary which
-                maps str names of Cirq gates to qcal gates. Defaults to None.
+                maps str names of Cirq gates to qcal gates. Defaults to
+                ``None``.
         """
         if gate_mapper is None:
             self._gate_mapper = defaultdict(lambda: transpilation_error,
@@ -137,7 +140,7 @@ class CirqTranspiler(Transpiler):
 
 
 class QiskitTranspiler(Transpiler):
-    """Qiskit Transpiler."""
+    """Transpiler from Qiskit circuits to qcal circuits."""
 
     __slots__ = ('_gate_mapper',)
 
@@ -146,7 +149,8 @@ class QiskitTranspiler(Transpiler):
 
         Args:
             gate_mapper (defaultdict | Dict | None, optional): dictionary which
-                maps str names of Qiskit gates to qcal gates. Defaults to None.
+                maps str names of Qiskit gates to qcal gates. Defaults to
+                ``None``.
         """
         if gate_mapper is None:
             self._gate_mapper = defaultdict(lambda: transpilation_error,

@@ -17,27 +17,29 @@ __all__ = ('merge_gates', 'merge_cycles')
 def merge_gates(first: Gate, second: Gate) -> Gate:
     """Merge two gates acting on the same qubits into a single gate.
 
-    Computes the unitary of applying `first` then `second`:
-    `second.unitary @ first.unitary` (standard operator composition on a
+    Computes the unitary of applying ``first`` then ``second``:
+    ``second.unitary @ first.unitary`` (standard operator composition on a
     ket — the later-applied factor is the left factor).
 
-    Note: the returned Gate is a generic `Gate(matrix, qubits)`, so its
-    `name` is always 'Gate', and its `==`/hash (which only consider name,
-    qubits, subspace, and params) will not distinguish it from a
-    different merge on the same qubits. Use its `.unitary`/`.matrix`
-    directly rather than relying on its equality or hashing it.
+    Note:
+        The returned Gate is a generic ``Gate(matrix, qubits)``, so its
+        ``name`` is always ``'Gate'``, and its ``==``/hash (which only
+        consider name, qubits, subspace, and params) will not distinguish
+        it from a different merge on the same qubits. Use its
+        ``.unitary``/``.matrix`` directly rather than relying on its
+        equality or hashing it.
 
     Args:
         first (Gate): gate applied first.
         second (Gate): gate applied second, acting on the same qubits as
-            `first`.
+            ``first``.
 
     Returns:
-        Gate: a generic gate whose unitary is `second.unitary @
-            first.unitary`.
+        Gate: a generic gate whose unitary is
+            ``second.unitary @ first.unitary``.
 
     Raises:
-        ValueError: if `first` and `second` do not act on the same
+        ValueError: if ``first`` and ``second`` do not act on the same
             qubits, in the same order.
     """
     if first.qubits != second.qubits:
@@ -51,22 +53,22 @@ def merge_gates(first: Gate, second: Gate) -> Gate:
 def merge_cycles(first: Cycle, second: Cycle) -> Cycle:
     """Merge two cycles acting on the same qubits into a single cycle.
 
-    Pairs each gate in `first` with the gate in `second` that acts on the
-    same qubits, and merges each pair via `merge_gates` (see its
+    Pairs each gate in ``first`` with the gate in ``second`` that acts on the
+    same qubits, and merges each pair via ``merge_gates`` (see its
     docstring for the ordering convention and the merged gates' equality
     caveat).
 
     Args:
         first (Cycle): cycle applied first.
         second (Cycle): cycle applied second, acting on the same qubits
-            as `first` and grouped into gates the same way (e.g. both
+            as ``first`` and grouped into gates the same way (e.g. both
             purely single-qubit, one gate per qubit).
 
     Returns:
         Cycle: a cycle of merged gates, one per qubit grouping.
 
     Raises:
-        ValueError: if `first` and `second` do not act on the same
+        ValueError: if ``first`` and ``second`` do not act on the same
             qubits, or are grouped into gates differently (e.g. one has
             a two-qubit gate spanning qubits that the other splits
             across two single-qubit gates).

@@ -1,19 +1,64 @@
-"""Submodule for cycle benchmarking.
+"""Cycle benchmarking (CB) protocols.
 
-See:
-https://www.nature.com/articles/s41467-019-13068-7
-https://trueq.quantumbenchmark.com/guides/error_diagnostics/cb.html
-https://trueq.quantumbenchmark.com/api/protocols.html#trueq.make_cb
+This module provides three cycle benchmarking protocols:
 
-NOTE: we do not use TYPE_CHECKING for trueq types because this might fail if
-trueq is not installed when building docs.
+- :func:`CB`: a qcal-native implementation of cycle benchmarking (without
+  mirror inversion), which estimates per-Pauli fidelities and the process
+  infidelity of a target cycle or sub-circuit.
+- :func:`CB1`: the True-Q implementation of cycle benchmarking (requires a
+  valid True-Q license).
+- :func:`SC`: True-Q stochastic calibration, a variant of CB with
+  explicitly chosen Pauli decays (requires a valid True-Q license).
+
+Each function takes a :class:`~qcal.qpu.qpu.QPU` subclass (not an
+instance) and returns a protocol object that inherits from it. Calling
+``run()`` on that object generates the circuits, executes them, analyzes
+the results, and plots the fits.
+
+Example:
+    Benchmark a CZ gate on the bundled emulator:
+
+    .. code-block:: python
+
+        from qcal.backend.emulator import Emulator
+        from qcal.benchmarking.cb import CB
+        from qcal.circuit import Cycle
+        from qcal.config import EXAMPLE_CONFIG_PATH, Config
+        from qcal.gates.two_qubit import CZ
+
+        config = Config(EXAMPLE_CONFIG_PATH)
+        cb = CB(
+            Emulator,
+            config,
+            cycle_or_circuit=Cycle({CZ(0, 1)}),
+            circuit_depths=[2, 4, 8],
+        )
+        cb.run()
+        cb.process_infidelity
+        cb.pauli_fidelities['interleaved']
+
+    On hardware, replace ``Emulator`` with a hardware backend such as
+    :class:`~qcal.backend.qubic.qpu.QubicQPU`, passing any backend-specific
+    keyword arguments (e.g. ``n_shots``) to :func:`CB`.
+
+Note:
+    ``TYPE_CHECKING`` is not used for True-Q types, because this might fail
+    if True-Q is not installed when building the docs.
+
+References:
+    - `Erhard et al., Characterizing large-scale quantum computers via
+      cycle benchmarking, Nat. Commun. 10, 5347 (2019)
+      <https://www.nature.com/articles/s41467-019-13068-7>`_
+    - `True-Q CB guide
+      <https://trueq.quantumbenchmark.com/guides/error_diagnostics/cb.html>`_
+    - `True-Q make_cb
+      <https://trueq.quantumbenchmark.com/api/protocols.html#trueq.make_cb>`_
 """
 from __future__ import annotations
 
 import logging
 from collections.abc import Iterable, Sequence
 from functools import lru_cache
-from typing import Callable
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -45,6 +90,7 @@ from qcal.plotting.graphs import draw_qpu_heatmap
 from qcal.qpu.qpu import QPU
 from qcal.results import Results
 from qcal.settings import Settings
+from qcal.utils import pop_deprecated_kwarg
 
 logger = logging.getLogger(__name__)
 
@@ -117,97 +163,133 @@ def CB(
     targeted_decays:    Sequence[str] | None = None,
     analyze_subsystems: bool = False,
     **kwargs,
-) -> Callable:
-    """Cycle Benchmarking (CB) without mirror inversion.
+) -> QPU:
+    r"""Cycle Benchmarking (CB) without mirror inversion.
 
-    Estimates per-Pauli decay rates for a target cycle or circuit by twirling
-    with random Pauli layers and measuring expectation-value decay vs depth.
+    Estimates per-Pauli decay rates for a target cycle or circuit by
+    twirling with random Pauli layers and measuring the expectation-value
+    decay versus depth.
 
-    Protocol overview (depth d, Pauli decay string P):
-      1. Sample n_decays random n-qubit Pauli strings; group by QWC measurement
-         basis.
-      2. For each Pauli P, depth d, and randomization index r:
-           a. Build a preparation cycle that rotates |0...0> to the +1
-           eigenstate of P:
-                I, Z  →  identity (|0> is already the +1 eigenstate)
-                X     →  Ry(π/2)
-                Y     →  Rx(-π/2)
-           b. Insert d instances of cycle_or_circuit, with a random Pauli
-              twirl cycle before the first, between each adjacent pair,
-              and after the last (d+1 twirls total).
-           c. Apply the inverse preparation to rotate back to the Z basis.
-           d. Measure all qubits in Z.
-           e. Compute the expected eigenstate sign ±1 by propagating P through
-              the Pauli twirl layers: each twirl Q_i flips the sign if P and Q_i
-              anticommute (odd number of qubit-positions with distinct
-              non-identity Paulis).
-      3. Track per-circuit metadata in the CircuitSet: pauli, depth,
-         randomization, sign.
-      4. For analysis, group circuits by Pauli, depth, and sign, and then sum
-         results, and fit <P>(d) = A * f_P^d to extract the per-Pauli fidelity
-         f_P.
+    Protocol overview (depth :math:`d`, Pauli decay string :math:`P`):
 
-    Prerequisite: cycle_or_circuit composed depth times must equal the identity
-    (up to global phase) for every depth in circuit_depths.
+    1. Sample ``n_decays`` random n-qubit Pauli strings, and group them by
+       qubit-wise-commuting (QWC) measurement basis.
+    2. For each Pauli :math:`P`, depth :math:`d`, and randomization index
+       :math:`r`:
+
+       a. Build a preparation cycle that rotates :math:`|0 \ldots 0\rangle`
+          to the +1 eigenstate of :math:`P`: ``I``, ``Z`` :math:`\to`
+          identity (:math:`|0\rangle` is already the +1 eigenstate),
+          ``X`` :math:`\to` :math:`R_y(\pi/2)`, and ``Y`` :math:`\to`
+          :math:`R_x(-\pi/2)`.
+       b. Insert :math:`d` instances of ``cycle_or_circuit``, with a random
+          Pauli twirl cycle before the first, between each adjacent pair,
+          and after the last (:math:`d+1` twirls total).
+       c. Apply the inverse preparation to rotate back to the Z basis.
+       d. Measure all qubits in Z.
+       e. Compute the expected eigenstate sign :math:`\pm 1` by propagating
+          :math:`P` through the Pauli twirl layers: each twirl :math:`Q_i`
+          flips the sign if :math:`P` and :math:`Q_i` anticommute (an odd
+          number of qubit positions with distinct non-identity Paulis).
+
+    3. Track per-circuit metadata in the
+       :class:`~qcal.circuit.CircuitSet`: Pauli, depth, randomization, and
+       sign.
+    4. For analysis, group circuits by Pauli, depth, and sign, then sum the
+       results, and fit :math:`\langle P \rangle(d) = A f_P^d` to extract
+       the per-Pauli fidelity :math:`f_P`.
+
+    Prerequisite: ``cycle_or_circuit`` composed ``depth`` times must equal
+    the identity (up to global phase) for every depth in
+    ``circuit_depths``.
 
     Args:
-        qpu (QPU): custom QPU object.
+        qpu (QPU): custom QPU class (not an instance), e.g. a hardware
+            backend or :class:`~qcal.backend.emulator.Emulator`. The
+            returned protocol object inherits from this class.
         config (Config): qcal Config object.
         cycle_or_circuit (Cycle | Circuit): the cycle or sub-circuit to
             benchmark.
-        circuit_depths (Iterable[int]): number of interleaved cycle_or_circuit
-            instances per circuit, e.g. [1, 2, 4, 8, 16].
-        n_decays (int): number of randomly sampled Pauli decay strings. Defaults
-            to 20. Warning: values below min(20, 4^n - 1) may bias the process
-            fidelity estimate.
-        n_randomizations (int): number of random Pauli twirl instances per
-            (Pauli, depth) pair. Defaults to 30.
-        decompose_to_zxzxz (bool): whether to decompose all single-qubit gates
-            to ZXZXZ decomposition. Defaults to False. Setting to True can be
-            useful when implementing CB using hardware-efficient randomization.
-        include_ref_cycle (bool): whether to additionally benchmark the
-            empty (all-identity) cycle on the same qubits. Defaults to
-            False. The reference circuits are identical to the
-            interleaved ones except that cycle_or_circuit is never
+        circuit_depths (Iterable[int]): number of interleaved
+            ``cycle_or_circuit`` instances per circuit, e.g.
+            ``[1, 2, 4, 8, 16]``.
+        n_decays (int, optional): number of randomly sampled Pauli decay
+            strings. Defaults to 20. Warning: values below
+            :math:`\min(20, 4^n - 1)` may bias the process fidelity
+            estimate.
+        n_randomizations (int, optional): number of random Pauli twirl
+            instances per (Pauli, depth) pair. Defaults to 30.
+        decompose_to_zxzxz (bool, optional): whether to decompose all
+            single-qubit gates to ZXZXZ decomposition. Defaults to False.
+            Setting to True can be useful when implementing CB using
+            hardware-efficient randomization.
+        include_ref_cycle (bool, optional): whether to additionally
+            benchmark the empty (all-identity) cycle on the same qubits.
+            Defaults to False. The reference circuits are identical to the
+            interleaved ones except that ``cycle_or_circuit`` is never
             inserted, so they measure the decay due to the random Pauli
-            twirls alone. When True, self._e_F reports the estimated
-            bare infidelity of cycle_or_circuit (the interleaved decay
-            with the reference decay divided out); when False, self._e_F
-            reports the dressed infidelity, as before.
-        targeted_decays (Sequence[str] | None): an explicit set of Pauli
-            decay strings to prepare and measure, e.g. ['XII', 'ZZY'],
-            ordered by cycle_or_circuit.qubits. Defaults to None. If given,
-            this is used instead of randomly sampling n_decays Pauli decay
-            strings, and each string must have length equal to the number
-            of qubits in cycle_or_circuit.
-        analyze_subsystems (bool): whether to additionally compute a
-            marginal process infidelity for each individual gate body
-            (subsystem) in cycle_or_circuit, e.g. each disjoint CZ pair
-            in a multi-qubit CZ cycle. Defaults to False. Requires
-            cycle_or_circuit to be a Cycle (not a multi-cycle Circuit)
-            with at least two gates. When True, every sampled decay
-            Pauli is marginalized and refit per subsystem: e.g. a decay
-            of 'IXYZ' on two disjoint pairs contributes an 'IX'
-            measurement of the first pair and a 'YZ' measurement of the
-            second, regardless of what the other pair's substring is,
-            since the cycle's gates act on disjoint qubits (no new
-            circuits are generated for this). Data sharing the same
-            local substring on a subsystem, from otherwise-different
-            decay strings, is pooled together and refit, kept separate
-            from the whole-cycle Pauli fidelities (mixing them would
-            bias the whole-cycle average toward the higher-fidelity
-            low-weight patterns marginalization manufactures). Results
-            are available via self.subsystem_infidelities (bare if
-            include_ref_cycle, else dressed, mirroring
-            process_infidelity) and self.subsystem_summary (the full
-            per-subsystem dressed/reference/bare breakdown). Caveat: a
-            marginal fit cannot see errors correlated across subsystems
-            (e.g. crosstalk between two CZ pairs); it only reports each
-            subsystem's own local Pauli error rate, the same limitation
-            as marginal RB/GST.
+            twirls alone. When True, ``process_infidelity`` reports the
+            estimated bare infidelity of ``cycle_or_circuit`` (the
+            interleaved decay with the reference decay divided out); when
+            False, it reports the dressed infidelity.
+        targeted_decays (Sequence[str] | None, optional): an explicit set
+            of Pauli decay strings to prepare and measure, e.g.
+            ``['XII', 'ZZY']``, ordered by ``cycle_or_circuit.qubits``.
+            Defaults to None. If given, this is used instead of randomly
+            sampling ``n_decays`` Pauli decay strings, and each string must
+            have length equal to the number of qubits in
+            ``cycle_or_circuit``.
+        analyze_subsystems (bool, optional): whether to additionally
+            compute a marginal process infidelity for each individual gate
+            body (subsystem) in ``cycle_or_circuit``, e.g. each disjoint CZ
+            pair in a multi-qubit CZ cycle. Defaults to False. Requires
+            ``cycle_or_circuit`` to be a Cycle (not a multi-cycle Circuit)
+            with at least two gates. When True, every sampled decay Pauli
+            is marginalized and refit per subsystem: e.g. a decay of
+            ``'IXYZ'`` on two disjoint pairs contributes an ``'IX'``
+            measurement of the first pair and a ``'YZ'`` measurement of the
+            second, regardless of what the other pair's substring is, since
+            the cycle's gates act on disjoint qubits (no new circuits are
+            generated for this). Data sharing the same local substring on a
+            subsystem, from otherwise-different decay strings, is pooled
+            together and refit, kept separate from the whole-cycle Pauli
+            fidelities (mixing them would bias the whole-cycle average
+            toward the higher-fidelity low-weight patterns marginalization
+            manufactures). Results are available via
+            ``subsystem_infidelities`` (bare if ``include_ref_cycle``, else
+            dressed, mirroring ``process_infidelity``) and
+            ``subsystem_summary`` (the full per-subsystem
+            dressed/reference/bare breakdown). Caveat: a marginal fit
+            cannot see errors correlated across subsystems (e.g. crosstalk
+            between two CZ pairs); it only reports each subsystem's own
+            local Pauli error rate, the same limitation as marginal
+            RB/GST.
+        **kwargs: additional keyword arguments passed to the ``qpu``
+            constructor (e.g. ``n_shots``, ``compiler``, ``transpiler``).
 
     Returns:
-        Callable: CB class instance.
+        QPU: CB protocol instance (a subclass of ``qpu``). Call its
+        ``run()`` method to execute the full protocol.
+
+    Example:
+        .. code-block:: python
+
+            from qcal.backend.emulator import Emulator
+            from qcal.benchmarking.cb import CB
+            from qcal.circuit import Cycle
+            from qcal.config import EXAMPLE_CONFIG_PATH, Config
+            from qcal.gates.two_qubit import CZ
+
+            config = Config(EXAMPLE_CONFIG_PATH)
+            cb = CB(
+                Emulator,
+                config,
+                cycle_or_circuit=Cycle({CZ(0, 1)}),
+                circuit_depths=[2, 4, 8],
+                include_ref_cycle=True,
+            )
+            cb.run()
+            cb.process_infidelity  # bare infidelity of the CZ cycle
     """
 
     class CB(qpu):
@@ -511,9 +593,10 @@ def CB(
 
         @property
         def subsystem_summary(self) -> pd.DataFrame | None:
-            """Summary table of the whole-cycle and per-subsystem
-            process infidelities.
+            """Summary table of the whole-cycle and subsystem infidelities.
 
+            The table lists the whole-cycle and per-subsystem process
+            infidelities.
             Always populated after analyze() runs. If
             analyze_subsystems is False (or no subsystems were
             found), the table only contains the whole-cycle row.
@@ -595,8 +678,7 @@ def CB(
         def subsystem_fit(
             self
         ) -> dict[str, dict[tuple, dict[str, FitExponential]]]:
-            """Exponential fits underlying each per-subsystem Pauli
-            decay.
+            """Exponential fits underlying each per-subsystem Pauli decay.
 
             Only populated when analyze_subsystems was True.
 
@@ -617,32 +699,32 @@ def CB(
             eigenstate of every member Pauli, and marginalizing a single
             measurement in that basis yields the expectation value of each
             member. So circuits are generated per (group, depth,
-            randomization), not per (Pauli, depth, randomization):
+            randomization), not per (Pauli, depth, randomization)::
 
-              prepare(basis) | twirl | barrier | [cycle_or_circuit | twirl
-                             | barrier]^d | measure(basis)
+                prepare(basis) | twirl | barrier | [cycle_or_circuit | twirl
+                               | barrier]^d | measure(basis)
 
-            If include_ref_cycle is True, this is repeated for a
-            'reference' experiment in which cycle_or_circuit is never
-            inserted, so the circuit reduces to d+1 random Pauli twirl
-            layers with no interleaved gate:
+            If ``include_ref_cycle`` is True, this is repeated for a
+            ``'reference'`` experiment in which ``cycle_or_circuit`` is
+            never inserted, so the circuit reduces to d+1 random Pauli
+            twirl layers with no interleaved gate::
 
-              prepare(basis) | twirl | barrier | [twirl
-                             | barrier]^d | measure(basis)
+                prepare(basis) | twirl | barrier | [twirl
+                               | barrier]^d | measure(basis)
 
             CircuitSet metadata columns:
-              'measurement_basis' — joined basis string, e.g. 'XZI'
-              'depth'             — number of cycle_or_circuit instances
-              'randomization'     — integer index 0..n_randomizations-1
-              'group_paulis'      — joined Pauli strings of every member
-                                    of this group, e.g. ['XZI', 'XZZ']
-              'group_signs'       — ±1 expected eigenstate sign for each
-                                    entry in 'group_paulis', under ideal
-                                    evolution
-              'twirl_strings'     — list of d+1 joined twirl strings
-                                    applied during the circuit, kept for
-                                    reference
-              'experiment'        — 'interleaved' or 'reference'
+
+            - ``'measurement_basis'``: joined basis string, e.g. ``'XZI'``.
+            - ``'depth'``: number of ``cycle_or_circuit`` instances.
+            - ``'randomization'``: integer index
+              ``0..n_randomizations-1``.
+            - ``'group_paulis'``: joined Pauli strings of every member of
+              this group, e.g. ``['XZI', 'XZZ']``.
+            - ``'group_signs'``: ±1 expected eigenstate sign for each entry
+              in ``'group_paulis'``, under ideal evolution.
+            - ``'twirl_strings'``: list of d+1 joined twirl strings applied
+              during the circuit, kept for reference.
+            - ``'experiment'``: ``'interleaved'`` or ``'reference'``.
             """
             logger.info(" Generating circuits...")
 
@@ -841,17 +923,17 @@ def CB(
             depth d, collects the parity expectation value from every
             circuit sharing Q's group (a single measurement in the
             group's basis yields Q's expectation value via
-            marginalization), and averages over randomizations:
+            marginalization), and averages over randomizations::
 
-              EV(Q, d) = mean_r [ sign(r) * marginalized_ev(result, Q) ]
+                EV(Q, d) = mean_r [ sign(r) * marginalized_ev(result, Q) ]
 
             Fits EV(Q, d) = A * f_Q^d per Pauli using FitExponential with
             offset fixed to zero (f_Q = exp(-b)), via the module-level
             _fit_decay_curve helper. Reports the process infidelity of
             each experiment (via _polarization_and_infidelity), where
-            the polarization is the mean f_Q over sampled Paulis:
+            the polarization is the mean f_Q over sampled Paulis::
 
-              e_F = (d^2 - 1) / d^2 * (1 - polarization)
+                e_F = (d^2 - 1) / d^2 * (1 - polarization)
 
             If include_ref_cycle is True, the estimated bare infidelity
             of cycle_or_circuit is additionally computed from the
@@ -1075,15 +1157,17 @@ def CB(
                 tuple, dict[tuple, dict[int, list[float]]]
             ],
         ) -> None:
-            """Marginalize one circuit's result onto every subsystem
-            pauli_tuple has non-identity overlap with.
+            """Marginalize one circuit's result onto overlapping subsystems.
 
-            For each subsystem S, the local pattern is pauli_tuple's
+            The result is marginalized onto every subsystem that
+            ``pauli_tuple`` has non-identity overlap with. For each
+            subsystem S, the local pattern is pauli_tuple's
             substring at S's positions. Its sign is obtained by calling
             _propagate_sign on that pattern zero-padded to full length:
             'I' never anticommutes, so positions outside S trivially
             drop out of the parity computation, leaving exactly S's
-            local sign (see the analyze_subsystems note on `analyze`).
+            local sign (see the ``analyze_subsystems`` note on
+            :meth:`analyze`).
 
             Args:
                 pauli_tuple (PauliString): the full decay Pauli this
@@ -1137,21 +1221,30 @@ def CB(
                 tuple, dict[tuple, dict[int, list[float]]]
             ],
         ) -> None:
-            """Fit each subsystem's pooled local-pattern decays and
-            store them in self._subsystem_pauli_decays/
-            _subsystem_pauli_fidelities, keyed by the local (not
-            zero-padded) Pauli string (e.g. 'IX' on a subsystem's
+            """Fit each subsystem's pooled local-pattern decays.
+
+            The fits are stored in ``self._subsystem_pauli_decays`` /
+            ``_subsystem_pauli_fidelities``, keyed by the local (not
+            zero-padded) Pauli string (e.g. ``'IX'`` on a subsystem's
             positions).
 
             This pools data from every sampled decay Pauli that shares
             that local substring, however they differ outside the
             subsystem. Deliberately kept separate from
-            self._pauli_decays/_pauli_fidelities: those must remain
-            exactly the originally sampled full-register Pauli set,
-            since the whole-cycle infidelity is a uniform average over
-            it -- merging in subsystem-local reconstructions would
+            ``self._pauli_decays`` / ``_pauli_fidelities``: those must
+            remain exactly the originally sampled full-register Pauli
+            set, since the whole-cycle infidelity is a uniform average
+            over it -- merging in subsystem-local reconstructions would
             over-represent low-weight (higher-fidelity) Paulis and bias
-            that average low (see self._subsystem_pauli_fidelities).
+            that average low (see ``self._subsystem_pauli_fidelities``).
+
+            Args:
+                experiment (str): experiment name (``'interleaved'`` or
+                    ``'reference'``).
+                depths (np.ndarray): circuit depths.
+                subsystem_local_evs (dict): accumulated signed EVs:
+                    subsystem -> local pattern -> depth -> list of signed
+                    EVs.
             """
             for s in self._subsystems:
                 positions_s = self._subsystem_positions[s]
@@ -1183,16 +1276,25 @@ def CB(
             experiment:               str,
             subsystem_polarizations:  dict[str, dict[tuple, ufloat]],
         ) -> None:
-            """Average each subsystem's Pauli fidelities into a
-            polarization and compute its dressed process infidelity,
-            mirroring the whole-cycle calculation in `analyze`.
+            """Compute each subsystem's dressed process infidelity.
 
-            The full register uses self._pauli_fidelities directly
+            Each subsystem's Pauli fidelities are averaged into a
+            polarization, mirroring the whole-cycle calculation in
+            :meth:`analyze`.
+
+            The full register uses ``self._pauli_fidelities`` directly
             (the originally sampled set, unmodified); every other
             subsystem uses its own marginalize-and-refit-pooled
-            self._subsystem_pauli_fidelities (see
-            _fit_subsystem_decays) -- these are intentionally not
-            mixed (see self._subsystem_pauli_fidelities).
+            ``self._subsystem_pauli_fidelities`` (see
+            :meth:`_fit_subsystem_decays`) -- these are intentionally not
+            mixed (see ``self._subsystem_pauli_fidelities``).
+
+            Args:
+                experiment (str): experiment name (``'interleaved'`` or
+                    ``'reference'``).
+                subsystem_polarizations (dict[str, dict[tuple, ufloat]]):
+                    accumulator, mutated in place: experiment to
+                    (subsystem to polarization) map.
             """
             for s in self._subsystems:
                 if len(self._subsystem_positions[s]) == len(self._qubits):
@@ -1221,10 +1323,15 @@ def CB(
             self,
             subsystem_polarizations: dict[str, dict[tuple, ufloat]],
         ) -> None:
-            """Compute each subsystem's bare (reference-corrected)
-            infidelity from its interleaved and reference
-            polarizations, mirroring the whole-cycle self._e_F
-            calculation in `analyze`.
+            """Compute each subsystem's bare (reference-corrected) infidelity.
+
+            The bare infidelity is computed from the interleaved and
+            reference polarizations, mirroring the whole-cycle
+            ``self._e_F`` calculation in :meth:`analyze`.
+
+            Args:
+                subsystem_polarizations (dict[str, dict[tuple, ufloat]]):
+                    experiment to (subsystem to polarization) map.
             """
             for s in self._subsystems:
                 f_D_sub = subsystem_polarizations['interleaved'].get(s)
@@ -1251,6 +1358,7 @@ def CB(
             displayed via IPython.display.display.
             """
             def format_infidelity(e_F) -> str:
+                """Format an infidelity for display, or NaN if missing."""
                 if e_F is None or (
                     isinstance(e_F, float) and np.isnan(e_F)
                 ):
@@ -1287,14 +1395,15 @@ def CB(
             self._subsystems always includes the whole cycle (the full
             register) as its first entry, plus one entry per gate body
             when analyze_subsystems is True:
-              1. Raw decays: one subplot per Pauli string supported on
-                 that subsystem, showing the mean EV per depth
-                 (markers) and the fitted A * f_P^depth curve (line),
-                 with f_P ± uncertainty in the legend.
-              2. Pauli infidelities: a bar plot of 1 - f_P per Pauli
-                 string supported on that subsystem, with that
-                 subsystem's process infidelity drawn as a horizontal
-                 line.
+
+            1. Raw decays: one subplot per Pauli string supported on
+               that subsystem, showing the mean EV per depth
+               (markers) and the fitted A * f_P^depth curve (line),
+               with f_P ± uncertainty in the legend.
+            2. Pauli infidelities: a bar plot of 1 - f_P per Pauli
+               string supported on that subsystem, with that
+               subsystem's process infidelity drawn as a horizontal
+               line.
 
             If include_ref_cycle is True, the estimated bare infidelity
             (self.subsystem_infidelities, already displayed by
@@ -1321,8 +1430,7 @@ def CB(
                     self._plot_subsystem(experiment, s)
 
         def _plot_subsystem_heatmap(self) -> None:
-            """Plot a QPU heatmap of the marginalized subsystem
-            infidelities.
+            """Plot a QPU heatmap of the marginalized subsystem infidelities.
 
             Draws self.subsystem_infidelities (dressed infidelity by
             default, or bare/reference-corrected infidelity if
@@ -1352,8 +1460,9 @@ def CB(
             )
 
         def _plot_subsystem(self, experiment: str, s: tuple) -> None:
-            """Plot one subsystem's raw decays and Pauli infidelities
-            for one experiment (see `plot`).
+            """Plot one subsystem's raw decays and Pauli infidelities.
+
+            The plots are for a single experiment (see :meth:`plot`).
             """
             colors = qualitative.Plotly
             all_depths = np.array(self._circuit_depths, dtype=float)
@@ -1691,49 +1800,54 @@ def CB1(
     n_decays:             int = 20,
     targeted_errors:      Iterable[str] | trueq.math.Weyls | None = None,  # noqa: F821 # type: ignore
     twirl:                str | trueq.Twirl = "P",  # noqa: F821 # type: ignore
-    propogate_correction: bool = False,
+    propagate_correction: bool = False,
     compiled_pauli:       bool = True,
     include_ref_cycle:    bool = False,
     include_rcal:         bool = False,
     **kwargs,
-) -> Callable:
+) -> QPU:
     """Cycle Benchmarking.
 
     This is a True-Q protocol and requires a valid True-Q license.
 
     Args:
-        qpu (QPU): custom QPU object.
+        qpu (QPU): custom QPU class (not an instance). The returned
+            protocol object inherits from this class.
         config (Config): qcal Config object.
-        cycle (dict, trueq.Cycle): cycle (or subcircuit) to benchmark.
+        cycle (dict | trueq.Cycle): cycle (or subcircuit) to benchmark.
         circuit_depths (Iterable[int]): a list of positive integers specifying
             how many interleaved cycles of the target cycle and
-            random Pauli operators to generate, for example, [4, 16, 64].
-        tq_config (str | trueq.Config | None, optional): True-Q config yaml file
-            or config object. Defaults to None.
+            random Pauli operators to generate, for example,
+            ``[4, 16, 64]``.
+        tq_config (str | trueq.Config | None, optional): True-Q config yaml
+            file or config object. Defaults to None.
         n_circuits (int, optional): the number of circuits for each circuit
             depth. Defaults to 30.
         n_decays (int, optional): an integer specifying the total number of
-            randomly  chosen Pauli decay strings used to measure the process
+            randomly chosen Pauli decay strings used to measure the process
             infidelity or the probability of each error. Defaults to 20.
-            Warning: Setting this value lower than min(20, 4 ** n_qubits - 1)
-            may result in a biased estimate of the process fidelity, and
-            setting this value lower than min(40, 4 ** n_qubits - 1) may result
-            in a biased estimate of the probability for non-identity errors.
-        targeted_errors (Iterable[str] | trueq.math.Weyls | None, optional): A
-            True-Q Weyls instance, where each row specifies an error to measure.
-            Defaults to None. The identity Pauli will always be added to the
-            list of errors (or be the sole target if None is the argument),
-            which corresponds to measuring the process fidelity of the cycle.
-            For convenience, a list of strings can be given, e.g. ["XII",
-            "ZZY"], which will be used to instantiate a Weyls object.
-        twirl (str | trueq.Twirl, optional): The Twirl to use in this protocol.
-            Defaults to 'P'. You can also specify a twirling group that will be
-            used to automatically instantiate a twirl based on the labels in
-            the given cycles.
+            Warning: Setting this value lower than
+            ``min(20, 4 ** n_qubits - 1)`` may result in a biased estimate of
+            the process fidelity, and setting this value lower than
+            ``min(40, 4 ** n_qubits - 1)`` may result in a biased estimate of
+            the probability for non-identity errors.
+        targeted_errors (Iterable[str] | trueq.math.Weyls | None, optional):
+            A True-Q Weyls instance, where each row specifies an error to
+            measure. Defaults to None. The identity Pauli will
+            always be added to the list of errors (or be the sole target if
+            None is the argument), which corresponds to measuring the process
+            fidelity of the cycle. For convenience, a list of strings can be
+            given, e.g. ``["XII", "ZZY"]``, which will be used to instantiate
+            a Weyls object.
+        twirl (str | trueq.Twirl, optional): The Twirl to use in this
+            protocol. Defaults to ``'P'``. You can also specify a twirling
+            group that will be used to automatically instantiate a twirl
+            based on the labels in the given cycles.
         propagate_correction (bool, optional): whether to propagate correction
             gates to the end of the circuit or compile them into neighbouring
             cycles. Defaults to False. Warning: this can result in arbitrary
             multi-qubit gates at the end of the circuit!
+            The misspelled alias ``propogate_correction`` is deprecated.
         compiled_pauli (bool, optional): whether or not to compile a random
             Pauli gate for each qubit in the cycle preceding a measurement
             operation. Defaults to True.
@@ -1742,13 +1856,19 @@ def CB1(
             is useful when one wants to benchmark the process fidelity of the
             interleaved cycle, as opposed to the dressed cycle.
         include_rcal (bool, optional): whether to measure RCAL circuits in the
-            same circuit collection as the SRB circuit. Defaults to False. If
-            True, readout correction will be apply to the fit results
+            same circuit collection as the CB circuits. Defaults to False.
+            If True, readout correction will be applied to the fit results
             automatically.
+        **kwargs: additional keyword arguments passed to the ``qpu``
+            constructor (e.g. ``n_shots``, ``compiler``, ``transpiler``).
 
     Returns:
-        Callable: CB class instance.
+        QPU: CB protocol instance (a subclass of ``qpu``).
     """
+    propagate_correction = pop_deprecated_kwarg(
+        kwargs, 'propogate_correction', 'propagate_correction',
+        propagate_correction, default=False,
+    )
 
     class CB(qpu):
         """True-Q CB protocol."""
@@ -1761,9 +1881,13 @@ def CB1(
             tq_config:            str | trueq.Config = None,  # noqa: F821 # type: ignore
             n_circuits:           int = 30,
             n_decays:             int = 20,
-            targeted_errors:      Iterable[str] | trueq.math.Weyls | None = None,  # noqa: F821 # type: ignore
+            targeted_errors:      (
+                Iterable[str]
+                | trueq.math.Weyls  # noqa: F821 # type: ignore
+                | None
+            ) = None,
             twirl:                str | trueq.Twirl = "P",  # noqa: F821 # type: ignore
-            propogate_correction: bool = False,
+            propagate_correction: bool = False,
             compiled_pauli:       bool = True,
             include_ref_cycle:    bool = False,
             include_rcal:         bool = False,
@@ -1784,7 +1908,7 @@ def CB1(
             self._n_decays = n_decays
             self._targeted_errors = targeted_errors
             self._twirl = twirl
-            self._propagate_correction = propogate_correction
+            self._propagate_correction = propagate_correction
             self._compiled_pauli = compiled_pauli
             self._include_ref_cycle = include_ref_cycle
             self._include_rcal = include_rcal
@@ -1969,7 +2093,7 @@ def CB1(
         n_decays=n_decays,
         targeted_errors=targeted_errors,
         twirl=twirl,
-        propogate_correction=propogate_correction,
+        propagate_correction=propagate_correction,
         compiled_pauli=compiled_pauli,
         include_ref_cycle=include_ref_cycle,
         include_rcal=include_rcal,
@@ -1986,11 +2110,11 @@ def SC(
     n_circuits:           int = 30,
     pauli_decays:         Iterable[str] | trueq.math.Weyls | None = None,  # noqa: F821 # type: ignore
     twirl:                str | trueq.Twirl = "P",  # noqa: F821 # type: ignore
-    propogate_correction: bool = False,
+    propagate_correction: bool = False,
     compiled_pauli:       bool = True,
     include_rcal:         bool = False,
     **kwargs,
-) -> Callable:
+) -> QPU:
     """Stochastic Calibration.
 
     SC is nearly identical to CB. The only difference is that in SC measurement
@@ -2003,12 +2127,14 @@ def SC(
     This is a True-Q protocol and requires a valid True-Q license.
 
     Args:
-        qpu (QPU): custom QPU object.
+        qpu (QPU): custom QPU class (not an instance). The returned
+            protocol object inherits from this class.
         config (Config): qcal Config object.
-        cycle (dict, trueq.Cycle): cycle (or subcircuit) to benchmark.
+        cycle (dict | trueq.Cycle): cycle (or subcircuit) to benchmark.
         circuit_depths (Iterable[int]): iterable of positive integers
             specifying how many interleaved cycles of the target cycle and
-            random Pauli operators to generate, for example, [4, 16, 64].
+            random Pauli operators to generate, for example,
+            ``[4, 16, 64]``.
         tq_config (str | trueq.Config, optional): True-Q config yaml file or
             config object. Defaults to None.
         n_circuits (int, optional): the number of circuits for each circuit
@@ -2018,27 +2144,34 @@ def SC(
             diagonalized error channel should be estimated. These should be
             chosen to anticommute with the Hamiltonian terms of a known noise
             source to be optimized. As a convenience, a list of strings can be
-            given, e.g. ["XII", "ZZY"], which will be used to instantiate a
-            Weyls object.
-        twirl (str | trueq.Twirl, optional): The Twirl to use in this protocol.
-            Defaults to 'P'. You can also specify a twirling group that will be
-            used to automatically instantiate a twirl based on the labels in
-            the given cycles.
+            given, e.g. ``["XII", "ZZY"]``, which will be used to instantiate
+            a Weyls object.
+        twirl (str | trueq.Twirl, optional): The Twirl to use in this
+            protocol. Defaults to ``'P'``. You can also specify a twirling
+            group that will be used to automatically instantiate a twirl
+            based on the labels in the given cycles.
         propagate_correction (bool, optional): whether to propagate correction
             gates to the end of the circuit or compile them into neighbouring
             cycles. Defaults to False. Warning: this can result in arbitrary
             multi-qubit gates at the end of the circuit!
+            The misspelled alias ``propogate_correction`` is deprecated.
         compiled_pauli (bool, optional): whether or not to compile a random
             Pauli gate for each qubit in the cycle preceding a measurement
             operation. Defaults to True.
         include_rcal (bool, optional): whether to measure RCAL circuits in the
-            same circuit collection as the SRB circuit. Defaults to False. If
-            True, readout correction will be apply to the fit results
+            same circuit collection as the SC circuits. Defaults to False.
+            If True, readout correction will be applied to the fit results
             automatically.
+        **kwargs: additional keyword arguments passed to the ``qpu``
+            constructor (e.g. ``n_shots``, ``compiler``, ``transpiler``).
 
     Returns:
-        Callable: SC class instance.
+        QPU: SC protocol instance (a subclass of ``qpu``).
     """
+    propagate_correction = pop_deprecated_kwarg(
+        kwargs, 'propogate_correction', 'propagate_correction',
+        propagate_correction, default=False,
+    )
 
     class SC(qpu):
         """True-Q SC protocol."""
@@ -2050,9 +2183,13 @@ def SC(
             circuit_depths:       Iterable[int],
             tq_config:            str | trueq.Config = None,  # noqa: F821 # type: ignore
             n_circuits:           int = 30,
-            pauli_decays:         Iterable[str] | trueq.math.Weyls | None = None,  # noqa: F821 # type: ignore
+            pauli_decays:         (
+                Iterable[str]
+                | trueq.math.Weyls  # noqa: F821 # type: ignore
+                | None
+            ) = None,
             twirl:                str | trueq.Twirl = "P",  # noqa: F821 # type: ignore
-            propogate_correction: bool = False,
+            propagate_correction: bool = False,
             compiled_pauli:       bool = True,
             include_rcal:         bool = False,
             **kwargs,
@@ -2071,7 +2208,7 @@ def SC(
             self._n_circuits = n_circuits
             self._pauli_decays = pauli_decays
             self._twirl = twirl
-            self._propagate_correction = propogate_correction
+            self._propagate_correction = propagate_correction
             self._compiled_pauli = compiled_pauli
             self._include_rcal = include_rcal
 
@@ -2218,7 +2355,7 @@ def SC(
         n_circuits=n_circuits,
         pauli_decays=pauli_decays,
         twirl=twirl,
-        propogate_correction=propogate_correction,
+        propagate_correction=propagate_correction,
         compiled_pauli=compiled_pauli,
         include_rcal=include_rcal,
         **kwargs,
@@ -2319,8 +2456,10 @@ def _polarization_and_infidelity(
     fidelities: list[ufloat],
     n_qubits:   int,
 ) -> tuple[ufloat, ufloat]:
-    """Average a list of Pauli fidelities into a polarization, and
-    convert that to a process infidelity.
+    """Convert a list of Pauli fidelities to a process infidelity.
+
+    The fidelities are averaged into a polarization, which is then
+    converted to a process infidelity.
 
     Args:
         fidelities (list[ufloat]): per-Pauli fidelities to average.
@@ -2362,7 +2501,7 @@ def _propagate_sign(
 
     Args:
         decay_pauli (PauliString): the Pauli decay string, ordered by
-            `cycle_or_circuit.qubits`, e.g. ('X', 'Z', 'I').
+            ``cycle_or_circuit.qubits``, e.g. ('X', 'Z', 'I').
         twirl_paulis (list[PauliString]): all d+1 Pauli twirl layers.
         cycle_or_circuit (Cycle | Circuit): the benchmarked cycle or
             circuit.
@@ -2399,7 +2538,7 @@ def _pauli_orbit(
 
     Args:
         decay_pauli (PauliString): the starting Pauli string, ordered by
-            `cycle_or_circuit.qubits`.
+            ``cycle_or_circuit.qubits``.
         cycle_or_circuit (Cycle | Circuit): the Clifford cycle or circuit.
 
     Returns:

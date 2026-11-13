@@ -1,11 +1,13 @@
-"""Submodule for readout benchmarking routines.
+r"""Readout benchmarking routines.
 
+Provides :func:`ReadoutFidelity`, which measures the per-qubit confusion
+matrix (assignment fidelity) by preparing and measuring each qubit in the
+:math:`|0\rangle` and :math:`|1\rangle` states.
 """
 from __future__ import annotations
 
 import logging
 from collections.abc import Sequence
-from typing import Callable
 
 import pandas as pd
 from IPython.display import clear_output, display
@@ -25,28 +27,34 @@ def ReadoutFidelity(
     qubits: Sequence[int],
     gate:   str = 'X90',
     **kwargs
-) -> Callable:
+) -> QPU:
     """Function which passes a custom QPU to the ReadoutFidelity class.
 
-    Basic example useage:
-
-    ```
-    ro = ReadoutFidelity(CustomQPU, config, [0, 1, 2])
-    ro.run()
-    ```
-
     Args:
-        qpu (QPU): custom QPU object.
+        qpu (QPU): custom QPU class (not an instance). The returned object
+            inherits from this class.
         config (Config): qcal Config object.
         qubits (Sequence[int]): qubits to measure.
-        gate (str, optional): native gate used for state preparation. Defaults
-            to 'X90'.
+        gate (str, optional): native gate used for state preparation
+            (``'X90'`` or ``'X'``). Defaults to ``'X90'``.
+        **kwargs: additional keyword arguments passed to the ``qpu``
+            constructor (e.g. ``n_shots``).
 
     Returns:
-        Callable: ReadoutFidelity class.
+        QPU: ReadoutFidelity instance (a subclass of ``qpu``).
+
+    Example:
+        .. code-block:: python
+
+            from qcal.backend.emulator import Emulator
+            from qcal.benchmarking.readout import ReadoutFidelity
+            from qcal.config import EXAMPLE_CONFIG_PATH, Config
+
+            config = Config(EXAMPLE_CONFIG_PATH)
+            ro = ReadoutFidelity(Emulator, config, qubits=[0, 1, 2])
+            ro.run()
+            ro.cmat  # confusion matrix for each qubit
     """
-
-
     class ReadoutFidelity(qpu):
         """ReadoutFidelity class.
 
@@ -62,6 +70,16 @@ def ReadoutFidelity(
         ) -> None:
             """Initialize the ReadoutFidelity class within the function.
 
+            Args:
+                config (Config): qcal Config object.
+                qubits (Sequence[int]): qubits to measure.
+                gate (str, optional): native gate used for state
+                    preparation. Defaults to ``'X90'``.
+                **kwargs: additional keyword arguments passed to the
+                    ``qpu`` constructor.
+
+            Raises:
+                ValueError: if ``gate`` is not ``'X90'`` or ``'X'``.
             """
             qpu.__init__(self,
                 config=config,
@@ -162,7 +180,8 @@ def ReadoutFidelity(
             """Save all circuits and data."""
             clear_output(wait=True)
             self._data_manager._exp_id += (
-                f'_readout_fidelity_{"".join("Q"+str(q) for q in self._qubits)}'
+                '_readout_fidelity_'
+                f'{"".join("Q"+str(q) for q in self._qubits)}'
             )
             if settings.Settings.save_data:
                 qpu.save(self)

@@ -1,12 +1,9 @@
-"""Submodule for readout characterization.
-
-"""
+"""Submodule for readout characterization."""
 from __future__ import annotations
 
 import inspect
 import logging
 from collections.abc import Sequence
-from typing import Callable
 
 import numpy as np
 from IPython.display import clear_output
@@ -31,28 +28,29 @@ def RandomizedReadout(
     config: Config,
     qubits: Sequence[int],
     **kwargs
-) -> Callable:
+) -> QPU:
     """Characterize the probability of bit-flips under randomized readout.
 
-    This method requires that the `qpu` object accepts `randomized_readout` as
-    a valid runtime kwarg.
-
-    Basic example useage:
-    ```
-    ro = RandomizedReadout(CustomQPU, config, [0, 1, 2])
-    ro.run()
-    ```
+    This method requires that the ``qpu`` object accepts
+    ``randomized_readout`` as a valid runtime kwarg.
 
     Args:
         qpu (QPU): custom QPU object.
         config (Config): qcal Config object.
         qubits (Sequence[int]): qubits to measure.
+        **kwargs: additional keyword arguments passed to the ``qpu``
+            constructor (e.g. ``n_shots``).
 
     Returns:
-        Callable: RandomizedReadout class.
+        QPU: an instance of the RandomizedReadout class, which
+            inherits from ``qpu``.
+
+    Example:
+        .. code-block:: python
+
+            ro = RandomizedReadout(CustomQPU, config, [0, 1, 2])
+            ro.run()
     """
-
-
     class RandomizedReadout(qpu):
         """RandomizedReadout class."""
 

@@ -1,4 +1,4 @@
-"""Submodule for handling transpilation to/from Bqskit.
+"""Submodule for handling transpilation to/from BQSKit.
 
 See: https://github.com/BQSKit/bqskit
 """
@@ -28,7 +28,6 @@ def to_bqskit(circuit: Circuit) -> bqCircuit:
     Returns:
         bqskit.ir.Circuit: BQSKit circuit.
     """
-
     tcircuit = bqCircuit(circuit.n_qubits)
     for cycle in circuit:
         if cycle.is_barrier:
@@ -92,7 +91,11 @@ def to_qcal(circuit: bqCircuit, gate_mapper: GateMapper | Dict) -> Circuit:
 
 
 class BQSKitTranspiler(Transpiler):
-    """BQSKit Transpiler."""
+    """Transpiler between qcal and BQSKit circuits.
+
+    By default, transpiles BQSKit circuits to qcal circuits; pass
+    ``to_bqskit=True`` to transpile qcal circuits to BQSKit circuits.
+    """
 
     __slots__ = ('_gate_mapper', '_to_bqskit')
 
@@ -105,9 +108,11 @@ class BQSKitTranspiler(Transpiler):
 
         Args:
             gate_mapper (GateMapper | Dict | None, optional): dictionary which
-                maps str names of BQSKit gates to qcal gates. Defaults to None.
-            to_bqskit (bool): whether to transpile from qcal to BSQKit.
-                Defaults to False.
+                maps str names of BQSKit gates to qcal gates. Defaults to
+                ``None``, in which case a default mapping for the BQSKit
+                native gates is used.
+            to_bqskit (bool, optional): whether to transpile from qcal to
+                BQSKit. Defaults to ``False``.
         """
         if gate_mapper is None and to_bqskit is False:
             self._gate_mapper = GateMapper(

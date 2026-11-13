@@ -1,6 +1,4 @@
-"""Helper functions for fitting.
-
-"""
+"""Helper functions for fitting."""
 import logging
 
 import numpy as np

@@ -1,6 +1,4 @@
-"""Helper functions for calibration scripts.
-
-"""
+"""Helper functions for calibration scripts."""
 import numpy as np
 from numpy.typing import NDArray
 
@@ -15,7 +13,12 @@ def find_pulse_index(config: Config, param: str):
 
     Args:
         config (Config): qcal Config object.
-        param (str): parameter path.
+        param (str): config path to the list of pulses of a gate (e.g.
+            ``'single_qubit/0/GE/X90/pulse'``).
+
+    Returns:
+        int: index of the first pulse that is not a string reference or a
+            ``virtualz`` pulse, or None if there is no such pulse.
     """
     for i, pulse in enumerate(config[param]):
         if isinstance(pulse, str):

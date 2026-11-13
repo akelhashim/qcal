@@ -1,7 +1,8 @@
 """Helper functions for True-Q compilation.
 
-NOTE: we do not use TYPE_CHECKING for trueq types because this might fail if
-trueq is not installed when building docs.
+Note:
+    We do not use ``TYPE_CHECKING`` for trueq types because this might fail
+    if trueq is not installed when building docs.
 """
 from __future__ import annotations
 
@@ -17,7 +18,7 @@ logger = logging.getLogger(__name__)
 def set_cycles(
     circuit: trueq.Circuit, list_of_cycles: List[trueq.Cycle]  # noqa: F821 # type: ignore
 ) -> trueq.Circuit:  # noqa: F821 # type: ignore
-    """Function that changes the cycles of a circuit.
+    """Change the cycles of a circuit.
 
     Args:
         circuit (trueq.Circuit): True-Q circuit.
@@ -39,7 +40,7 @@ def set_cycles(
 
 
 def set_marker(cycle: trueq.Cycle, marker: int) -> trueq.Cycle:  # noqa: F821 # type: ignore
-    """Function that sets the marker of a cycle.
+    """Set the marker of a cycle.
 
     Args:
         cycle (trueq.Cycle): True-Q cycle.
@@ -61,7 +62,7 @@ def set_marker(cycle: trueq.Cycle, marker: int) -> trueq.Cycle:  # noqa: F821 # 
 
 
 def serialize_cycles(circuit: trueq.Circuit) -> trueq.Circuit:  # noqa: F821 # type: ignore
-    """Function to serialize all single-qubit and two-qubit gate cycles.
+    """Serialize all single-qubit and two-qubit gate cycles.
 
     This function separates all single-qubit gates from two-qubit gates that
     occur simultaneously within a given cycle, and then merges the single-qubit
@@ -117,12 +118,13 @@ def serialize_cycles(circuit: trueq.Circuit) -> trueq.Circuit:  # noqa: F821 # t
 def X90_phases(
     qubits: Iterable[int], compiler: trueq.Compiler, in_radians: bool = True  # noqa: F821 # type: ignore
 ) -> Dict[int, List[float]]:
-    """Extracts the phases of a decomposed X90.
+    """Extract the phases of a decomposed X90.
 
     Args:
-        qubits (Iterable[int]): qubit labels
-        compiler (trueq.Compiler): True-Q compiler
-        in_radians (bool, optional): phases in radians. Defaults to True.
+        qubits (Iterable[int]): qubit labels.
+        compiler (trueq.Compiler): True-Q compiler.
+        in_radians (bool, optional): phases in radians. Defaults to
+            ``True``.
 
     Returns:
         Dict[int, List[float]]: list of phases for each qubit.

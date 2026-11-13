@@ -1,6 +1,4 @@
-"""Helper functions for ML.
-
-"""
+"""Helper functions for machine learning."""
 from typing import Dict
 
 from numpy.typing import ArrayLike

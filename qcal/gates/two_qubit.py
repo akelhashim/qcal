@@ -1,6 +1,27 @@
 """Submodule for storing two-qubit gate definitions.
 
+This module provides the matrix definitions of common two-qubit
+operations (e.g. :func:`cphase`, :func:`fsim`, :func:`xx`, :func:`zz`)
+and the corresponding :class:`~qcal.gates.gate.Gate` subclasses, such as
+:class:`CNOT` / :class:`CX`, :class:`CZ`, :class:`iSWAP`,
+:class:`SWAP`, :class:`CPhase`, and :class:`FSim`. Two-qubit gates accept
+their qubit labels either as a tuple ``(q0, q1)`` or as two separate
+ints.
+
 See https://threeplusone.com/pubs/on_gates.pdf for relevant definitions.
+
+Example:
+    >>> import numpy as np
+    >>> from qcal.gates.two_qubit import CNOT, CPhase, CZ
+    >>> cz = CZ(0, 1)
+    >>> cz.name, cz.qubits
+    ('CZ', (0, 1))
+    >>> CZ((0, 1)) == cz
+    True
+    >>> CNOT(0, 1).locally_equivalent
+    'CY, CZ'
+    >>> CPhase(2, 3, theta=np.pi / 2).params['angle']
+    1.5707963267948966
 """
 from collections import defaultdict
 from collections.abc import Callable, Mapping
@@ -330,7 +351,7 @@ def givens(theta: float) -> NDArray:
 
 
 def pswap(theta: float) -> NDArray:
-    """pSWAP gate defintion.
+    """Parametric SWAP (pSWAP) gate definition.
 
     Args:
         theta (float): rotation angle.
@@ -435,7 +456,14 @@ def zz(t: float = 1.) -> NDArray:
 def _normalize_qubits(qubits: tuple) -> Tuple[int, int]:
     """Normalize variadic qubits args to a (q0, q1) tuple.
 
-    Handles both GATE((q0, q1)) and GATE(q0, q1) call forms.
+    Handles both ``GATE((q0, q1))`` and ``GATE(q0, q1)`` call forms.
+
+    Args:
+        qubits (tuple): variadic qubit arguments, either ``((q0, q1),)``
+            or ``(q0, q1)``.
+
+    Returns:
+        Tuple[int, int]: qubit labels (q0, q1).
     """
     return qubits[0] if len(qubits) == 1 else qubits
 
@@ -476,6 +504,7 @@ class AGate(Gate):
                 or two separate ints.
             theta (float): first gate parameter.
             phi (float): second gate parameter.
+            **kwargs: unused; accepted for interface compatibility.
         """
         super().__init__(a_gate(theta, phi), _normalize_qubits(qubits))
 
@@ -515,6 +544,7 @@ class Barenco(Gate):
             phi (float): off-diagonal phase angle.
             alpha (float): diagonal phase angle.
             theta (float): rotation angle.
+            **kwargs: unused; accepted for interface compatibility.
         """
         super().__init__(barenco(phi, alpha, theta), _normalize_qubits(qubits))
         self._properties['locally_equivalent'] = 'XX'
@@ -535,6 +565,7 @@ class BGate(Gate):
         Args:
             *qubits (int | Tuple[int, int]): qubit labels as a tuple (q0, q1)
                 or two separate ints.
+            **kwargs: unused; accepted for interface compatibility.
         """
         super().__init__(b_gate, _normalize_qubits(qubits))
         self._properties['alias'] = 'Berkeley'
@@ -550,6 +581,7 @@ class bSWAP(Gate):
         Args:
             *qubits (int | Tuple[int, int]): qubit labels as a tuple (q0, q1)
                 or two separate ints.
+            **kwargs: unused; accepted for interface compatibility.
         """
         super().__init__(bswap, _normalize_qubits(qubits))
         self._properties['name'] = 'bSWAP'
@@ -564,6 +596,7 @@ class CH(Gate):
         Args:
             *qubits (int | Tuple[int, int]): qubit labels as a tuple (q0, q1)
                 or two separate ints.
+            **kwargs: unused; accepted for interface compatibility.
         """
         super().__init__(ch, _normalize_qubits(qubits))
         self._properties['alias'] = 'Controlled-H'
@@ -580,6 +613,7 @@ class CNOT(Gate):
         Args:
             *qubits (int | Tuple[int, int]): qubit labels as a tuple (q0, q1)
                 or two separate ints.
+            **kwargs: unused; accepted for interface compatibility.
         """
         super().__init__(cnot, _normalize_qubits(qubits))
         self._properties['alias'] = 'CX'
@@ -602,6 +636,7 @@ class CPhase(Gate):
             *qubits (int | Tuple[int, int]): qubit labels as a tuple (q0, q1)
                 or two separate ints.
             theta (float): phase factor. Defaults to 1.
+            **kwargs: unused; accepted for interface compatibility.
         """
         super().__init__(cphase(theta), _normalize_qubits(qubits))
 
@@ -648,6 +683,7 @@ class CRot(Gate):
                 or two separate ints.
             theta (float): rotation angle.
             n (List, NDarray):   unit vector defining the axis of rotation.
+            **kwargs: unused; accepted for interface compatibility.
         """
         super().__init__(crot(theta, n), _normalize_qubits(qubits))
         self._properties['name'] = 'CRot'
@@ -670,6 +706,7 @@ class CS(Gate):
         Args:
             *qubits (int | Tuple[int, int]): qubit labels as a tuple (q0, q1)
                 or two separate ints.
+            **kwargs: unused; accepted for interface compatibility.
         """
         super().__init__(cphase(0.5), _normalize_qubits(qubits))
         self._properties['alias'] = 'sqrt(CZ)'
@@ -692,6 +729,7 @@ class CSdag(Gate):
         Args:
             *qubits (int | Tuple[int, int]): qubit labels as a tuple (q0, q1)
                 or two separate ints.
+            **kwargs: unused; accepted for interface compatibility.
         """
         super().__init__(cphase(-0.5), _normalize_qubits(qubits))
         self._properties['alias'] = 'sqrt(CZ)dag'
@@ -714,6 +752,7 @@ class CT(Gate):
         Args:
             *qubits (int | Tuple[int, int]): qubit labels as a tuple (q0, q1)
                 or two separate ints.
+            **kwargs: unused; accepted for interface compatibility.
         """
         super().__init__(cphase(0.25), _normalize_qubits(qubits))
         self._properties['alias'] = 'CZ^(1/4)'
@@ -736,6 +775,7 @@ class CTdag(Gate):
         Args:
             *qubits (int | Tuple[int, int]): qubit labels as a tuple (q0, q1)
                 or two separate ints.
+            **kwargs: unused; accepted for interface compatibility.
         """
         super().__init__(cphase(-0.25), _normalize_qubits(qubits))
         self._properties['alias'] = 'CZ^(-1/4)'
@@ -758,6 +798,7 @@ class CV(Gate):
         Args:
             *qubits (int | Tuple[int, int]): qubit labels as a tuple (q0, q1)
                 or two separate ints.
+            **kwargs: unused; accepted for interface compatibility.
         """
         super().__init__(cv, _normalize_qubits(qubits))
         self._properties['alias'] = 'SqrtCNOT'
@@ -781,6 +822,7 @@ class CX(Gate):
         Args:
             *qubits (int | Tuple[int, int]): qubit labels as a tuple (q0, q1)
                 or two separate ints.
+            **kwargs: unused; accepted for interface compatibility.
         """
         super().__init__(cx, _normalize_qubits(qubits))
         self._properties['alias'] = 'CNOT'
@@ -804,6 +846,7 @@ class CY(Gate):
         Args:
             *qubits (int | Tuple[int, int]): qubit labels as a tuple (q0, q1)
                 or two separate ints.
+            **kwargs: unused; accepted for interface compatibility.
         """
         super().__init__(cy, _normalize_qubits(qubits))
         self._properties['locally_equivalent'] = 'CX, CZ'
@@ -826,6 +869,7 @@ class CZ(Gate):
         Args:
             *qubits (int | Tuple[int, int]): qubit labels as a tuple (q0, q1)
                 or two separate ints.
+            **kwargs: unused; accepted for interface compatibility.
         """
         super().__init__(cz, _normalize_qubits(qubits))
         self._properties['locally_equivalent'] = 'CX, CY'
@@ -848,6 +892,7 @@ class DB(Gate):
         Args:
             *qubits (int | Tuple[int, int]): qubit labels as a tuple (q0, q1)
                 or two separate ints.
+            **kwargs: unused; accepted for interface compatibility.
         """
         super().__init__(db, _normalize_qubits(qubits))
         self._properties['locally_equivalent'] = 'XY'
@@ -867,6 +912,7 @@ class DCNOT(Gate):
         Args:
             *qubits (int | Tuple[int, int]): qubit labels as a tuple (q0, q1)
                 or two separate ints.
+            **kwargs: unused; accepted for interface compatibility.
         """
         super().__init__(dcnot, _normalize_qubits(qubits))
         self._properties['locally_equivalent'] = 'fSWAP, iSWAP'
@@ -886,6 +932,7 @@ class ECP(Gate):
         Args:
             *qubits (int | Tuple[int, int]): qubit labels as a tuple (q0, q1)
                 or two separate ints.
+            **kwargs: unused; accepted for interface compatibility.
         """
         super().__init__(ecp, _normalize_qubits(qubits))
         self._properties['locally_equivalent'] = 'WGate'
@@ -909,6 +956,7 @@ class FSim(Gate):
                 or two separate ints.
             theta (float): gate rotation angle.
             phi (float): ZZ phase parameter.
+            **kwargs: unused; accepted for interface compatibility.
         """
         super().__init__(fsim(theta, phi), _normalize_qubits(qubits))
         self._properties['name'] = 'FSim'
@@ -931,6 +979,7 @@ class fSWAP(Gate):
         Args:
             *qubits (int | Tuple[int, int]): qubit labels as a tuple (q0, q1)
                 or two separate ints.
+            **kwargs: unused; accepted for interface compatibility.
         """
         super().__init__(fswap, _normalize_qubits(qubits))
         self._properties['locally_equivalent'] = 'iSWAP, DCNOT'
@@ -952,6 +1001,7 @@ class Givens(Gate):
             *qubits (int | Tuple[int, int]): qubit labels as a tuple (q0, q1)
                 or two separate ints.
             theta (float): rotation angle.
+            **kwargs: unused; accepted for interface compatibility.
         """
         super().__init__(givens(theta), _normalize_qubits(qubits))
         self._properties['locally_equivalent'] = 'XY'
@@ -974,6 +1024,7 @@ class iSWAP(Gate):
         Args:
             *qubits (int | Tuple[int, int]): qubit labels as a tuple (q0, q1)
                 or two separate ints.
+            **kwargs: unused; accepted for interface compatibility.
         """
         super().__init__(iswap, _normalize_qubits(qubits))
         self._properties['locally_equivalent'] = 'fSWAP, DCNOT'
@@ -993,6 +1044,7 @@ class M(Gate):
         Args:
             *qubits (int | Tuple[int, int]): qubit labels as a tuple (q0, q1)
                 or two separate ints.
+            **kwargs: unused; accepted for interface compatibility.
         """
         super().__init__(m, _normalize_qubits(qubits))
         self._properties['alias'] = 'Magic'
@@ -1013,6 +1065,7 @@ class MS(Gate):
         Args:
             *qubits (int | Tuple[int, int]): qubit labels as a tuple (q0, q1)
                 or two separate ints.
+            **kwargs: unused; accepted for interface compatibility.
         """
         super().__init__(ms, _normalize_qubits(qubits))
         self._properties['locally_equivalent'] = 'CX'
@@ -1034,6 +1087,7 @@ class pSWAP(Gate):
             *qubits (int | Tuple[int, int]): qubit labels as a tuple (q0, q1)
                 or two separate ints.
             theta (float): rotation angle.
+            **kwargs: unused; accepted for interface compatibility.
         """
         super().__init__(pswap(theta), _normalize_qubits(qubits))
         self._properties['locally_equivalent'] = 'QFT2'
@@ -1056,6 +1110,7 @@ class QFT2(Gate):
         Args:
             *qubits (int | Tuple[int, int]): qubit labels as a tuple (q0, q1)
                 or two separate ints.
+            **kwargs: unused; accepted for interface compatibility.
         """
         super().__init__(qft2, _normalize_qubits(qubits))
         self._properties['locally_equivalent'] = 'pSWAP'
@@ -1071,6 +1126,7 @@ class SWAP(Gate):
         Args:
             *qubits (int | Tuple[int, int]): qubit labels as a tuple (q0, q1)
                 or two separate ints.
+            **kwargs: unused; accepted for interface compatibility.
         """
         super().__init__(swap, _normalize_qubits(qubits))
         self._properties['name'] = 'SWAP'
@@ -1091,6 +1147,7 @@ class SWAPAlpha(Gate):
             *qubits (int | Tuple[int, int]): qubit labels as a tuple (q0, q1)
                 or two separate ints.
             alpha (float): power of the SWAP gate.
+            **kwargs: unused; accepted for interface compatibility.
         """
         super().__init__(swap_alpha(alpha), _normalize_qubits(qubits))
         self._properties['locally_equivalent'] = 'SqrtSWAP, SqrtSWAPdag'
@@ -1109,6 +1166,7 @@ class SqrtSWAP(Gate):
         Args:
             *qubits (int | Tuple[int, int]): qubit labels as a tuple (q0, q1)
                 or two separate ints.
+            **kwargs: unused; accepted for interface compatibility.
         """
         super().__init__(sqrt_swap, _normalize_qubits(qubits))
         self._properties['locally_equivalent'] = 'SWAPAlpha, SqrtSWAPdag'
@@ -1124,6 +1182,7 @@ class SqrtSWAPdag(Gate):
         Args:
             *qubits (int | Tuple[int, int]): qubit labels as a tuple (q0, q1)
                 or two separate ints.
+            **kwargs: unused; accepted for interface compatibility.
         """
         super().__init__(sqrt_swap_dag, _normalize_qubits(qubits))
         self._properties['locally_equivalent'] = 'SWAPAlpha, SqrtSWAP'
@@ -1139,6 +1198,7 @@ class Syc(Gate):
         Args:
             *qubits (int | Tuple[int, int]): qubit labels as a tuple (q0, q1)
                 or two separate ints.
+            **kwargs: unused; accepted for interface compatibility.
         """
         super().__init__(syc, _normalize_qubits(qubits))
         self._properties['alias'] = 'Sycamore'
@@ -1154,6 +1214,7 @@ class WGate(Gate):
         Args:
             *qubits (int | Tuple[int, int]): qubit labels as a tuple (q0, q1)
                 or two separate ints.
+            **kwargs: unused; accepted for interface compatibility.
         """
         super().__init__(w_gate, _normalize_qubits(qubits))
         self._properties['locally_equivalent'] = 'ECP'
@@ -1175,6 +1236,7 @@ class XX(Gate):
             *qubits (int | Tuple[int, int]): qubit labels as a tuple (q0, q1)
                 or two separate ints.
             t (float): phase factor. Defaults to 1.
+            **kwargs: unused; accepted for interface compatibility.
         """
         super().__init__(xx(t), _normalize_qubits(qubits))
         self._properties['name'] = 'XX'
@@ -1198,6 +1260,7 @@ class XY(Gate):
             *qubits (int | Tuple[int, int]): qubit labels as a tuple (q0, q1)
                 or two separate ints.
             t (float): phase factor. Defaults to 1.
+            **kwargs: unused; accepted for interface compatibility.
         """
         super().__init__(xy(t), _normalize_qubits(qubits))
         self._properties['alias'] = 'piSWAP'
@@ -1222,6 +1285,7 @@ class YY(Gate):
             *qubits (int | Tuple[int, int]): qubit labels as a tuple (q0, q1)
                 or two separate ints.
             t (float): phase factor. Defaults to 1.
+            **kwargs: unused; accepted for interface compatibility.
         """
         super().__init__(yy(t), _normalize_qubits(qubits))
         self._properties['name'] = 'YY'
@@ -1245,6 +1309,7 @@ class ZZ(Gate):
             *qubits (int | Tuple[int, int]): qubit labels as a tuple (q0, q1)
                 or two separate ints.
             t (float): phase factor. Defaults to 1.
+            **kwargs: unused; accepted for interface compatibility.
         """
         super().__init__(zz(t), _normalize_qubits(qubits))
         self._properties['name'] = 'ZZ'

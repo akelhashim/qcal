@@ -1,6 +1,6 @@
 """Submodule for data management.
 
-The saving of data is handled by the DataManager class.
+The saving of data is handled by the :class:`DataManager` class.
 """
 import logging
 import pathlib
@@ -15,8 +15,16 @@ from qcal.utils import save_to_csv, save_to_pickle
 
 logger = logging.getLogger(__name__)
 
+__all__ = ('DataManager',)
 
-class DataMananger:
+
+class DataManager:
+    """Manager for experiment IDs, save paths, and saving data.
+
+    Each :class:`~qcal.qpu.qpu.QPU` holds a data manager, which generates a
+    timestamped experiment ID for each run and saves data to
+    ``{settings.Settings.data_save_path}/{date}/{exp_id}/``.
+    """
 
     __slots__ = (
         '_date',
@@ -53,7 +61,8 @@ class DataMananger:
     def exp_id(self) -> str:
         """Experiment id.
 
-        This is the current state time in hrs, mins, secs.
+        This is the experiment start time (date and hrs, mins, secs),
+        followed by the qcal version, plus any protocol-specific suffix.
 
         Returns:
             str: experiment id.
@@ -72,7 +81,7 @@ class DataMananger:
     def generate_exp_id(self) -> None:
         """Generate a new experimental id.
 
-        A no-op immediately after reserve_exp_id() -- see its
+        A no-op immediately after :meth:`reserve_exp_id`; see its
         docstring.
         """
         if self._keep_exp_id:
@@ -83,15 +92,14 @@ class DataMananger:
         )
 
     def reserve_exp_id(self) -> None:
-        """Prevent the next generate_exp_id() call from overwriting
-        the current exp_id.
+        """Keep the current exp_id on the next :meth:`generate_exp_id` call.
 
-        Use this after deliberately customizing exp_id (e.g.
+        Use this after deliberately customizing ``exp_id`` (e.g.
         appending a protocol-specific suffix) and creating a save
-        path for it, before calling QPU.run(), whose _initialize()
-        otherwise unconditionally calls generate_exp_id() and would
-        silently clobber it. One-shot: only skips the very next
-        generate_exp_id() call.
+        path for it, before calling :meth:`~qcal.qpu.qpu.QPU.run`, whose
+        ``_initialize()`` otherwise unconditionally calls
+        :meth:`generate_exp_id` and would silently clobber it. One-shot:
+        only skips the very next :meth:`generate_exp_id` call.
         """
         self._keep_exp_id = True
 
@@ -115,10 +123,15 @@ class DataMananger:
         save_to_csv(data, self._save_path + filename)
 
     def save_to_pickle(self, data: Any, filename: str) -> None:
-        """Save data to a pickle file in the save_path directory.
+        """Save data to a pickle file in the ``save_path`` directory.
 
         Args:
             data (Any): data to save.
             filename (str): filename for the data.
         """
         save_to_pickle(data, self._save_path + filename)
+
+
+# Deprecated misspelled alias, kept so that existing imports and pickled
+# objects continue to work.
+DataMananger = DataManager

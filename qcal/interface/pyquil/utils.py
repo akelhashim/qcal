@@ -1,7 +1,8 @@
 """Helper functions for PyQuil interface.
 
-NOTE: we do not use TYPE_CHECKING for PyQuil types because this might fail if
-PyQuil is not installed when building docs.
+Note:
+    We do not use ``TYPE_CHECKING`` for PyQuil types because this might
+    fail if PyQuil is not installed when building docs.
 """
 from __future__ import annotations
 
@@ -24,6 +25,21 @@ DEFAULT_SYMMETRIC_GATES: FrozenSet[str] = frozenset(
 
 @dataclass(frozen=True)
 class CycleSignature:
+    """Matchable summary of a ``DefCircuit`` body.
+
+    Built by :func:`signature_from_defcircuit` and used by
+    :func:`replace_parallel_cycles` to collapse matching parallel-cycle
+    blocks into ``DefCircuit`` invocations.
+
+    Attributes:
+        name (str): name of the ``DefCircuit``.
+        formal_qubits (Tuple[int, ...]): formal qubit indices, in
+            declaration order.
+        active_multiset (FrozenSet[Tuple[Tuple, int]]): ``(key, count)``
+            pairs of the active (gate and measurement) instructions.
+        idle_qubits (FrozenSet[int]): qubits marked idle via ``I q``.
+    """
+
     name: str
     formal_qubits: Tuple[int, ...]
     active_multiset: FrozenSet[Tuple[Tuple, int]]
@@ -69,9 +85,10 @@ def _classify(
             does not affect matching.
 
     Returns:
-        A ``(kind, payload)`` tuple where ``kind`` is one of ``"idle"``,
-        ``"active"``, or ``"boundary"``, and ``payload`` is a qubit index,
-        a canonical instruction key, or ``None`` respectively.
+        Tuple[str, object]: a ``(kind, payload)`` tuple where ``kind`` is
+            one of ``"idle"``, ``"active"``, or ``"boundary"``, and
+            ``payload`` is a qubit index, a canonical instruction key, or
+            ``None`` respectively.
     """
     try:
         from pyquil.quilbase import Gate, Measurement
@@ -150,9 +167,10 @@ def _is_identity(instr: AbstractInstruction) -> bool:  # type: ignore  # noqa: F
         instr (AbstractInstruction): any PyQuil instruction.
 
     Returns:
-        ``True`` if ``instr`` is an unmodified, unparameterized ``I`` gate,
-        ``False`` otherwise (including for non-``Gate`` instructions such as
-        ``Measurement``, ``Pragma``, or ``Fence``).
+        bool: ``True`` if ``instr`` is an unmodified, unparameterized ``I``
+            gate, ``False`` otherwise (including for non-``Gate``
+            instructions such as ``Measurement``, ``Pragma``, or
+            ``Fence``).
     """
     try:
         from pyquil.quilbase import Gate
@@ -178,16 +196,17 @@ def _make_invocation(name: str, qubits: Sequence[int]) -> Gate: # type: ignore  
     block's instructions.
 
     Args:
-        name: The DefCircuit name (used as the gate name in the emitted
+        name (str): the DefCircuit name (used as the gate name in the emitted
             instruction), e.g. ``"CZ_3"`` or ``"MEASURE_ANCILLA"``.
-        qubits: Concrete physical qubit indices, in the order declared by
-            the DefCircuit's formal parameter list. These are wrapped in
-            ``Qubit`` objects to form the gate's qubit arguments.
+        qubits (Sequence[int]): concrete physical qubit indices, in the
+            order declared by the DefCircuit's formal parameter list. These
+            are wrapped in ``Qubit`` objects to form the gate's qubit
+            arguments.
 
     Returns:
-        A ``Gate`` whose ``out()`` renders as ``"<name> q0 q1 ..."``,
-        suitable for direct insertion into a ``Program``'s instruction
-        stream.
+        Gate: a ``Gate`` whose ``out()`` renders as
+            ``"<name> q0 q1 ..."``, suitable for direct insertion into a
+            ``Program``'s instruction stream.
     """
     try:
         from pyquil.quilatom import Qubit
@@ -270,8 +289,9 @@ def _qubit_index(q: Qubit | FormalArgument | int) -> int:  # type: ignore  # noq
         if q.name.startswith("q") and q.name[1:].isdigit():
             return int(q.name[1:])
         raise ValueError(
-            f"Formal argument {q.name!r} is not of the form 'qN'; this matcher "
-            "assumes DefCircuit formals correspond to physical qubits by name."
+            f"Formal argument {q.name!r} is not of the form 'qN'; this "
+            "matcher assumes DefCircuit formals correspond to physical qubits "
+            "by name."
         )
     elif isinstance(q, int):
         return q
@@ -289,12 +309,13 @@ def add_active_reset(
 
     For each reset cycle, every qubit in the program is measured into a
     dedicated ``ro_reset`` register. A ``JUMP-UNLESS`` branch skips the
-    correction pulses when the qubit is already in |0⟩. Successive reset
+    correction pulses when the qubit is already in ``|0⟩``. Successive reset
     cycles are separated by global FENCEs across all program qubits; a final
     global FENCE follows the last reset before the main program body.
 
-    The correction sequence applied when a qubit is measured as |1⟩ depends
-    on whether excited state promotion (ESP) is enabled for that qubit:
+    The correction sequence applied when a qubit is measured as ``|1⟩``
+    depends on whether excited state promotion (ESP) is enabled for that
+    qubit:
 
     - If ``esp=True`` and the qubit is in ``esp_qubits``: two
       ``RX_F12(π/2)`` pulses (EF subspace) then two ``RX(π/2)`` pulses
@@ -313,12 +334,12 @@ def add_active_reset(
             ``esp=True``. Defaults to ``None``.
 
     Returns:
-        Program: a new program with active reset cycles prepended before the
-        original instructions.
+        Program: a new program with active reset cycles prepended before
+            the original instructions.
     """
     try:
         from pyquil import Program
-        from pyquil.gates import DELAY, FENCE, MEASURE
+        from pyquil.gates import FENCE, MEASURE
         from pyquil.quilatom import MemoryReference, Qubit
         from pyquil.quilbase import Jump, JumpTarget, JumpUnless, Label
     except ImportError as exc:
@@ -373,7 +394,7 @@ def add_dd_sequence_during_operation(
     dd_method:  str = 'XX_N',
     subspace:   str = 'GE',
 ) -> Program:  # type: ignore  # noqa: F821
-    """Add a dynamical decoupling sequence concurrent with a matching operation.
+    """Add a dynamical decoupling sequence concurrent with an operation.
 
     Walks the program's instruction stream and, alongside every instruction
     that matches ``operation``, inserts a dynamical decoupling (DD) sequence on
@@ -386,61 +407,64 @@ def add_dd_sequence_during_operation(
     - ``Gate``: name and qubit indices must both match, in order.
     - ``Measurement``: qubit index must match (classical register is ignored).
 
-    Basic example usage:
+    Example:
+        .. code-block:: python
 
-    ```python
-    from pyquil import Program
-    from pyquil.gates import CZ, H
+            from pyquil import Program
+            from pyquil.gates import CZ, FENCE, H
 
-    from qcal.interface.pyquil.utils import add_dd_sequence_during_operation
-    from qcal.units import ns
+            from qcal.interface.pyquil.utils import (
+                add_dd_sequence_during_operation,
+            )
+            from qcal.units import ns
 
-    # Program with a CZ on qubits 0 and 1; qubit 2 is idle during the CZ.
-    p = Program()
-    p += FENCE(0, 1, 2)
-    p += CZ(0, 1)
-    p += FENCE(0, 1, 2)
-    p += H(2)
+            # CZ on qubits 0 and 1; qubit 2 is idle during the CZ.
+            p = Program()
+            p += FENCE(0, 1, 2)
+            p += CZ(0, 1)
+            p += FENCE(0, 1, 2)
+            p += H(2)
 
-    # Apply an XX_N DD sequence on qubit 2 while CZ(0, 1) executes.
-    p = add_dd_sequence_during_operation(
-        program=p,
-        operation=CZ(0, 1),
-        dd_qubits=[2],
-        total_time=100 * ns,
-        gate_time=20 * ns,
-        dd_method='XX_N',
-    )
-    print(p)
-    # DECLARE ro BIT[1]
-    # FENCE 0 1 2
-    # CZ 0 1
-    # DELAY 2 4e-9
-    # RX(1.5707963267948966) 2
-    # RX(1.5707963267948966) 2
-    # DELAY 2 1.2000000000000002e-8
-    # RX(1.5707963267948966) 2
-    # RX(1.5707963267948966) 2
-    # DELAY 2 4e-9
-    # FENCE 2
-    # FENCE 0 1 2
-    # H 2
-    ```
+            # Apply an XX_N DD sequence on qubit 2 while CZ(0, 1) executes.
+            p = add_dd_sequence_during_operation(
+                program=p,
+                operation=CZ(0, 1),
+                dd_qubits=[2],
+                total_time=100 * ns,
+                gate_time=20 * ns,
+                dd_method='XX_N',
+            )
+            print(p)
+            # DECLARE ro BIT[1]
+            # FENCE 0 1 2
+            # CZ 0 1
+            # DELAY 2 4e-9
+            # RX(1.5707963267948966) 2
+            # RX(1.5707963267948966) 2
+            # DELAY 2 1.2000000000000002e-8
+            # RX(1.5707963267948966) 2
+            # RX(1.5707963267948966) 2
+            # DELAY 2 4e-9
+            # FENCE 2
+            # FENCE 0 1 2
+            # H 2
 
     Args:
         program (Program): the program to update.
-        operation (Gate | Measurement): the PyQuil instruction to match against.
+        operation (Gate | Measurement): the PyQuil instruction to match
+            against.
         dd_qubits (Sequence[int]): qubit indices on which the DD sequence
             should be applied concurrently with ``operation``.
         total_time (float): total time over which to perform the DD.
         gate_time (float): time of the native X90 gate.
-        n_pulses (int | None, optional): number of pulses. Defaults to ``None``.
-            If ``None``, the number of pulses is set to the maximum number of
-            pulses that can fit within the total time, with a minimum that
-            depends on the DD method.
-        dd_method (str, optional): the DD method to use. Defaults to 'XX_N'.
-        subspace (str, optional): qubits subspace for the DD sequence. Defaults
-            'GE'.
+        n_pulses (int | None, optional): number of pulses. Defaults to
+            ``None``. If ``None``, the number of pulses is set to the
+            maximum number of pulses that can fit within the total time,
+            with a minimum that depends on the DD method.
+        dd_method (str, optional): the DD method to use. Defaults to
+            ``'XX_N'``.
+        subspace (str, optional): qubits subspace for the DD sequence.
+            Defaults to ``'GE'``.
 
     Returns:
         Program: a new program with DD sequences inserted alongside each
@@ -536,15 +560,17 @@ def get_defcal_param(
     a matching parameter and returns the parameter value.
 
     Supported instruction/template pairs are:
-        - ``Pulse.waveform``
-        - ``Capture.kernel``
+
+    - ``Pulse.waveform``
+    - ``Capture.kernel``
 
     Args:
         defcal (DefCalibration | DefMeasureCalibration): the calibration object
             to inspect.
         param (str): the name of the template parameter to retrieve.
         instr_idx (int | None, optional): optional specific instruction index
-            to inspect. If not provided, all instructions are searched in order.
+            to inspect. If not provided, all instructions are searched in
+            order.
 
     Returns:
         Any: the retrieved template parameter value.
@@ -610,7 +636,7 @@ def prepend_esp_to_measure(
 ) -> Program:  # type: ignore  # noqa: F821
     """Prepend an EF Pi pulse (ESP) to each measurement in a PyQuil program.
 
-    When ``fence_between_cycles=True`` (default), the function operates on
+    When ``fence_between_cycles=True``, the function operates on
     fenced cycles: for each block of instructions between a pair of FENCE
     instructions that contains measurements, a single EF pi cycle is inserted
     immediately before the original measurement cycle. The EF pi cycle is
@@ -634,7 +660,7 @@ def prepend_esp_to_measure(
             inline before each matching measurement with no FENCEs added.
             Defaults to ``False``.
 
-    Returns
+    Returns:
         Program: the updated program.
     """
     try:
@@ -679,8 +705,12 @@ def prepend_esp_to_measure(
                 new_program += FENCE(*all_qubits)
                 for meas in measure_instrs:
                     if qubits is None or _qubit_index(meas.qubit) in qubits:
-                        new_program += add_X90(meas.qubit, **{'subspace': 'EF'})
-                        new_program += add_X90(meas.qubit, **{'subspace': 'EF'})
+                        new_program += add_X90(
+                            meas.qubit, **{'subspace': 'EF'}
+                        )
+                        new_program += add_X90(
+                            meas.qubit, **{'subspace': 'EF'}
+                        )
                 new_program += FENCE(*all_qubits)
 
             new_program += opening_fence
@@ -704,8 +734,12 @@ def prepend_esp_to_measure(
                 if esp_meas:
                     new_program += FENCE(*all_qubits)
                     for meas in esp_meas:
-                        new_program += add_X90(meas.qubit, **{'subspace': 'EF'})
-                        new_program += add_X90(meas.qubit, **{'subspace': 'EF'})
+                        new_program += add_X90(
+                            meas.qubit, **{'subspace': 'EF'}
+                        )
+                        new_program += add_X90(
+                            meas.qubit, **{'subspace': 'EF'}
+                        )
                     new_program += FENCE(*all_qubits)
                 for m in meas_run:
                     new_program += m
@@ -749,7 +783,7 @@ def replace_parallel_cycles(
     *,
     symmetric_gates: FrozenSet[str] = DEFAULT_SYMMETRIC_GATES
 ) -> Program: # type: ignore  # noqa: F821
-    """Rewrite parallel-cycle blocks in a program as ``DefCircuit`` invocations.
+    """Rewrite parallel-cycle blocks in a program as ``DefCircuit`` calls.
 
     Walks the program's instruction stream, partitioning it into blocks of
     consecutive gate-level instructions (``Gate`` and ``Measurement``)
@@ -774,30 +808,30 @@ def replace_parallel_cycles(
     ``DefCircuit`` without first stripping the old one.
 
     The returned program preserves all of the original program's metadata
-    (frames, waveforms, ``DefCal``s, measure calibrations, ``DefCircuit``s, ...)
-    and additionally includes every ``DefCircuit`` passed via ``defcircuits``,
-    so the result is self-contained and can be handed straight back to the
-    compiler.
+    (frames, waveforms, ``DefCal`` objects, measure calibrations,
+    ``DefCircuit`` objects, ...) and additionally includes every
+    ``DefCircuit`` passed via ``defcircuits``, so the result is
+    self-contained and can be handed straight back to the compiler.
 
     Args:
         program (Program): the PyQuil ``Program`` whose instruction stream will
             be rewritten. Its calibrations, frames, waveforms, and
-            ``DefCircuit``s are carried through to the result.
-        defcircuits (Iterable[DefCircuit], optional): optional extra
+            ``DefCircuit`` objects are carried through to the result.
+        defcircuits (Iterable[DefCircuit] | None, optional): optional extra
             ``DefCircuit`` objects to consider for matching, in addition to
             those already on the program. Defaults to ``None``. When ``None``
-            (the default), only the program's own ``DefCircuit``s are used.
-            Names that collide with existing program ``DefCircuit``s override
-            the program's version.
-        symmetric_gates: Names of two-qubit gates whose argument order is
-            irrelevant for matching. Forwarded to
+            (the default), only the program's own ``DefCircuit`` objects are
+            used. Names that collide with existing program ``DefCircuit``
+            objects override the program's version.
+        symmetric_gates (FrozenSet[str], optional): names of two-qubit
+            gates whose argument order is irrelevant for matching. Forwarded to
             :func:`signature_from_defcircuit`. Defaults to
             :data:`DEFAULT_SYMMETRIC_GATES`.
 
     Returns:
         Program: a new ``Program`` with parallel-cycle blocks replaced by
-        ``DefCircuit`` invocations, with all original metadata and any merged-in
-        ``DefCircuit``s attached.
+            ``DefCircuit`` invocations, with all original metadata and any
+            merged-in ``DefCircuit`` objects attached.
 
     Raises:
         ValueError: if two DefCircuits in the merged set share the same
@@ -811,6 +845,7 @@ def replace_parallel_cycles(
         raise ImportError("Unable to import PyQuil!") from exc
 
     def flush() -> None:
+        """Emit the current block, collapsed if it matches a signature."""
         if not block:
             return
         sig = by_active.get(frozenset(Counter(block_active).items()))
@@ -914,8 +949,9 @@ def set_defcal_param(
     a matching parameter and updates that parameter in place.
 
     Supported instruction/template pairs are:
-        - ``Pulse.waveform``
-        - ``Capture.kernel``
+
+    - ``Pulse.waveform``
+    - ``Capture.kernel``
 
     Args:
         defcal (DefCalibration | DefMeasureCalibration): the calibration object
@@ -1078,16 +1114,18 @@ def signature_from_defcircuit(
     convention enforced by :func:`_qubit_index`.
 
     Args:
-        defcircuit: The ``DefCircuit`` to summarize. Must have no classical
-            parameters (parametric DefCircuits are out of scope for this
-            matcher) and a non-empty body of gate-level instructions.
-        symmetric_gates: Names of two-qubit gates whose argument order is
-            irrelevant when building active keys. Forwarded to
+        defcircuit (DefCircuit): the ``DefCircuit`` to summarize. Must
+            have no classical parameters (parametric DefCircuits are out of
+            scope for this matcher) and a non-empty body of gate-level
+            instructions.
+        symmetric_gates (FrozenSet[str], optional): names of two-qubit
+            gates whose argument order is irrelevant when building active
+            keys. Forwarded to
             :func:`_classify`. Defaults to :data:`DEFAULT_SYMMETRIC_GATES`.
 
     Returns:
-        A ``CycleSignature`` containing the DefCircuit's name, formal qubit
-        tuple, active-instruction multiset, and idle-qubit set.
+        CycleSignature: the DefCircuit's name, formal qubit tuple,
+            active-instruction multiset, and idle-qubit set.
 
     Raises:
         ValueError: If the DefCircuit declares classical parameters, has an
@@ -1113,7 +1151,8 @@ def signature_from_defcircuit(
         else:
             raise ValueError(
                 f"DefCircuit {defcircuit.name!r} body contains "
-                f"{type(body_instr).__name__}; only Gate and Measurement allowed."
+                f"{type(body_instr).__name__}; only Gate and Measurement "
+                "allowed."
             )
 
     if not active_keys:

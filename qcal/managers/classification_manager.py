@@ -1,6 +1,7 @@
 """Submodule for managing the classification of data.
 
-The classification of data is handled by the ClassificationManager class.
+The classification of data is handled by the :class:`ClassificationManager`
+class.
 """
 import logging
 from typing import Any, List, Tuple
@@ -13,7 +14,11 @@ logger = logging.getLogger(__name__)
 
 
 class ClassificationManager:
-    """Manager for handling how raw IQ results are classified."""
+    """Manager for handling how raw IQ results are classified.
+
+    This class stores a classification model for each qubit. This model can
+    be saved and loaded for future use.
+    """
 
     def __init__(
         self,
@@ -22,18 +27,18 @@ class ClassificationManager:
         model:    str = 'gmm',
         **kwargs
     ) -> None:
-        """Classification manager.
-
-        This class stores a classification model for each qubit. This model can
-        be saved and loaded for future use.
+        """Initialize a ClassificationManager.
 
         Args:
             qubits (List | Tuple): list of qubits.
             n_levels (int, optional): number of states to classify. Defaults to
                 2.
-            model (str, optional): classification algorithm. Defaults to 'gmm'.
+            model (str, optional): classification algorithm. Defaults to
+                ``'gmm'`` (currently the only supported model).
+            **kwargs: additional keyword arguments passed to the
+                classification model for each qubit (e.g.
+                :class:`~qcal.machine_learning.clustering.GMM`).
         """
-
         self._qubits = qubits
         self._n_levels = n_levels
 
@@ -83,8 +88,9 @@ class ClassificationManager:
         """Predict the classification labels for an array of data.
 
         Args:
-        qubit (int): qubit label.
-            X (ArrayLike): data to predict.
+            qubit (int): qubit label.
+            X (ArrayLike): data to predict. Array-like of shape
+                (n_samples, n_features).
 
         Returns:
             NDArray: classification labels.

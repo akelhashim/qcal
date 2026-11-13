@@ -1,7 +1,7 @@
-"""Directed Acyclic Graph (DAG)
+"""Directed Acyclic Graph (DAG).
 
 Module for constructing and running a DAG for calibration routines.
-This module is a wrapper around the networkx.Graph class.
+This module is a wrapper around the ``networkx.DiGraph`` class.
 See: https://networkx.org/documentation/stable/tutorial.html
 """
 import logging
@@ -20,26 +20,63 @@ logger = logging.getLogger(__name__)
 
 
 class NodeStatus(Enum):
-    """Status of a calibration node"""
+    """Status of a calibration node."""
     PENDING =   "PENDING"
     RUNNING =   "RUNNING"
-    COMPLETED = "COMPLETED "
+    COMPLETED = "COMPLETED"
     FAILED =    "FAILED"
     SKIPPED =   "SKIPPED"
 
 
 class DAG:
-    """
-    Directed Acyclic Graph for managing quantum workflows.
+    """Directed Acyclic Graph for managing quantum workflows.
 
     This class allows you to:
+
     - Add (e.g., calibration) nodes with associated classes
     - Define dependencies between nodes
     - Execute calibration in dependency order
     - Track status of each calibration step
+
+    Each node wraps a class (e.g. a calibration routine) which is
+    instantiated with the node's parameters and then has its ``run()``
+    method called when the node is executed.
+
+    Example:
+        .. code-block:: python
+
+            import numpy as np
+            from qcal.calibration.single_qubit import Amplitude, Frequency
+            from qcal.dag.dag import DAG
+
+            dag = DAG('single_qubit_cal')
+            dag.add_node(
+                'freq',
+                Frequency,
+                {'qpu': CustomQPU, 'config': config, 'qubits': [0]},
+            )
+            dag.add_node(
+                'amp',
+                Amplitude,
+                {
+                    'qpu': CustomQPU,
+                    'config': config,
+                    'qubits': [0],
+                    'amplitudes': np.linspace(0, 1.0, 21),
+                },
+                dependencies=['freq'],
+            )
+            dag.get_execution_order()  # ['freq', 'amp']
+            dag.execute()
     """
 
     def __init__(self, name: str = "DAG"):
+        """Initialize an empty DAG.
+
+        Args:
+            name (str, optional): name of the DAG/workflow. Defaults to
+                "DAG".
+        """
         self._name = name
         self._nodes: Dict[str, Node] = {}
         self._dependencies: Dict[str, Set[str]] = defaultdict(set)
@@ -49,12 +86,12 @@ class DAG:
 
     @property
     def nodes(self) -> list:
-        """DAG Nodes"""
+        """DAG Nodes."""
         return self._graph.nodes
 
     @property
     def edges(self) -> list:
-        """DAG Edges"""
+        """DAG Edges."""
         return self._graph.edges
 
     def _has_cycle(self) -> bool:
@@ -67,6 +104,7 @@ class DAG:
         color = dict.fromkeys(self._nodes, WHITE)
 
         def visit(node):
+            """Return True if a cycle is reachable from ``node``."""
             if color[node] == GRAY:
                 return True  # Back edge found - cycle detected
             if color[node] == BLACK:
@@ -90,8 +128,7 @@ class DAG:
         start_node: Optional[str],
         stop_node: Optional[str]
     ) -> List[str]:
-        """
-        Determine which nodes to execute based on start/stop/skip parameters.
+        """Determine which nodes to execute based on start/stop parameters.
 
         Args:
             full_order (List[str]): complete topological order of nodes.
@@ -115,7 +152,8 @@ class DAG:
 
         if stop_node:
             try:
-                stop_idx = full_order.index(stop_node) + 1  # +1 to include stop node
+                # +1 to include stop node
+                stop_idx = full_order.index(stop_node) + 1
             except ValueError as err:
                 raise ValueError(
                     f"Stop node '{stop_node}' not in execution order"
@@ -136,8 +174,8 @@ class DAG:
     def _mark_nodes_before_start_as_completed(
         self, full_order: List[str], start_node: str
     ) -> None:
-        """
-        Mark all nodes before the start node as completed.
+        """Mark all nodes before the start node as completed.
+
         This is useful when resuming a workflow.
 
         Args:
@@ -155,16 +193,17 @@ class DAG:
         parameters:   Dict[str, Any],
         dependencies: List[str] = None
     ) -> None:
-        """
-        Add a module (i.e., node) to the DAG.
+        """Add a module (i.e., node) to the DAG.
 
         Args:
             name (str): unique identifier for the node.
-            module (Callable): class to execute. Must have a
-                module.run() method.
-            parameters: args and kwargs to pass to the module.
-            dependencies (List[str], optional): the nodes that must be completed
-                first.
+            module (Callable): class to execute. It is instantiated with
+                ``parameters`` as keyword arguments, and the resulting
+                object must have a ``run()`` method.
+            parameters (Dict[str, Any]): keyword arguments to pass to the
+                module.
+            dependencies (List[str], optional): the nodes that must be
+                completed first. Defaults to None.
         """
         if name in self._nodes:
             raise ValueError(f"Node '{name}' already exists in the DAG")
@@ -185,8 +224,7 @@ class DAG:
             self.add_dependencies(name, dependencies)
 
     def add_dependency(self, node: str, depends_on: str) -> None:
-        """
-        Add a dependency relationship between nodes.
+        """Add a dependency relationship between nodes.
 
         Args:
             node (str): the node that has a dependency.
@@ -206,7 +244,8 @@ class DAG:
             self._dependencies[node].discard(depends_on)
             self._dependents[depends_on].discard(node)
             raise ValueError(
-                f"Adding dependency {depends_on} -> {node} would create a cycle"
+                f"Adding dependency {depends_on} -> {node} would create a "
+                "cycle"
             )
 
         self._graph.add_edge(node, depends_on)
@@ -224,8 +263,9 @@ class DAG:
             self.add_dependency(node, dep)
 
     def can_execute(self, node: str) -> bool:
-        """
-        Check if a node's dependencies are satisfied, considering skipped nodes.
+        """Check if a node's dependencies are satisfied.
+
+        Dependencies which have been skipped are considered satisfied.
 
         Args:
             node (str): node to check.
@@ -247,20 +287,28 @@ class DAG:
         skip_nodes: Optional[List[str]] = None,
         assume_completed_before_start: bool = True
     ) -> None:
-        """
-        Execute the calibration workflow with optional start/stop nodes and
-        optional nodes to skip.
+        """Execute the calibration workflow.
+
+        Execution can optionally begin/end at specific nodes and skip a
+        given set of nodes.
 
         Args:
-            start_node: Node from which to start execution. Defaults to None,
-                which means start from beginning.
-            stop_node:  Node to stop execution at (inclusive). Defaults to None,
-                which means execute to end.
-            skip_nodes: List of nodes to skip during execution. Defaults to
-                None, which means execute all nodes.
-            assume_completed_before_start: If True, assume all nodes before
-                start_node are completed (for dependency checking). Defaults to
-                True.
+            start_node (Optional[str], optional): node from which to start
+                execution. Defaults to None, which means start from the
+                beginning.
+            stop_node (Optional[str], optional): node to stop execution at
+                (inclusive). Defaults to None, which means execute to the
+                end.
+            skip_nodes (Optional[List[str]], optional): list of nodes to
+                skip during execution. Defaults to None, which means
+                execute all nodes.
+            assume_completed_before_start (bool, optional): if True,
+                assume all nodes before ``start_node`` are completed (for
+                dependency checking). Defaults to True.
+
+        Raises:
+            ValueError: if a start, stop, or skip node is not in the DAG.
+            RuntimeError: if the execution of a node fails.
         """
         skip_nodes = skip_nodes or []
 
@@ -337,13 +385,12 @@ class DAG:
     def execute_node(
         self, node_name: str, check_dependencies: bool = True
     ) -> None:
-        """
-        Execute a specific node.
+        """Execute a specific node.
 
         Args:
             node_name (str): name of the node to execute.
-            check_dependencies (bool): whether to check if dependencies are
-                satisfied.
+            check_dependencies (bool, optional): whether to check if
+                dependencies are satisfied. Defaults to True.
         """
         if node_name not in self._nodes:
             raise ValueError(f"Node '{node_name}' does not exist!")
@@ -359,11 +406,10 @@ class DAG:
         node.execute()
 
     def execute_subgraph(self, nodes: List[str]) -> None:
-        """
-        Execute only a specific subgraph of nodes.
+        """Execute only a specific subgraph of nodes.
 
         Args:
-            nodes: List of specific nodes to execute
+            nodes (List[str]): list of specific nodes to execute.
         """
         # Validate all nodes exist
         for node in nodes:
@@ -415,7 +461,7 @@ class DAG:
         Uses Kahn's algorithm for topological sorting.
 
         Raises:
-            RuntimeError: if there exists a cyle in the DAG.
+            RuntimeError: if there exists a cycle in the DAG.
 
         Returns:
             List[str]: order of nodes to execute.
@@ -462,8 +508,7 @@ class DAG:
         return {name: node.status for name, node in self._nodes.items()}
 
     def get_reachable_nodes(self, from_node: str) -> Set[str]:
-        """
-        Get all nodes reachable from a given node (forward dependencies).
+        """Get all nodes reachable from a given node (forward dependencies).
 
         Args:
             from_node (str): starting node name.
@@ -486,8 +531,7 @@ class DAG:
         return reachable
 
     def get_required_nodes(self, for_node: str) -> Set[str]:
-        """
-        Get all nodes required for a given node (backward dependencies).
+        """Get all nodes required for a given node (backward dependencies).
 
         Args:
             for_node (str): target node.
@@ -510,7 +554,7 @@ class DAG:
         return required
 
     def reset(self) -> None:
-        """Reset all nodes to pending status"""
+        """Reset all nodes to pending status."""
         for node in self._nodes.values():
             node.status = NodeStatus.PENDING
             node.error = None
@@ -518,7 +562,7 @@ class DAG:
             node.end_time = None
 
     def visualize(self) -> None:
-        """Generate a simple text representation of the DAG."""
+        """Print a simple text representation of the DAG."""
         lines = [f"DAG: {self._name}"]
         lines.append("=" * 40)
 
@@ -550,7 +594,20 @@ class DAG:
 
 @dataclass
 class Node:
-    """Represents a single node in the DAG"""
+    """Represents a single node in the DAG.
+
+    Attributes:
+        name (str): unique identifier for the node.
+        module (Callable): class to instantiate and run. After execution,
+            this is replaced by the instantiated object.
+        parameters (Dict[str, Any]): keyword arguments used to instantiate
+            the module.
+        status (NodeStatus): current execution status of the node.
+        error (Optional[Exception]): exception raised during execution, if
+            any.
+        start_time (Optional[float]): execution start time (Unix time).
+        end_time (Optional[float]): execution end time (Unix time).
+    """
     name:       str
     module:     Callable
     parameters: Dict[str, Any]
@@ -568,7 +625,11 @@ class Node:
         return None
 
     def execute(self):
-        """Execute the calibration function for this node."""
+        """Execute the calibration function for this node.
+
+        Instantiates ``module`` with ``parameters`` and calls its ``run()``
+        method, updating the node status and timing.
+        """
         self.status = NodeStatus.RUNNING
         self.start_time = time.time()
 

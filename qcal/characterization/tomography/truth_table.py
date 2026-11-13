@@ -1,9 +1,7 @@
-"""Submodule for Truth Table Tomography.
-
-"""
+"""Truth table tomography."""
 import itertools
 import logging
-from typing import Callable, Dict, List, Tuple
+from typing import Dict, List, Tuple
 
 import matplotlib.colors as colors
 import matplotlib.pyplot as plt
@@ -31,19 +29,25 @@ def TruthTable(
     qubits:          List | Tuple | None = None,
     ideal_unitary:   NDArray | None = None,
     **kwargs
-) -> Callable:
-    """Truth Table tomography.
+) -> Characterize:
+    """Truth table tomography.
 
     Args:
         qpu (QPU): custom QPU object.
         config (Config): qcal Config object.
-        cicuit (Circuit): qcal Circuit.
-        qubits (List | Tuple | None): qubits to measure. Defaults to None.
-        ideal_unitary (NDArray| None): unitary for ideal gate. Defaults to None.
-            If not None, it will be used to compute the truth table fidelity.
+        circuit (Circuit): qcal Circuit for which to measure the truth
+            table.
+        qubits (List | Tuple | None, optional): qubits to measure. If None,
+            ``circuit.qubits`` is used. Defaults to None.
+        ideal_unitary (NDArray | None, optional): unitary for ideal gate.
+            Defaults to None. If not None, it will be used to compute the
+            truth table fidelity.
+        **kwargs: additional keyword arguments passed to the ``qpu``
+            constructor (e.g. ``n_shots``).
 
     Returns:
-        Callable: TruthTable class.
+        Characterize: an instance of the TruthTable class, which inherits from
+            ``qpu`` and :class:`Characterize`.
     """
 
     class TruthTable(qpu, Characterize):
@@ -62,7 +66,6 @@ def TruthTable(
             **kwargs
         ) -> None:
             """Initialize the TruthTable class within the function."""
-
             qpu.__init__(self,
                 config=config,
                 **kwargs
@@ -189,7 +192,6 @@ def TruthTable(
 
         def plot(self):
             """Plot the truth table."""
-
             bg = colors.LinearSegmentedColormap.from_list(
                 'custom grey', [(1, 1, 1), '#d3d3d3'], N=256
             )

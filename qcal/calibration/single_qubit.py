@@ -1,10 +1,53 @@
 """Submodule for single-qubit gate calibration.
 
+This module provides factory functions that build calibration classes for
+single-qubit gates on top of a user-supplied :class:`~qcal.qpu.qpu.QPU`
+class:
+
+- :func:`Amplitude`: calibrate the amplitude of ``X90`` or ``X`` pulses
+  (Rabi or RAP methods, with optional pulse repetition).
+- :func:`Frequency`: calibrate the qubit frequency using Ramsey
+  experiments at several artificial detunings.
+- :func:`Phase`: calibrate the phase of single-qubit pulses to correct
+  for Stark-shift-induced phase errors.
+
+Each factory returns an instance of a class that inherits from both the
+given QPU class and :class:`~qcal.calibration.calibration.Calibration`.
+
+Example:
+    .. code-block:: python
+
+        import numpy as np
+
+        from qcal.backend.emulator import Emulator
+        from qcal.calibration.single_qubit import Amplitude, Frequency
+        from qcal.config import EXAMPLE_CONFIG_PATH, Config
+        from qcal.units import MHz
+
+        config = Config(str(EXAMPLE_CONFIG_PATH))
+
+        # Rabi amplitude calibration of the X90 gate
+        cal = Amplitude(
+            Emulator,  # or a hardware QPU class, e.g. QubicQPU
+            config,
+            qubits=[0, 1],
+            amplitudes=np.linspace(0, 1.0, 21),
+        )
+        cal.run()
+
+        # Ramsey frequency calibration
+        cal = Frequency(
+            Emulator,
+            config,
+            qubits=[0, 1],
+            detunings=np.array([-2, -1, 1, 2]) * MHz,
+        )
+        cal.run()
 """
 from __future__ import annotations
 
 import logging
-from typing import Callable, Dict, List, Tuple
+from typing import Dict, List, Tuple
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -48,20 +91,21 @@ def Amplitude(
     relative_amp: bool = False,
     params:       Dict | None = None,
     **kwargs
-) -> Callable:
+) -> Calibration:
     """Amplitude calibration for single-qubit gates.
 
-    Basic example useage for initial calibration:
+    Example:
+        Initial calibration:
 
-    ```
-    amps = np.linspace(0, 1.0, 21)
-    cal = Amplitude(
-        CustomQPU,
-        config,
-        qubits=[0, 1, 2],
-        amplitudes=amps)
-    cal.run()
-    ```
+        .. code-block:: python
+
+            amps = np.linspace(0, 1.0, 21)
+            cal = Amplitude(
+                CustomQPU,
+                config,
+                qubits=[0, 1, 2],
+                amplitudes=amps)
+            cal.run()
 
     Args:
         qpu (QPU): custom QPU object.
@@ -82,9 +126,15 @@ def Amplitude(
             is defined relative to the existing pulse amplitude. Defaults to
             False. If True, the amplitudes are swept over the current amplitude
             times the amplitudes argument.
+        params (Dict | None, optional): dictionary mapping the qubit labels
+            to the config parameter to sweep over. Defaults to None, in
+            which case the amplitude of the gate pulse is used.
+        **kwargs: additional keyword arguments passed to the QPU
+            constructor (e.g. ``n_shots``).
 
     Returns:
-        Callable: Amplitude calibration class.
+        Calibration: Amplitude calibration instance (a subclass of
+            ``qpu``).
     """
 
     class Amplitude(qpu, Calibration):
@@ -107,8 +157,7 @@ def Amplitude(
             params:       Dict | None = None,
             **kwargs
         ) -> None:
-            """Initialize the Amplitude calibration class within the function.
-            """
+            """Initialize the Amplitude calibration class."""
             n_levels = 3 if subspace == 'EF' else 2
             qpu.__init__(self, config=config, n_levels=n_levels, **kwargs)
             Calibration.__init__(self, config)
@@ -370,34 +419,39 @@ def Frequency(
     n_elements: int = 30,
     params:     Dict | None = None,
     **kwargs
-) -> Callable:
+) -> Calibration:
     """Frequency calibration for single qubits.
 
-    Basic example useage:
+    Example:
+        .. code-block:: python
 
-    ```
-    cal = Frequency(
-        CustomQPU,
-        config,
-        qubits=[0],
-        detunings=np.array([-2, -1, 1, 2])*MHz)
-    cal.run()
-    ```
+            cal = Frequency(
+                CustomQPU,
+                config,
+                qubits=[0],
+                detunings=np.array([-2, -1, 1, 2])*MHz)
+            cal.run()
 
     Args:
         qpu (QPU): custom QPU object.
         config (Config): qcal Config object.
         qubits (List | Tuple): qubits to measure.
         t_max (float, optional): maximum Ramsey time. Defaults to 2 us.
-        detunings (float, optional): artificial detunings from the actual qubit
-            frequency. Defaults to np.array([-2, -1, 1, 2])*MHz.
+        detunings (NDArray, optional): artificial detunings from the actual
+            qubit frequency. Defaults to ``np.array([-2, -1, 1, 2])*MHz``.
         subspace (str, optional): qubit subspace for frequency calibration.
             Defaults to 'GE'.
         n_elements (int, optional): number of delays starting from 0 to t_max.
             Defaults to 30.
+        params (Dict | None, optional): dictionary mapping the qubit labels
+            to the config parameter to calibrate. Defaults to None, in
+            which case ``single_qubit/{q}/{subspace}/freq`` is used.
+        **kwargs: additional keyword arguments passed to the QPU
+            constructor (e.g. ``n_shots``).
 
     Returns:
-        Callable: Frequency calibration class.
+        Calibration: Frequency calibration instance (a subclass of
+            ``qpu``).
     """
 
     class Frequency(qpu, Calibration):
@@ -418,8 +472,7 @@ def Frequency(
             params:     Dict | None = None,
             **kwargs
         ) -> None:
-            """Initialize the Frequency experiment class within the function.
-            """
+            """Initialize the Frequency calibration class."""
             # n_levels = 3 if subspace == 'EF' else 2
             qpu.__init__(self, config=config, **kwargs)
             Calibration.__init__(self, config)
@@ -461,7 +514,7 @@ def Frequency(
             """Frequency detunings.
 
             Returns:
-                NDArray: frequency detunings..
+                NDArray: frequency detunings.
             """
             return self._detunings
 
@@ -475,7 +528,7 @@ def Frequency(
             return self._times
 
         def generate_circuits(self):
-            """Generate all amplitude calibration circuits."""
+            """Generate all frequency calibration circuits."""
             logger.info(' Generating circuits...')
 
             circuits = []
@@ -575,7 +628,9 @@ def Frequency(
                 params.add('a', value=1)
                 params.add('b', value=0)
                 params.add('c', value=0)
-                self._fit[q].fit(self._detunings, self._freqs[q], params=params)
+                self._fit[q].fit(
+                    self._detunings, self._freqs[q], params=params
+                )
 
                 if self._fit[q].fit_success:
                     a = self._fit[q].fit_params['a'].value
@@ -740,23 +795,24 @@ def Phase(
     relative_phase: bool = False,
     params:         Dict | None = None,
     **kwargs
-) -> Callable:
+) -> Calibration:
     """Phase calibration for single-qubit gates.
 
     This calibration corrects for phases errors that occur due to stark shifts
     during single-qubit gates.
 
-    Basic example useage for initial calibration:
+    Example:
+        Initial calibration:
 
-    ```
-    phases = np.pi * np.linspace(-1, 1, 21)
-    cal = Phase(
-        CustomQPU,
-        config,
-        qubits=[0, 1, 2],
-        phases=phases)
-    cal.run()
-    ```
+        .. code-block:: python
+
+            phases = np.pi * np.linspace(-1, 1, 21)
+            cal = Phase(
+                CustomQPU,
+                config,
+                qubits=[0, 1, 2],
+                phases=phases)
+            cal.run()
 
     Args:
         qpu (QPU): custom QPU object.
@@ -772,11 +828,13 @@ def Phase(
         relative_phase (bool, optional): whether phase sweep is relative to the
             current phase value. Defaults to False. If true, the phase sweep
             is added to the current value.
-        params (Dict, None): dictionary mapping the qubit labels to the config
-            parameter to sweep over.
+        params (Dict | None, optional): dictionary mapping the qubit labels
+            to the config parameter to sweep over. Defaults to None.
+        **kwargs: additional keyword arguments passed to the QPU
+            constructor (e.g. ``n_shots``).
 
     Returns:
-        Callable: Phases calibration class.
+        Calibration: Phases calibration class.
     """
 
     class Phase(qpu, Calibration):
@@ -797,7 +855,7 @@ def Phase(
             params:         Dict | None = None,
             **kwargs
         ) -> None:
-            """Initialize the Phase calibration class within the function."""
+            """Initialize the Phase calibration class."""
             n_levels = 3 if subspace == 'EF' else 2
             qpu.__init__(self, config=config, n_levels=n_levels, **kwargs)
             Calibration.__init__(self, config)
@@ -856,7 +914,7 @@ def Phase(
             return self._phases
 
         def generate_circuits(self):
-            """Generate all amplitude calibration circuits."""
+            """Generate all phase calibration circuits."""
             logger.info(' Generating circuits...')
 
             level = {2: 'GE', 3: 'EF'}

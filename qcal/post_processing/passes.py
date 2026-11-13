@@ -57,20 +57,26 @@ def compute_counts(p: PostProcessor) -> None:
 
 
 def compute_conditional_counts(p: PostProcessor) -> None:
-    """Compute the conditional counts for all unique combinations of 0s, 1s, ...
+    """Compute the conditional counts for all unique outcome combinations.
 
     This pass takes in sequential dataframes of mid-circuit and terminating
-    measurements an computes a dictionary mapping mapping 'b0:b1:...:bk-1' ->
-    count for each circuit, where b_i is the bitstring of the i-th measurement,
-    and b_i:b_j denotes the bitstring of the j-th measurement that is
-    conditioned on the i-th measurement, etc. This is extended to the case where
-    there are multiple qubits measured in each mid-circuit measurement, which
-    would yield an outcome of the form '<mid0>:<mid1>:...:<final>', where <mid>
-    is the combined bitstring of the mid-circuit measurement and <final> is the
-    bitstring of the final measurement (e.g., '010:110').
+    measurements and computes a dictionary mapping ``'b0:b1:...:bk-1'`` ->
+    count for each circuit, where ``b_i`` is the bitstring of the i-th
+    measurement, and ``b_i:b_j`` denotes the bitstring of the j-th
+    measurement that is conditioned on the i-th measurement, etc. This is
+    extended to the case where there are multiple qubits measured in each
+    mid-circuit measurement, which would yield an outcome of the form
+    ``'<mid0>:<mid1>:...:<final>'``, where ``<mid>`` is the combined
+    bitstring of the mid-circuit measurement and ``<final>`` is the
+    bitstring of the final measurement (e.g., ``'010:110'``).
 
     Args:
         p (PostProcessor): post-processor object.
+
+    Raises:
+        ValueError: if the dataframes of a circuit do not all have the same
+            number of rows (shots), or if any of them is not a DataFrame
+            with at least one column.
     """
     conditional_counts = []
     for circuit_results in p._circuit_results:
@@ -116,8 +122,8 @@ def discard_heralded_shots(
     """Discard heralded shots for each circuit.
 
     Args:
-        p (PostProcessor): post-processor object.
-        herald_idx (int): measurement index for heralding.
+        p (PostProcessor): post-processor object. The herald measurement
+            index is taken from ``p.herald_idx``.
     """
     if p.config['readout/herald']:
         # Boolean series
@@ -133,7 +139,7 @@ def discard_heralded_shots(
 
 
 def relabel_esp(p: PostProcessor) -> None:
-    """Relable all 2s as 1s for excited state promotion.
+    """Relabel all 2s as 1s for excited state promotion.
 
     Args:
         p (PostProcessor): post-processor object.

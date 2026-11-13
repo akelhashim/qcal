@@ -1,5 +1,4 @@
-"""Submodule for defining the basic gate class.
-"""
+"""Submodule for defining the basic gate class."""
 from __future__ import annotations
 
 from typing import Any
@@ -11,6 +10,24 @@ from sympy import Matrix
 
 
 class Gate:
+    """Base class for all qcal gates.
+
+    A gate stores its matrix definition, the qubit (or qudit) label(s) it
+    acts on, and a dictionary of properties (name, alias, dimension,
+    parameters, subspace, etc.). All concrete gates in
+    :mod:`qcal.gates.single_qubit`, :mod:`qcal.gates.two_qubit`,
+    :mod:`qcal.gates.single_qutrit`, and :mod:`qcal.gates.two_qutrit`
+    subclass this class.
+
+    Example:
+        >>> import numpy as np
+        >>> from qcal.gates.gate import Gate
+        >>> g = Gate(np.array([[0., 1.], [1., 0.]]), 0)
+        >>> g.qubits
+        (0,)
+        >>> g.is_single_qubit
+        True
+    """
 
     __slots__ = ['_matrix', '_matrix_key_cache', '_properties', '_unitary']
 
@@ -22,7 +39,8 @@ class Gate:
 
         Args:
             matrix (NDArray): numpy array defining the unitary matrix.
-            qubits (int | tuple): qubit label(s).
+            qubits (int | tuple, optional): qubit label(s). Defaults to
+                None.
         """
         self._matrix = matrix
         self._matrix_key_cache = None
@@ -110,7 +128,7 @@ class Gate:
         """Returns information about the gate.
 
         Returns:
-            html: html representation of the gate.
+            str: html representation of the gate.
         """
         df = pd.DataFrame([
             [(pd.DataFrame(self._matrix)
@@ -142,7 +160,7 @@ class Gate:
 
     @property
     def alias(self) -> str:
-        """The alias(es) of the gate.
+        """The alias or aliases of the gate.
 
         Returns:
             str: alias of the gate.
@@ -226,7 +244,7 @@ class Gate:
         """The unitary matrix of the gate in the full qudit space.
 
         For 2×2 gates with ``subspace='EF'``, the matrix is embedded
-        into the |1⟩–|2⟩ block of a 3×3 qutrit space. All other
+        into the ``|1⟩–|2⟩`` block of a 3×3 qutrit space. All other
         gates are returned as-is.
 
         Returns:

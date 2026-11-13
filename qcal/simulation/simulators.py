@@ -1,4 +1,4 @@
-"""Submodule for simulation of quantum circuits.
+"""Simulators for qcal circuits.
 
 Simulation is backed by `rigetti-quax
 <https://github.com/rigetti/quax>`_, a JAX-based quantum circuit
@@ -13,31 +13,63 @@ Three classes are provided:
     Subclasses must implement :meth:`_simulate`.
 
 :class:`StateVectorSimulator`
-    Noiseless statevector simulation. Evolves an initial |0...0⟩
+    Noiseless statevector simulation. Evolves an initial ``|0...0⟩``
     state through every non-measurement gate and records the exact
     probability distribution (or sampled results).
 
 :class:`DensityMatrixSimulator`
     Noisy density-matrix simulation. Evolves an initial
-    |0...0⟩⟨0...0| state and, after each gate, applies an optional
+    ``|0...0⟩⟨0...0|`` state and, after each gate, applies an optional
     noise channel (``quax.KrausMap`` or ``quax.SuperOp``) specified
-    by an *error_model* dict keyed on gate-class name.
+    by an *error_model* (an
+    :class:`~qcal.simulation.error_models.ErrorModel` or a dict keyed
+    on gate-class name).
 
 Both qubits (d=2) and qutrits (d=3) are supported; the simulator
 detects the required per-qudit dimension from gate unitaries
 automatically.
 
-Workflow
---------
+The typical workflow is:
+
 1. Construct a :class:`~qcal.circuit.Circuit` from
    :class:`~qcal.circuit.Cycle` objects using gates from
-   ``qcal.gates``.
+   :mod:`qcal.gates`.
 2. Create a simulator (optionally with a default ``n_shots``).
 3. Call ``.run()`` — this attaches a
    :class:`~qcal.results.Results` object to each circuit.
 
 When ``n_shots=None`` (the default), the exact probability
 distribution is stored rather than sampled results.
+
+Example:
+    .. code-block:: python
+
+        from qcal.circuit import Circuit, Cycle
+        from qcal.gates.single_qubit import H, Meas
+        from qcal.gates.two_qubit import CNOT
+        from qcal.simulation import (
+            DensityMatrixSimulator,
+            StateVectorSimulator,
+        )
+        from qcal.simulation.error_models import DepolarizingNoise
+
+        # Bell-state circuit
+        circuit = Circuit([
+            Cycle({H(0)}),
+            Cycle({CNOT((0, 1))}),
+            Cycle({Meas(0), Meas(1)}),
+        ])
+
+        # Exact, noiseless probabilities: {'00': 0.5, '11': 0.5}
+        sim = StateVectorSimulator()
+        sim.run(circuit)
+        print(circuit.results)
+
+        # Noisy simulation with 1000 sampled shots
+        noise = DepolarizingNoise(single_qubit=0.001, two_qubit=0.01)
+        sim = DensityMatrixSimulator(error_model=noise, n_shots=1000)
+        sim.run(circuit)
+        print(circuit.results)
 """
 from __future__ import annotations
 
@@ -108,7 +140,7 @@ class Simulator(ABC):
 
     @property
     def circuits(self) -> CircuitSet | None:
-        """Circuits from the last call to run().
+        """Circuits from the last call to :meth:`run`.
 
         Returns:
             CircuitSet | None: all circuits from the last run.
@@ -199,40 +231,38 @@ class Simulator(ABC):
 class StateVectorSimulator(Simulator):
     """Noiseless statevector simulator backed by rigetti-quax.
 
-    Each circuit is evolved from |0...0⟩ by applying the ideal
+    Each circuit is evolved from ``|0...0⟩`` by applying the ideal
     unitary of every non-measurement gate. Measurement outcomes are
     sampled from the resulting probability distribution.
-
-    Basic example usage::
-
-            sim = StateVectorSimulator()
-            sim.run(circuit)
-            print(circuit.results)
 
     To simulate non-ideal evolution, overwrite a gate's
     ``.unitary`` attribute with a custom matrix before calling
     :meth:`run`. The simulator reads each gate's unitary at
-    simulation time, so any replacement is used as-is::
+    simulation time, so any replacement is used as-is.
 
-        import numpy as np
-        from qcal.circuit import Circuit, Cycle
-        from qcal.gates.single_qubit import X
+    Example:
+        .. code-block:: python
 
-        # Build a circuit with an X gate on qubit 0
-        gate = X(0)
+            import numpy as np
+            from qcal.circuit import Circuit, Cycle
+            from qcal.gates.single_qubit import X
+            from qcal.simulation import StateVectorSimulator
 
-        # Replace with a slightly over-rotated unitary
-        theta = np.pi + 0.1          # pi-pulse with 0.1 rad error
-        gate.unitary = np.array([
-            [np.cos(theta / 2), -1j * np.sin(theta / 2)],
-            [-1j * np.sin(theta / 2),  np.cos(theta / 2)],
-        ])
+            # Build a circuit with an X gate on qubit 0
+            gate = X(0)
 
-        circuit = Circuit([Cycle({gate})])
+            # Replace with a slightly over-rotated unitary
+            theta = np.pi + 0.1  # pi-pulse with 0.1 rad error
+            gate.unitary = np.array([
+                [np.cos(theta / 2), -1j * np.sin(theta / 2)],
+                [-1j * np.sin(theta / 2), np.cos(theta / 2)],
+            ])
 
-        sim = StateVectorSimulator()
-        sim.run(circuit)
-        print(circuit.results)
+            circuit = Circuit([Cycle({gate})])
+
+            sim = StateVectorSimulator()
+            sim.run(circuit)
+            print(circuit.results)
     """
 
     @property
@@ -363,7 +393,7 @@ class StateVectorSimulator(Simulator):
 class DensityMatrixSimulator(Simulator):
     """Noisy density-matrix simulator backed by rigetti-quax.
 
-    Each circuit is evolved from |0...0⟩⟨0...0| by applying the
+    Each circuit is evolved from ``|0...0⟩⟨0...0|`` by applying the
     ideal unitary of every non-measurement gate. After each gate,
     an optional noise channel from *error_model* is applied to the
     same subsystem. Measurement outcomes are sampled from the
@@ -374,26 +404,42 @@ class DensityMatrixSimulator(Simulator):
     * A :class:`~qcal.simulation.error_models.ErrorModel` instance
       (e.g. :class:`~qcal.simulation.error_models.DepolarizingNoise`)
       that assigns channels by broad gate category
-      (``'single_qubit'``, ``'two_qubit'``, etc.)::
-
-          from qcal.simulation.error_models import DepolarizingNoise
-          noise = DepolarizingNoise(single_qubit=0.001, two_qubit=0.01)
-          sim = DensityMatrixSimulator(error_model=noise)
-          sim.run(circuit)
-
+      (``'single_qubit'``, ``'two_qubit'``, etc.).
     * A plain ``dict`` mapping gate-class names to ``quax.KrausMap``
-      or ``quax.SuperOp`` channels for fine-grained control::
+      or ``quax.SuperOp`` channels for fine-grained control.
 
-          import quax
-          error_model = {
-              'X':  quax.channels.depolarizing(0.01),
-              'CZ': quax.channels.depolarizing(0.05),
-          }
-          sim = DensityMatrixSimulator(error_model=error_model)
-          sim.run(circuit)
+    Example:
+        .. code-block:: python
 
-    Mid-circuit measurement (MCM) note:
-        MCM outcomes (``circuit.mcm_results``) and terminal outcomes
+            import quax
+            from qcal.circuit import Circuit, Cycle
+            from qcal.gates.single_qubit import X, Meas
+            from qcal.gates.two_qubit import CZ
+            from qcal.simulation import DensityMatrixSimulator
+            from qcal.simulation.error_models import DepolarizingNoise
+
+            circuit = Circuit([
+                Cycle({X(0)}),
+                Cycle({CZ((0, 1))}),
+                Cycle({Meas(0), Meas(1)}),
+            ])
+
+            # Category-based error model
+            noise = DepolarizingNoise(single_qubit=0.001, two_qubit=0.01)
+            sim = DensityMatrixSimulator(error_model=noise)
+            sim.run(circuit)
+
+            # Per-gate-class channels
+            error_model = {
+                'X': quax.channels.depolarizing(0.01),
+                'CZ': quax.channels.depolarizing(0.05),
+            }
+            sim = DensityMatrixSimulator(error_model=error_model)
+            sim.run(circuit)
+
+    Note:
+        Mid-circuit measurement (MCM) outcomes
+        (``circuit.mcm_results``) and terminal outcomes
         (``circuit.results``) are each sampled from their correct
         marginal distributions, but the two samplings are independent.
         Shot-by-shot cross-correlations — e.g. the joint distribution
@@ -450,7 +496,7 @@ class DensityMatrixSimulator(Simulator):
         rho:       quax.DensityMatrix,
         subsystem: tuple,
     ) -> quax.DensityMatrix:
-        """Apply a KrausMap or SuperOp to rho at subsystem.
+        """Apply a KrausMap or SuperOp to *rho* at *subsystem*.
 
         If the channel acts on a single qudit but the gate subsystem
         has multiple qudits, the channel is applied independently to
@@ -459,8 +505,9 @@ class DensityMatrixSimulator(Simulator):
         subsystems matches the gate's qudit count exactly.
 
         Args:
-            channel: ``quax.KrausMap`` or ``quax.SuperOp``.
-            rho: ``quax.DensityMatrix`` to update.
+            channel (quax.KrausMap | quax.SuperOp): noise channel to
+                apply.
+            rho (quax.DensityMatrix): density matrix to update.
             subsystem (tuple): qudit index positions.
 
         Returns:

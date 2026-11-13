@@ -1,6 +1,4 @@
-"""Submodule for math on probability distributions.
-
-"""
+"""Submodule for math on probability distributions."""
 import logging
 
 import numpy as np
@@ -11,26 +9,29 @@ logger = logging.getLogger(__name__)
 
 
 def hellinger_fidelity(results1, results2) -> ufloat:
-    """Classical (Hellinger) fidelity.
+    r"""Classical (Hellinger) fidelity.
 
-    fidelity(p, q) = (sum_i sqrt(p_i * q_i))^2
+    .. math::
+
+        F(p, q) = \left( \sum_i \sqrt{p_i q_i} \right)^2
 
     Only bitstrings observed in both results1 and results2 can
-    contribute, since sqrt(p_i * q_i) is exactly 0 whenever either
-    population is 0 (rather than every bitstring in the full
-    levels ** n_qudits Hilbert space). This keeps the cost
+    contribute, since :math:`\sqrt{p_i q_i}` is exactly 0 whenever
+    either population is 0 (rather than every bitstring in the full
+    ``levels ** n_qudits`` Hilbert space). This keeps the cost
     proportional to the number of distinct measured outcomes instead
     of exponential in n_qudits.
 
     Each population p_i (q_i) is treated as an independent binomial
-    proportion with standard error sqrt(p_i * (1 - p_i) / n_shots),
-    and these per-bitstring errors are propagated (ignoring the
-    typically small covariance between bitstrings induced by the
-    multinomial normalization) to give the uncertainty on the
-    returned fidelity. Bitstrings with zero population in either
-    distribution are skipped rather than propagated through sqrt(),
-    whose derivative diverges at 0 and would otherwise turn an exact
-    zero contribution into a NaN uncertainty.
+    proportion with standard error
+    :math:`\sqrt{p_i (1 - p_i) / n_\mathrm{shots}}`, and these
+    per-bitstring errors are propagated (ignoring the typically small
+    covariance between bitstrings induced by the multinomial
+    normalization) to give the uncertainty on the returned fidelity.
+    Bitstrings with zero population in either distribution are skipped
+    rather than propagated through sqrt(), whose derivative diverges at 0
+    and would otherwise turn an exact zero contribution into a NaN
+    uncertainty.
 
     Args:
         results1 (Results): qcal Results object.
@@ -62,23 +63,25 @@ def hellinger_fidelity(results1, results2) -> ufloat:
 
 
 def total_variation_distance(results1, results2) -> ufloat:
-    """Total Variation Distance.
+    r"""Total Variation Distance.
 
-    tvd(p, q) = 0.5 * sum_i |p_i - q_i|
+    .. math::
+
+        \mathrm{TVD}(p, q) = \frac{1}{2} \sum_i |p_i - q_i|
 
     Only bitstrings observed in either results1 or results2 are
     summed over, rather than every bitstring in the full
-    levels ** n_qudits Hilbert space (unobserved bitstrings have
+    ``levels ** n_qudits`` Hilbert space (unobserved bitstrings have
     zero population in both, so they don't contribute). This keeps
     the cost proportional to the number of distinct measured
     outcomes instead of exponential in n_qudits.
 
     Each population p_i (q_i) is treated as an independent binomial
-    proportion with standard error sqrt(p_i * (1 - p_i) / n_shots),
-    and these per-bitstring errors are propagated (ignoring the
-    typically small covariance between bitstrings induced by the
-    multinomial normalization) to give the uncertainty on the
-    returned tvd.
+    proportion with standard error
+    :math:`\sqrt{p_i (1 - p_i) / n_\mathrm{shots}}`, and these
+    per-bitstring errors are propagated (ignoring the typically small
+    covariance between bitstrings induced by the multinomial
+    normalization) to give the uncertainty on the returned tvd.
 
     Args:
         results1 (Results): qcal Results object.

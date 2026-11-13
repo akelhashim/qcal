@@ -1,5 +1,4 @@
-"""Submodule for storing abbreviations for commonly used units.
-"""
+"""Submodule for storing abbreviations for commonly used units."""
 
 # Frequencies
 kHz = 1e3

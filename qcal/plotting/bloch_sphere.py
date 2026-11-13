@@ -1,3 +1,8 @@
+"""Matplotlib plotting of points, vectors, and paths on the Bloch sphere.
+
+The main entry point is :class:`BlochSphere`, which draws a 3D Bloch
+sphere with optional 2D projections onto the XY, YZ, and ZX planes.
+"""
 from typing import Any, List, Optional
 
 import matplotlib.pyplot as plt
@@ -24,6 +29,11 @@ class Arrow3D(FancyArrowPatch):
             xs (List[float]): x-coordinates of the arrow [start, end].
             ys (List[float]): y-coordinates of the arrow [start, end].
             zs (List[float]): z-coordinates of the arrow [start, end].
+            *args: additional positional arguments passed to
+                ``matplotlib.patches.FancyArrowPatch``.
+            **kwargs: additional keyword arguments passed to
+                ``matplotlib.patches.FancyArrowPatch`` (e.g.
+                ``mutation_scale``, ``arrowstyle``, ``color``).
         """
         FancyArrowPatch.__init__(self, (0, 0), (0, 0), *args, **kwargs)
         self._verts3d = xs, ys, zs
@@ -40,11 +50,12 @@ class Arrow3D(FancyArrowPatch):
         """Project the 3D arrow onto the 2D view before drawing.
 
         Required by matplotlib's 3D rendering pipeline (since ~3.5) to
-        depth-sort artists prior to calling draw().
+        depth-sort artists prior to calling :meth:`draw`.
 
         Args:
             renderer (Any, optional): unused; kept for backwards
-                compatibility with the older draw(renderer)-based API.
+                compatibility with the older ``draw(renderer)``-based API.
+                Defaults to None.
 
         Returns:
             float: minimum projected z-value, used for depth-sorting.
@@ -58,20 +69,34 @@ class Arrow3D(FancyArrowPatch):
 class BlochSphere:
     """Class for plotting points and vectors on the Bloch Sphere.
 
-    Typical usage example:
+    Example:
+        .. code-block:: python
 
-            b = BlochSphere(point_alpha=0.7,
-                            xy_projection=True,
-                            xz_projection=True,
-                            yz_projection=True,
-                            show_3d_projection=True,
-                            plot_2d_slice=True)
-            b.add_vector([x1, y1, z1], color='k', label='Vector 1')
-            b.add_vector([x2, y2, z1], color='b', label='Vector 2')
-            b.add_points([x_array, y_array, z_array],
-                         color='orange', label='A bunch of scatter points')
-            b.show(save=True, save_pdf=True,
-                   directory='../data/Figures/', filename='Bloch Sphere')
+            import numpy as np
+            from qcal.plotting.bloch_sphere import BlochSphere
+
+            b = BlochSphere(
+                point_alpha=0.7,
+                xy_projection=True,
+                yz_projection=True,
+                zx_projection=True,
+                show_3d_projection=True,
+                plot_2d_slice=True,
+            )
+            b.add_vector([0, 0, 1], color='k', label='Vector 1')
+            b.add_vector([1, 0, 0], color='b', label='Vector 2')
+
+            theta = np.linspace(0, np.pi, 20)
+            b.add_points(
+                [np.sin(theta), np.zeros(20), np.cos(theta)],
+                color='orange', label='Scatter points',
+            )
+            b.add_trajectory(
+                [np.cos(theta), np.sin(theta), np.zeros(20)],
+                label='Trajectory',
+            )
+            # Saves bloch_Bloch_sphere.{png,pdf,svg} and shows the figure
+            b.show(save=True, filename='bloch_')
     """
 
     def __init__(
@@ -129,7 +154,6 @@ class BlochSphere:
             plot_2d_slice (bool, optional): plot the projection as a slice on
                 a separate 2D graph. Defaults to False.
         """
-
         self.figsize = figsize
         self.label_fontsize = label_fontsize
         self.tick_label_fontsize = tick_label_fontsize
@@ -166,7 +190,7 @@ class BlochSphere:
             self.sign_zx = 1
 
     def draw_bloch_sphere(self) -> None:
-        """Draws an empty Bloch sphere."""
+        """Draw an empty Bloch sphere."""
         phi = np.linspace(0, 2 * np.pi, 50)
         theta = np.linspace(0, np.pi, 50)
         PHI, THETA = np.meshgrid(phi, theta)
@@ -336,19 +360,19 @@ class BlochSphere:
         linewidth: float = 1.5,
         size: float = None,
     ) -> None:
-        """Adds points to the Bloch sphere.
+        """Add points to the Bloch sphere.
 
         Args:
-            points (list[list]): [x, y, z] coordinates for a point. Each can
+            points (List): [x, y, z] coordinates for a point. Each can
                 be an individual list of multiple coordinates for multiple
                 points.
-            color (str, RGB, optional): color of points for scatter point.
-                Defaults to None.
+            color (str, optional): color (name or RGB) of points for
+                scatter point. Defaults to None.
             label (str, optional): label of the points for the legend.
                 Defaults to None.
-            linewidth (float, int, optional): width of the edgecolor around
+            linewidth (float, optional): width of the edgecolor around
                 the points. Defaults to 1.5.
-            size (float, int, optional): size of the scatter points. Defaults
+            size (float, optional): size of the scatter points. Defaults
                 to None.
         """
         if self.fig is None:
@@ -448,7 +472,7 @@ class BlochSphere:
         marker: str = 'o',
         ms: Optional[float] = None,
     ) -> None:
-        """Adds a trajectory to the Bloch sphere.
+        """Add a trajectory to the Bloch sphere.
 
         Args:
             points (List): [x, y, z] coordinates for the trajectory. Each can
@@ -666,10 +690,11 @@ class BlochSphere:
         """Plot the Bloch Sphere in a figure.
 
         Args:
-            save (bool, optional): save the figure as a PNG. Defaults to
-                False.
-            filename (str, optional): prefix prepended to 'Bloch_sphere.png'
-                for the filename. Defaults to None.
+            save (bool, optional): save the figure as PNG, PDF, and SVG.
+                Defaults to False.
+            filename (str, optional): prefix prepended to
+                ``'Bloch_sphere.png'`` (and the ``.pdf`` / ``.svg``
+                variants) for the filename. Defaults to None.
         """
         if self.fig is None:
             self.draw_bloch_sphere()

@@ -1,7 +1,13 @@
-"""Submodule for translating between qcal and QubiC
+"""Submodule for translating between qcal and QubiC.
+
+This module provides the :class:`Transpiler` that converts qcal circuits
+into QubiC programs (lists of instruction dictionaries), along with the
+helper functions used to build each part of a QubiC program: resets,
+heralding, gates, measurements, dynamical decoupling, and conditional
+operations based on mid-circuit measurements.
 
 References:
-https://ieeexplore.ieee.org/document/9552516
+    https://ieeexplore.ieee.org/document/9552516
 """
 import copy  # noqa: I001
 import logging
@@ -35,7 +41,7 @@ def get_by_path(root: Dict | defaultdict, items: List[Any]) -> Any:
     """Access a nested object in root by item sequence.
 
     Args:
-        root ((Dict | defaultdict): nested dictionary.
+        root (Dict | defaultdict): nested dictionary.
         items (List[Any]): list of keys.
 
     Returns:
@@ -63,7 +69,7 @@ def readout_time(config: Config, qubit: int) -> float:
         qubit (int):     qubit label.
 
     Returns:
-        float: total readout time (readout + demod - integration delay)
+        float: total readout time (readout + demod - integration delay).
     """
     time = (
         config[f'readout/{qubit}/demod/delay'] +
@@ -431,8 +437,8 @@ def add_dynamical_decoupling(
         total_time (float): total time over which to perform the DD.
         n_dd_pulses (int): number of dynamical decoupling pulses.
         pulse (List): qubic pulse.
-        subspace (str, optional): qubits subspace for the DD sequence. Defaults
-            'GE'.
+        subspace (str, optional): qubit subspace for the DD sequence.
+            Defaults to 'GE'.
     """
     idx = find_pulse_index(
         config, f'single_qubit/{qubit}/{subspace}/X90/pulse'
@@ -554,7 +560,7 @@ def add_virtualz_gate(
 
     Args:
         config (Config):      qcal Config object.
-        gate (Gate):          multi-qubit gate.
+        gate (Gate):          virtual Z gate.
         circuit (List):       qubic circuit.
         pulses (defaultdict): pulses that have been stored for reuse.
     """
@@ -576,7 +582,7 @@ def add_single_qubit_gate(
 
     Args:
         config (Config):      qcal Config object.
-        gate (Gate):          multi-qubit gate.
+        gate (Gate):          single-qubit gate.
         circuit (List):       qubic circuit.
         pulses (defaultdict): pulses that have been stored for reuse.
     """
@@ -924,10 +930,11 @@ def to_qubic(
         pulses (defaultdict): pulses that have been stored for reuse.
         hardware_vz_qubits (List[str], optional): list of qubit labels
             specifying for which qubits should the virtualz gates be done
-            on hardware (as opposed to software). Defaults to None. This is
-            necessary if doing conditional phase shifts using mid-
-            circuit measurements. Example: ```measure_qubits = ['Q0', 'Q1',
-            'Q3']```.
+            on hardware (as opposed to software). Defaults to ``[]``. This
+            is necessary if doing conditional phase shifts using mid-circuit
+            measurements. If empty and ``circuit_for_loop`` is True, all
+            qubits in the circuit are used. Example:
+            ``hardware_vz_qubits = ['Q0', 'Q1', 'Q3']``.
         circuit_for_loop (bool, optional): loops over circuit partitions for
             circuits with repeated structures. Defaults to False.
         barrier_between_cycles (bool, optional): insert a global barrier
@@ -936,8 +943,8 @@ def to_qubic(
             synchronize qubits, so each qubit's timeline runs
             independently (e.g. desynchronized delays followed by
             immediate per-qubit readout). Per-qubit ordering is still
-            guaranteed by the scoped barriers emitted by add_measurement
-            and multi-qubit gates.
+            guaranteed by the scoped barriers emitted by
+            :func:`add_measurement` and multi-qubit gates.
 
     Returns:
         List: transpiled qubic circuit.
@@ -1134,7 +1141,7 @@ def to_qubic(
 
 
 class Transpiler:
-    """qcal to QubiC Transpiler"""
+    """qcal to QubiC Transpiler."""
 
     def __init__(self,
             config:             Config,
@@ -1152,18 +1159,18 @@ class Transpiler:
                 maps circuit gates to QubiC gates. Defaults to None.
             hardware_vz_qubits (List[str], optional): list of qubit labels
                 specifying for which qubits should the virtualz gates be done
-                on hardware (as opposed to software). Defaults to None. This is
-                necessary if doing conditional phase shifts using mid-
-                circuit measurements. Example: ```measure_qubits = ['Q0', 'Q1',
-                'Q3']```.
-            circuit_for_loop (bool, optional): loops over circuit partitions for
-                circuits with repeated structures. Defaults to False.
+                on hardware (as opposed to software). Defaults to ``[]``.
+                This is necessary if doing conditional phase shifts using
+                mid-circuit measurements. Example:
+                ``hardware_vz_qubits = ['Q0', 'Q1', 'Q3']``.
+            circuit_for_loop (bool, optional): loops over circuit partitions
+                for circuits with repeated structures. Defaults to False.
             reload_pulse (bool, optional): reloads the stored pulses when
                 compiling each circuit. Defaults to True.
             barrier_between_cycles (bool, optional): insert a global
                 barrier before every cycle. Defaults to True (historical
                 behavior). When False, only explicit Barrier objects
-                synchronize qubits; see to_qubic() for details.
+                synchronize qubits; see :func:`to_qubic` for details.
         """
         self._config = config
 

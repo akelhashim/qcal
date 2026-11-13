@@ -14,15 +14,15 @@ These mappings are fixed facts about each gate's matrix definition, not
 data that depends on qubits, config, or runtime state, so they are written
 here as literal values rather than recomputed on every import.
 
-Convention: for a two-qubit gate with `gate.qubits == (q0, q1)`, a Pauli
-string `(p0, p1)` means p0 acts on q0 and p1 acts on q1 (matching the
-tensor-factor order of `gate.unitary`); a single-qubit Pauli is just its
-bare label, e.g. 'X'. Both tables are keyed by `gate.name` (e.g. 'CZ',
+Convention: for a two-qubit gate with ``gate.qubits == (q0, q1)``, a Pauli
+string ``(p0, p1)`` means p0 acts on q0 and p1 acts on q1 (matching the
+tensor-factor order of ``gate.unitary``); a single-qubit Pauli is just its
+bare label, e.g. 'X'. Both tables are keyed by ``gate.name`` (e.g. 'CZ',
 'CNOT', 'iSWAP', 'Cliff4', 'H'), not by qubit labels, since the mapping
 only depends on the gate's unitary, not on which physical qubits it acts
-on. `SINGLE_QUBIT_PAULI_CONJUGATION_TABLE` includes entries for gate
+on. ``SINGLE_QUBIT_PAULI_CONJUGATION_TABLE`` includes entries for gate
 classes that are aliases of the same underlying Clifford (e.g. 'SX', 'V',
-and 'X90' are all sqrt(X) = Cliff4), since each is a distinct `gate.name`.
+and 'X90' are all sqrt(X) = Cliff4), since each is a distinct ``gate.name``.
 """
 from __future__ import annotations
 
@@ -601,10 +601,10 @@ SINGLE_QUBIT_PAULI_CONJUGATION_TABLE: dict[
 def get_pauli_conjugation(
     gate: str | Gate, pauli: str | PauliString
 ) -> tuple[PauliString, int] | tuple[str, int] | None:
-    """Look up how `gate` conjugates `pauli`, or None if not tabulated.
+    """Look up how ``gate`` conjugates ``pauli``, or None if not tabulated.
 
     Checks the two-qubit table first, then the single-qubit table, and
-    parses `pauli` accordingly (a 2-qubit Pauli for the former, a bare
+    parses ``pauli`` accordingly (a 2-qubit Pauli for the former, a bare
     single-qubit label for the latter).
 
     Cached (bounded): a dict lookup is already O(1), but a cache hit skips
@@ -614,12 +614,12 @@ def get_pauli_conjugation(
         gate (str | Gate): gate name (e.g. 'CZ', 'Cliff4') or Gate
             instance.
         pauli (str | PauliString): Pauli matching the number of qubits
-            `gate` acts on, e.g. 'XZ' or ('X', 'Z') for a two-qubit gate,
+            ``gate`` acts on, e.g. 'XZ' or ('X', 'Z') for a two-qubit gate,
             or 'X' for a single-qubit gate.
 
     Returns:
         tuple[PauliString, int] | tuple[str, int] | None: (conjugated
-            Pauli, sign), or None if `gate` isn't a tabulated Clifford.
+            Pauli, sign), or None if ``gate`` isn't a tabulated Clifford.
             Callers should fall back to direct unitary conjugation in
             that case.
     """
@@ -658,7 +658,7 @@ def pauli_str_to_matrix(pauli: NQubitPauliString) -> np.ndarray:
 def identify_pauli_str(M: np.ndarray, n: int) -> NQubitPauliString:
     """Return Pauli labels for an n-qubit Pauli matrix, ignoring phase.
 
-    Thin wrapper around `_identify_pauli_str_cached`: ndarrays aren't
+    Thin wrapper around ``_identify_pauli_str_cached``: ndarrays aren't
     hashable, so this converts M to a hashable (bytes, dtype, shape) key
     before delegating to the cached implementation.
 
@@ -725,10 +725,10 @@ def conjugate_pauli_by_gate(
     per distinct gate), so this saturates almost immediately regardless of
     how many circuits/randomizations reuse the same gate.
 
-    Tries `get_pauli_conjugation` first, which looks `gate` up by name in
+    Tries ``get_pauli_conjugation`` first, which looks ``gate`` up by name in
     the precomputed single-/two-qubit Clifford tables; only falls back to
     conjugating the actual unitary and identifying the resulting Pauli
-    string (the expensive path) when `gate` isn't tabulated (e.g. a
+    string (the expensive path) when ``gate`` isn't tabulated (e.g. a
     gate with more than two qubits).
 
     Args:
@@ -791,7 +791,7 @@ def conjugate_pauli_by_cycle(
 
     Args:
         pauli (NQubitPauliString): n-qubit Pauli string, ordered by
-            `qubits`.
+            ``qubits``.
         qubits (tuple): qubit labels corresponding to each entry of pauli.
         cycle (Cycle): cycle to conjugate by.
 
@@ -823,14 +823,14 @@ def conjugate_pauli(
     fixed by its own qubit count, independent of the total number of
     qubits), so this never constructs the full 2^n x 2^n unitary.
 
-    Cached: in CB's `_propagate_sign`, this result depends only on
+    Cached: in CB's ``_propagate_sign``, this result depends only on
     decay_pauli (not on depth, randomization, or twirl_strings), so
     across an entire CB run only ~n_decays distinct calls ever do real
     work.
 
     Args:
         pauli (NQubitPauliString): n-qubit Pauli string, ordered by
-            `cycle_or_circuit.qubits`.
+            ``cycle_or_circuit.qubits``.
         cycle_or_circuit (Cycle | Circuit): cycle or circuit to conjugate
             by.
 
@@ -890,7 +890,7 @@ def _parse_single_qubit_pauli(pauli: str | tuple) -> str:
 def _identify_pauli_str_cached(
     data: bytes, dtype: str, shape: tuple, n: int
 ) -> NQubitPauliString:
-    """Cached (bounded) implementation of `identify_pauli_str`.
+    """Cached (bounded) implementation of ``identify_pauli_str``.
 
     Uses recursive block decomposition: for σ_k ⊗ rest, the 2x2 block
     structure of M in the first qubit's index uniquely identifies σ_k.
@@ -899,8 +899,8 @@ def _identify_pauli_str_cached(
     differ by which qubits they act on.
 
     Args:
-        data (bytes): raw bytes of M (`M.tobytes()`).
-        dtype (str): dtype string of M (`M.dtype.str`).
+        data (bytes): raw bytes of M (``M.tobytes()``).
+        dtype (str): dtype string of M (``M.dtype.str``).
         shape (tuple): shape of M.
         n (int): number of qubits.
 

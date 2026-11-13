@@ -92,4 +92,4 @@ Circuits are compiled via [qcal/compilation/compiler.py](qcal/compilation/compil
 
 ### Global Settings
 
-[qcal/settings.py](qcal/settings.py) is a module-level singleton. Key flags: `settings.save_data` (default `False`) and `settings.data_save_path`. Import as `import qcal.settings as settings`.
+[qcal/settings.py](qcal/settings.py) exposes a module-level singleton, `Settings`. Import as `import qcal.settings as settings` and access attributes on the singleton: `settings.Settings.config_path`, `settings.Settings.save_data` (default `False`), `settings.Settings.data_save_path`, and `settings.Settings.plot_renderer`. Assigning an unknown attribute (e.g. `data_path`) silently does nothing useful.

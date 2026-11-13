@@ -1,10 +1,51 @@
 """Submodule for two-qubit CZ gate calibrations.
 
+This module provides factory functions that build CZ calibration classes
+on top of a user-supplied :class:`~qcal.qpu.qpu.QPU` class. Each returns
+an instance inheriting from both the QPU class and
+:class:`~qcal.calibration.calibration.Calibration`:
+
+- :func:`AmpFreqSweep`: 2D amplitude/frequency sweep of the CZ pulse.
+- :func:`Amplitude`: calibrate the CZ pulse amplitude.
+- :func:`Frequency`: calibrate the CZ drive frequency.
+- :func:`RelativeAmp`: calibrate the relative amplitude between the two
+  drive lines.
+- :func:`RelativePhase`: calibrate the relative phase between the two
+  drive lines.
+- :func:`LocalPhases`: calibrate the local (IZ and ZI) phase corrections.
+- :func:`SpectatorPhase`: calibrate local phases on spectator qubits.
+
+It also provides :func:`calculate_parametric_cz_frequency` and the
+:func:`tomography_circuits` helper used by the sweeps.
+
+Example:
+    .. code-block:: python
+
+        import numpy as np
+
+        import qcal as qc
+        from qcal.backend.qubic.qpu import QubicQPU
+        from qcal.calibration.cz import Amplitude, LocalPhases
+
+        config = qc.Config()
+
+        # Find the amplitude that maximizes the conditionality
+        cal = Amplitude(
+            QubicQPU,  # any QPU class
+            config,
+            qubit_pairs=[(0, 1), (2, 3)],
+            amplitudes=np.linspace(0.0, 0.5, 21),
+        )
+        cal.run()
+
+        # Then correct the local Z phases of the CZ gate
+        cal = LocalPhases(QubicQPU, config, qubit_pairs=[(0, 1), (2, 3)])
+        cal.run()
 """
 from __future__ import annotations
 
 import logging
-from typing import Callable, Dict, Sequence, Tuple
+from typing import Dict, Sequence, Tuple
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -203,25 +244,26 @@ def AmpFreqSweep(
     n_gates:     int = 1,
     params:      Dict | None = None,
     **kwargs
-) -> Callable:
+) -> Calibration:
     """Amplitude & Frequency sweep for CZ gate.
 
-    This sweep searches a 2D lanscape to find the where the conditionality is
+    This sweep searches a 2D landscape to find where the conditionality is
     a maximum.
 
-    Basic example useage for initial calibration:
+    Example:
+        Initial calibration:
 
-    ```
-    amplitudes = np.linspace(0.0, 0.5, 21)
-    frequencies = np.linspace(5.5, 5.6, 21) * GHz
-    sweep = AmpFreqSweep(
-        CustomQPU,
-        config,
-        qubit_pairs=[(0, 1), (2, 3)],
-        amplitudes=amplitudes,
-        frequencies=frequencies)
-    sweep.run()
-    ```
+        .. code-block:: python
+
+            amplitudes = np.linspace(0.0, 0.5, 21)
+            frequencies = np.linspace(5.5, 5.6, 21) * GHz
+            sweep = AmpFreqSweep(
+                CustomQPU,
+                config,
+                qubit_pairs=[(0, 1), (2, 3)],
+                amplitudes=amplitudes,
+                frequencies=frequencies)
+            sweep.run()
 
     Args:
         qpu (QPU): custom QPU object.
@@ -239,11 +281,13 @@ def AmpFreqSweep(
             dictionary mapping an array to each qubit pair label.
         n_gates (int, optional): number of gates for pulse repetition.
             Defaults to 1.
-        params (Dict): dictionary mapping the qubit labels to the config
-            parameter to sweep over.
+        params (Dict | None, optional): dictionary mapping the qubit labels
+            to the config parameter to sweep over. Defaults to None.
+        **kwargs: additional keyword arguments passed to the QPU
+            constructor (e.g. ``n_shots``).
 
     Returns:
-        Callable: AmpFreqSweep class.
+        Calibration: AmpFreqSweep class.
     """
 
     class AmpFreqSweep(qpu, Calibration):
@@ -262,7 +306,7 @@ def AmpFreqSweep(
             params:      Dict | None = None,
             **kwargs
         ) -> None:
-            """Initialize the AmpFreqSweep within the function."""
+            """Initialize the AmpFreqSweep class."""
             qpu.__init__(self, config=config, **kwargs)
             Calibration.__init__(self, config)
 
@@ -274,7 +318,9 @@ def AmpFreqSweep(
             else:
                 self._params = {}
                 for pair in qubit_pairs:
-                    idx = find_pulse_index(config, f'two_qubit/{pair}/CZ/pulse')
+                    idx = find_pulse_index(
+                        config, f'two_qubit/{pair}/CZ/pulse'
+                    )
                     self._params[pair] = (
                         f'two_qubit/{pair}/CZ/pulse/{idx}/kwargs/amp',
                         f'two_qubit/{pair}/CZ/pulse/{idx+1}/kwargs/amp',
@@ -553,23 +599,24 @@ def Amplitude(
     relative_amp: bool = False,
     params:       Dict | None = None,
     **kwargs
-) -> Callable:
+) -> Calibration:
     """Amplitude calibration for CZ gate.
 
     This calibration finds the amplitude for both drive lines where the
     conditionality is a maximum.
 
-    Basic example useage for initial calibration:
+    Example:
+        Initial calibration:
 
-    ```
-    amplitudes = np.linspace(0.0, 0.5, 21)
-    cal = Amplitude(
-        CustomQPU,
-        config,
-        qubit_pairs=[(0, 1), (2, 3)],
-        amplitudes=amplitudes)
-    cal.run()
-    ```
+        .. code-block:: python
+
+            amplitudes = np.linspace(0.0, 0.5, 21)
+            cal = Amplitude(
+                CustomQPU,
+                config,
+                qubit_pairs=[(0, 1), (2, 3)],
+                amplitudes=amplitudes)
+            cal.run()
 
     Args:
         qpu (QPU): custom QPU object.
@@ -587,11 +634,14 @@ def Amplitude(
             is defined relative to the existing pulse amplitude. Defaults to
             False. If True, the amplitudes are swept over the current amplitude
             times the amplitudes argument.
-        params (Dict): dictionary mapping the qubit labels to the config
-            parameter to sweep over.
+        params (Dict | None, optional): dictionary mapping the qubit labels
+            to the config parameter to sweep over. Defaults to None.
+        **kwargs: additional keyword arguments passed to the QPU
+            constructor (e.g. ``n_shots``).
 
     Returns:
-        Callable: Amplitude calibration class.
+        Calibration: Amplitude calibration instance (a subclass of
+            ``qpu``).
     """
 
     class Amplitude(qpu, Calibration):
@@ -611,7 +661,7 @@ def Amplitude(
             params:       Dict | None = None,
             **kwargs
         ) -> None:
-            """Initialize the Amplitude class within the function."""
+            """Initialize the Amplitude calibration class."""
             qpu.__init__(self, config=config, **kwargs)
             Calibration.__init__(self, config)
 
@@ -623,7 +673,9 @@ def Amplitude(
             else:
                 self._params = {}
                 for pair in qubit_pairs:
-                    idx = find_pulse_index(config, f'two_qubit/{pair}/CZ/pulse')
+                    idx = find_pulse_index(
+                        config, f'two_qubit/{pair}/CZ/pulse'
+                    )
                     self._params[pair] = (
                         f'two_qubit/{pair}/CZ/pulse/{idx}/kwargs/amp',
                         f'two_qubit/{pair}/CZ/pulse/{idx+1}/kwargs/amp'
@@ -754,9 +806,15 @@ def Amplitude(
                         self._amplitudes[pair][j], self._R[pair], params=params
                     )
 
-                # If the fit was successful, find the new amplitude
+                # If the fit was successful, find the new amplitude. If the
+                # fit failed or was rejected, fall back to the amplitude that
+                # maximizes the conditionality, so that there is always one
+                # value per parameter (required by Calibration.final).
                 self._cal_values[pair] = []
                 for k in range(len(self._params[pair])):
+                    fallback = (
+                        self._amplitudes[pair][k][np.argmax(self._R[pair])]
+                    )
                     if self._fit[pair][k].fit_success:
                         a = self._fit[pair][k].fit_params['a'].value
                         b = self._fit[pair][k].fit_params['b'].value
@@ -766,18 +824,18 @@ def Amplitude(
                               f'Fit failed for {pair} (positive curvature)!'
                             )
                             self._fit[pair][k]._fit_success = False
+                            self._cal_values[pair].append(fallback)
                         elif not in_range(newvalue, self._amplitudes[pair][k]):
                             logger.warning(
                                 f'Fit failed for {pair} (out of range)!'
                             )
                             self._fit[pair][k]._fit_success = False
+                            self._cal_values[pair].append(fallback)
                         else:
                             self._cal_values[pair].append(newvalue)
 
                     else:
-                        self._cal_values[pair].append(
-                            self._amplitudes[pair][k][np.argmax(self._R[pair])]
-                        )
+                        self._cal_values[pair].append(fallback)
 
         def save(self):
             """Save all circuits and data."""
@@ -848,7 +906,9 @@ def Amplitude(
 
                         # Add a second x-axis on top of plot
                         # ax2 = ax.twiny()
-                        # ax2.set_xlabel('Control Amplitude (a.u.)', fontsize=15)
+                        # ax2.set_xlabel(
+                        #     'Control Amplitude (a.u.)', fontsize=15
+                        # )
                         # ax.plot(
                         #     self._param_sweep[q][0], self._sweep_results[q],
                         #     'o', c='blue'
@@ -909,22 +969,23 @@ def Frequency(
     relative_freq: bool = False,
     params:        Dict | None = None,
     **kwargs
-) -> Callable:
+) -> Calibration:
     """Frequency calibration for CZ gate.
 
     This calibration finds the frequency where the conditionality is a maximum.
 
-    Basic example useage for initial calibration:
+    Example:
+        Initial calibration:
 
-    ```
-    frequencies = np.linspace(5.0, 5.2, 21) * GHz
-    cal = Frequency(
-        CustomQPU,
-        config,
-        qubit_pairs=[(0, 1), (2, 3)],
-        frequencies=frequencies)
-    cal.run()
-    ```
+        .. code-block:: python
+
+            frequencies = np.linspace(5.0, 5.2, 21) * GHz
+            cal = Frequency(
+                CustomQPU,
+                config,
+                qubit_pairs=[(0, 1), (2, 3)],
+                frequencies=frequencies)
+            cal.run()
 
     Args:
         qpu (QPU): custom QPU object.
@@ -941,11 +1002,14 @@ def Frequency(
             is defined relative to the existing pulse frequencies. Defaults to
             False. If True, the frequencies are swept over the current
             frequency plus/minus the frequencies argument.
-        params (Dict): dictionary mapping the qubit labels to the config
-            parameter to sweep over.
+        params (Dict | None, optional): dictionary mapping the qubit labels
+            to the config parameter to sweep over. Defaults to None.
+        **kwargs: additional keyword arguments passed to the QPU
+            constructor (e.g. ``n_shots``).
 
     Returns:
-        Callable: Frequency calibration class.
+        Calibration: Frequency calibration instance (a subclass of
+            ``qpu``).
     """
 
     class Frequency(qpu, Calibration):
@@ -965,7 +1029,7 @@ def Frequency(
             params:        Dict | None = None,
             **kwargs
         ) -> None:
-            """Initialize the Amplitude class within the function."""
+            """Initialize the Frequency calibration class."""
             qpu.__init__(self, config=config, **kwargs)
             Calibration.__init__(self, config)
 
@@ -1231,23 +1295,24 @@ def RelativeAmp(
     amplitudes:  ArrayLike | Dict[Tuple[int, int], ArrayLike],
     params:      Dict | None = None,
     **kwargs
-) -> Callable:
+) -> Calibration:
     """Relative amplitude calibration for CZ gate.
 
     This calibration finds a relative amplitude between the drive lines where
     the conditionality is a maximum.
 
-    Basic example useage for initial calibration:
+    Example:
+        Initial calibration:
 
-    ```
-    amplitudes = np.linspace(0.8, 1.2, 21)
-    cal = RelativeAmp(
-        CustomQPU,
-        config,
-        qubit_pairs=[(0, 1), (2, 3)],
-        amplitudes=amplitudes)
-    cal.run()
-    ```
+        .. code-block:: python
+
+            amplitudes = np.linspace(0.8, 1.2, 21)
+            cal = RelativeAmp(
+                CustomQPU,
+                config,
+                qubit_pairs=[(0, 1), (2, 3)],
+                amplitudes=amplitudes)
+            cal.run()
 
     Args:
         qpu (QPU): custom QPU object.
@@ -1260,11 +1325,13 @@ def RelativeAmp(
             relative to the amplitude on the control qubit line. If calibrating
             multiple gates at the same time, this should be a dictionary
             mapping an array to a qubit pair label.
-        params (Dict): dictionary mapping the qubit labels to the config
-            parameter to sweep over.
+        params (Dict | None, optional): dictionary mapping the qubit labels
+            to the config parameter to sweep over. Defaults to None.
+        **kwargs: additional keyword arguments passed to the QPU
+            constructor (e.g. ``n_shots``).
 
     Returns:
-        Callable: RelativeAmp calibration class.
+        Calibration: RelativeAmp calibration class.
     """
 
     class RelativeAmp(qpu, Calibration):
@@ -1282,7 +1349,7 @@ def RelativeAmp(
             params:      Dict | None = None,
             **kwargs
         ) -> None:
-            """Initialize the RelativeAmp class within the function."""
+            """Initialize the RelativeAmp calibration class."""
             qpu.__init__(self, config=config, **kwargs)
             Calibration.__init__(self, config)
 
@@ -1293,7 +1360,9 @@ def RelativeAmp(
             else:
                 self._params = {}
                 for pair in qubit_pairs:
-                    idx = find_pulse_index(config, f'two_qubit/{pair}/CZ/pulse')
+                    idx = find_pulse_index(
+                        config, f'two_qubit/{pair}/CZ/pulse'
+                    )
                     self._params[pair] = (
                         f'two_qubit/{pair}/CZ/pulse/{idx+1}/kwargs/amp'
                     )
@@ -1487,23 +1556,24 @@ def RelativePhase(
     phases:      ArrayLike | Dict[Tuple[int, int], ArrayLike],
     params:      Dict | None = None,
     **kwargs
-) -> Callable:
+) -> Calibration:
     """Relative phase calibration for CZ gate.
 
     This calibration finds a relative phase between the drive lines where the
     conditionality is a maximum.
 
-    Basic example useage for initial calibration:
+    Example:
+        Initial calibration:
 
-    ```
-    phases = np.pi * np.linspace(-0.5, 0.5, 21)
-    cal = RelativePhase(
-        CustomQPU,
-        config,
-        qubit_pairs=[(0, 1), (2, 3)],
-        phases=phases)
-    cal.run()
-    ```
+        .. code-block:: python
+
+            phases = np.pi * np.linspace(-0.5, 0.5, 21)
+            cal = RelativePhase(
+                CustomQPU,
+                config,
+                qubit_pairs=[(0, 1), (2, 3)],
+                phases=phases)
+            cal.run()
 
     Args:
         qpu (QPU): custom QPU object.
@@ -1514,11 +1584,13 @@ def RelativePhase(
             phases to sweep over for calibrating the two-qubit gate phases.
             If calibrating multiple gates at the same time, this should be a
             dictionary mapping an array to a qubit pair label.
-        params (Dict): dictionary mapping the qubit labels to the config
-            parameter to sweep over.
+        params (Dict | None, optional): dictionary mapping the qubit labels
+            to the config parameter to sweep over. Defaults to None.
+        **kwargs: additional keyword arguments passed to the QPU
+            constructor (e.g. ``n_shots``).
 
     Returns:
-        Callable: RelativePhase calibration calss.
+        Calibration: RelativePhase calibration class.
     """
 
     class RelativePhase(qpu, Calibration):
@@ -1536,7 +1608,7 @@ def RelativePhase(
             params:      Dict | None = None,
             **kwargs
         ) -> None:
-            """Initialize the RelativePhase class within the function."""
+            """Initialize the RelativePhase calibration class."""
             qpu.__init__(self, config=config, **kwargs)
             Calibration.__init__(self, config)
 
@@ -1553,7 +1625,9 @@ def RelativePhase(
             else:
                 self._params = {}
                 for pair in qubit_pairs:
-                    idx = find_pulse_index(config, f'two_qubit/{pair}/CZ/pulse')
+                    idx = find_pulse_index(
+                        config, f'two_qubit/{pair}/CZ/pulse'
+                    )
                     self._params[pair] = (
                         f'two_qubit/{pair}/CZ/pulse/{idx+1}/kwargs/phase'
                     )
@@ -1727,21 +1801,22 @@ def LocalPhases(
     phases:      NDArray | Dict | None = None,
     params:      Dict | None = None,
     **kwargs
-) -> Callable:
+) -> Calibration:
     """Local phase calibration for CZ gate.
 
     This calibration finds the local phases to calibrate the IZ and ZI terms in
     the Hamiltonian.
 
-    Basic example useage for initial calibration:
+    Example:
+        Initial calibration:
 
-    ```
-    cal = LocalPhases(
-        CustomQPU,
-        config,
-        qubit_pairs=[(0, 1), (2, 3)])
-    cal.run()
-    ```
+        .. code-block:: python
+
+            cal = LocalPhases(
+                CustomQPU,
+                config,
+                qubit_pairs=[(0, 1), (2, 3)])
+            cal.run()
 
     Args:
         qpu (QPU): custom QPU object.
@@ -1750,14 +1825,16 @@ def LocalPhases(
             two-qubit gate calibration.
         phases (NDArray | Dict, optional): array of phases to sweep over for
             calibrating the local phases of the gate. Defaults to None. If
-            None, it defaults to```np.pi * np.linspace(-1, 1, 21)```. If
+            None, it defaults to ``np.pi * np.linspace(-1, 1, 21)``. If
             calibrating multiple gates at the same time, this should be a
             dictionary mapping an array to a qubit pair label.
-        params (Dict): dictionary mapping the qubit labels to the config
-            parameter to sweep over.
+        params (Dict | None, optional): dictionary mapping the qubit labels
+            to the config parameter to sweep over. Defaults to None.
+        **kwargs: additional keyword arguments passed to the QPU
+            constructor (e.g. ``n_shots``).
 
     Returns:
-        Callable: LocalPhases calibration calss.
+        Calibration: LocalPhases calibration class.
     """
 
     class LocalPhases(qpu, Calibration):
@@ -1775,7 +1852,7 @@ def LocalPhases(
             params:      Dict | None = None,
             **kwargs
         ) -> None:
-            """Initialize the LocalPhases class within the function."""
+            """Initialize the LocalPhases calibration class."""
             qpu.__init__(self, config=config, **kwargs)
             Calibration.__init__(self, config)
 
@@ -1795,7 +1872,9 @@ def LocalPhases(
             else:
                 self._params = {}
                 for pair in qubit_pairs:
-                    idx = find_pulse_index(config, f'two_qubit/{pair}/CZ/pulse')
+                    idx = find_pulse_index(
+                        config, f'two_qubit/{pair}/CZ/pulse'
+                    )
                     if isinstance(  # Check for post-pulse
                         config[f'two_qubit/{pair}/CZ/pulse/{idx+2}'], str):
                         idx += 1
@@ -2253,23 +2332,24 @@ def SpectatorPhase(
     phases:             NDArray | Dict | None = None,
     params:             Dict | None = None,
     **kwargs
-) -> Callable:
+) -> Calibration:
     """Spectator phase calibration for CZ gate.
 
-    This calibration finds a the local phase on a spectator qubit that minimizes
-    the conditionality on that qubit imparted from a two-qubit CZ gate.
+    This calibration finds the local phase on a spectator qubit that
+    minimizes the conditionality on that qubit imparted from a two-qubit CZ
+    gate.
 
-    Basic example useage:
-    ```
-    cal = SpectatorPhase(
-        CustomQPU,
-        config,
-        qubit_pairs=[(0, 1)],
-        spectator_qubits=[2],
-        conditional_qubits=[1]
-    )
-    cal.run()
-    ```
+    Example:
+        .. code-block:: python
+
+            cal = SpectatorPhase(
+                CustomQPU,
+                config,
+                qubit_pairs=[(0, 1)],
+                spectator_qubits=[2],
+                conditional_qubits=[1]
+            )
+            cal.run()
 
     Args:
         qpu (QPU): custom QPU object.
@@ -2281,14 +2361,16 @@ def SpectatorPhase(
             conditional phase of the spectator qubits depend.
         phases (NDArray | Dict, optional): array of phases to sweep over for
             calibrating the spectator phases. Defaults to None. If None, it
-            defaults to ```np.pi * np.linspace(-1, 1, 21)```. If calibrating
+            defaults to ``np.pi * np.linspace(-1, 1, 21)``. If calibrating
             multiple gates at the same time, this can be a dictionary mapping
             an array to a spectator qubit label.
-        params (Dict): dictionary mapping the qubit labels to the config
-            parameter to sweep over.
+        params (Dict | None, optional): dictionary mapping the qubit labels
+            to the config parameter to sweep over. Defaults to None.
+        **kwargs: additional keyword arguments passed to the QPU
+            constructor (e.g. ``n_shots``).
 
     Returns:
-        Callable: SpectatorPhase calibration class.
+        Calibration: SpectatorPhase calibration class.
     """
 
     class SpectatorPhase(qpu, Calibration):
@@ -2308,7 +2390,7 @@ def SpectatorPhase(
             params:             Dict | None = None,
             **kwargs
         ) -> None:
-            """Initialize the SpectatorPhase class within the function."""
+            """Initialize the SpectatorPhase calibration class."""
             qpu.__init__(self, config=config, **kwargs)
             Calibration.__init__(self, config)
 

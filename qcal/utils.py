@@ -1,10 +1,10 @@
-"""Helper functions.
-"""
+"""Helper functions."""
 import functools
 import inspect
 import logging
 import pathlib
 import pickle
+import warnings
 from collections.abc import Iterable
 from typing import Any, Callable, List
 
@@ -17,7 +17,7 @@ def flatten(xs: List):
     """Flatten a list with arbitrary nesting.
 
     Args:
-        xs (List): List of nested lists.
+        xs (List): list of nested lists.
 
     Yields:
         Any: the flattened item in the list.
@@ -53,28 +53,82 @@ def load_from_pickle(filename: str) -> Any:
     return data
 
 
-def save_init(init: Callable) -> Callable:
-    """Decorator that saves the arguments passed to a class's __init__ method.
+def pop_deprecated_kwarg(
+    kwargs: dict, old: str, new: str, value: Any, default: Any = None
+) -> Any:
+    """Resolve a renamed keyword argument, warning if the old name is used.
 
-    Stores the initialization arguments in `_init_args` and `_init_kwargs`
-    on the instance, allowing for later re-instantiation or debugging.
+    Removes ``old`` from ``kwargs`` (so it is not forwarded elsewhere) and
+    returns the value to use for ``new``.
+
+    Example:
+        .. code-block:: python
+
+            def f(propagate_correction=False, **kwargs):
+                propagate_correction = pop_deprecated_kwarg(
+                    kwargs, 'propogate_correction', 'propagate_correction',
+                    propagate_correction, default=False,
+                )
 
     Args:
-        init (Callable): original __init__ method of the class.
+        kwargs (dict): keyword arguments that may contain ``old``. Modified
+            in place.
+        old (str): deprecated argument name.
+        new (str): current argument name.
+        value (Any): value passed for ``new``.
+        default (Any, optional): default value of ``new``, used to detect
+            whether ``new`` was passed explicitly. Defaults to None.
 
     Returns:
-        Callable: wrapped __init__ method with argument-saving functionality.
+        Any: the value passed for ``old`` if it was given, otherwise
+        ``value``.
+
+    Raises:
+        TypeError: if both ``old`` and ``new`` were passed with different
+            values.
+    """
+    if old not in kwargs:
+        return value
+    old_value = kwargs.pop(old)
+    warnings.warn(
+        f'{old!r} is deprecated; use {new!r} instead.',
+        DeprecationWarning,
+        stacklevel=3,
+    )
+    if value != default and value != old_value:
+        raise TypeError(
+            f'Got values for both {new!r} and its deprecated alias '
+            f'{old!r}.'
+        )
+    return old_value
+
+
+def save_init(init: Callable) -> Callable:
+    """Decorator that saves the arguments passed to a class's ``__init__``.
+
+    Stores the initialization arguments in ``_init_args`` and
+    ``_init_kwargs`` on the instance, allowing for later re-instantiation
+    or debugging.
+
+    Args:
+        init (Callable): original ``__init__`` method of the class.
+
+    Returns:
+        Callable: wrapped ``__init__`` method with argument-saving
+            functionality.
     """
     @functools.wraps(init)
     def wrapped(self, *args, **kwargs) -> Any:
-        """Wrapped __init__ that saves init arguments to instance variables.
+        """Wrapped ``__init__`` that saves init arguments to the instance.
 
         Args:
-            *args: positional arguments passed to __init__.
-            **kwargs: keyword arguments passed to __init__.
+            self (Any): the instance being initialized.
+            *args: positional arguments passed to ``__init__``.
+            **kwargs: keyword arguments passed to ``__init__``.
 
         Returns:
-            Any: whatever the original __init__ returns (typically None).
+            Any: whatever the original ``__init__`` returns (typically
+                None).
         """
         sig = inspect.signature(init)
         bound = sig.bind(self, *args, **kwargs)
@@ -114,5 +168,6 @@ def save_to_pickle(data: Any, filename: str) -> None:
         pkl_filename = f'{filename}.pkl'
     if isinstance(data, pd.DataFrame):
         data.to_pickle(pkl_filename)
-    with open(pkl_filename, 'wb') as handle:
-        pickle.dump(data, handle, protocol=pickle.HIGHEST_PROTOCOL)
+    else:
+        with open(pkl_filename, 'wb') as handle:
+            pickle.dump(data, handle, protocol=pickle.HIGHEST_PROTOCOL)

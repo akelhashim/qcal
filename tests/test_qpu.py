@@ -27,7 +27,7 @@ from qcal.circuit import Circuit, CircuitSet, Cycle
 from qcal.config import Config
 from qcal.gates.single_qubit import X90
 from qcal.managers.classification_manager import ClassificationManager
-from qcal.managers.data_manager import DataMananger
+from qcal.managers.data_manager import DataManager
 from qcal.qpu.qpu import QPU
 from qcal.utils import save_to_pickle
 
@@ -182,7 +182,7 @@ class TestInitialize:
         qpu = QPU(config)
         calls = []
         monkeypatch.setattr(
-            DataMananger, 'generate_exp_id', lambda self: calls.append(1)
+            DataManager, 'generate_exp_id', lambda self: calls.append(1)
         )
 
         qpu._initialize(_circuits(1))

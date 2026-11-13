@@ -1,19 +1,34 @@
 """Submodule for handling cycles, circuits, and sets of circuits.
 
-A Cycle or Layer defines a single clock-cycle in a quantum circuit (i.e., a set
-of gates defined in parallel on disjoin sets of qubits).
+A :class:`Cycle` or :class:`Layer` defines a single clock-cycle in a
+quantum circuit (i.e., a set of gates defined in parallel on disjoint sets
+of qubits).
 
-A Circuit is a collection of cycles or layers defining the set of operations
-on quibts.
+A :class:`Circuit` is a collection of cycles or layers (and optionally
+:class:`Barrier` objects) defining the set of operations on qubits.
 
-CircuitSet takes a list of circuits and loads them into a dataframe that can be
-used to store other useful information about the circuits, enabling fast and
-easy sorting of circuits by arbitrary variables.
+:class:`CircuitSet` takes a list of circuits and loads them into a
+dataframe that can be used to store other useful information about the
+circuits, enabling fast and easy sorting of circuits by arbitrary
+variables.
 
-Basic example useage:
-```
-cs = CircuitSet([list of circuits])
-```
+Example:
+    >>> from qcal.circuit import Circuit, CircuitSet, Cycle
+    >>> from qcal.gates.single_qubit import X90
+    >>> from qcal.gates.two_qubit import CZ
+    >>> circuit = Circuit([
+    ...     Cycle({X90(0), X90(1)}),
+    ...     Cycle({CZ(0, 1)}),
+    ... ])
+    >>> circuit.measure()  # Appends a measurement cycle on all qubits
+    >>> circuit.n_cycles, circuit.qubits
+    (3, (0, 1))
+    >>> cs = CircuitSet([circuit, circuit.copy()])
+    >>> cs['label'] = ['a', 'b']  # Store metadata alongside the circuits
+    >>> cs.n_circuits
+    2
+    >>> cs.subset(label='b').n_circuits
+    1
 """
 from __future__ import annotations
 
@@ -45,7 +60,10 @@ __all__ = [
 
 
 def partition_circuit(circuit: Circuit, block_size: int = 1) -> List:
-    """Partition a circuit in terms of a maximum of `block_size`.
+    """Partition a circuit in terms of a maximum of ``block_size``.
+
+    Consecutive, identical blocks of cycles are grouped together and
+    counted.
 
     Args:
         circuit (Circuit): qcal Circuit.
@@ -53,7 +71,9 @@ def partition_circuit(circuit: Circuit, block_size: int = 1) -> List:
             group together. Defaults to 1.
 
     Returns:
-        List: (circuit_partitions, counts)
+        List: list of ``(block, count)`` tuples, where ``block`` is a list
+            of cycles and ``count`` is the number of consecutive repetitions
+            of the block.
     """
     cycles = circuit.cycles
     blocks = [
@@ -73,9 +93,9 @@ class Barrier:
     def __init__(self, qubits: Iterable[int] = ()) -> None:
         """Initialize the Barrier class.
 
-        Barrier takes an option qubits kwarg. If qubits does not include every
-        qubit in full quantum register, then only a partial barrier is
-        implemented.
+        Barrier takes an optional qubits kwarg. If qubits does not include
+        every qubit in the full quantum register, then only a partial
+        barrier is implemented.
 
         Args:
             qubits (Iterable[int], optional): qubits to enforce a barrier
@@ -87,11 +107,11 @@ class Barrier:
         return Barrier(copy.deepcopy(self._qubits))
 
     def __repr__(self) -> str:
-        """Draw the circuit as a string."""
+        """Draw the barrier as a string."""
         return self.name
 
     def __str__(self) -> str:
-        """Draw the circuit as a string."""
+        """Draw the barrier as a string."""
         return self.name
 
     @property
@@ -99,7 +119,7 @@ class Barrier:
         """Whether or not the cycle is a barrier.
 
         Returns:
-            bool: True
+            bool: True.
         """
         return True
 
@@ -108,7 +128,7 @@ class Barrier:
         """Name of the barrier cycle.
 
         Returns:
-            str: 'Barrier'
+            str: ``'Barrier'``.
         """
         return 'Barrier'
 
@@ -139,12 +159,24 @@ class Barrier:
         return self.__copy__()
 
 class Cycle:
-    """Class defining a cycle in a circuit."""
+    """Class defining a cycle in a circuit.
+
+    A cycle is a set of gates acting in parallel on disjoint sets of qubits
+    within a single clock cycle.
+
+    Example:
+        >>> from qcal.circuit import Cycle
+        >>> from qcal.gates.single_qubit import X90
+        >>> cycle = Cycle({X90(0), X90(1)})
+        >>> cycle.n_gates, cycle.qubits
+        (2, (0, 1))
+    """
 
     __slots__ = ('_gates', '_qubits')
 
     def __init__(self, gate_or_gates: Gate | Iterable[Gate] = None) -> None:
-        """
+        """Initialize a Cycle.
+
         Args:
             gate_or_gates (Gate | Iterable[Gate], optional): gate or set of
                 gates. Defaults to None.
@@ -164,6 +196,11 @@ class Cycle:
         return self.gates[idx]
 
     def __call__(self) -> Set:
+        """Return the set of gates in the cycle.
+
+        Returns:
+            Set: gates in the cycle.
+        """
         return self._gates
 
     def __copy__(self) -> Cycle:
@@ -244,7 +281,7 @@ class Cycle:
         """Whether or not the cycle is a barrier.
 
         Returns:
-            bool: False
+            bool: False.
         """
         return False
 
@@ -330,7 +367,8 @@ class Cycle:
         """Appends a gate to the existing cycle/layer.
 
         Args:
-            gate_or_gates (Gate): qcal gate object.
+            gate_or_gates (Gate | Iterable[Gate]): qcal gate object or
+                iterable of gate objects.
         """
         if isinstance(gate_or_gates, Gate):
             self._gates.add(gate_or_gates)
@@ -383,16 +421,21 @@ class Layer(Cycle):
     __slots__ = ('_gates', '_qubits')
 
     def __init__(self, gates: Set[Gate] = None) -> None:
+        """Initialize a Layer.
+
+        Args:
+            gates (Set[Gate], optional): set of gates. Defaults to None.
+        """
         super().__init__(gates)
 
     def __copy__(self) -> Layer:
         return Layer({copy.deepcopy(gate) for gate in self._gates})
 
     def to_str(self) -> str:
-        """Convert the cycle to a string.
+        """Convert the layer to a string.
 
         Returns:
-            str: string representation of the cycle.
+            str: string representation of the layer.
         """
         str_rep = 'Layer'
         for gate in self.gates:
@@ -401,6 +444,19 @@ class Layer(Cycle):
 
 
 class Circuit:
+    """Class defining a quantum circuit as an ordered sequence of cycles.
+
+    Example:
+        >>> from qcal.circuit import Circuit, Cycle
+        >>> from qcal.gates.single_qubit import X90
+        >>> from qcal.gates.two_qubit import CZ
+        >>> circuit = Circuit([Cycle({X90(0), X90(1)}), Cycle({CZ(0, 1)})])
+        >>> circuit.append(Cycle({X90(0)}))
+        >>> circuit.prepare('ZX', qubits=(0, 1))  # Prepend state prep
+        >>> circuit.measure()
+        >>> circuit.circuit_depth
+        5
+    """
 
     __slots__ = (
         '_cycles', '_qubits', '_results', '_mcm_results', '_per_shot_results'
@@ -409,7 +465,7 @@ class Circuit:
     def __init__(self,
             cycles_or_layers: Iterable[Cycle | Layer | Barrier] = None
         ) -> None:
-        """qcal Circuit.
+        """Initialize a Circuit.
 
         Args:
             cycles_or_layers (Iterable[Cycle | Layer | Barrier], optional):
@@ -653,11 +709,10 @@ class Circuit:
 
     @property
     def unitary(self) -> NDArray:
-        """The unitary matrix of the circuit (ordered product of cycle
-        unitaries).
+        """The unitary matrix of the circuit.
 
-        Barriers are skipped. Raises if any cycle contains a
-        non-unitary gate.
+        This is the ordered product of the cycle unitaries. Barriers are
+        skipped. Raises if any cycle contains a non-unitary gate.
 
         Raises:
             ValueError: if any cycle in the circuit contains a
@@ -779,8 +834,8 @@ class Circuit:
     ) -> int:
         """Returns the first index of the cycle_or_layer in the circuit.
 
-        The search is performed starting from the `beg` index and ending with
-        the `end` index.
+        The search is performed starting from the ``beg`` index and ending
+        with the ``end`` index.
 
         Args:
             cycle_or_layer (Barrier, Cycle, Layer, Iterable): cycle/layer to
@@ -810,7 +865,7 @@ class Circuit:
         self,
         cycle_or_layer: Barrier | Cycle | Layer | Iterable, idx: int
     ) -> None:
-        """Inserts a cycle/layer at index `idx`.
+        """Inserts a cycle/layer at index ``idx``.
 
         Args:
             cycle_or_layer (Barrier, Cycle, Layer, Iterable): cycle/layer to
@@ -834,13 +889,13 @@ class Circuit:
 
         Args:
             circuit (Circuit): circuit to join with.
-            how (str, optional): how to join the circuits. Defaults to 'outer'.
-                ```how='outer'``` takes the union of cycles from both circuits,
-                which will produce a circuit with a number of cycles that is
-                the maximum of the two circuits.
-                ```how='inner'``` takes the intersection of cycles from both
-                circuits, which will produce a circuit with a number of cycles
-                that is the minimum of the two circuits.
+            how (str, optional): how to join the circuits. Defaults to
+                ``'outer'``. ``how='outer'`` takes the union of cycles from
+                both circuits, which will produce a circuit with a number of
+                cycles that is the maximum of the two circuits.
+                ``how='inner'`` takes the intersection of cycles from both
+                circuits, which will produce a circuit with a number of
+                cycles that is the minimum of the two circuits.
         """
         new_cycles = []
         if how == 'outer':
@@ -944,17 +999,18 @@ class Circuit:
         """Plot a mock sequence of the circuit.
 
         Args:
-            single_qubit_gate_time (float, optional): duration of a
-                single-qubit gate in seconds. Defaults to 20 ns.
-            two_qubit_gate_time (float, optional): duration of a two-qubit
-                gate in seconds. Defaults to 100 ns.
-            measurement_time (float, optional): duration of a measurement in
-                seconds. Defaults to 1 us.
+            **kwargs: keyword arguments passed to
+                :func:`qcal.plotting.sequence.plot_mock_sequence`. Supported
+                keywords are ``single_qubit_gate_time`` (float, duration of a
+                single-qubit gate in seconds, default 20 ns),
+                ``two_qubit_gate_time`` (float, duration of a two-qubit gate
+                in seconds, default 100 ns), and ``measurement_time`` (float,
+                duration of a measurement in seconds, default 1 us).
         """
         plot_mock_sequence(self, **kwargs)
 
     def pop(self) -> None:
-        """Removes the last cycle/layer to the end of the circuit."""
+        """Removes the last cycle/layer at the end of the circuit."""
         self._cycles.pop()
         self._update_qubits()
 
@@ -977,7 +1033,7 @@ class Circuit:
 
         Args:
             pauli (str | Sequence[str]): Paulis defining the eigenstate to
-                prepare, one per qubit in `qubits`. Either an unsigned Pauli
+                prepare, one per qubit in ``qubits``. Either an unsigned Pauli
                 string (e.g. 'XYZ'), or a sequence of (optionally signed)
                 Paulis (e.g. ['-X', 'Y', '-Z']).
             qubits (Sequence[int] | None, optional): qubits to prepare.
@@ -1038,7 +1094,7 @@ class Circuit:
         self._qubits.update(circuit.qubits)
 
     def relable(self, map: Dict) -> None:
-        """Relable the qubit labels in a circuit.
+        """Relabel the qubit labels in a circuit.
 
         Args:
             map (Dict): dictionary mapping the old to new qubit labels.
@@ -1127,7 +1183,28 @@ class Circuit:
 
 
 class CircuitSet:
-    """Class for storing multiple circuits in a single set."""
+    """Class for storing multiple circuits in a single set.
+
+    The circuits are stored in a pandas DataFrame (in the ``'circuit'``
+    column), and additional columns can be assigned to store metadata
+    about each circuit (e.g. the value of a swept parameter). Results are
+    stored in the ``'results'`` column once the circuits are executed.
+
+    Example:
+        >>> from qcal.circuit import Circuit, CircuitSet, Cycle
+        >>> from qcal.gates.single_qubit import X90
+        >>> circuits = [
+        ...     Circuit([Cycle({X90(0)})] * n) for n in (1, 2, 3)
+        ... ]
+        >>> cs = CircuitSet(circuits)
+        >>> cs['n_gates'] = [1, 2, 3]
+        >>> cs.n_circuits
+        3
+        >>> cs[2].n_cycles
+        3
+        >>> cs.subset(n_gates=2).circuits[0].n_cycles
+        2
+    """
 
     __slots__ = '_df'
 
@@ -1140,9 +1217,11 @@ class CircuitSet:
 
         Args:
             circuits (Iterable[Any] | None, optional): circuits to store in a
-                CircuitSet. Defaults to None.
-            index (List[int] | None, optional): Indices for the circuits in the
-                DataFrame. Defaults to None.
+                CircuitSet. This can be a list of circuits, a single
+                circuit, or a DataFrame with a ``'circuit'`` column (e.g.
+                as returned by :meth:`CircuitSet.load`). Defaults to None.
+            index (List[int] | None, optional): indices for the circuits in
+                the DataFrame. Defaults to None.
         """
         if circuits is not None:
             if isinstance(circuits, pd.DataFrame):
@@ -1188,6 +1267,11 @@ class CircuitSet:
         self._df[label] = value
 
     def __call__(self) -> pd.DataFrame:
+        """Return the underlying DataFrame.
+
+        Returns:
+            pd.DataFrame: DataFrame of circuits and metadata.
+        """
         return self._df
 
     def __copy__(self) -> CircuitSet:
@@ -1237,7 +1321,7 @@ class CircuitSet:
         """The total number of circuits in the CircuitSet.
 
         Returns:
-            int: number of circuits
+            int: number of circuits.
         """
         return self.__len__()
 
@@ -1246,7 +1330,7 @@ class CircuitSet:
         """The circuits in the CircuitSet.
 
         Returns:
-            pd.Series: circuits
+            pd.Series: circuits.
         """
         return self._df['circuit']
 
@@ -1273,7 +1357,7 @@ class CircuitSet:
         """The MCM results in the CircuitSet.
 
         Returns:
-            pd.Series: MCM results
+            pd.Series: MCM results.
         """
         if 'mcm_results' not in self._df.columns:
             return None
@@ -1284,7 +1368,7 @@ class CircuitSet:
         """The terminating results in the CircuitSet.
 
         Returns:
-            pd.Series: terminatingresults
+            pd.Series: terminating results.
         """
         if 'results' not in self._df.columns:
             return None
@@ -1292,6 +1376,13 @@ class CircuitSet:
 
     @results.setter
     def results(self, values) -> None:
+        """Set the results of the circuits.
+
+        Args:
+            values (Any): a Series, list, tuple, or array with one result per
+                circuit, a single value to assign to every circuit, or None
+                to clear the results.
+        """
         if values is None:
             self._df['results'] = None
             return
@@ -1316,7 +1407,18 @@ class CircuitSet:
         self._df['results'] = [values] * len(self._df)
 
     def append(self, circuits: CircuitSet | Iterable, index=None):
-        """Appends circuit(s) to the CircuitSet."""
+        """Appends circuit(s) to the CircuitSet.
+
+        Args:
+            circuits (CircuitSet | Iterable): CircuitSet or iterable of
+                circuits to append.
+            index (List[int] | None, optional): indices for the appended
+                circuits. Defaults to None, in which case the index of the
+                combined DataFrame is reset.
+
+        Returns:
+            pd.DataFrame: the updated underlying DataFrame.
+        """
         if isinstance(circuits, Iterable) and not isinstance(
             circuits, CircuitSet
         ):
@@ -1358,7 +1460,7 @@ class CircuitSet:
             n (int, optional): number of rows to return. Defaults to 5.
 
         Returns:
-            pd.DataFrame: first n rows
+            pd.DataFrame: first n rows.
         """
         return self._df.head(n)
 
@@ -1379,7 +1481,7 @@ class CircuitSet:
             n (int, optional): number of rows to return. Defaults to 5.
 
         Returns:
-            pd.DataFrame: last n rows
+            pd.DataFrame: last n rows.
         """
         return self._df.tail(n)
 
@@ -1418,12 +1520,13 @@ class CircuitSet:
 
     @staticmethod
     def load(path: str) -> pd.DataFrame:
-        """Load a saved CircuitSet
+        """Load a saved CircuitSet.
 
         Args:
             path (str): filepath for saved CircuitSet.
 
         Returns:
-            pd.DataFrame: CircuitSet
+            pd.DataFrame: the saved CircuitSet DataFrame (note: this is a
+                DataFrame, not a CircuitSet object).
         """
         return pd.read_pickle(path)

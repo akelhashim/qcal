@@ -177,3 +177,45 @@ class TestAmplitudeSimulatedRun:
         # a real window popping open.
         cal, *_ = analyzed_cal
         cal.plot()
+
+
+class TestAmplitudeRejectedFit:
+    """A fit that succeeds but is rejected must still yield cal values.
+
+    Regression test: analyze() used to append nothing to
+    ``_cal_values[pair]`` when a successful fit was rejected (positive
+    curvature or vertex out of range), so ``Calibration.final()`` raised
+    ``IndexError``. It now falls back to the amplitude that maximizes the
+    conditionality, matching the single-qubit Amplitude calibration.
+    """
+
+    def test_out_of_range_fit_falls_back_to_argmax(self, config):
+        pair = (0, 1)
+        amp_ideal = 0.3
+        # Sweep entirely above the ideal amplitude: R decreases
+        # monotonically, so the parabola vertex lies outside the sweep.
+        amps = np.linspace(1.1 * amp_ideal, 1.3 * amp_ideal, 21)
+        cal = Amplitude(
+            qpu=Emulator, config=config, qubit_pairs=[pair],
+            amplitudes=amps, simulator=StateVectorSimulator(),
+            n_shots=None,
+        )
+        cal.generate_circuits()
+        amp_col = cal._circuits[
+            'param: two_qubit/(0, 1)/CZ/pulse/0/kwargs/amp'
+        ]
+        for circuit, amp in zip(cal._circuits, amp_col, strict=True):
+            _set_cz_unitary(
+                circuit, _cz_conditional_phase(amp, amp_ideal)
+            )
+        Emulator.run(cal, cal._circuits, auto_save=False)
+        cal.analyze()
+
+        assert not cal._fit[pair][0].fit_success
+        assert not cal._fit[pair][1].fit_success
+        expected = amps[np.argmax(cal._R[pair])]
+        assert cal.calibrated_values[pair] == [expected, expected]
+
+        cal.final()  # used to raise IndexError
+        for param in cal.params[pair]:
+            assert config[param] == pytest.approx(expected)

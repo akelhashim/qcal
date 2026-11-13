@@ -1,9 +1,42 @@
-""""Submodule for qubit coherence experiments.
+"""Qubit coherence experiments.
 
+This module provides factory functions for the standard coherence
+characterization experiments:
+
+- :func:`T1`: energy relaxation time.
+- :func:`T2`: Ramsey (:math:`T_2^*`) or Hahn echo (:math:`T_{2e}`)
+  dephasing time.
+- :func:`T2DD`: dephasing time under dynamical decoupling.
+- :func:`ParityOscillations`: parity oscillations for estimating the
+  fidelity of GHZ-like states.
+
+Each function takes a :class:`~qcal.qpu.qpu.QPU` subclass (the hardware
+backend) and returns an instance of a protocol class that inherits from
+both that backend and
+:class:`~qcal.characterization.characterize.Characterize`. Calling
+``run()`` generates the circuits, executes them, fits the results, saves
+the data, plots, and writes the fitted values back to the config.
+
+Example:
+    .. code-block:: python
+
+        from qcal.backend.qubic.qpu import QubicQPU
+        from qcal.characterization.coherence import T1, T2
+        from qcal.config import Config
+        from qcal.units import us
+
+        config = Config('config.yaml')
+
+        t1 = T1(QubicQPU, config, qubits=[0, 1, 2], t_max=300 * us)
+        t1.run()
+        print(t1.characterized_values)  # e.g. {0: 45.1(3)e-6, ...}
+
+        t2 = T2(QubicQPU, config, qubits=[0, 1, 2], echo=True)
+        t2.run()
 """
 import itertools
 import logging
-from typing import Callable, Dict, List, Sequence
+from typing import Dict, List, Sequence
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -48,24 +81,17 @@ def T1(
     n_elements: int = 50,
     mapto0:     bool = True,
     **kwargs
-) -> Callable:
+) -> Characterize:
     """T1 coherence characterization.
 
-    Basic example useage:
-    ```
-    exp = T1(
-        CustomQPU,
-        config,
-        qubits=[0, 1, 2],
-        t_max=5e-4)
-    exp.run()
-    ```
+    The qubit is excited and its excited-state population is measured after
+    a variable delay; the T1 time is obtained from an exponential fit.
 
     Args:
         qpu (QPU): custom QPU object.
         config (Config): qcal Config object.
         qubits (Sequence[int]): qubits to measure.
-        t_max (float, option): maximum wait time. Defaults to 500 us.
+        t_max (float, optional): maximum wait time. Defaults to 500 us.
         gate (str, optional): native gate used for state preparation.
             Defaults to 'X90'.
         subspace (str, optional): qubit subspace for T1 measurement.
@@ -74,10 +100,19 @@ def T1(
             to t_max. Defaults to 50.
         mapto0 (bool, optional): map EF measurements back to the
             computational subspace by appending EF and GE pi pulses,
-            so that a |2> outcome is read as |0>. Defaults to True.
+            so that a ``|2>`` outcome is read as ``|0>``. Defaults to True.
+        **kwargs: additional keyword arguments passed to the ``qpu``
+            constructor (e.g. ``n_shots``, ``compiler``, ``transpiler``).
 
     Returns:
-        Callable: T1 class.
+        Characterize: an instance of the T1 characterization class, which
+            inherits from ``qpu`` and :class:`Characterize`.
+
+    Example:
+        .. code-block:: python
+
+            exp = T1(CustomQPU, config, qubits=[0, 1, 2], t_max=500 * us)
+            exp.run()
     """
 
     class T1(qpu, Characterize):
@@ -99,7 +134,6 @@ def T1(
             **kwargs
         ) -> None:
             """Initialize the T1 experiment class within the function."""
-
             n_levels = 3 if subspace == 'EF' else 2
             qpu.__init__(self, config=config, n_levels=n_levels, **kwargs)
             Characterize.__init__(self, config)
@@ -143,7 +177,7 @@ def T1(
             return self._times
 
         def generate_circuits(self):
-            """Generate all amplitude calibration circuits."""
+            """Generate all characterization circuits."""
             logger.info(' Generating circuits...')
 
             circuits = []
@@ -331,21 +365,12 @@ def T2(
     n_elements: int = 50,
     mapto0:     bool = True,
     **kwargs
-) -> Callable:
+) -> Characterize:
     """T2 coherence characterization.
 
-    Basic example useage:
-
-    ```
-    exp = T2(
-        CustomQPU,
-        config,
-        qubits=[0, 1, 2],
-        t_max=250e-4,
-        detuning=0.05e6,
-        echo=True)
-    exp.run()
-    ```
+    Performs a Ramsey experiment (``echo=False``, measuring
+    :math:`T_2^*`) or a Hahn echo experiment (``echo=True``, measuring
+    :math:`T_{2e}`).
 
     Args:
         qpu (QPU): custom QPU object.
@@ -362,10 +387,22 @@ def T2(
             to t_max. Defaults to 50.
         mapto0 (bool, optional): map EF measurements back to the
             computational subspace by appending EF and GE pi pulses,
-            so that a |2> outcome is read as |0>. Defaults to True.
+            so that a ``|2>`` outcome is read as ``|0>``. Defaults to True.
+        **kwargs: additional keyword arguments passed to the ``qpu``
+            constructor (e.g. ``n_shots``, ``compiler``, ``transpiler``).
 
     Returns:
-        Callable: T2 class.
+        Characterize: an instance of the T2 characterization class, which
+            inherits from ``qpu`` and :class:`Characterize`.
+
+    Example:
+        .. code-block:: python
+
+            exp = T2(
+                CustomQPU, config, qubits=[0, 1, 2], t_max=250 * us,
+                detuning=50 * kHz, echo=True,
+            )
+            exp.run()
     """
 
     class T2(qpu, Characterize):
@@ -388,7 +425,6 @@ def T2(
             **kwargs
         ) -> None:
             """Initialize the T2 experiment class within the function."""
-
             n_levels = 3 if subspace == 'EF' else 2
             qpu.__init__(self, config=config, n_levels=n_levels, **kwargs)
             Characterize.__init__(self, config)
@@ -442,7 +478,7 @@ def T2(
             return self._times
 
         def generate_circuits(self):
-            """Generate all amplitude calibration circuits."""
+            """Generate all characterization circuits."""
             logger.info(' Generating circuits...')
 
             circuits = []
@@ -537,7 +573,9 @@ def T2(
                 if self._echo:  # a * np.exp(-b * x) + c
                     c = np.array(prob0).min()
                     a = np.array(prob0).max() - c
-                    b = -np.mean( np.diff(prob0) / np.diff(self._times[q]) ) / a
+                    b = -np.mean(
+                        np.diff(prob0) / np.diff(self._times[q])
+                    ) / a
                     params = Parameters()
                     params.add('a', value=a)
                     params.add('b', value=b)
@@ -665,18 +703,8 @@ def T2DD(
     n_pulses:   int | None = None,
     mapto0:     bool = True,
     **kwargs
-) -> Callable:
+) -> Characterize:
     """T2 dynamical decoupling coherence characterization.
-
-    Basic example useage:
-    ```
-    exp = T2DD(
-        CustomQPU,
-        config,
-        qubits=[0, 1, 2]
-    )
-    exp.run()
-    ```
 
     Args:
         qpu (QPU): custom QPU object.
@@ -698,10 +726,19 @@ def T2DD(
             determined by the total idle time.
         mapto0 (bool, optional): map EF measurements back to the
             computational subspace by appending EF and GE pi pulses,
-            so that a |2> outcome is read as |0>. Defaults to True.
+            so that a ``|2>`` outcome is read as ``|0>``. Defaults to True.
+        **kwargs: additional keyword arguments passed to the ``qpu``
+            constructor (e.g. ``n_shots``, ``compiler``, ``transpiler``).
 
     Returns:
-        Callable: T2DD class.
+        Characterize: an instance of the T2DD characterization class, which
+            inherits from ``qpu`` and :class:`Characterize`.
+
+    Example:
+        .. code-block:: python
+
+            exp = T2DD(CustomQPU, config, qubits=[0, 1, 2])
+            exp.run()
     """
 
     class T2DD(qpu, Characterize):
@@ -726,7 +763,6 @@ def T2DD(
             **kwargs
         ) -> None:
             """Initialize the T2 XY experiment class within the function."""
-
             n_levels = 3 if subspace == 'EF' else 2
             qpu.__init__(self, config=config, n_levels=n_levels, **kwargs)
             Characterize.__init__(self, config)
@@ -770,7 +806,7 @@ def T2DD(
             return self._times
 
         def generate_circuits(self):
-            """Generate all amplitude calibration circuits."""
+            """Generate all characterization circuits."""
             logger.info(' Generating circuits...')
 
             if self._gate_time is not None:
@@ -949,21 +985,26 @@ def ParityOscillations(
     qubits:     Sequence[int] | None = None,
     n_elements: int = 31,
     **kwargs
-) -> Callable:
+) -> Characterize:
     """Parity oscillations coherence characterization.
 
-    See: https://arxiv.org/abs/2112.14589
+    See: `arXiv:2112.14589 <https://arxiv.org/abs/2112.14589>`_
 
     Args:
         qpu (QPU): custom QPU object.
         config (Config): qcal Config object.
-        cicuit (Circuit): qcal Circuit.
-        qubits (Sequence[int] | None): qubits to measure. Defaults to None.
+        circuit (Circuit): qcal Circuit preparing the state whose
+            parity oscillations are measured.
+        qubits (Sequence[int] | None, optional): qubits to measure. If
+            None, ``circuit.qubits`` is used. Defaults to None.
         n_elements (int, optional): number of phases between 0 and pi.
             Defaults to 31.
+        **kwargs: additional keyword arguments passed to the ``qpu``
+            constructor (e.g. ``n_shots``, ``compiler``, ``transpiler``).
 
     Returns:
-        Callable: ParityOscillations class.
+        Characterize: an instance of the ParityOscillations characterization
+            class, which inherits from ``qpu`` and :class:`Characterize`.
     """
 
     class ParityOscillations(qpu, Characterize):
@@ -982,7 +1023,6 @@ def ParityOscillations(
             **kwargs
         ) -> None:
             """Initialize the ParityOscillations class within the function."""
-
             qpu.__init__(self, config=config, **kwargs)
             Characterize.__init__(self, config)
 
@@ -1008,12 +1048,12 @@ def ParityOscillations(
         def fidelity(self) -> UFloat | None:
             """Fidelity of the state.
 
-            The fidelity is determined from the populations of the |0^n> and
-            |1^n> states, as well as the coherence of the state, which is
-            determined from the amplitude of the parity oscillations. The error
-            in the fidelity is determined from the shot noise for the
-            populations and the error in the amplitude fit for the parity
-            oscillations.
+            The fidelity is determined from the populations of the
+            ``|0^n>`` and ``|1^n>`` states, as well as the coherence of the
+            state, which is determined from the amplitude of the parity
+            oscillations. The error in the fidelity is determined from the
+            shot noise for the populations and the error in the amplitude
+            fit for the parity oscillations.
 
             Returns:
                 UFloat | None: value and error (uncertainty) of the
@@ -1032,7 +1072,7 @@ def ParityOscillations(
             return self._phases
 
         def generate_circuits(self):
-            """Generate all amplitude calibration circuits."""
+            """Generate all characterization circuits."""
             logger.info(' Generating circuits...')
 
             # Measure the state in the computational basis
@@ -1114,7 +1154,8 @@ def ParityOscillations(
             """Save all circuits and data."""
             clear_output(wait=True)
             self._data_manager._exp_id += (
-              f'_ParityOscillations_{"".join("Q"+str(q) for q in self._qubits)}'
+              '_ParityOscillations_'
+              f'{"".join("Q"+str(q) for q in self._qubits)}'
             )
             if settings.Settings.save_data:
                 qpu.save(self)
@@ -1133,7 +1174,6 @@ def ParityOscillations(
 
         def plot(self):
             """Plot the parity oscillations."""
-
             q_index = tuple([
                 self._circuit.qubits.index(q) for q in self._qubits
             ])

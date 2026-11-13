@@ -1,20 +1,52 @@
-"""Submodule for RB routines.
+"""Randomized benchmarking (RB) protocols.
 
-For CRB, see:
-https://github.com/sandialabs/pyGSTi/blob/master/docs/markdown/rb/CliffordRB.md
+This module provides two randomized benchmarking protocols:
 
-For SRB, see:
-https://trueq.quantumbenchmark.com/guides/error_diagnostics/srb.html
+- :func:`CRB`: Clifford randomized benchmarking, implemented with pyGSTi.
+  Passing several qubit labels performs simultaneous RB.
+- :func:`SRB`: streamlined randomized benchmarking, implemented with
+  True-Q (requires a valid True-Q license).
 
-NOTE: we do not use TYPE_CHECKING for trueq types because this might fail if
-trueq is not installed when building docs.
+Each function takes a :class:`~qcal.qpu.qpu.QPU` subclass (not an
+instance) and returns a protocol object that inherits from it. Calling
+``run()`` on that object generates the circuits, executes them, analyzes
+the results, and plots the fits.
+
+Example:
+    Run simultaneous single-qubit CRB on the bundled emulator:
+
+    .. code-block:: python
+
+        from qcal.backend.emulator import Emulator
+        from qcal.benchmarking.rb import CRB
+        from qcal.config import EXAMPLE_CONFIG_PATH, Config
+
+        config = Config(EXAMPLE_CONFIG_PATH)
+        crb = CRB(Emulator, config, qubit_labels=[0, 1], n_circuits=10)
+        crb.run()
+        crb.process_infidelity  # {0: ufloat, 1: ufloat}
+
+    On hardware, replace ``Emulator`` with a hardware backend such as
+    :class:`~qcal.backend.qubic.qpu.QubicQPU`, passing any backend-specific
+    keyword arguments (e.g. ``n_shots``) to :func:`CRB`.
+
+Note:
+    ``TYPE_CHECKING`` is not used for True-Q types, because this might fail
+    if True-Q is not installed when building the docs.
+
+References:
+    - `pyGSTi Clifford RB tutorial
+      <https://github.com/sandialabs/pyGSTi/blob/master/docs/markdown/rb/
+      CliffordRB.md>`_
+    - `True-Q SRB guide
+      <https://trueq.quantumbenchmark.com/guides/error_diagnostics/srb.html>`_
 """
 from __future__ import annotations
 
 import logging
 from collections.abc import Iterable, Sequence
 from concurrent.futures import ThreadPoolExecutor
-from typing import Any, Callable, Dict, List, Tuple
+from typing import Any, Dict, List, Tuple
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -63,18 +95,20 @@ def CRB(
     citerations:    int = 5,
     seed:           int | None = None,
     **kwargs
-) -> Callable:
+) -> QPU:
     """Clifford Randomized Benchmarking.
 
     This is a pyGSTi protocol and requires pyGSTi to be installed.
 
     Args:
-        qpu (QPU): custom QPU object.
+        qpu (QPU): custom QPU class (not an instance), e.g. a hardware
+            backend or :class:`~qcal.backend.emulator.Emulator`. The
+            returned protocol object inherits from this class.
         config (Config): qcal Config object.
         qubit_labels (List[int | Tuple[int, int]]): a list specifying sets of
-            qubit labels to be twirled together. For example, [0, 1, (2, 3)]
-            would perform single-qubit RB on 0 and 1, and two-qubit RB on
-            (2, 3).
+            qubit labels to be twirled together. For example,
+            ``[0, 1, (2, 3)]`` would perform single-qubit RB on 0 and 1, and
+            two-qubit RB on (2, 3).
         circuit_depths (Sequence[int] | None, optional): a sequence of
             integers >= 0. The CRB depth is the number of Cliffords in the
             circuit - 2 before each Clifford is compiled into the native
@@ -83,32 +117,54 @@ def CRB(
             two-qubit RB.
         n_circuits (int, optional): The number of (possibly) different CRB
             circuits sampled at each depth. Defaults to 30.
-        native_gates (List[str] | None, optional): a list of the native gates.
-            Example: ['X90', 'Y90']. All Cliffords will be decomposed in terms
-            of these gates. If a custom pspec is passed, this list will be
-            ignored.
+        native_gates (List[str] | None, optional): a list of the native
+            gates, e.g. ``['X90', 'Y90']``. All Cliffords will be decomposed
+            in terms of these gates. If a custom ``pspec`` is passed, this
+            list will be ignored. Defaults to None, in which case
+            ``['X90', 'Z90']`` (plus the two-qubit native gates from the
+            config, for multi-qubit labels) is used.
         pspec (QPSpec | Dict[int | Tuple[int, int], QPSpec] | None, optional):
-            pyGSTi qubit processor spec. Defaults to None. If None, a processor
-            spec will be automatically generated based on the native_gates and
-            the qubit labels.
-        randomizeout (bool, optional): whether or not a random Pauli is compiled
-            into the output layer of the circuit. Defaults to True. If False,
-            the ideal output of the circuits (the "success" or "survival"
-            outcome) is always the all-zeros bit string. If True, the ideal
-            output a circuit is randomized to a uniformly random bit-string.
-        citerations (int, optional): some of the Clifford compilation algorithms
-            in pyGSTi (including the default algorithm) are randomized, and the
-            lowest-cost circuit is chosen from all the circuit generated in the
-            iterations of the algorithm. This is the number of iterations used.
-            Defaults to 5. The time required to generate a CRB circuit is
-            linear in `citerations * (CRB length + 2)`. Lower-depth / lower
-            2-qubit gate count compilations of the Cliffords are important in
-            order to successfully implement CRB on more qubits.
-        seed (int | None, optional): random seed for reproducibility in circuit
-            generation. Defaults to None.
+            pyGSTi qubit processor spec. Defaults to None. If None, a
+            processor spec will be automatically generated based on the
+            ``native_gates`` and the qubit labels.
+        randomizeout (bool, optional): whether or not a random Pauli is
+            compiled into the output layer of the circuit. Defaults to True.
+            If False, the ideal output of the circuits (the "success" or
+            "survival" outcome) is always the all-zeros bit string. If True,
+            the ideal output a circuit is randomized to a uniformly random
+            bit-string.
+        citerations (int, optional): some of the Clifford compilation
+            algorithms in pyGSTi (including the default algorithm) are
+            randomized, and the lowest-cost circuit is chosen from all the
+            circuit generated in the iterations of the algorithm. This is the
+            number of iterations used. Defaults to 5. The time required to
+            generate a CRB circuit is linear in
+            ``citerations * (CRB length + 2)``. Lower-depth / lower 2-qubit
+            gate count compilations of the Cliffords are important in order
+            to successfully implement CRB on more qubits.
+        seed (int | None, optional): random seed for reproducibility in
+            circuit generation. Defaults to None.
+        **kwargs: additional keyword arguments passed to the ``qpu``
+            constructor (e.g. ``n_shots``, ``compiler``, ``transpiler``). If
+            no ``transpiler`` is given,
+            :class:`~qcal.interface.pygsti.transpiler.PyGSTiTranspiler` is
+            used.
 
     Returns:
-        Callable: CRB class instance.
+        QPU: CRB protocol instance (a subclass of ``qpu``). Call its
+        ``run()`` method to execute the full protocol.
+
+    Example:
+        .. code-block:: python
+
+            from qcal.backend.emulator import Emulator
+            from qcal.benchmarking.rb import CRB
+            from qcal.config import EXAMPLE_CONFIG_PATH, Config
+
+            config = Config(EXAMPLE_CONFIG_PATH)
+            crb = CRB(Emulator, config, qubit_labels=[(0, 1)])
+            crb.run()
+            crb.process_infidelity[(0, 1)]
     """
 
     class CRB(qpu):
@@ -256,24 +312,24 @@ def CRB(
 
         @property
         def protocol(self) -> RB | DefaultRunner:
-            """pyGSTi RB protocol used to fit the data."""
+            """PyGSTi RB protocol used to fit the data."""
             return self._protocol
 
         @property
         def edesign(self) -> (
             CliffordRBDesign | SimultaneousExperimentDesign | None
         ):
-            """pyGSTi experiment design (populated after generate_circuits)."""
+            """PyGSTi experiment design (set by ``generate_circuits``)."""
             return self._edesign
 
         @property
         def data(self) -> ProtocolData | None:
-            """pyGSTi ProtocolData object (populated after analyze)."""
+            """PyGSTi ProtocolData object (populated after ``analyze``)."""
             return self._data
 
         @property
         def dataset(self) -> DataSet | None:
-            """pyGSTi DataSet (populated after analyze)."""
+            """PyGSTi DataSet (populated after ``analyze``)."""
             return self._dataset
 
         @property
@@ -295,7 +351,7 @@ def CRB(
 
         @property
         def results(self) -> Any | None:
-            """pyGSTi fit results (populated after analyze).
+            """PyGSTi fit results (populated after ``analyze``).
 
             A single results object for single-qubit RB, or a dict keyed by
             qubit-label tuple for simultaneous RB.
@@ -303,7 +359,7 @@ def CRB(
             return self._results
 
         def generate_circuits(self):
-            """Generate all pyGSTi clifford RB circuits."""
+            """Generate all pyGSTi Clifford RB circuits."""
             logger.info(' Generating circuits from pyGSTi...')
 
             if not self._sim_RB:
@@ -371,7 +427,9 @@ def CRB(
                     edesigns
                 )
 
-            self._circuits = CircuitSet(self._edesign.all_circuits_needing_data)
+            self._circuits = CircuitSet(
+                self._edesign.all_circuits_needing_data
+            )
             self._circuits['pygsti_circuit'] = [
                 circ.str for circ in self._edesign.all_circuits_needing_data
             ]
@@ -424,7 +482,9 @@ def CRB(
                             self._qubit_labels[0]
                         ] = ufloat(rA, rAstd)
                         self._fit_params[self._qubit_labels[0]] = {
-                            'base': self._results.fits['A-fixed'].estimates['p'],
+                            'base': (
+                                self._results.fits['A-fixed'].estimates['p']
+                            ),
                             'a': self._results.fits['A-fixed'].estimates['b'],
                             'b': 1,
                             'c': self._results.fits['A-fixed'].estimates['a']
@@ -526,12 +586,15 @@ def CRB(
                             "(fit with a free asymptote)"
                         )
                         print(
-                            f"Process infidelity: r = {rA:1.2e} ({rAstd:1.2e}) "
+                            f"Process infidelity: r = {rA:1.2e} "
+                            f"({rAstd:1.2e}) "
                             "(fit with the asymptote fixed to 1/2^n)"
                         )
 
             if Settings.save_data:
-                # self._data_manager.save_to_pickle(self._results, 'CRB_results')
+                # self._data_manager.save_to_pickle(
+                #     self._results, 'CRB_results'
+                # )
                 self._data_manager.save_to_csv(
                     pd.DataFrame(self._success_probabilities),
                     'CRB_success_probabilities'
@@ -745,7 +808,9 @@ def CRB(
                             col=col,
                         )
                         pfig.update_yaxes(
-                            title_text='Success Probability' if col == 1 else '',
+                            title_text=(
+                                'Success Probability' if col == 1 else ''
+                            ),
                             automargin=True,
                             showgrid=True,
                             row=row,
@@ -802,7 +867,9 @@ def CRB(
                     if Settings.save_data else None
                 )
 
-            if any(circ.results.dim == 3 for circ in self._transpiled_circuits):
+            if any(
+                circ.results.dim == 3 for circ in self._transpiled_circuits
+            ):
                 analyze_leakage(
                     self._transpiled_circuits,
                     filename=self.data_manager.save_path
@@ -845,35 +912,38 @@ def SRB(
     compiled_pauli: bool = True,
     include_rcal:   bool = False,
     **kwargs
-) -> Callable:
+) -> QPU:
     """Streamlined Randomized Benchmarking.
 
     This is a True-Q protocol and requires a valid True-Q license.
 
     Args:
-        qpu (QPU): custom QPU object.
+        qpu (QPU): custom QPU class (not an instance). The returned
+            protocol object inherits from this class.
         config (Config): qcal Config object.
         qubit_labels (List[int | Tuple[int, int]]): a list specifying sets of
             system labels to be twirled together by Clifford gates in each
-            circuit. For example, [0, 1, (2, 3)] would perform single-qubit RB
-            on 0 and 1, and two-qubit RB on (2, 3).
+            circuit. For example, ``[0, 1, (2, 3)]`` would perform
+            single-qubit RB on 0 and 1, and two-qubit RB on (2, 3).
         circuit_depths (Sequence[int]): a sequence of positive integers
             specifying how many cycles of random Clifford gates to generate for
-            RB, for example, [4, 64, 256].
+            RB, for example, ``[4, 64, 256]``.
         n_circuits (int, optional): the number of circuits for each circuit
             depth. Defaults to 30.
-        tq_config (str | trueq.Config | None, optional): True-Q config yaml file
-            or config object. Defaults to None.
+        tq_config (str | trueq.Config | None, optional): True-Q config yaml
+            file or config object. Defaults to None.
         compiled_pauli (bool, optional): whether or not to compile a random
             Pauli gate for each qubit in the cycle preceding a measurement
             operation. Defaults to True.
         include_rcal (bool, optional): whether to measure RCAL circuits in the
             same circuit collection as the SRB circuit. Defaults to False. If
-            True, readout correction will be apply to the fit results
+            True, readout correction will be applied to the fit results
             automatically.
+        **kwargs: additional keyword arguments passed to the ``qpu``
+            constructor (e.g. ``n_shots``, ``compiler``, ``transpiler``).
 
     Returns:
-        Callable: SRB class instance.
+        QPU: SRB protocol instance (a subclass of ``qpu``).
     """
 
     class SRB(qpu):
@@ -958,7 +1028,6 @@ def SRB(
 
         def plot(self) -> None:
             """Plot the SRB fit results."""
-
             # Plot the raw curves
             nrows, ncols = calculate_nrows_ncols(len(self._qubit_labels))
             figsize = (5 * ncols, 4 * nrows)
@@ -1078,8 +1147,7 @@ def _build_crb_edesign_for_qubit_label(
     citerations:    int,
     seed:           int | None = None,
 ) -> CliffordRBDesign:
-    """
-    Build a CRB experiment design for a given qubit label.
+    """Build a CRB experiment design for a given qubit label.
 
     Attempts to load a pre-generated design from the default_experiments
     directory first; falls back to generating a new one if not found or if

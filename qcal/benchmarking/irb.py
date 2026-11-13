@@ -1,10 +1,14 @@
-"""Submodule for interleaved randomized benchmarking routines.
+"""Interleaved randomized benchmarking (IRB) protocol.
 
-For IRB, see:
-https://trueq.quantumbenchmark.com/guides/error_diagnostics/irb.html
+Provides :func:`IRB`, the True-Q implementation of interleaved randomized
+benchmarking (requires a valid True-Q license).
+
+References:
+    `True-Q IRB guide
+    <https://trueq.quantumbenchmark.com/guides/error_diagnostics/irb.html>`_
 """
 import logging
-from typing import Any, Callable, Dict, List, Tuple
+from typing import Any, Dict, List, Tuple
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -15,6 +19,7 @@ from qcal.analysis.leakage import analyze_leakage
 from qcal.config import Config
 from qcal.plotting.utils import calculate_nrows_ncols
 from qcal.qpu.qpu import QPU
+from qcal.utils import pop_deprecated_kwarg
 
 logger = logging.getLogger(__name__)
 
@@ -27,49 +32,61 @@ def IRB(qpu:                  QPU,
         n_circuits:           int = 30,
         tq_config:            str | Any = None,
         twirl:                str = None,
-        propogate_correction: bool = False,
+        propagate_correction: bool = False,
         compiled_pauli:       bool = True,
         include_rcal:         bool = False,
         include_srb:          bool = True,
         **kwargs
-    ) -> Callable:
+    ) -> QPU:
     """Interleaved Randomized Benchmarking.
 
     This is a True-Q protocol and requires a valid True-Q license.
 
     Args:
-        qpu (QPU): custom QPU object.
+        qpu (QPU): custom QPU class (not an instance). The returned
+            protocol object inherits from this class.
         config (Config): qcal Config object.
-        cycle (Dict, tq.Cycle): cycle (or subcircuit) to benchmark.
+        cycle (Dict): cycle (or subcircuit) to benchmark, as a dict or a
+            True-Q ``Cycle``.
+        qubit_labels (List[int | Tuple[int]]): qubit labels used to generate
+            the SRB circuits. Required if ``include_srb`` is True.
         circuit_depths (List[int] | Tuple[int]): a list of positive integers
-            specifying how many cycles of random Clifford gates to generate for
-            IRB, for example, [4, 64, 256].
+            specifying how many cycles of random Clifford gates to generate
+            for IRB, for example, ``[4, 64, 256]``.
         n_circuits (int, optional): the number of circuits for each circuit
             depth. Defaults to 30.
         tq_config (str | Any, optional): True-Q config yaml file or config
             object. Defaults to None.
-        twirl (tq.Twirl, str, optional): The Twirl to use in this protocol.
-            Defaults to 'P'. You can also specify a twirling group that will be
-            used to automatically instantiate a twirl based on the labels in
-            the given cycles.
+        twirl (str, optional): The Twirl to use in this protocol (a string
+            or a True-Q ``Twirl``). Defaults to None, in which case True-Q's
+            default twirl is used. You can also specify a twirling group that
+            will be used to automatically instantiate a twirl based on the
+            labels in the given cycles.
         propagate_correction (bool, optional): whether to propagate correction
             gates to the end of the circuit or compile them into neighbouring
             cycles. Defaults to False. Warning: this can result in arbitrary
             multi-qubit gates at the end of the circuit!
+            The misspelled alias ``propogate_correction`` is deprecated.
         compiled_pauli (bool, optional): whether or not to compile a random
             Pauli gate for each qubit in the cycle preceding a measurement
             operation. Defaults to True.
         include_rcal (bool, optional): whether to measure RCAL circuits in the
-            same circuit collection as the SRB circuit. Defaults to False. If
-            True, readout correction will be apply to the fit results
+            same circuit collection as the IRB circuits. Defaults to False.
+            If True, readout correction will be applied to the fit results
             automatically.
         include_srb (bool, optional): whether to measure SRB circuits in
             addition to IRB circuits. Defaults to True. Together, IRB and SRB
             can be used to estimate interleaved gate error.
+        **kwargs: additional keyword arguments passed to the ``qpu``
+            constructor (e.g. ``n_shots``, ``compiler``, ``transpiler``).
 
     Returns:
-        Callable: IRB class instance.
+        QPU: IRB protocol instance (a subclass of ``qpu``).
     """
+    propagate_correction = pop_deprecated_kwarg(
+        kwargs, 'propogate_correction', 'propagate_correction',
+        propagate_correction, default=False,
+    )
 
     class IRB(qpu):
         """True-Q IRB protocol."""
@@ -82,7 +99,7 @@ def IRB(qpu:                  QPU,
                 tq_config:            str | Any = None,
                 twirl:                str = None,
                 qubit_labels:         List[int | Tuple[int]] = None,
-                propogate_correction: bool = False,
+                propagate_correction: bool = False,
                 compiled_pauli:       bool = True,
                 include_rcal:         bool = False,
                 include_srb:          bool = True,
@@ -107,7 +124,7 @@ def IRB(qpu:                  QPU,
             self._n_circuits = n_circuits
             self._twirl = twirl
             self._qubit_labels = qubit_labels
-            self._propogate_correction = propogate_correction
+            self._propagate_correction = propagate_correction
             self._compiled_pauli = compiled_pauli
             self._include_rcal = include_rcal
             self._include_srb = include_srb
@@ -138,7 +155,7 @@ def IRB(qpu:                  QPU,
                 n_random_cycles=self._circuit_depths,
                 n_circuits=self._n_circuits,
                 twirl=self._twirl,
-                propagate_correction=self._propogate_correction,
+                propagate_correction=self._propagate_correction,
                 compiled_pauli=self._compiled_pauli
             )
 
@@ -175,7 +192,6 @@ def IRB(qpu:                  QPU,
 
         def plot(self) -> None:
             """Plot the IRB fit results."""
-
             # Plot the raw curves
             nrows, ncols = calculate_nrows_ncols(len(self._qubit_labels))
             figsize = (5 * ncols, 4 * nrows)
@@ -294,7 +310,7 @@ def IRB(qpu:                  QPU,
         tq_config=tq_config,
         twirl=twirl,
         qubit_labels=qubit_labels,
-        propogate_correction=propogate_correction,
+        propagate_correction=propagate_correction,
         compiled_pauli=compiled_pauli,
         include_rcal=include_rcal,
         include_srb=include_srb,

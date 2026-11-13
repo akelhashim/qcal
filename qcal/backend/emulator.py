@@ -12,19 +12,22 @@ Default noise model:
 - Readout confusion matrix: diag(0.995, 0.98) applied to every qubit
   defined in the config.
 
-Basic usage::
+Example:
+    .. code-block:: python
 
-    from qcal.backend.emulator import Emulator
-    from qcal.config import Config
+        from qcal.backend.emulator import Emulator
+        from qcal.config import Config
 
-    config = Config('examples/config/config.yaml')
-    qpu = Emulator(config)
-    qpu.run(circuits)
+        config = Config('examples/config/config.yaml')
+        qpu = Emulator(config)
+        qpu.run(circuits)
 
-Or load the bundled example config automatically::
+    Or load the bundled example config automatically:
 
-    qpu = Emulator()
-    qpu.run(circuits)
+    .. code-block:: python
+
+        qpu = Emulator()
+        qpu.run(circuits)
 """
 import logging
 
@@ -74,13 +77,14 @@ class Emulator(QPU):
     - **Readout noise** — confusion matrix diag(0.995, 0.98) applied
       to every qubit defined in the config.
 
-    Basic example usage::
+    Example:
+        .. code-block:: python
 
-        from qcal.backend.emulator import Emulator
+            from qcal.backend.emulator import Emulator
 
-        qpu = Emulator()          # uses example config + default noise
-        qpu.run(circuit)
-        print(circuit.results)
+            qpu = Emulator()          # uses example config + default noise
+            qpu.run(circuit)
+            print(circuit.results)
     """
 
     def __init__(
@@ -116,6 +120,9 @@ class Emulator(QPU):
                 :class:`~qcal.simulation.simulators.StateVectorSimulator`)
                 to use in place of the default depolarizing model.
                 Defaults to ``None``.
+            **kwargs: additional keyword arguments passed to the
+                :class:`~qcal.qpu.qpu.QPU` constructor (e.g.
+                ``compiler``, ``transpiler``, or ``rcorr_cmat``).
         """
         if config is None:
             config = Config(str(EXAMPLE_CONFIG_PATH))
@@ -176,7 +183,7 @@ class Emulator(QPU):
         :meth:`acquire` and :meth:`process`.
 
         Args:
-            circuits: circuits to measure.
+            circuits (CircuitSet | List[Any]): circuits to measure.
             n_shots (int | None, optional): number of shots per batch.
                 Defaults to ``None``.
             n_batches (int | None, optional): number of batches of

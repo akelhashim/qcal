@@ -1,5 +1,34 @@
 """Submodule handling the main calibration class.
 
+All calibration routines in :mod:`qcal.calibration` derive from the
+abstract :class:`Calibration` class, which stores the swept config
+parameters, the sweep results, and the fits, and provides the shared
+:meth:`~Calibration.final`, :meth:`~Calibration.plot`, and
+:meth:`~Calibration.set_param` methods. Concrete calibrations are created
+by factory functions (e.g.
+:func:`~qcal.calibration.single_qubit.Amplitude`) that combine a
+:class:`~qcal.qpu.qpu.QPU` subclass with :class:`Calibration`, and are
+run with ``cal.run()``, which generates the circuits, measures them,
+analyzes the results, updates the config, and plots the fits.
+
+Example:
+    .. code-block:: python
+
+        import numpy as np
+
+        from qcal.backend.emulator import Emulator
+        from qcal.calibration.single_qubit import Amplitude
+        from qcal.config import EXAMPLE_CONFIG_PATH, Config
+
+        config = Config(str(EXAMPLE_CONFIG_PATH))
+        cal = Amplitude(
+            Emulator,  # or a hardware QPU class, e.g. QubicQPU
+            config,
+            qubits=[0, 1],
+            amplitudes=np.linspace(0, 1.0, 21),
+        )
+        cal.run()
+        print(cal.calibrated_values)  # new X90 amplitude for each qubit
 """
 import logging
 from abc import ABC, abstractmethod
@@ -19,18 +48,19 @@ logger = logging.getLogger(__name__)
 class Calibration(ABC):
     """Main calibration class.
 
-    This class will handle basic calibration methods.
+    This abstract class handles basic calibration methods. Subclasses
+    must implement :meth:`generate_circuits` and :meth:`analyze`, and
+    populate ``self._qubits``, ``self._params``, ``self._param_sweep``,
+    ``self._sweep_results``, ``self._fit``, and ``self._cal_values``.
     """
 
     def __init__(self, config: Config) -> None:
         """Initialize the main Calibration class.
 
         Args:
-            config (Config): qcal Config object.
-            esp (bool, optional): whether to enable excited state
-                promotion for the calibration. Defaults to False.
-            heralding (bool, optional): whether to enable heralding
-                for the calibraion. Defaults to True.
+            config (Config): qcal Config object. A warning is logged if
+                excited state promotion (``readout/esp/enable``) is
+                enabled in the config.
         """
         self._config = config
         self._gate = None
@@ -59,7 +89,7 @@ class Calibration(ABC):
 
     @property
     def gate(self) -> str:
-        """Gate being calibration.
+        """Gate being calibrated.
 
         Returns:
             str: name of gate.
@@ -174,8 +204,12 @@ class Calibration(ABC):
         """Plot the sweep and fit results.
 
         Args:
-            xlabel (str, optional): x-axis label. Defaults to 'Value Sweep'.
-            ylabel (str, optional): y-axis label. Defaults to 'Results'.
+            xlabel (str, optional): x-axis label. Defaults to
+                ``'Value Sweep'``.
+            ylabel (str, optional): y-axis label. Defaults to ``'Results'``.
+            save_path (str, optional): path prefix used when saving the
+                figure (only if ``settings.Settings.save_data`` is
+                ``True``). Defaults to ``''``.
         """
         nrows, ncols = calculate_nrows_ncols(len(self._qubits))
         figsize = (5 * ncols, 4 * nrows)

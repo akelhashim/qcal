@@ -13,7 +13,6 @@ from numpy.typing import NDArray
 
 from qcal.gates.gate import Gate
 
-
 __all__ = (
     'H3',
     'Id3',
@@ -210,6 +209,13 @@ def _expm_herm(H: NDArray, theta: float) -> NDArray:
     """Compute exp(-i·theta/2·H) for a Hermitian matrix H.
 
     Uses eigendecomposition: exp(-i t H) = U diag(exp(-i t λ)) U†.
+
+    Args:
+        H (NDArray): Hermitian matrix.
+        theta (float): rotation angle in radians.
+
+    Returns:
+        NDArray: unitary matrix exp(-i·theta/2·H).
     """
     vals, vecs = np.linalg.eigh(H)
     return (vecs * np.exp(-0.5j * theta * vals)) @ vecs.conj().T
@@ -231,7 +237,7 @@ def rgm(k: int, theta: float) -> NDArray:
 
 
 def rx01(theta: float) -> NDArray:
-    """Rx rotation in the GE (|0⟩-|1⟩) subspace.
+    """Rx rotation in the GE (``|0⟩-|1⟩``) subspace.
 
     Args:
         theta (float): rotation angle.
@@ -248,7 +254,7 @@ def rx01(theta: float) -> NDArray:
 
 
 def rx12(theta: float) -> NDArray:
-    """Rx rotation in the EF (|1⟩-|2⟩) subspace.
+    """Rx rotation in the EF (``|1⟩-|2⟩``) subspace.
 
     Args:
         theta (float): rotation angle.
@@ -265,7 +271,7 @@ def rx12(theta: float) -> NDArray:
 
 
 def ry01(theta: float) -> NDArray:
-    """Ry rotation in the GE (|0⟩-|1⟩) subspace.
+    """Ry rotation in the GE (``|0⟩-|1⟩``) subspace.
 
     Args:
         theta (float): rotation angle.
@@ -282,7 +288,7 @@ def ry01(theta: float) -> NDArray:
 
 
 def ry12(theta: float) -> NDArray:
-    """Ry rotation in the EF (|1⟩-|2⟩) subspace.
+    """Ry rotation in the EF (``|1⟩-|2⟩``) subspace.
 
     Args:
         theta (float): rotation angle.
@@ -299,7 +305,7 @@ def ry12(theta: float) -> NDArray:
 
 
 def rz01(theta: float) -> NDArray:
-    """Rz rotation in the GE (|0⟩-|1⟩) subspace.
+    """Rz rotation in the GE (``|0⟩-|1⟩``) subspace.
 
     Args:
         theta (float): rotation angle.
@@ -316,7 +322,7 @@ def rz01(theta: float) -> NDArray:
 
 
 def rz12(theta: float) -> NDArray:
-    """Rz rotation in the EF (|1⟩-|2⟩) subspace.
+    """Rz rotation in the EF (``|1⟩-|2⟩``) subspace.
 
     Args:
         theta (float): rotation angle.
@@ -344,6 +350,7 @@ class H3(Gate):
 
         Args:
             qudit (int): qudit label.
+            **kwargs: unused; accepted for interface compatibility.
         """
         super().__init__(h3, qudit)
         self._properties['alias'] = 'QFT3'
@@ -359,6 +366,7 @@ class Id3(Gate):
 
         Args:
             qudit (int): qudit label.
+            **kwargs: unused; accepted for interface compatibility.
         """
         super().__init__(id3, qudit)
         self._properties['name'] = 'I3'
@@ -375,6 +383,7 @@ class Rx01(Gate):
         Args:
             qudit (int):   qudit label.
             theta (float): rotation angle.
+            **kwargs: unused; accepted for interface compatibility.
         """
         super().__init__(rx01(theta), qudit)
         self._properties['name'] = 'Rx01'
@@ -391,6 +400,7 @@ class Rx12(Gate):
         Args:
             qudit (int):   qudit label.
             theta (float): rotation angle.
+            **kwargs: unused; accepted for interface compatibility.
         """
         super().__init__(rx12(theta), qudit)
         self._properties['name'] = 'Rx12'
@@ -407,6 +417,7 @@ class Ry01(Gate):
         Args:
             qudit (int):   qudit label.
             theta (float): rotation angle.
+            **kwargs: unused; accepted for interface compatibility.
         """
         super().__init__(ry01(theta), qudit)
         self._properties['name'] = 'Ry01'
@@ -423,6 +434,7 @@ class Ry12(Gate):
         Args:
             qudit (int):   qudit label.
             theta (float): rotation angle.
+            **kwargs: unused; accepted for interface compatibility.
         """
         super().__init__(ry12(theta), qudit)
         self._properties['name'] = 'Ry12'
@@ -439,6 +451,7 @@ class Rz01(Gate):
         Args:
             qudit (int):   qudit label.
             theta (float): rotation angle.
+            **kwargs: unused; accepted for interface compatibility.
         """
         super().__init__(rz01(theta), qudit)
         self._properties['name'] = 'Rz01'
@@ -455,6 +468,7 @@ class Rz12(Gate):
         Args:
             qudit (int):   qudit label.
             theta (float): rotation angle.
+            **kwargs: unused; accepted for interface compatibility.
         """
         super().__init__(rz12(theta), qudit)
         self._properties['name'] = 'Rz12'
@@ -471,6 +485,7 @@ class VirtualZ01(Gate):
         Args:
             qudit (int):   qudit label.
             theta (float): rotation angle.
+            **kwargs: unused; accepted for interface compatibility.
         """
         super().__init__(rz01(theta), qudit)
         self._properties['name'] = 'VirtualZ01'
@@ -487,6 +502,7 @@ class VirtualZ12(Gate):
         Args:
             qudit (int):   qudit label.
             theta (float): rotation angle.
+            **kwargs: unused; accepted for interface compatibility.
         """
         super().__init__(rz12(theta), qudit)
         self._properties['name'] = 'VirtualZ12'
@@ -495,13 +511,14 @@ class VirtualZ12(Gate):
 
 
 class X01(Gate):
-    """Class for the Pauli-X gate in the GE (|0⟩-|1⟩) subspace."""
+    """Class for the Pauli-X gate in the GE (``|0⟩-|1⟩``) subspace."""
 
     def __init__(self, qudit: int, **kwargs) -> None:
         """Initialize using the x01 matrix.
 
         Args:
             qudit (int): qudit label.
+            **kwargs: unused; accepted for interface compatibility.
         """
         super().__init__(x01, qudit)
         self._properties['name'] = 'X01'
@@ -510,13 +527,14 @@ class X01(Gate):
 
 
 class X02(Gate):
-    """Class for the Pauli-X gate in the GF (|0⟩-|2⟩) subspace."""
+    """Class for the Pauli-X gate in the GF (``|0⟩-|2⟩``) subspace."""
 
     def __init__(self, qudit: int, **kwargs) -> None:
         """Initialize using the x02 matrix.
 
         Args:
             qudit (int): qudit label.
+            **kwargs: unused; accepted for interface compatibility.
         """
         super().__init__(x02, qudit)
         self._properties['name'] = 'X02'
@@ -525,13 +543,14 @@ class X02(Gate):
 
 
 class X12(Gate):
-    """Class for the Pauli-X gate in the EF (|1⟩-|2⟩) subspace."""
+    """Class for the Pauli-X gate in the EF (``|1⟩-|2⟩``) subspace."""
 
     def __init__(self, qudit: int, **kwargs) -> None:
         """Initialize using the x12 matrix.
 
         Args:
             qudit (int): qudit label.
+            **kwargs: unused; accepted for interface compatibility.
         """
         super().__init__(x12, qudit)
         self._properties['name'] = 'X12'
@@ -540,13 +559,14 @@ class X12(Gate):
 
 
 class X90_01(Gate):
-    """Class for the sqrt(X) gate in the GE (|0⟩-|1⟩) subspace."""
+    """Class for the sqrt(X) gate in the GE (``|0⟩-|1⟩``) subspace."""
 
     def __init__(self, qudit: int, **kwargs) -> None:
         """Initialize using the rx01 function at π/2.
 
         Args:
             qudit (int): qudit label.
+            **kwargs: unused; accepted for interface compatibility.
         """
         super().__init__(rx01(np.pi / 2), qudit)
         self._properties['alias'] = 'SX01'
@@ -556,13 +576,14 @@ class X90_01(Gate):
 
 
 class X90_12(Gate):
-    """Class for the sqrt(X) gate in the EF (|1⟩-|2⟩) subspace."""
+    """Class for the sqrt(X) gate in the EF (``|1⟩-|2⟩``) subspace."""
 
     def __init__(self, qudit: int, **kwargs) -> None:
         """Initialize using the rx12 function at π/2.
 
         Args:
             qudit (int): qudit label.
+            **kwargs: unused; accepted for interface compatibility.
         """
         super().__init__(rx12(np.pi / 2), qudit)
         self._properties['alias'] = 'SX12'
@@ -572,13 +593,14 @@ class X90_12(Gate):
 
 
 class Y01(Gate):
-    """Class for the Pauli-Y gate in the GE (|0⟩-|1⟩) subspace."""
+    """Class for the Pauli-Y gate in the GE (``|0⟩-|1⟩``) subspace."""
 
     def __init__(self, qudit: int, **kwargs) -> None:
         """Initialize using the y01 matrix.
 
         Args:
             qudit (int): qudit label.
+            **kwargs: unused; accepted for interface compatibility.
         """
         super().__init__(y01, qudit)
         self._properties['name'] = 'Y01'
@@ -587,13 +609,14 @@ class Y01(Gate):
 
 
 class Y02(Gate):
-    """Class for the Pauli-Y gate in the GF (|0⟩-|2⟩) subspace."""
+    """Class for the Pauli-Y gate in the GF (``|0⟩-|2⟩``) subspace."""
 
     def __init__(self, qudit: int, **kwargs) -> None:
         """Initialize using the y02 matrix.
 
         Args:
             qudit (int): qudit label.
+            **kwargs: unused; accepted for interface compatibility.
         """
         super().__init__(y02, qudit)
         self._properties['name'] = 'Y02'
@@ -602,13 +625,14 @@ class Y02(Gate):
 
 
 class Y12(Gate):
-    """Class for the Pauli-Y gate in the EF (|1⟩-|2⟩) subspace."""
+    """Class for the Pauli-Y gate in the EF (``|1⟩-|2⟩``) subspace."""
 
     def __init__(self, qudit: int, **kwargs) -> None:
         """Initialize using the y12 matrix.
 
         Args:
             qudit (int): qudit label.
+            **kwargs: unused; accepted for interface compatibility.
         """
         super().__init__(y12, qudit)
         self._properties['name'] = 'Y12'
@@ -617,13 +641,14 @@ class Y12(Gate):
 
 
 class Y90_01(Gate):
-    """Class for the sqrt(Y) gate in the GE (|0⟩-|1⟩) subspace."""
+    """Class for the sqrt(Y) gate in the GE (``|0⟩-|1⟩``) subspace."""
 
     def __init__(self, qudit: int, **kwargs) -> None:
         """Initialize using the ry01 function at π/2.
 
         Args:
             qudit (int): qudit label.
+            **kwargs: unused; accepted for interface compatibility.
         """
         super().__init__(ry01(np.pi / 2), qudit)
         self._properties['alias'] = 'SY01'
@@ -633,13 +658,14 @@ class Y90_01(Gate):
 
 
 class Y90_12(Gate):
-    """Class for the sqrt(Y) gate in the EF (|1⟩-|2⟩) subspace."""
+    """Class for the sqrt(Y) gate in the EF (``|1⟩-|2⟩``) subspace."""
 
     def __init__(self, qudit: int, **kwargs) -> None:
         """Initialize using the ry12 function at π/2.
 
         Args:
             qudit (int): qudit label.
+            **kwargs: unused; accepted for interface compatibility.
         """
         super().__init__(ry12(np.pi / 2), qudit)
         self._properties['alias'] = 'SY12'
@@ -649,13 +675,14 @@ class Y90_12(Gate):
 
 
 class Z01(Gate):
-    """Class for the Pauli-Z gate in the GE (|0⟩-|1⟩) subspace."""
+    """Class for the Pauli-Z gate in the GE (``|0⟩-|1⟩``) subspace."""
 
     def __init__(self, qudit: int, **kwargs) -> None:
         """Initialize using the z01 matrix.
 
         Args:
             qudit (int): qudit label.
+            **kwargs: unused; accepted for interface compatibility.
         """
         super().__init__(z01, qudit)
         self._properties['name'] = 'Z01'
@@ -664,13 +691,14 @@ class Z01(Gate):
 
 
 class Z12(Gate):
-    """Class for the Pauli-Z gate in the EF (|1⟩-|2⟩) subspace."""
+    """Class for the Pauli-Z gate in the EF (``|1⟩-|2⟩``) subspace."""
 
     def __init__(self, qudit: int, **kwargs) -> None:
         """Initialize using the z12 matrix.
 
         Args:
             qudit (int): qudit label.
+            **kwargs: unused; accepted for interface compatibility.
         """
         super().__init__(z12, qudit)
         self._properties['name'] = 'Z12'
@@ -679,7 +707,7 @@ class Z12(Gate):
 
 
 class WeylX(Gate):
-    """Qutrit shift (increment) operator X: |j⟩ → |(j+1) mod 3⟩.
+    """Qutrit shift (increment) operator X: ``|j⟩ → |(j+1) mod 3⟩``.
 
     Corresponds to the Weyl operator W_{10}.
     """
@@ -689,6 +717,7 @@ class WeylX(Gate):
 
         Args:
             qudit (int): qudit label.
+            **kwargs: unused; accepted for interface compatibility.
         """
         super().__init__(weyl_x, qudit)
         self._properties['alias'] = 'W10'
@@ -697,7 +726,7 @@ class WeylX(Gate):
 
 
 class WeylX2(Gate):
-    """Qutrit double-shift operator X²: |j⟩ → |(j+2) mod 3⟩.
+    """Qutrit double-shift operator X²: ``|j⟩ → |(j+2) mod 3⟩``.
 
     Corresponds to the Weyl operator W_{20}.
     """
@@ -707,6 +736,7 @@ class WeylX2(Gate):
 
         Args:
             qudit (int): qudit label.
+            **kwargs: unused; accepted for interface compatibility.
         """
         super().__init__(weyl_x2, qudit)
         self._properties['alias'] = 'W20'
@@ -715,7 +745,7 @@ class WeylX2(Gate):
 
 
 class WeylZ(Gate):
-    """Qutrit clock operator Z: |j⟩ → ω^j |j⟩, ω = exp(2πi/3).
+    """Qutrit clock operator Z: ``|j⟩ → ω^j |j⟩``, ω = exp(2πi/3).
 
     Corresponds to the Weyl operator W_{01}.
     """
@@ -725,6 +755,7 @@ class WeylZ(Gate):
 
         Args:
             qudit (int): qudit label.
+            **kwargs: unused; accepted for interface compatibility.
         """
         super().__init__(weyl_z, qudit)
         self._properties['alias'] = 'W01'
@@ -733,7 +764,7 @@ class WeylZ(Gate):
 
 
 class WeylZ2(Gate):
-    """Qutrit double-clock operator Z²: |j⟩ → ω^(2j) |j⟩.
+    """Qutrit double-clock operator Z²: ``|j⟩ → ω^(2j) |j⟩``.
 
     Corresponds to the Weyl operator W_{02}.
     """
@@ -743,6 +774,7 @@ class WeylZ2(Gate):
 
         Args:
             qudit (int): qudit label.
+            **kwargs: unused; accepted for interface compatibility.
         """
         super().__init__(weyl_z2, qudit)
         self._properties['alias'] = 'W02'
@@ -753,7 +785,7 @@ class WeylZ2(Gate):
 class WeylXZ(Gate):
     """Weyl operator W_{11} = X·Z.
 
-    Applies clock then shift: |j⟩ → ω^j |(j+1) mod 3⟩.
+    Applies clock then shift: ``|j⟩ → ω^j |(j+1) mod 3⟩``.
     """
 
     def __init__(self, qudit: int, **kwargs) -> None:
@@ -761,6 +793,7 @@ class WeylXZ(Gate):
 
         Args:
             qudit (int): qudit label.
+            **kwargs: unused; accepted for interface compatibility.
         """
         super().__init__(weyl_xz, qudit)
         self._properties['alias'] = 'W11'
@@ -771,7 +804,7 @@ class WeylXZ(Gate):
 class WeylXZ2(Gate):
     """Weyl operator W_{12} = X·Z².
 
-    Applies double-clock then shift: |j⟩ → ω^(2j) |(j+1) mod 3⟩.
+    Applies double-clock then shift: ``|j⟩ → ω^(2j) |(j+1) mod 3⟩``.
     """
 
     def __init__(self, qudit: int, **kwargs) -> None:
@@ -779,6 +812,7 @@ class WeylXZ2(Gate):
 
         Args:
             qudit (int): qudit label.
+            **kwargs: unused; accepted for interface compatibility.
         """
         super().__init__(weyl_xz2, qudit)
         self._properties['alias'] = 'W12'
@@ -789,7 +823,7 @@ class WeylXZ2(Gate):
 class WeylX2Z(Gate):
     """Weyl operator W_{21} = X²·Z.
 
-    Applies clock then double-shift: |j⟩ → ω^j |(j+2) mod 3⟩.
+    Applies clock then double-shift: ``|j⟩ → ω^j |(j+2) mod 3⟩``.
     """
 
     def __init__(self, qudit: int, **kwargs) -> None:
@@ -797,6 +831,7 @@ class WeylX2Z(Gate):
 
         Args:
             qudit (int): qudit label.
+            **kwargs: unused; accepted for interface compatibility.
         """
         super().__init__(weyl_x2z, qudit)
         self._properties['alias'] = 'W21'
@@ -808,7 +843,7 @@ class WeylX2Z2(Gate):
     """Weyl operator W_{22} = X²·Z².
 
     Applies double-clock then double-shift:
-    |j⟩ → ω^(2j) |(j+2) mod 3⟩.
+    ``|j⟩ → ω^(2j) |(j+2) mod 3⟩``.
     """
 
     def __init__(self, qudit: int, **kwargs) -> None:
@@ -816,6 +851,7 @@ class WeylX2Z2(Gate):
 
         Args:
             qudit (int): qudit label.
+            **kwargs: unused; accepted for interface compatibility.
         """
         super().__init__(weyl_x2z2, qudit)
         self._properties['alias'] = 'W22'
@@ -826,7 +862,7 @@ class WeylX2Z2(Gate):
 class RGM1(Gate):
     """Rotation about Gell-Mann axis λ₁: exp(-i·theta/2·λ₁).
 
-    λ₁ acts in the GE (|0⟩-|1⟩) subspace; it is the off-diagonal
+    λ₁ acts in the GE (``|0⟩-|1⟩``) subspace; it is the off-diagonal
     real part of the SU(2) generators embedded in SU(3).
     """
 
@@ -836,6 +872,7 @@ class RGM1(Gate):
         Args:
             qudit (int):   qudit label.
             theta (float): rotation angle in radians.
+            **kwargs: unused; accepted for interface compatibility.
         """
         super().__init__(rgm(1, theta), qudit)
         self._properties['name'] = 'RGM1'
@@ -846,7 +883,7 @@ class RGM1(Gate):
 class RGM2(Gate):
     """Rotation about Gell-Mann axis λ₂: exp(-i·theta/2·λ₂).
 
-    λ₂ acts in the GE (|0⟩-|1⟩) subspace; it is the off-diagonal
+    λ₂ acts in the GE (``|0⟩-|1⟩``) subspace; it is the off-diagonal
     imaginary part (Y-type generator).
     """
 
@@ -856,6 +893,7 @@ class RGM2(Gate):
         Args:
             qudit (int):   qudit label.
             theta (float): rotation angle in radians.
+            **kwargs: unused; accepted for interface compatibility.
         """
         super().__init__(rgm(2, theta), qudit)
         self._properties['name'] = 'RGM2'
@@ -866,7 +904,7 @@ class RGM2(Gate):
 class RGM3(Gate):
     """Rotation about Gell-Mann axis λ₃: exp(-i·theta/2·λ₃).
 
-    λ₃ is diagonal in the GE (|0⟩-|1⟩) subspace (Z-type generator).
+    λ₃ is diagonal in the GE (``|0⟩-|1⟩``) subspace (Z-type generator).
     """
 
     def __init__(self, qudit: int, theta: float, **kwargs) -> None:
@@ -875,6 +913,7 @@ class RGM3(Gate):
         Args:
             qudit (int):   qudit label.
             theta (float): rotation angle in radians.
+            **kwargs: unused; accepted for interface compatibility.
         """
         super().__init__(rgm(3, theta), qudit)
         self._properties['name'] = 'RGM3'
@@ -885,7 +924,7 @@ class RGM3(Gate):
 class RGM4(Gate):
     """Rotation about Gell-Mann axis λ₄: exp(-i·theta/2·λ₄).
 
-    λ₄ acts in the GF (|0⟩-|2⟩) subspace (X-type generator).
+    λ₄ acts in the GF (``|0⟩-|2⟩``) subspace (X-type generator).
     """
 
     def __init__(self, qudit: int, theta: float, **kwargs) -> None:
@@ -894,6 +933,7 @@ class RGM4(Gate):
         Args:
             qudit (int):   qudit label.
             theta (float): rotation angle in radians.
+            **kwargs: unused; accepted for interface compatibility.
         """
         super().__init__(rgm(4, theta), qudit)
         self._properties['name'] = 'RGM4'
@@ -904,7 +944,7 @@ class RGM4(Gate):
 class RGM5(Gate):
     """Rotation about Gell-Mann axis λ₅: exp(-i·theta/2·λ₅).
 
-    λ₅ acts in the GF (|0⟩-|2⟩) subspace (Y-type generator).
+    λ₅ acts in the GF (``|0⟩-|2⟩``) subspace (Y-type generator).
     """
 
     def __init__(self, qudit: int, theta: float, **kwargs) -> None:
@@ -913,6 +953,7 @@ class RGM5(Gate):
         Args:
             qudit (int):   qudit label.
             theta (float): rotation angle in radians.
+            **kwargs: unused; accepted for interface compatibility.
         """
         super().__init__(rgm(5, theta), qudit)
         self._properties['name'] = 'RGM5'
@@ -923,7 +964,7 @@ class RGM5(Gate):
 class RGM6(Gate):
     """Rotation about Gell-Mann axis λ₆: exp(-i·theta/2·λ₆).
 
-    λ₆ acts in the EF (|1⟩-|2⟩) subspace (X-type generator).
+    λ₆ acts in the EF (``|1⟩-|2⟩``) subspace (X-type generator).
     """
 
     def __init__(self, qudit: int, theta: float, **kwargs) -> None:
@@ -932,6 +973,7 @@ class RGM6(Gate):
         Args:
             qudit (int):   qudit label.
             theta (float): rotation angle in radians.
+            **kwargs: unused; accepted for interface compatibility.
         """
         super().__init__(rgm(6, theta), qudit)
         self._properties['name'] = 'RGM6'
@@ -942,7 +984,7 @@ class RGM6(Gate):
 class RGM7(Gate):
     """Rotation about Gell-Mann axis λ₇: exp(-i·theta/2·λ₇).
 
-    λ₇ acts in the EF (|1⟩-|2⟩) subspace (Y-type generator).
+    λ₇ acts in the EF (``|1⟩-|2⟩``) subspace (Y-type generator).
     """
 
     def __init__(self, qudit: int, theta: float, **kwargs) -> None:
@@ -951,6 +993,7 @@ class RGM7(Gate):
         Args:
             qudit (int):   qudit label.
             theta (float): rotation angle in radians.
+            **kwargs: unused; accepted for interface compatibility.
         """
         super().__init__(rgm(7, theta), qudit)
         self._properties['name'] = 'RGM7'
@@ -971,6 +1014,7 @@ class RGM8(Gate):
         Args:
             qudit (int):   qudit label.
             theta (float): rotation angle in radians.
+            **kwargs: unused; accepted for interface compatibility.
         """
         super().__init__(rgm(8, theta), qudit)
         self._properties['name'] = 'RGM8'

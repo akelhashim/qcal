@@ -1,9 +1,45 @@
-"""Submodule for resonator spectroscopy.
+"""Readout resonator spectroscopy.
 
+This module provides two readout resonator characterization experiments:
+
+- :func:`Resonator`: sweeps the readout frequency to locate the readout
+  resonator frequency of each qubit, which is written back to the config.
+- :func:`Punchout`: sweeps both the readout amplitude and frequency to
+  identify the dispersive (low-power) and bare (high-power) regimes of the
+  readout resonator. The results are plotted but not written to the
+  config.
+
+Example:
+    .. code-block:: python
+
+        import numpy as np
+
+        from qcal.backend.qubic.qpu import QubicQPU
+        from qcal.characterization.spectroscopy.resonator import (
+            Punchout, Resonator
+        )
+        from qcal.config import Config
+        from qcal.units import MHz
+
+        config = Config('config.yaml')
+        qubits = [0, 1]
+
+        # Sweep +/- 25 MHz around each expected resonator frequency
+        freqs = {
+            q: np.linspace(-25, 25, 501) * MHz + config[f'readout/{q}/freq']
+            for q in qubits
+        }
+
+        spec = Resonator(QubicQPU, config, qubits, freqs, n_shots=2048)
+        spec.run()
+
+        amps = {q: np.linspace(0.005, 0.1, 20) for q in qubits}
+        punchout = Punchout(QubicQPU, config, qubits, amps, freqs)
+        punchout.run()
 """
 import logging
 from collections.abc import Iterable
-from typing import Callable, Dict
+from typing import Dict
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -40,25 +76,37 @@ def Punchout(
     freqs:  NDArray | Dict[int, NDArray],
     params: Dict | None = None,
     **kwargs
-) -> Callable:
-    """Resonator Punchout.
+) -> Characterize:
+    """Resonator punchout.
 
     Args:
         qpu (QPU): custom QPU object.
         config (Config): qcal Config object.
-        qubits (List[int] | Tuple[int]): qubits to measure.
-        amps (NDArray | Dict[int, NDArray]): amps to sweep over for each qubit
-            resonator.
-        freqs (NDArray | Dict[int, NDArray]): frequencies to sweep over for each
-            qubit resonator.
-        params (Dict | None, optional): dictionary mapping qubit label to sweep
-            parameter in the config. Defaults to None.
+        qubits (Iterable[int]): qubits to measure.
+        amps (NDArray | Dict[int, NDArray]): amps to sweep over for each
+            qubit resonator. If an array is given, the same sweep is used
+            for all qubits.
+        freqs (NDArray | Dict[int, NDArray]): frequencies to sweep over for
+            each qubit resonator. If an array is given, the same sweep is
+            used for all qubits.
+        params (Dict | None, optional): dictionary mapping qubit label to a
+            tuple of (amplitude, frequency) sweep parameters in the config.
+            If None, defaults to ``('readout/{q}/amp', 'readout/{q}/freq')``
+            for each qubit. Defaults to None.
+        **kwargs: additional keyword arguments passed to the ``qpu``
+            constructor (e.g. ``n_shots``, ``n_circs_per_seq``).
 
     Returns:
-        Callable: Punchout
+        Characterize: an instance of the Punchout class, which inherits from
+            ``qpu`` and :class:`Characterize`.
     """
 
     class Punchout(qpu, Characterize):
+        """Resonator punchout class.
+
+        This class inherits a custom QPU from the Punchout characterization
+        function.
+        """
 
         def __init__(
             self,
@@ -69,9 +117,7 @@ def Punchout(
             params: Dict | None = None,
             **kwargs
         ) -> None:
-            """
-            Instantiate the Punchout class within the function.
-            """
+            """Instantiate the Punchout class within the function."""
             qpu.__init__(self, config=config, **kwargs)
             Characterize.__init__(self, config)
 
@@ -179,9 +225,9 @@ def Punchout(
                 self._circuits[f'param: {self._params[q][idx_amp[0]]}'] = (
                     amps
                 )
-                self._circuits[f'param: {self._params[q][idx_freq[0]]}'] = list(
-                    self._freqs[q]
-                ) * self._amps[q].size
+                self._circuits[f'param: {self._params[q][idx_freq[0]]}'] = (
+                    list(self._freqs[q]) * self._amps[q].size
+                )
 
         def analyze(self) -> None:
             """Analyze the data."""
@@ -216,8 +262,9 @@ def Punchout(
             # """Plot the sweep results.
 
             # Args:
-            #     interactive (bool, optional): whether to plot the 2D sweep
-            #         using interactive plotting with Plotly. Defaults to False.
+            #     interactive (bool, optional): whether to plot the 2D
+            #         sweep using interactive plotting with Plotly. Defaults
+            #         to False.
             # """
         def plot(self) -> None:
             """Plot the sweep results."""
@@ -401,23 +448,33 @@ def Resonator(
     freqs:  NDArray | Dict[int, NDArray],
     params: Dict | None = None,
     **kwargs
-) -> Callable:
-    """Resonator Spectroscopy.
+) -> Characterize:
+    """Resonator spectroscopy.
 
     Args:
         qpu (QPU): custom QPU object.
         config (Config): qcal Config object.
-        qubits (List[int] | Tuple[int]): qubits to measure.
-        freqs (NDArray | Dict[int, NDArray]): frequencies to sweep over for each
-            qubit resonator.
-        params (Dict | None, optional): dictionary mapping qubit label to sweep
-            parameter in the config. Defaults to None.
+        qubits (Iterable[int]): qubits to measure.
+        freqs (NDArray | Dict[int, NDArray]): frequencies to sweep over for
+            each qubit resonator. If an array is given, the same sweep is
+            used for all qubits.
+        params (Dict | None, optional): dictionary mapping qubit label to
+            sweep parameter in the config. If None, defaults to
+            ``'readout/{q}/freq'`` for each qubit. Defaults to None.
+        **kwargs: additional keyword arguments passed to the ``qpu``
+            constructor (e.g. ``n_shots``, ``n_circs_per_seq``).
 
     Returns:
-        Callable: Resonator
+        Characterize: an instance of the Resonator class, which inherits from
+            ``qpu`` and :class:`Characterize`.
     """
 
     class Resonator(qpu, Characterize):
+        """Resonator spectroscopy class.
+
+        This class inherits a custom QPU from the Resonator characterization
+        function.
+        """
 
         def __init__(
             self,
@@ -427,9 +484,7 @@ def Resonator(
             params: Dict | None = None,
             **kwargs
         ) -> None:
-            """
-            Instantiate the Resonator Spectroscopy class within the function.
-            """
+            """Instantiate the Resonator class within the function."""
             qpu.__init__(self, config=config, **kwargs)
             Characterize.__init__(self, config)
 
@@ -556,7 +611,8 @@ def Resonator(
                 except Exception as e:
                     self._char_values[q] = None
                     logger.warning(
-                        f' Unable to find the resonator frequency for R{q}: {e}'
+                        f' Unable to find the resonator frequency for R{q}: '
+                        f'{e}'
                     )
 
         def save(self):

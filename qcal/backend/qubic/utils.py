@@ -1,6 +1,4 @@
-"""Helper functions for QubiC
-
-"""
+"""Helper functions for QubiC."""
 import logging
 from typing import Dict
 
@@ -19,10 +17,11 @@ def calculate_n_reads(compiled_program) -> dict:
     """Calculate the number of reads per qubit per circuit.
 
     The number of reads will depend on:
-    1) number of active resets
-    2) heralding
-    3) number of mid-circuit measurements
-    4) readout at the end of the circuit
+
+    1. number of active resets
+    2. heralding
+    3. number of mid-circuit measurements
+    4. readout at the end of the circuit
 
     Args:
         compiled_program (distproc.compiler.CompiledProgram): QubiC compiled
@@ -53,10 +52,11 @@ def generate_pulse_env(
         config (Config): qcal Config object.
         pulse (Dict): dictionary object of a pulse returned from indexing a
             config file.
-        channel: (str | None, optional): drive channel (e.g., 'qdrv'). Defaults
-            to None. If None, drive channel is determined from the pulse.
-        include_amp_phase (bool, optional): whether to include the pulse amp and
-            phase in the generation of the envelope. Defaults to True. By
+        channel (str | None, optional): drive channel (e.g., ``'qdrv'``).
+            Defaults to None. If None, drive channel is determined from the
+            pulse.
+        include_amp_phase (bool, optional): whether to include the pulse amp
+            and phase in the generation of the envelope. Defaults to True. By
             default, QubiC uses False because the amp and phase are dynamically
             included in compilation. This lowers the waveform memory
             requirements when generating sequences.

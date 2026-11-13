@@ -1,5 +1,8 @@
-"""Submodule for storing different fit functions.
+"""Model functions used for fitting experimental data.
 
+Each function takes the independent variable ``x`` as its first argument
+followed by the model parameters, so it can be passed directly to
+:class:`lmfit.Model` (see :mod:`qcal.fitting.fit`).
 """
 import logging
 
@@ -22,13 +25,17 @@ __all__ = (
 
 
 def absolute_value(x: ArrayLike, a: float, b: float, c: float) -> ArrayLike:
-    """Absolute value function.
+    r"""Absolute value function.
+
+    .. math::
+
+        f(x) = a |x - b| + c
 
     Args:
         x (ArrayLike): data.
         a (float): amplitude.
         b (float): x-offset.
-        c (float): y-offset
+        c (float): y-offset.
 
     Returns:
         ArrayLike: absolute value curve.
@@ -43,14 +50,18 @@ def base_exponential(
     b:    float,
     c:    float,
 ) -> ArrayLike:
-    """Exponential function.
+    r"""Exponential function with an arbitrary base.
+
+    .. math::
+
+        f(x) = a \, \mathrm{base}^{b x} + c
 
     Args:
         x (ArrayLike): data.
         base (float): base of the exponential.
         a (float): amplitude.
         b (float): exponential constant.
-        c (float): y-offset
+        c (float): y-offset.
 
     Returns:
         ArrayLike: exponential curve.
@@ -61,14 +72,19 @@ def base_exponential(
 def cosine(
     x: ArrayLike, amp: float, freq: float, phase: float, offset: float
 ) -> ArrayLike:
-    """Cosine function.
+    r"""Cosine function.
+
+    .. math::
+
+        f(x) = \mathrm{amp} \cos(2 \pi \, \mathrm{freq} \, x
+        + \mathrm{phase}) + \mathrm{offset}
 
     Args:
-        x (ArrayLike):  data.
-        amp (float):    amplitude.
-        freq (float):   frequency.
-        phase (float):  phase.
-        offset (float): phase offset.
+        x (ArrayLike): data.
+        amp (float): amplitude.
+        freq (float): frequency.
+        phase (float): phase.
+        offset (float): y-offset.
 
     Returns:
         ArrayLike: cosine curve.
@@ -79,7 +95,11 @@ def cosine(
 def decaying_cosine(
     x: ArrayLike, a: float, b: float, c: float, d: float, e: float
 ) -> ArrayLike:
-    """Decaying cosine function.
+    r"""Decaying cosine function.
+
+    .. math::
+
+        f(x) = a e^{-b x} \cos(2 \pi c x + d) + e
 
     Args:
         x (ArrayLike): data.
@@ -99,7 +119,11 @@ def decaying_cosine_exponential(
     x: ArrayLike, a: float, b: float, c: float, d: float, e: float,
     f: float, g: float
 ) -> ArrayLike:
-    """Decaying cosine function with an exponential baseline.
+    r"""Decaying cosine function with an exponential baseline.
+
+    .. math::
+
+        f(x) = a e^{-b x} \cos(2 \pi c x + d) + e \, e^{-f x} + g
 
     Args:
         x (ArrayLike): data.
@@ -121,13 +145,17 @@ def decaying_cosine_exponential(
 
 
 def exponential(x: ArrayLike, a: float, b: float, c: float) -> ArrayLike:
-    """Exponential function.
+    r"""Exponential decay function.
+
+    .. math::
+
+        f(x) = a e^{-b x} + c
 
     Args:
         x (ArrayLike): data.
         a (float): amplitude.
         b (float): exponential constant.
-        c (float): y-offset
+        c (float): y-offset.
 
     Returns:
         ArrayLike: exponential curve.
@@ -136,7 +164,11 @@ def exponential(x: ArrayLike, a: float, b: float, c: float) -> ArrayLike:
 
 
 def linear(x: ArrayLike, m: float, b: float) -> ArrayLike:
-    """Linear function
+    r"""Linear function.
+
+    .. math::
+
+        f(x) = m x + b
 
     Args:
         x (ArrayLike): data.
@@ -150,13 +182,17 @@ def linear(x: ArrayLike, m: float, b: float) -> ArrayLike:
 
 
 def parabola(x: ArrayLike, a: float, b: float, c: float) -> ArrayLike:
-    """Parabola function.
+    r"""Parabola function.
+
+    .. math::
+
+        f(x) = a x^2 + b x + c
 
     Args:
         x (ArrayLike): data.
-        a (float):     quadratic coefficient.
-        b (float):     linear coefficient; sets the x-offset.
-        c (float):     y offset.
+        a (float): quadratic coefficient.
+        b (float): linear coefficient; sets the x-offset.
+        c (float): y-offset.
 
     Returns:
         ArrayLike: parabola curve.

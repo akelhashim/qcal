@@ -1,4 +1,9 @@
-"""Submodule for plotting networkx style graphs using Plotly.
+"""Plotly-based drawing of circuits, DAGs, and QPU connectivity graphs.
+
+Provides :func:`draw_circuit` for visualizing a
+:class:`~qcal.circuit.Circuit`, :func:`draw_DAG` for networkx DAGs, and
+:func:`draw_qpu` / :func:`draw_qpu_heatmap` for drawing the processor
+connectivity defined in a :class:`~qcal.config.Config`.
 """
 import logging
 from collections import defaultdict
@@ -29,10 +34,10 @@ def format_gate_text(gate: Gate, include_matrix: bool = True):
     """Format Gate text using the gate properties metadata.
 
     Args:
-        gate (Gate):           qcal Gate object.
-        include_matrix (bool): whether to include the gate's matrix in
-            the text. Defaults to True. For large circuits, this is set
-            to False to keep the hover-text payload small.
+        gate (Gate): qcal Gate object.
+        include_matrix (bool, optional): whether to include the gate's
+            matrix in the text. Defaults to True. For large circuits,
+            this is set to False to keep the hover-text payload small.
 
     Returns:
         str: text formatted for Plotly plot.
@@ -74,9 +79,12 @@ def draw_circuit(circuit: Circuit, show: bool = True):
 
     Args:
         circuit (Circuit): qcal Circuit object.
-        show (bool):       whether to plot the circuit. Defaults to True. If
-            False, the figure object is returned.
+        show (bool, optional): whether to plot the circuit. Defaults to
+            True. If False, the figure object is returned.
 
+    Returns:
+        go.Figure | None: the Plotly figure if ``show`` is False,
+            otherwise ``None``.
     """
     pio.templates.default = 'plotly'
 
@@ -120,6 +128,7 @@ def draw_circuit(circuit: Circuit, show: bool = True):
     per_qubit_gates = ('Meas', 'MCM', 'Reset')
 
     def is_per_qubit(gate: Gate) -> bool:
+        """Return True if the gate is drawn independently per qubit."""
         return gate.is_single_qudit or gate.name in per_qubit_gates
 
     node_x = []
@@ -296,8 +305,8 @@ def draw_circuit(circuit: Circuit, show: bool = True):
             hovermode='closest',
             margin={'b': 20, 'l': 10, 'r': 5, 't': 50},
             annotations=gate_names,
-            xaxis={'tick0': 0, 'dtick': 1, 'showgrid': False, 'zeroline': False,
-                'showticklabels': True},
+            xaxis={'tick0': 0, 'dtick': 1, 'showgrid': False,
+                'zeroline': False, 'showticklabels': True},
             yaxis={'tickmode': 'array',
                 'tickvals': list(range(len(circuit.qubits))),
                 'ticktext': circuit.qubits,
@@ -326,7 +335,8 @@ def draw_circuit(circuit: Circuit, show: bool = True):
             'filename': 'quantum_circuit',
             # 'height': 500,
             # 'width': 1000,
-            'scale': 10 # Multiply title/legend/axis/canvas sizes by this factor
+            # Multiply title/legend/axis/canvas sizes by this factor
+            'scale': 10
         }
     }
 
@@ -457,7 +467,8 @@ def draw_DAG(G: nx.Graph | nx.DiGraph):
             'filename': 'quantum_circuit',
             # 'height': 500,
             # 'width': 1000,
-            'scale': 10 # Multiply title/legend/axis/canvas sizes by this factor
+            # Multiply title/legend/axis/canvas sizes by this factor
+            'scale': 10
         }
     }
 
@@ -495,7 +506,7 @@ def draw_qpu(config: Config):
     """Draw a processor connectivity graph for a given config.
 
     Args:
-        config (Config): qcal Config
+        config (Config): qcal Config.
     """
     G = nx.Graph()
     G.add_edges_from(config.qubit_pairs)
@@ -636,7 +647,8 @@ def draw_qpu(config: Config):
             'filename': 'qpu_layout',
             # 'height': 500,
             # 'width': 1000,
-            'scale': 10 # Multiply title/legend/axis/canvas sizes by this factor
+            # Multiply title/legend/axis/canvas sizes by this factor
+            'scale': 10
         }
     }
 
@@ -662,28 +674,37 @@ def draw_qpu_heatmap(
     all on the same processor layout.
 
     Args:
-        config (Config):  qcal Config.
+        config (Config): qcal Config.
         values (Dict[int | Tuple[int, ...], float]): mapping from qubit
             label (int) to a node value, or from qubit pair (tuple of
             ints) to an edge value. Qubits/pairs not present in this
-            dict are drawn using `missing_color`.
-        label (str): figure title. Defaults to 'QPU'.
-        cbar_label (str): colorbar title (also used in the hover text)
-            describing what `values` represents (e.g. 'T1 (us)' or
-            'Gate Infidelity'). Defaults to 'Value'.
-        colorscale (str): Plotly colorscale name. Defaults to
-            'Tealgrn'.
-        missing_color (str): color used for qubits/pairs that are not
-            present in `values`. Defaults to '#FFFFFF'.
-        plot_full_qpu (bool): if True, plot the full QPU lattice from
-            `config.qubit_pairs`, filling in any qubits/pairs missing
-            from `values` with `missing_color`. If False (default),
-            only plot the qubits present in `values` (plus any qubits
-            only referenced via an edge key), along with any edges
-            between those qubits from `config.qubit_pairs` — edges
-            without a passed value are drawn in `missing_color`.
-        show (bool): whether to plot the figure. Defaults to True. If
-            False, the figure object is returned instead.
+            dict are drawn using ``missing_color``.
+        label (str, optional): figure title. Defaults to ``'QPU'``.
+        cbar_label (str, optional): colorbar title (also used in the
+            hover text) describing what ``values`` represents (e.g.
+            ``'T1 (us)'`` or ``'Gate Infidelity'``). Defaults to
+            ``'Value'``.
+        colorscale (str, optional): Plotly colorscale name. Defaults to
+            ``'Tealgrn'``.
+        missing_color (str, optional): color used for qubits/pairs that
+            are not present in ``values``. Defaults to ``'#FFFFFF'``.
+        plot_full_qpu (bool, optional): if True, plot the full QPU
+            lattice from ``config.qubit_pairs``, filling in any
+            qubits/pairs missing from ``values`` with ``missing_color``.
+            If False (default), only plot the qubits present in
+            ``values`` (plus any qubits only referenced via an edge
+            key), along with any edges between those qubits from
+            ``config.qubit_pairs`` — edges without a passed value are
+            drawn in ``missing_color``.
+        show (bool, optional): whether to plot the figure. Defaults to
+            True. If False, the figure object is returned instead.
+
+    Returns:
+        go.Figure | None: the Plotly figure if ``show`` is False,
+            otherwise ``None``.
+
+    Raises:
+        ValueError: if ``values`` is empty.
     """
     node_values = {}
     edge_values = {}
@@ -715,6 +736,7 @@ def draw_qpu_heatmap(
         vmin, vmax = vmin - 0.5, vmax + 0.5
 
     def to_color(val):
+        """Map a value to a colorscale color (``missing_color`` if None)."""
         if val is None:
             return missing_color
         frac = (val - vmin) / (vmax - vmin)

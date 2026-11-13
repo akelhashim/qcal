@@ -1,11 +1,34 @@
-"""Quantum Processing Unit (QPU)
+"""Quantum Processing Unit (QPU).
 
-This module is used to run all experiments on hardware.
+This module is used to run all experiments on hardware. The :class:`QPU`
+base class implements the full execution pipeline for a set of circuits:
+compilation, transpilation, sequence generation, writing to hardware,
+acquisition, post-processing, and saving. Concrete backends (e.g.
+:class:`~qcal.backend.qubic.qpu.QubicQPU`, or the simulator-backed
+:class:`~qcal.backend.emulator.Emulator`) subclass :class:`QPU` and
+override :meth:`~QPU.generate_sequence`, :meth:`~QPU.write`,
+:meth:`~QPU.acquire`, and :meth:`~QPU.process`.
 
-Basic example usage::
+Example:
+    Running a circuit on the emulator backend, which needs no hardware:
 
-    qpu = QPU(config)
-    qpu.run(circuit)
+    .. code-block:: python
+
+        from qcal.backend.emulator import Emulator
+        from qcal.circuit import Circuit, Cycle
+        from qcal.gates.single_qubit import Meas, X90
+
+        circuit = Circuit([
+            Cycle({X90(0), X90(1)}),
+            Cycle({Meas(0), Meas(1)}),
+        ])
+
+        qpu = Emulator(n_shots=1000)  # loads the example config
+        qpu.run(circuit)
+        print(circuit.results.counts)
+
+    A hardware backend is used the same way, e.g.
+    ``qpu = QubicQPU(config); qpu.run(circuits)``.
 """
 import logging
 import timeit
@@ -22,7 +45,7 @@ from qcal.circuit import CircuitSet
 from qcal.compilation.compiler import Compiler
 from qcal.config import Config
 from qcal.managers.classification_manager import ClassificationManager
-from qcal.managers.data_manager import DataMananger
+from qcal.managers.data_manager import DataManager
 from qcal.results import Results
 from qcal.transpilation.transpiler import Transpiler
 from qcal.utils import load_from_pickle
@@ -41,7 +64,8 @@ class QPU:
     saving of results.
 
     Custom QPUs should inherit this parent class and overwrite the relevant
-    methods.
+    methods (:meth:`generate_sequence`, :meth:`write`, :meth:`acquire`, and
+    :meth:`process`).
     """
     __slots__ = (
         '_active_sequence',
@@ -89,12 +113,12 @@ class QPU:
 
         Args:
             config (Config): qcal config object.
-            compiler (Any | Compiler | List[Any] | None, optional): a custom
-                (set of) compilers to compile the experimental circuits.
-                Defaults to ``None``.
-            transpiler (Any | Transpiler | List[Any] | None, optional): a custom
-                (set of) transpiler(s) to transpile the experimental circuits.
-                Defaults to ``None``.
+            compiler (Any | Compiler | List[Any] | None, optional): a
+                custom (set of) compilers to compile the experimental
+                circuits. Defaults to ``None``.
+            transpiler (Any | Transpiler | List[Any] | None, optional): a
+                custom (set of) transpiler(s) to transpile the experimental
+                circuits. Defaults to ``None``.
             classifier (ClassificationManager | None, optional): manager used
                 for classifying raw data. Defaults to ``None``.
             n_shots (int, optional): number of measurements per circuit.
@@ -104,27 +128,29 @@ class QPU:
             n_circs_per_seq (int, optional): maximum number of circuits that
                 can be measured per sequence. Defaults to 1.
             n_levels (int, optional): number of energy levels to be measured.
-                Defaults to 2. If n_levels = 3, this assumes that the
+                Defaults to 2. If ``n_levels = 3``, this assumes that the
                 measurement supports qutrit classification.
-            jit (bool, optional): enable just-in-time compilation. Defaults to
-                ``True``. When ``True``, the classical prep (compile, transpile,
-                generate_sequence) for batch i+1 runs concurrently with the
-                hardware acquisition of batch i.
+            jit (bool, optional): enable just-in-time compilation. Defaults
+                to ``True``. When ``True``, the classical prep (compile,
+                transpile, generate_sequence) for batch i+1 runs concurrently
+                with the hardware acquisition of batch i.
             raster_circuits (bool, optional): whether to raster through all
-                circuits in a batch during measurement. Defaults to ``False``.
-                By default, all circuits in a batch will be measured ``n_shots``
-                times one by one. If ``True``, all circuits in a batch will be
-                measured back-to-back one shot at a time. This can help average
-                out the effects of drift on the timescale of a measurement.
+                circuits in a batch during measurement. Defaults to
+                ``False``. By default, all circuits in a batch will be
+                measured ``n_shots`` times one by one. If ``True``, all
+                circuits in a batch will be measured back-to-back one shot at
+                a time. This can help average out the effects of drift on the
+                timescale of a measurement.
             rcorr_cmat (pd.DataFrame | None, optional): confusion matrix for
-                readout correction. Defaults to ``None``. If passed, the readout
-                correction will be applied to the raw bit strings in
-                post-processing.
-            rcorr_rr_results (Results | Dict | None, optional): characterization
-                results of measuring the all-zero state with randomized readout.
-                Defaults to ``None``. If passed, quasi-prabilistic readout
-                correction will be applied to the raw bit strings in
-                post-processing.
+                readout correction. Defaults to ``None``. If passed, the
+                readout correction will be applied to the raw bit strings in
+                post-processing. Cannot be passed together with
+                ``rcorr_rr_results``.
+            rcorr_rr_results (Results | Dict | None, optional):
+                characterization results of measuring the all-zero state with
+                randomized readout. Defaults to ``None``. If passed,
+                quasi-probabilistic readout correction will be applied to the
+                raw bit strings in post-processing.
             keep_per_shot_results (bool, optional): whether to keep the
                 per-shot outcomes of every measurement cycle (e.g. for
                 decoding) in each circuit's ``per_shot_results``. These can
@@ -182,7 +208,7 @@ class QPU:
         self._sequence = None
         self._transpiled_circuits = None
         self._measurements = []
-        self._data_manager = DataMananger()
+        self._data_manager = DataManager()
 
     @property
     def active_sequence(self) -> Any:
@@ -278,11 +304,11 @@ class QPU:
         return self._config
 
     @property
-    def data_manager(self) -> DataMananger:
+    def data_manager(self) -> DataManager:
         """Data manager.
 
         Returns:
-            DataMananger: current DataManager instance.
+            DataManager: current DataManager instance.
         """
         return self._data_manager
 
@@ -309,7 +335,8 @@ class QPU:
         """Current pulse sequence.
 
         Returns:
-            Any: pulse sequence. The format will depend on the hardware backend.
+            Any: pulse sequence. The format will depend on the hardware
+                backend.
         """
         return self._sequence
 
@@ -348,7 +375,10 @@ class QPU:
         """
         self._data_manager.generate_exp_id()  # Create a new experimental id
 
-        if not isinstance(circuits, List) and 'n_circuits' not in dir(circuits):
+        if (
+            not isinstance(circuits, List)
+            and 'n_circuits' not in dir(circuits)
+        ):
             circuits = [circuits]
         if isinstance(circuits, List):
             self._circuits = CircuitSet(circuits=circuits)
@@ -424,13 +454,14 @@ class QPU:
     def acquire(self) -> None:
         """Measure the sequence.
 
-        Read self.active_sequence here, not self._sequence: in the
-        JIT path of _batch_measurements(), this method can run on a
-        background thread while _prepare() for the next batch
-        concurrently overwrites self._sequence. See
-        self.active_sequence's docstring for details.
+        Read :attr:`active_sequence` here, not ``self._sequence``: in the
+        JIT path of ``_batch_measurements()``, this method can run on a
+        background thread while ``_prepare()`` for the next batch
+        concurrently overwrites ``self._sequence``. See
+        :attr:`active_sequence` for details.
 
-        The output of this method should be appended to self._measurements.
+        The output of this method should be appended to
+        ``self._measurements``.
         """
         pass
 
@@ -604,11 +635,13 @@ class QPU:
                 Defaults to ``None``.
             n_batches (int | None, optional): number of batches of shots.
                 Defaults to ``None``.
-            auto_save (bool): whether this method should save data itself
-                right after measuring. Defaults to ``True``. Custom QPUs
-                whose own run() orchestrates further steps (e.g. analyze())
-                before the real save point should pass ``False`` here and
-                call ``self.save()`` themselves at the right time instead.
+            auto_save (bool, optional): whether this method should save data
+                itself right after measuring (only if
+                ``settings.Settings.save_data`` is ``True``). Defaults to
+                ``True``. Custom QPUs whose own ``run()`` orchestrates further
+                steps (e.g. ``analyze()``) before the real save point should
+                pass ``False`` here and call ``self.save()`` themselves at
+                the right time instead.
         """
         t_start = timeit.default_timer()
         self._initialize(circuits, n_shots, n_batches)

@@ -1,5 +1,9 @@
-"""Submodule for post-processing measurement results.
+"""Post-processing of raw measurement results.
 
+Provides :class:`PostProcessor`, which reshapes per-shot measurement
+results, applies a sequence of per-shot passes (see
+:mod:`qcal.post_processing.passes`), and aggregates the outcomes into
+counts.
 """
 from __future__ import annotations  # noqa: I001
 
@@ -52,9 +56,11 @@ class PostProcessor:
             has shape ``(n_shots, n_reads)``.
         passes (List[Pass]): list of per-shot post-processing passes.
         aggregate (Pass): pass aggregating per-shot outcomes into counts.
-            Defaults to ``compute_counts``.
+            Defaults to
+            :func:`~qcal.post_processing.passes.compute_counts`.
         measurement_cycles (List[MeasurementCycles] | None): measurement
-            cycles of each circuit (see ``circuit_measurement_cycles``).
+            cycles of each circuit (see
+            :func:`~qcal.post_processing.utils.circuit_measurement_cycles`).
             Required if qubits in a circuit are measured a different number
             of times. Defaults to None.
         keep_per_shot_results (bool): whether to keep the per-shot outcomes
@@ -157,8 +163,7 @@ class PostProcessor:
         return self._qubits
 
     def _construct_dataframes(self) -> None:
-        """Reshape the measurement results into a list of lists of DataFrames.
-        """
+        """Reshape the measurement results into lists of DataFrames."""
         if self.config['readout/herald']:
             start_idx = self._herald_idx + 1
         else:

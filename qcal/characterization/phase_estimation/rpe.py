@@ -1,14 +1,52 @@
-""""Submodule for RPE experiments.
+"""Robust Phase Estimation (RPE) experiments.
+
+This module provides factory functions for robust phase estimation of the
+rotation angles (and hence coherent errors) of native gates:
+
+- :func:`RPE`: generic RPE for a gate in ``('I', 'X90', 'CZ', 'ZZ')``.
+- :func:`IdleRPE`: RPE for the idle gate.
+- :func:`X90RPE`: RPE for the X90 gate (X and Z angle components).
+- :func:`CZRPE`: RPE for the CZ gate (IZ, ZI, and ZZ angles).
+- :func:`ZZRPE`: RPE for the ZZ interaction between pairs of qubits.
+
+Each function takes a :class:`~qcal.qpu.qpu.QPU` subclass and returns an
+instance of a protocol class that inherits from it. Calling ``run()``
+generates the circuits, executes them, estimates the angles, and plots the
+results. The ``loss`` property of the protocol can be used as the cost
+function for optimizing gate parameters.
 
 See:
-https://journals.aps.org/pra/abstract/10.1103/PhysRevA.92.062315
-https://journals.aps.org/prl/abstract/10.1103/PhysRevLett.118.190502
+
+- https://journals.aps.org/pra/abstract/10.1103/PhysRevA.92.062315
+- https://journals.aps.org/prl/abstract/10.1103/PhysRevLett.118.190502
 
 Relevant pyRPE code: https://gitlab.com/quapack/pyrpe
+
+Example:
+    .. code-block:: python
+
+        from qcal.backend.qubic.qpu import QubicQPU
+        from qcal.characterization.phase_estimation.rpe import (
+            CZRPE, X90RPE
+        )
+        from qcal.config import Config
+
+        config = Config('config.yaml')
+
+        rpe = X90RPE(
+            QubicQPU, config, qubit_labels=[0, 1],
+            circuit_depths=(1, 2, 4, 8, 16, 32, 64),
+        )
+        rpe.run()
+        print(rpe.trusted_angle_est)  # angle estimates per qubit
+        print(rpe.loss)  # loss for each qubit
+
+        cz_rpe = CZRPE(QubicQPU, config, qubit_labels=[(0, 1)])
+        cz_rpe.run()
 """
 import logging
 from collections.abc import Iterable
-from typing import Callable, Dict, List, Sequence, Tuple
+from typing import Dict, List, Sequence, Tuple
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -68,11 +106,11 @@ def X90(theta: float) -> pygsti.unitary_to_pauligate:
 def CZ(theta_iz: float, theta_zi: float, theta_zz: float) -> NDArray:
     """Definition of a CZ gate.
 
-    diag([1,1,1,-1]) == CZ(np.pi/2, np.pi/2, -np.pi/2) (up to phase).
+    ``diag([1,1,1,-1]) == CZ(np.pi/2, np.pi/2, -np.pi/2)`` (up to phase).
 
     Args:
         theta_iz (float): IZ angle.
-        theta_zi (float): ZI angle
+        theta_zi (float): ZI angle.
         theta_zz (float): ZZ angle.
 
     Returns:
@@ -150,31 +188,36 @@ def RPE(
     gate_layer:     GateLayer = None,
     loss_angle:     str | List[str] | None = None,
     **kwargs
-) -> Callable:
+) -> QPU:
     """Robust Phase Estimation.
 
     This is the parent class for all RPE experiments. For gate-specific RPE,
-    use the subclasses: IdleRPE, X90RPE, CZRPE, or ZZRPE.
+    use the subclasses: :func:`IdleRPE`, :func:`X90RPE`, :func:`CZRPE`, or
+    :func:`ZZRPE`.
 
     Args:
         qpu (QPU): custom QPU object.
         config (Config): qcal Config object.
         qubit_labels (Sequence[int]): a list specifying sets of system labels
             on which to perform RPE for a given gate.
-        gate (str): gate on which to perform RPE. Must be one of 'I', 'X90',
-            'CZ', or 'ZZ'.
+        gate (str): gate on which to perform RPE. Must be one of ``'I'``,
+            ``'X90'``, ``'CZ'``, or ``'ZZ'``.
         circuit_depths (Sequence[int], optional): a list of positive integers
-            specifying the circuit depths. Defaults to ```(1, 2, 4, 8, 16, 32,
-            64, 128, 256)```.
+            specifying the circuit depths. Defaults to
+            ``(1, 2, 4, 8, 16, 32, 64, 128, 256)``.
         gate_layer (GateLayer, optional): custom gate layer for the gate of
             interest. Defaults to None.
-        loss_angle (str | list[str] | None, optional): a string or list of
+        loss_angle (str | List[str] | None, optional): a string or list of
             strings specifying which angle to use for calculating the loss from
             RPE. Defaults to None. If None, all angles are used. For example,
-            for the X90 gate, the possible options are `'X'` or `'Z'`.
+            for the X90 gate, the possible options are ``'X'`` or ``'Z'``.
+        **kwargs: additional keyword arguments passed to the ``qpu``
+            constructor (e.g. ``n_shots``). If no ``transpiler`` is given,
+            a :class:`~qcal.interface.pygsti.transpiler.PyGSTiTranspiler`
+            is used.
 
     Returns:
-        Callable: RPE class instance.
+        QPU: RPE class instance.
     """
     if gate not in ['I', 'X90', 'CZ', 'ZZ']:
         raise ValueError(
@@ -213,7 +256,7 @@ def RPE(
     _analyze_results_func = analyze_results_map[_gate_name]
 
     class RPE(qpu):
-        """pyRPE protocol."""
+        """Robust phase estimation (RPE) protocol."""
 
         @save_init
         def __init__(
@@ -357,10 +400,11 @@ def RPE(
         def signal(self) -> Dict:
             """Signal decay.
 
-            signal = 1 - 2p(I) + i(1 - 2p(Q))
+            :math:`s = 1 - 2p(I) + i(1 - 2p(Q))`
 
             Returns:
-                Dict: signal as a function of cirucit depth for each experiment.
+                Dict: signal as a function of circuit depth for each
+                    experiment.
             """
             return self._signal
 
@@ -810,7 +854,7 @@ def IdleRPE(
     gate_layer:     GateLayer = None,
     loss_angle:     str | List[str] | None = None,
     **kwargs
-) -> Callable:
+) -> QPU:
     """Robust Phase Estimation for the Idle (I) gate.
 
     Args:
@@ -819,16 +863,20 @@ def IdleRPE(
         qubit_labels (Sequence[int]): a list specifying sets of system labels
             on which to perform RPE for the idle gate.
         circuit_depths (Sequence[int], optional): a list of positive integers
-            specifying the circuit depths. Defaults to ```(1, 2, 4, 8, 16, 32,
-            64, 128, 256)```.
+            specifying the circuit depths. Defaults to
+            ``(1, 2, 4, 8, 16, 32, 64, 128, 256)``.
         gate_layer (GateLayer, optional): custom gate layer for the gate of
             interest. Defaults to None.
-        loss_angle (str | list[str] | None, optional): a string or list of
+        loss_angle (str | List[str] | None, optional): a string or list of
             strings specifying which angle to use for calculating the loss from
             RPE. Defaults to None. If None, all angles are used.
+        **kwargs: additional keyword arguments passed to the ``qpu``
+            constructor (e.g. ``n_shots``). If no ``transpiler`` is given,
+            a :class:`~qcal.interface.pygsti.transpiler.PyGSTiTranspiler`
+            is used.
 
     Returns:
-        Callable: IdleRPE class instance.
+        QPU: IdleRPE class instance.
     """
     rpe = type(RPE(
         qpu=qpu,
@@ -882,7 +930,7 @@ def X90RPE(
     gate_layer:     GateLayer = None,
     loss_angle:     str | List[str] | None = None,
     **kwargs
-) -> Callable:
+) -> QPU:
     """Robust Phase Estimation for the X90 gate.
 
     Args:
@@ -891,17 +939,21 @@ def X90RPE(
         qubit_labels (Sequence[int]): a list specifying sets of system labels
             on which to perform RPE for the X90 gate.
         circuit_depths (Sequence[int], optional): a list of positive integers
-            specifying the circuit depths. Defaults to ```(1, 2, 4, 8, 16, 32,
-            64, 128, 256)```.
+            specifying the circuit depths. Defaults to
+            ``(1, 2, 4, 8, 16, 32, 64, 128, 256)``.
         gate_layer (GateLayer, optional): custom gate layer for the gate of
             interest. Defaults to None.
-        loss_angle (str | list[str] | None, optional): a string or list of
+        loss_angle (str | List[str] | None, optional): a string or list of
             strings specifying which angle to use for calculating the loss from
             RPE. Defaults to None. If None, all angles are used. Possible
-            options are `'X'` or `'Z'`.
+            options are ``'X'`` or ``'Z'``.
+        **kwargs: additional keyword arguments passed to the ``qpu``
+            constructor (e.g. ``n_shots``). If no ``transpiler`` is given,
+            a :class:`~qcal.interface.pygsti.transpiler.PyGSTiTranspiler`
+            is used.
 
     Returns:
-        Callable: X90RPE class instance.
+        QPU: X90RPE class instance.
     """
     rpe = type(RPE(
         qpu=qpu,
@@ -955,7 +1007,7 @@ def CZRPE(
     gate_layer:     GateLayer = None,
     loss_angle:     str | List[str] | None = None,
     **kwargs
-) -> Callable:
+) -> QPU:
     """Robust Phase Estimation for the CZ gate.
 
     Args:
@@ -964,16 +1016,20 @@ def CZRPE(
         qubit_labels (Sequence[Tuple[int, int]]): a list specifying sets of
             system labels on which to perform RPE for the CZ gate.
         circuit_depths (Sequence[int], optional): a list of positive integers
-            specifying the circuit depths. Defaults to ```(1, 2, 4, 8, 16, 32,
-            64, 128, 256)```.
+            specifying the circuit depths. Defaults to
+            ``(1, 2, 4, 8, 16, 32, 64, 128, 256)``.
         gate_layer (GateLayer, optional): custom gate layer for the gate of
             interest. Defaults to None.
-        loss_angle (str | list[str] | None, optional): a string or list of
+        loss_angle (str | List[str] | None, optional): a string or list of
             strings specifying which angle to use for calculating the loss from
             RPE. Defaults to None. If None, all angles are used.
+        **kwargs: additional keyword arguments passed to the ``qpu``
+            constructor (e.g. ``n_shots``). If no ``transpiler`` is given,
+            a :class:`~qcal.interface.pygsti.transpiler.PyGSTiTranspiler`
+            is used.
 
     Returns:
-        Callable: CZRPE class instance.
+        QPU: CZRPE class instance.
     """
     rpe = type(RPE(
         qpu=qpu,
@@ -1027,25 +1083,29 @@ def ZZRPE(
     gate_layer:     GateLayer = None,
     loss_angle:     str | List[str] | None = None,
     **kwargs
-) -> Callable:
+) -> QPU:
     """Robust Phase Estimation for the ZZ gate.
 
     Args:
         qpu (QPU): custom QPU object.
         config (Config): qcal Config object.
-        qubit_labels (Sequence[Tuple[int, int]]): a list specifying sets of system
-            labels on which to perform RPE for the ZZ gate.
+        qubit_labels (Sequence[Tuple[int, int]]): a list specifying sets of
+            system labels on which to perform RPE for the ZZ gate.
         circuit_depths (Sequence[int], optional): a list of positive integers
-            specifying the circuit depths. Defaults to ```(1, 2, 4, 8, 16, 32,
-            64, 128, 256)```.
+            specifying the circuit depths. Defaults to
+            ``(1, 2, 4, 8, 16, 32, 64, 128, 256)``.
         gate_layer (GateLayer, optional): custom gate layer for the gate of
             interest. Defaults to None.
-        loss_angle (str | list[str] | None, optional): a string or list of
+        loss_angle (str | List[str] | None, optional): a string or list of
             strings specifying which angle to use for calculating the loss from
             RPE. Defaults to None. If None, all angles are used.
+        **kwargs: additional keyword arguments passed to the ``qpu``
+            constructor (e.g. ``n_shots``). If no ``transpiler`` is given,
+            a :class:`~qcal.interface.pygsti.transpiler.PyGSTiTranspiler`
+            is used.
 
     Returns:
-        Callable: ZZRPE class instance.
+        QPU: ZZRPE class instance.
     """
     rpe = type(RPE(
         qpu=qpu,

@@ -1,8 +1,13 @@
 """Submodule for performing generic parameter sweeps for calibration.
 
+The :func:`ParamSweep` factory builds a calibration class on top of a
+user-supplied :class:`~qcal.qpu.qpu.QPU` class. It sweeps arbitrary config
+parameters while measuring a fixed circuit and sets each parameter to the
+value that maximizes and/or minimizes the population of the given dit
+strings.
 """
 import logging
-from typing import Callable, Dict, List
+from typing import Dict, List
 
 import numpy as np
 import pandas as pd
@@ -29,54 +34,62 @@ def ParamSweep(
     minimize:    List[str] = None,
     xlabel:      str = 'Value Sweep',
     **kwargs
-) -> Callable:
+) -> Calibration:
     """Parameter sweep calibration.
 
-    This calibration finds the param value for which the leakage on
-    `leakage_qubit` is minimized.
+    This calibration finds the param value which maximizes the population of
+    the dit strings in ``maximize`` and/or minimizes the population of the
+    dit strings in ``minimize``. If several dit strings are given, the mean
+    of the optimal values is used.
 
-    Basic example useage:
-    ```
-    # Calibrate the frequency of the 11 <-> 02 transition of a CZ gate
-    circuit = qc.Circuit([
-        qc.Cycle({qc.X90(0), qc.X90(1)}),
-        qc.Cycle({qc.X90(0), qc.X90(1)}),
-        qc.Cycle({qc.CZ((0, 1))}),
-    ])
-    circuit.measure()
+    Example:
+        .. code-block:: python
 
-    # Sweep +/- 10 MHz around the expected 11 <-> 02 transition frequency
-    freqs = np.linspace(-10, 10, 31) * MHz + config['two_qubit/(0, 1)/CZ/freq']
+            # Calibrate the frequency of the 11 <-> 02 transition of a CZ gate
+            circuit = qc.Circuit([
+                qc.Cycle({qc.X90(0), qc.X90(1)}),
+                qc.Cycle({qc.X90(0), qc.X90(1)}),
+                qc.Cycle({qc.CZ((0, 1))}),
+            ])
+            circuit.measure()
 
-    cal = ParamSweep(
-        CustomQPU,
-        config,
-        circuit=circuit,
-        params={(0, 1): 'two_qubit/(0, 1)/CZ/freq'},
-        param_sweep={(0, 1): freqs},
-        maximize=['02'],
-        minimize=['11']
-    )
-    cal.run()
-    ```
+            # Sweep +/- 10 MHz around the expected 11 <-> 02 frequency
+            freqs = (
+                np.linspace(-10, 10, 31) * MHz
+                + config['two_qubit/(0, 1)/CZ/freq']
+            )
+
+            cal = ParamSweep(
+                CustomQPU,
+                config,
+                circuit=circuit,
+                params={(0, 1): 'two_qubit/(0, 1)/CZ/freq'},
+                param_sweep={(0, 1): freqs},
+                maximize=['02'],
+                minimize=['11']
+            )
+            cal.run()
 
     Args:
         qpu (QPU): custom QPU object.
         config (Config): qcal Config object.
-        circuit (Circuit): circuit which amplifies leakage on some qubit.
-        leakage_qubit (int): qubit on which leakage should be minimized.
-        params (Dict): dictionary mapping the qubits on which leakage occurs to
-            the config parameter which is causing the leakage.
-        param_sweep (Dict): dictionary mapping the qubits on which leakage
-            occurs to sweep values for the parameter to be optimized.
+        circuit (Circuit): circuit measured for every value of the sweep.
+        params (Dict): dictionary mapping qubit labels (or tuples of qubit
+            labels) to the config parameter(s) to sweep over. The keys
+            determine which qubits the populations are marginalized onto.
+        param_sweep (Dict): dictionary mapping the same keys as ``params``
+            to the sweep values for the parameter to be optimized.
         maximize (List[str], optional): list of dit strings specifying on which
             state(s) to maximize the population. Defaults to None.
         minimize (List[str], optional): list of dit strings specifying on which
-            state(s) to minimize the population. Defaults to None.
+            state(s) to minimize the population. Defaults to None. At least
+            one of ``maximize`` or ``minimize`` must be given.
         xlabel (str, optional): x-axis label. Defaults to 'Value Sweep'.
+        **kwargs: additional keyword arguments passed to the QPU
+            constructor (e.g. ``n_shots``, ``n_levels``).
 
     Returns:
-        Callable: ParamSweep calibration class.
+        Calibration: ParamSweep calibration class.
     """
 
     class ParamSweep(qpu, Calibration):
@@ -96,7 +109,7 @@ def ParamSweep(
                 xlabel:      str = 'Value Sweep',
                 **kwargs
             ) -> None:
-            """Initialize the ParamSweep class within the function."""
+            """Initialize the ParamSweep calibration class."""
             qpu.__init__(self, config=config, **kwargs)
             Calibration.__init__(self, config)
 
@@ -109,8 +122,8 @@ def ParamSweep(
 
             if not maximize and not minimize:
                 raise ValueError(
-                    'You must specify a dit string for at least one of maximize'
-                    ' or minimize!'
+                    'You must specify a dit string for at least one of '
+                    'maximize or minimize!'
                 )
 
             self._qubits = list(self._params.keys())
@@ -240,7 +253,7 @@ def ParamSweep(
                 )
 
         def plot(self) -> None:
-            """Plot the sweep results"""
+            """Plot the sweep results."""
             Calibration.plot(self,
                 ylabel='Population',
                 xlabel=self._xlabel,

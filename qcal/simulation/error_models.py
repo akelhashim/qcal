@@ -1,4 +1,4 @@
-"""Error model wrappers for the DensityMatrixSimulator.
+"""Category-based error models for the DensityMatrixSimulator.
 
 Each :class:`ErrorModel` maps broad gate categories
 (``'single_qubit'``, ``'two_qubit'``, ``'single_qutrit'``,
@@ -27,14 +27,44 @@ independently to each qudit touched by a multi-qudit gate. The
 on the full two-qubit gate body (``dims=(2, 2)``), matching how a
 per-instance ``gate_unitaries`` error would act.
 
-Example::
+Example:
+    .. code-block:: python
 
-    from qcal.simulation import DensityMatrixSimulator
-    from qcal.simulation.error_models import DepolarizingNoise
+        import numpy as np
+        from qcal.circuit import Circuit, Cycle
+        from qcal.gates.single_qubit import H, Meas
+        from qcal.gates.two_qubit import CNOT
+        from qcal.simulation import DensityMatrixSimulator
+        from qcal.simulation.error_models import (
+            CustomErrorModel,
+            DepolarizingNoise,
+            RelaxationNoise,
+            RelaxationParams,
+        )
 
-    noise = DepolarizingNoise(single_qubit=0.001, two_qubit=0.01)
-    sim = DensityMatrixSimulator(error_model=noise)
-    sim.run(circuit)
+        circuit = Circuit([
+            Cycle({H(0)}),
+            Cycle({CNOT((0, 1))}),
+            Cycle({Meas(0), Meas(1)}),
+        ])
+
+        # Depolarizing noise on every gate, plus T1/Tphi relaxation
+        # on single-qubit gates
+        noise = CustomErrorModel(
+            DepolarizingNoise(single_qubit=0.001, two_qubit=0.01),
+            RelaxationNoise(
+                single_qubit=RelaxationParams(
+                    t1=50e-6, tphi=30e-6, t=20e-9
+                ),
+            ),
+        )
+        # Readout error on Q0: C[prep, meas]
+        noise.add_readout_noise(0, np.array([[0.98, 0.02],
+                                             [0.05, 0.95]]))
+
+        sim = DensityMatrixSimulator(error_model=noise, n_shots=1000)
+        sim.run(circuit)
+        print(circuit.results)
 """
 from __future__ import annotations
 
@@ -90,8 +120,8 @@ class RelaxationParams:
     """Parameters for one category's relaxation channel.
 
     Passed to :class:`RelaxationNoise` per gate category.
-    Qubit categories model GE (|0⟩–|1⟩) relaxation; qutrit categories
-    model EF (|1⟩–|2⟩) relaxation.
+    Qubit categories model GE (``|0⟩``–``|1⟩``) relaxation; qutrit
+    categories model EF (``|1⟩``–``|2⟩``) relaxation.
 
     .. note::
         ``tphi`` is the *pure-dephasing* time Tφ, **not** T₂.
@@ -170,7 +200,7 @@ def _qutrit_bit_flip_channel(
     """Build a single-qutrit bit-flip KrausMap.
 
     Composes independent GE and EF bit-flip channels so each rate is
-    unconstrained. Kraus operators (GE channel applied first):
+    unconstrained. Kraus operators (GE channel applied first)::
 
         K₀₀ = √(1−γ_ge)·√(1−γ_ef) I₃
         K₀₁ = √γ_ge·√(1−γ_ef)      X₀₁
@@ -206,7 +236,7 @@ def _qutrit_phase_flip_channel(
     """Build a single-qutrit phase-flip KrausMap.
 
     Composes independent GE and EF phase-flip channels so each rate is
-    unconstrained. Kraus operators (GE channel applied first):
+    unconstrained. Kraus operators (GE channel applied first)::
 
         K₀₀ = √(1−γ_ge)·√(1−γ_ef) I₃
         K₀₁ = √γ_ge·√(1−γ_ef)      Z₀₁
@@ -242,7 +272,7 @@ def _qutrit_dephasing_channel(
     """Build a single-qutrit dephasing KrausMap.
 
     Kills off-diagonal coherences independently in the GE and EF
-    subspaces. Kraus operators are:
+    subspaces. Kraus operators are::
 
         K₀ = diag(1, √(1−γ_ge), √(1−γ_ef))
         K₁ = √γ_ge  |1⟩⟨1|
@@ -284,7 +314,7 @@ def _qutrit_thermal_relaxation_channel(
 
     Constructs a Lindbladian with up to six jump operators — GE and EF
     decay, excitation, and pure-dephasing — then evolves it for the
-    gate duration ``t``:
+    gate duration ``t``::
 
         L_ge↓  = √((1−p1_ge)/t1_ge) |0⟩⟨1|
         L_ge↑  = √(p1_ge/t1_ge)     |1⟩⟨0|
@@ -540,7 +570,7 @@ class ErrorModel(ABC):
         keyed to specific gate instances rather than gate categories.
 
         Args:
-            gate: gate instance, e.g. ``X(0)``.
+            gate (Gate): gate instance, e.g. ``X(0)``.
 
         Returns:
             quax.KrausMap | quax.SuperOp | None: channel to apply
@@ -565,15 +595,16 @@ class DepolarizingNoise(ErrorModel):
     Z⊗Z error) would act on — rather than two independent
     single-qudit channels.
 
-    Example::
+    Example:
+        .. code-block:: python
 
-        noise = DepolarizingNoise(single_qubit=0.001, two_qubit=0.01)
-        sim = DensityMatrixSimulator(error_model=noise)
+            noise = DepolarizingNoise(single_qubit=0.001, two_qubit=0.01)
+            sim = DensityMatrixSimulator(error_model=noise)
 
-        # qutrit circuit
-        noise = DepolarizingNoise(
-            single_qutrit=0.002, two_qutrit=0.02
-        )
+            # qutrit circuit
+            noise = DepolarizingNoise(
+                single_qutrit=0.002, two_qutrit=0.02
+            )
 
     Args:
         single_qubit (float): depolarizing rate for single-qubit
@@ -640,13 +671,14 @@ class AmplitudeDamping(ErrorModel):
     Delegates to ``quax.channels.amplitude_damping(rate, dims=(d,))``
     where *d* is 2 for qubit categories and 3 for qutrit categories.
 
-    Example::
+    Example:
+        .. code-block:: python
 
-        noise = AmplitudeDamping(single_qubit=0.005, two_qubit=0.02)
-        sim = DensityMatrixSimulator(error_model=noise)
+            noise = AmplitudeDamping(single_qubit=0.005, two_qubit=0.02)
+            sim = DensityMatrixSimulator(error_model=noise)
 
-        # qutrit circuit
-        noise = AmplitudeDamping(single_qutrit=0.005, two_qutrit=0.02)
+            # qutrit circuit
+            noise = AmplitudeDamping(single_qutrit=0.005, two_qutrit=0.02)
 
     Args:
         single_qubit (float): damping rate γ for single-qubit gates
@@ -708,8 +740,8 @@ class DephasingNoise(ErrorModel):
     """Dephasing (T2) noise applied uniformly by gate category.
 
     ``single_qubit`` uses ``quax.channels.dephasing(rate)`` and models
-    GE (|0⟩–|1⟩) dephasing on a single qubit. ``single_qutrit`` uses a
-    manually-constructed Kraus map (since ``quax.channels.dephasing``
+    GE (``|0⟩``–``|1⟩``) dephasing on a single qubit. ``single_qutrit``
+    uses a manually-constructed Kraus map (since ``quax.channels.dephasing``
     does not accept a *dims* argument) where the qubit rate supplies
     γ_ge and the qutrit rate supplies γ_ef. Both two-qudit categories
     are **joint** channels on the gate body, mirroring how a
@@ -720,31 +752,32 @@ class DephasingNoise(ErrorModel):
     :func:`_joint_two_qutrit_dephasing_channel` (separate GE/EF-axis
     jump operators on the joint two-qutrit subsystem):
 
-    +---------------------+----------+----------+
-    | Parameter           | γ_ge     | γ_ef     |
-    +=====================+==========+==========+
-    | ``single_qubit``    | ✓        |          |
-    | ``single_qutrit``   |          | ✓        |
-    | ``two_qubit``       | ✓        |          |
-    | ``two_qutrit``      |          | ✓        |
-    +---------------------+----------+----------+
+    ====================  ========  ========
+    Parameter             γ_ge      γ_ef
+    ====================  ========  ========
+    ``single_qubit``      ✓
+    ``single_qutrit``               ✓
+    ``two_qubit``         ✓
+    ``two_qutrit``                  ✓
+    ====================  ========  ========
 
     For a circuit that mixes qubit and qutrit gates, supply all four
     parameters and the appropriate rate is used per gate.
 
-    Example::
+    Example:
+        .. code-block:: python
 
-        # qubit-only circuit
-        noise = DephasingNoise(single_qubit=0.003, two_qubit=0.015)
+            # qubit-only circuit
+            noise = DephasingNoise(single_qubit=0.003, two_qubit=0.015)
 
-        # qutrit-only circuit
-        noise = DephasingNoise(single_qutrit=0.006, two_qutrit=0.012)
+            # qutrit-only circuit
+            noise = DephasingNoise(single_qutrit=0.006, two_qutrit=0.012)
 
-        # mixed: qutrit channel gets gamma_ge=0.003, gamma_ef=0.006
-        noise = DephasingNoise(
-            single_qubit=0.003, single_qutrit=0.006,
-        )
-        sim = DensityMatrixSimulator(error_model=noise)
+            # mixed: qutrit channel gets gamma_ge=0.003, gamma_ef=0.006
+            noise = DephasingNoise(
+                single_qubit=0.003, single_qutrit=0.006,
+            )
+            sim = DensityMatrixSimulator(error_model=noise)
 
     Args:
         single_qubit (float): GE dephasing rate for single-qubit
@@ -797,11 +830,11 @@ class DephasingNoise(ErrorModel):
             gate_name (str): ``type(gate).__name__``.
 
         Returns:
-            quax.SuperOp | None: for qubit categories.
-            quax.KrausMap | None: for qutrit categories (built from
-                γ_ge = qubit rate, γ_ef = qutrit rate).
-            None: if all relevant rates are zero or the gate is
-                unknown.
+            quax.SuperOp | quax.KrausMap | None: a ``quax.SuperOp`` for
+                qubit categories, a ``quax.KrausMap`` for qutrit
+                categories (built from γ_ge = qubit rate, γ_ef = qutrit
+                rate), or ``None`` if all relevant rates are zero or
+                the gate is unknown.
         """
         category = gate_category(gate_name)
         if category is None:
@@ -818,13 +851,14 @@ class BitFlipNoise(ErrorModel):
     (X₁₂). γ_ge and γ_ef are independent and each must lie in
     [0, 1]; their sum is unconstrained.
 
-    Example::
+    Example:
+        .. code-block:: python
 
-        noise = BitFlipNoise(single_qubit=0.01, two_qubit=0.02)
-        sim = DensityMatrixSimulator(error_model=noise)
+            noise = BitFlipNoise(single_qubit=0.01, two_qubit=0.02)
+            sim = DensityMatrixSimulator(error_model=noise)
 
-        # qutrit circuit
-        noise = BitFlipNoise(single_qutrit=0.01, two_qutrit=0.02)
+            # qutrit circuit
+            noise = BitFlipNoise(single_qutrit=0.01, two_qutrit=0.02)
 
     Args:
         single_qubit (float): GE bit-flip rate for single-qubit
@@ -878,10 +912,10 @@ class BitFlipNoise(ErrorModel):
             gate_name (str): ``type(gate).__name__``.
 
         Returns:
-            quax.SuperOp | None: for qubit categories.
-            quax.KrausMap | None: for qutrit categories.
-            None: if all relevant rates are zero or the gate is
-                unknown.
+            quax.SuperOp | quax.KrausMap | None: a ``quax.SuperOp`` for
+                qubit categories, a ``quax.KrausMap`` for qutrit
+                categories, or ``None`` if all relevant rates are zero
+                or the gate is unknown.
         """
         category = gate_category(gate_name)
         if category is None:
@@ -898,13 +932,14 @@ class PhaseFlipNoise(ErrorModel):
     supply γ_ef (Z₁₂). γ_ge and γ_ef are independent and each must
     lie in [0, 1]; their sum is unconstrained.
 
-    Example::
+    Example:
+        .. code-block:: python
 
-        noise = PhaseFlipNoise(single_qubit=0.01, two_qubit=0.02)
-        sim = DensityMatrixSimulator(error_model=noise)
+            noise = PhaseFlipNoise(single_qubit=0.01, two_qubit=0.02)
+            sim = DensityMatrixSimulator(error_model=noise)
 
-        # qutrit circuit
-        noise = PhaseFlipNoise(single_qutrit=0.01, two_qutrit=0.02)
+            # qutrit circuit
+            noise = PhaseFlipNoise(single_qutrit=0.01, two_qutrit=0.02)
 
     Args:
         single_qubit (float): GE phase-flip rate for single-qubit
@@ -958,10 +993,10 @@ class PhaseFlipNoise(ErrorModel):
             gate_name (str): ``type(gate).__name__``.
 
         Returns:
-            quax.SuperOp | None: for qubit categories.
-            quax.KrausMap | None: for qutrit categories.
-            None: if all relevant rates are zero or the gate is
-                unknown.
+            quax.SuperOp | quax.KrausMap | None: a ``quax.SuperOp`` for
+                qubit categories, a ``quax.KrausMap`` for qutrit
+                categories, or ``None`` if all relevant rates are zero
+                or the gate is unknown.
         """
         category = gate_category(gate_name)
         if category is None:
@@ -980,35 +1015,36 @@ class RelaxationNoise(ErrorModel):
     with separate GE and EF jump operators, following the convention
     that qubit params supply γ_ge and qutrit params supply γ_ef:
 
-    +---------------------+------+------+
-    | Parameter           | γ_ge | γ_ef |
-    +=====================+======+======+
-    | ``single_qubit``    | ✓    |      |
-    | ``single_qutrit``   |      | ✓    |
-    | ``two_qubit``       | ✓    |      |
-    | ``two_qutrit``      |      | ✓    |
-    +---------------------+------+------+
+    ====================  ========  ========
+    Parameter             γ_ge      γ_ef
+    ====================  ========  ========
+    ``single_qubit``      ✓
+    ``single_qutrit``               ✓
+    ``two_qubit``         ✓
+    ``two_qutrit``                  ✓
+    ====================  ========  ========
 
     The qutrit channel uses the gate duration ``t`` from the qutrit
     (EF) params when provided, otherwise falls back to the qubit (GE)
     params.
 
-    Example::
+    Example:
+        .. code-block:: python
 
-        from qcal.simulation.error_models import (
-            RelaxationNoise, RelaxationParams,
-        )
-        noise = RelaxationNoise(
-            single_qubit=RelaxationParams(t1=50e-6, tphi=30e-6, t=20e-9),
-            two_qubit=RelaxationParams(t1=50e-6, tphi=30e-6, t=60e-9),
-        )
-        sim = DensityMatrixSimulator(error_model=noise)
+            from qcal.simulation.error_models import (
+                RelaxationNoise, RelaxationParams,
+            )
+            noise = RelaxationNoise(
+                single_qubit=RelaxationParams(t1=50e-6, tphi=30e-6, t=20e-9),
+                two_qubit=RelaxationParams(t1=50e-6, tphi=30e-6, t=60e-9),
+            )
+            sim = DensityMatrixSimulator(error_model=noise)
 
-        # qutrit: GE from single_qubit, EF from single_qutrit
-        noise = RelaxationNoise(
-            single_qubit=RelaxationParams(t1=50e-6, tphi=30e-6, t=20e-9),
-            single_qutrit=RelaxationParams(t1=30e-6, tphi=20e-6, t=20e-9),
-        )
+            # qutrit: GE from single_qubit, EF from single_qutrit
+            noise = RelaxationNoise(
+                single_qubit=RelaxationParams(t1=50e-6, tphi=30e-6, t=20e-9),
+                single_qutrit=RelaxationParams(t1=30e-6, tphi=20e-6, t=20e-9),
+            )
 
     Args:
         single_qubit (RelaxationParams | None): params for single-qubit
@@ -1077,15 +1113,16 @@ class RelaxationNoise(ErrorModel):
 
 
 class LeakageNoise(ErrorModel):
-    """Leakage noise (|1⟩→|2⟩) for qutrit gate categories.
+    """Leakage noise (``|1⟩`` → ``|2⟩``) for qutrit gate categories.
 
     Delegates to ``quax.channels.leakage(rate)``. Qutrit-only;
     qubit categories always return ``None``.
 
-    Example::
+    Example:
+        .. code-block:: python
 
-        noise = LeakageNoise(single_qutrit=0.005, two_qutrit=0.01)
-        sim = DensityMatrixSimulator(error_model=noise)
+            noise = LeakageNoise(single_qutrit=0.005, two_qutrit=0.01)
+            sim = DensityMatrixSimulator(error_model=noise)
 
     Args:
         single_qutrit (float): leakage rate for single-qutrit gates.
@@ -1132,15 +1169,16 @@ class LeakageNoise(ErrorModel):
 
 
 class SeepageNoise(ErrorModel):
-    """Seepage noise (|2⟩→|1⟩) for qutrit gate categories.
+    """Seepage noise (``|2⟩`` → ``|1⟩``) for qutrit gate categories.
 
     Delegates to ``quax.channels.seepage(rate)``. Qutrit-only;
     qubit categories always return ``None``.
 
-    Example::
+    Example:
+        .. code-block:: python
 
-        noise = SeepageNoise(single_qutrit=0.005, two_qutrit=0.01)
-        sim = DensityMatrixSimulator(error_model=noise)
+            noise = SeepageNoise(single_qutrit=0.005, two_qutrit=0.01)
+            sim = DensityMatrixSimulator(error_model=noise)
 
     Args:
         single_qutrit (float): seepage rate for single-qutrit gates.
@@ -1265,29 +1303,31 @@ class UnitaryError(ErrorModel):
     each qudit of the gate) or a joint unitary over the whole gate
     subsystem (4×4 or 9×9).
 
-    Example::
+    Example:
+        .. code-block:: python
 
-        import numpy as np
-        from qcal.simulation.error_models import UnitaryError
-        from qcal.gates.single_qubit import X
-        from qcal.gates.two_qubit import CZ
+            import numpy as np
+            from qcal.simulation.error_models import UnitaryError
+            from qcal.gates.two_qubit import CZ
 
-        # Category-level: small Rz over-rotation on every single-qubit gate
-        theta = 0.05  # radians
-        Rz = np.array([
-            [np.exp(-0.5j * theta), 0],
-            [0, np.exp(0.5j * theta)],
-        ])
-        noise = UnitaryError(single_qubit=Rz)
+            # Category-level: small Rz over-rotation on every
+            # single-qubit gate
+            theta = 0.05  # radians
+            Rz = np.array([
+                [np.exp(-0.5j * theta), 0],
+                [0, np.exp(0.5j * theta)],
+            ])
+            noise = UnitaryError(single_qubit=Rz)
 
-        # Per-gate: different unitary on a specific CZ instance
-        noise = UnitaryError(
-            single_qubit=Rz,
-            gate_unitaries={CZ((0, 1)): U_cz_error},
-        )
+            # Per-gate: small extra conditional phase on one CZ
+            U_cz_error = np.diag([1, 1, 1, np.exp(1j * 0.02)])
+            noise = UnitaryError(
+                single_qubit=Rz,
+                gate_unitaries={CZ((0, 1)): U_cz_error},
+            )
 
-        # U = I → equivalent to the state-vector simulator
-        noise = UnitaryError()   # all None, no channels added
+            # U = I → equivalent to the state-vector simulator
+            noise = UnitaryError()   # all None, no channels added
 
     Args:
         single_qubit (np.ndarray | None): 2×2 unitary error for
@@ -1357,7 +1397,7 @@ class UnitaryError(ErrorModel):
         this gate instance.
 
         Args:
-            gate: gate instance, e.g. ``CZ((0, 1))``.
+            gate (Gate): gate instance, e.g. ``CZ((0, 1))``.
 
         Returns:
             quax.KrausMap | None: single-Kraus-operator channel, or
@@ -1386,7 +1426,7 @@ def _to_superop_matrix(channel) -> np.ndarray:
     the contribution is K ⊗ conj(K).
 
     Args:
-        channel: quax.SuperOp or quax.KrausMap.
+        channel (quax.SuperOp | quax.KrausMap): channel to convert.
 
     Returns:
         np.ndarray: real or complex d²×d² superoperator matrix.
@@ -1406,7 +1446,12 @@ def _compose_channels(channels: list) -> quax.SuperOp:
     """Compose a list of quax channels into a single SuperOp.
 
     Channels are applied left to right (``channels[0]`` first, i.e. nearest
-    to the gate). All channels must act on the same Hilbert-space dimension.
+    to the gate). Channels may act on different numbers of qudits as long
+    as each acts on either one qudit or the maximum number of qudits ``n``
+    among the channels. Single-qudit channels are lifted to ``n`` qudits
+    as an independent copy on each qudit (``E ⊗ E ⊗ ...``), matching how
+    the density-matrix simulator applies a single-qudit channel to a
+    multi-qudit gate.
 
     Args:
         channels (list): list of ``quax.KrausMap`` or ``quax.SuperOp``,
@@ -1414,12 +1459,36 @@ def _compose_channels(channels: list) -> quax.SuperOp:
 
     Returns:
         quax.SuperOp: composed channel.
+
+    Raises:
+        ValueError: if a channel acts on more than one qudit but fewer
+            than ``n`` qudits.
     """
-    matrices = [_to_superop_matrix(ch) for ch in channels]
+    n_qudits = [len(ch.dims[0]) for ch in channels]
+    n = max(n_qudits)
+    lifted = []
+    for ch, k in zip(channels, n_qudits, strict=True):
+        if k == n:
+            lifted.append(ch)
+        elif k == 1:
+            sop = quax.to_superop(ch)
+            full = sop
+            for _ in range(n - 1):
+                full = quax.tensor_superop(full, sop)
+            lifted.append(full)
+        else:
+            raise ValueError(
+                f'Cannot compose a {k}-qudit channel with a {n}-qudit '
+                'channel; only single-qudit channels can be lifted.'
+            )
+
+    matrices = [_to_superop_matrix(ch) for ch in lifted]
     composed = matrices[0]
     for m in matrices[1:]:
         composed = m @ composed
-    dims = channels[0].dims  # preserve qudit structure (e.g. ((2,2),(2,2)))
+    # Preserve the qudit structure of the widest channel, e.g.
+    # ((2, 2), (2, 2)).
+    dims = next(ch.dims for ch in lifted if len(ch.dims[0]) == n)
     return quax.SuperOp.from_matrix(jnp.array(composed), dims=dims)
 
 
@@ -1591,18 +1660,21 @@ class CustomErrorModel(ErrorModel):
     ``CustomErrorModel`` is itself a :class:`ErrorModel` and may therefore
     appear as a sub-model inside another ``CustomErrorModel``.
 
-    Example::
+    Example:
+        .. code-block:: python
 
-        noise = CustomErrorModel(
-            DepolarizingNoise(single_qubit=0.01),
-            RelaxationNoise(
-                single_qubit=RelaxationParams(
-                    t1=50e-6, tphi=30e-6, t=50e-9
-                )
-            ),
-        )
-        noise.add_readout_noise('Q0', cmat)
-        sim = DensityMatrixSimulator(error_model=noise)
+            noise = CustomErrorModel(
+                DepolarizingNoise(single_qubit=0.01),
+                RelaxationNoise(
+                    single_qubit=RelaxationParams(
+                        t1=50e-6, tphi=30e-6, t=50e-9
+                    )
+                ),
+            )
+            # Readout confusion matrix C[prep, meas] for Q0
+            cmat = np.array([[0.98, 0.02], [0.05, 0.95]])
+            noise.add_readout_noise('Q0', cmat)
+            sim = DensityMatrixSimulator(error_model=noise)
 
     Args:
         *error_models (ErrorModel): sub-models to compose. Accepts zero or
@@ -1706,7 +1778,7 @@ class CustomErrorModel(ErrorModel):
         qubits, subspace, and params (see :meth:`qcal.gates.gate.Gate.__eq__`).
 
         Args:
-            gate: gate instance, e.g. ``X(0)``.
+            gate (Gate): gate instance, e.g. ``X(0)``.
 
         Returns:
             quax.SuperOp | None: error channel, or ``None``.
@@ -1740,15 +1812,16 @@ class CustomErrorModel(ErrorModel):
         Only qubit gates (Hilbert-space dimension that is a power of 2) are
         supported; qutrit gates raise :class:`ValueError`.
 
-        Example::
+        Example:
+            .. code-block:: python
 
-            import qcal.gates.single_qubit as gates
-            import numpy as np
+                import qcal.gates.single_qubit as gates
+                import numpy as np
 
-            # Identity-like error on X(0) (slightly depolarised)
-            ptm = np.diag([1, 0.99, 0.99, 0.99])
-            noise = CustomErrorModel.from_PTM({gates.X(0): ptm})
-            sim = DensityMatrixSimulator(error_model=noise)
+                # Identity-like error on X(0) (slightly depolarised)
+                ptm = np.diag([1, 0.99, 0.99, 0.99])
+                noise = CustomErrorModel.from_PTM({gates.X(0): ptm})
+                sim = DensityMatrixSimulator(error_model=noise)
 
         Args:
             gate_ptm_dict (dict): mapping from gate instance to PTM array.
@@ -1784,20 +1857,21 @@ class CustomErrorModel(ErrorModel):
         are both supported (e.g. ``'Z'`` for 1-qubit, ``'ZZ'`` for 2-qubit
         joint errors).
 
-        Gate instances are compared by value — ``CZ(0, 1)`` created here
-        and ``CZ(0, 1)`` in the circuit compare as equal when they share
-        the same name, qubits, subspace, and params.
+        Gate instances are compared by value — ``CZ((0, 1))`` created
+        here and ``CZ((0, 1))`` in the circuit compare as equal when they
+        share the same name, qubits, subspace, and params.
 
-        Example::
+        Example:
+            .. code-block:: python
 
-            import qcal.gates.single_qubit as sq
-            import qcal.gates.two_qubit as tq
+                import qcal.gates.single_qubit as sq
+                import qcal.gates.two_qubit as tq
 
-            noise = CustomErrorModel.from_PNR({
-                sq.X(0):      {'Z': 0.002, 'X': 0.001},
-                tq.CZ((0,1)): {'ZI': 0.005, 'IZ': 0.003, 'ZZ': 0.001},
-            })
-            sim = DensityMatrixSimulator(error_model=noise)
+                noise = CustomErrorModel.from_PNR({
+                    sq.X(0):      {'Z': 0.002, 'X': 0.001},
+                    tq.CZ((0, 1)): {'ZI': 0.005, 'IZ': 0.003, 'ZZ': 0.001},
+                })
+                sim = DensityMatrixSimulator(error_model=noise)
 
         Args:
             gate_pauli_dict (dict): mapping from gate instance to a

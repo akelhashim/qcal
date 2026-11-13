@@ -1,5 +1,31 @@
-"""Submodule for storing different optimizers.
+"""Ask-tell optimizers for parameter optimization.
 
+Each optimizer exposes the same minimal interface: ``ask()`` proposes new
+parameter values, ``tell(x, loss)`` reports the loss measured at those
+values, ``stop()`` returns whether convergence has been reached, and the
+``opt_x`` / ``opt_loss`` properties return the best values found so far.
+This makes them interchangeable within
+:class:`~qcal.optimization.optimize.Optimize`, which instantiates the
+optimizer as ``optimizer(x0, **opt_kwargs)``.
+
+Example:
+    Minimize a simple quadratic with Adam:
+
+    .. code-block:: python
+
+        import numpy as np
+        from qcal.optimization.optimizers import Adam
+
+        def loss_fn(x):
+            return float(np.sum((x - 0.3) ** 2))
+
+        x0 = np.array([0.0])
+        opt = Adam(x0, lr=0.05, loss=loss_fn(x0))
+        opt.tell(x0 + 0.01, loss_fn(x0 + 0.01))
+        for _ in range(200):
+            x = opt.ask()
+            opt.tell(x, loss_fn(x))
+        opt.opt_x  # ~0.3
 """
 import logging
 from typing import Any
@@ -24,6 +50,12 @@ __all__ = (
 
 
 class Adam:
+    """Adam optimizer with finite-difference gradients.
+
+    Adam is a momentum-based stochastic optimizer. If no gradient function
+    is given, the gradient is estimated by finite differences between
+    successive calls to :meth:`tell`.
+    """
 
     def __init__(
         self,
@@ -36,30 +68,34 @@ class Adam:
         loss:      float | NDArray = 0.,
         grad_func: Any | None = None
     ) -> None:
-        """Based on ADAM, a momentum-based stochastic optimizer.
-
-        See: https://arxiv.org/abs/1412.6980
+        """Initialize an Adam optimizer.
 
         Args:
             x0 (float | NDArray): initial parameter values.
             lr (float, optional): learning rate, can be modified to improve
-                convergence. Defaults to 0.01
-            beta_1 (float, optional)): hyperparameter 1, [0, 1). In general,
+                convergence. Defaults to 0.01.
+            beta_1 (float, optional): hyperparameter 1, [0, 1). In general,
                 this value should not be changed. Defaults to 0.9.
-            beta_2 (float, optional)): hyperparameter 2, [0, 1). In general,
+            beta_2 (float, optional): hyperparameter 2, [0, 1). In general,
                 this value should not be changed. Defaults to 0.999.
             eps (float, optional): small additive factor to ensure we do not
-                divide by zero. In general, this value should not be changed.
-                Defaults to 1e-8.
-            tol (float, optional): convergence criteria. Defaults to 1e-4. If
-                the change in the cost is less than this value, the optimization
-                will terminate.
-            loss (float | NDArray | None, optional): initial loss corresponding
-                to the initial parameters (x). Defaults to 0. This is used to
-                compute gradients for the parameters via finite difference
-                methods.
-            grad_funct (Any | None, optional): function (or class) for computing
-                the gradient. If None, finite-difference is used.
+                divide by zero. In general, this value should not be
+                changed. Defaults to 1e-8.
+            tol (float, optional): convergence criteria. Defaults to 1e-4.
+                If the change in the cost is less than this value, the
+                optimization will terminate.
+            loss (float | NDArray, optional): initial loss corresponding to
+                the initial parameters (``x0``). Defaults to 0. This is used
+                to compute gradients for the parameters via finite
+                difference methods.
+            grad_func (Any | None, optional): function (or class) for
+                computing the gradient. It must have a ``tell(x, loss)``
+                method and a ``grad`` property. If None, finite-difference is
+                used. Defaults to None.
+
+        References:
+            `Kingma and Ba, Adam: A Method for Stochastic Optimization
+            <https://arxiv.org/abs/1412.6980>`_.
         """
         self._x_t = x0  # Parameters at time t = 0
         self._x_prev = x0  # Parameters at which self._loss was measured
@@ -92,7 +128,7 @@ class Adam:
 
     @property
     def opt_loss(self) -> NDArray:
-        """Loss correstponding to the optimal parameter values.
+        """Loss corresponding to the optimal parameter values.
 
         Returns:
             NDArray: loss.
@@ -104,18 +140,20 @@ class Adam:
 
         If no gradient function is specified, the gradient is computed using
         finite difference approximation, relative to the parameters at which
-        the previous loss (self._loss) was measured:
+        the previous loss (``self._loss``) was measured::
 
-        delta = x - x_prev
-        df(x)/dx = [f(x + delta) - f(x)] / delta
+            delta = x - x_prev
+            df(x)/dx = [f(x + delta) - f(x)] / delta
 
-        Note: x_prev is tracked separately from x_t (the parameters
-        ask() proposes next), since ask() updates x_t to the
-        not-yet-evaluated next guess before tell() is called with the
-        loss measured at that guess.
+        Note:
+            ``x_prev`` is tracked separately from ``x_t`` (the parameters
+            :meth:`ask` proposes next), since :meth:`ask` updates ``x_t`` to
+            the not-yet-evaluated next guess before :meth:`tell` is called
+            with the loss measured at that guess.
 
-        x (float | NDArray): parameter values corresponding to the loss.
-        loss (float | NDArray): loss for each paramter value.
+        Args:
+            x (float | NDArray): parameter values corresponding to the loss.
+            loss (float | NDArray): loss for each parameter value.
         """
         if isinstance(loss, list):  # Compatibility with Optimize class
             loss = loss[0]
@@ -142,8 +180,8 @@ class Adam:
         """Compute the new parameters values based on the gradient for each.
 
         Args:
-            grad (float | NDArray | None, optional): gradient for each paramter.
-                Defaults to None. If None, `self._grad` will be used.
+            grad (float | NDArray, optional): gradient for each parameter.
+                Defaults to None. If None, ``self._grad`` will be used.
 
         Returns:
             float | NDArray: new parameter values.
@@ -170,6 +208,11 @@ class Adam:
 
 
 class CMA:
+    """CMA-ES (Covariance Matrix Adaptation Evolution Strategy) optimizer.
+
+    Thin ask-tell wrapper around :class:`cma.CMAEvolutionStrategy` from
+    `pycma <https://github.com/CMA-ES/pycma>`_, which must be installed.
+    """
 
     def __init__(
         self,
@@ -178,24 +221,26 @@ class CMA:
         # opts:   Dict = None,
         **kwargs
     ) -> None:
-        """CMA-ES (Covariance Matrix Adaptation Evolution Strategy).
-
-        See:
-        - https://github.com/CMA-ES/pycma
-        - https://cma-es.github.io/apidocs-pycma/index.html
+        """Initialize a CMA-ES optimizer.
 
         Args:
             x0 (float | ArrayLike): initial solution, starting point.
-            sigma0 (float, optional): initial standard deviation.  Defaults to
-                0.15. The problem variables should have been scaled, such that a
-                single standard deviation on all variables is useful and the
-                optimum is expected to lie within about `x0` +- 3*sigma0.
-                Often one wants to check for solutions close to the initial
-                point. This allows, for example, for an easier check of
-                consistency of the objective function and its interfacing with
-                the optimizer. In this case, a much smaller sigma0 is advisable.
-            **kwargs (Dict, optional): options, a dictionary with optional
-                settings. Defaults to None.
+            sigma0 (float, optional): initial standard deviation. Defaults to
+                0.15. The problem variables should have been scaled, such
+                that a single standard deviation on all variables is useful
+                and the optimum is expected to lie within about
+                ``x0 +- 3*sigma0``. Often one wants to check for solutions
+                close to the initial point. This allows, for example, for an
+                easier check of consistency of the objective function and its
+                interfacing with the optimizer. In this case, a much smaller
+                ``sigma0`` is advisable.
+            **kwargs: options passed to :class:`cma.CMAEvolutionStrategy`
+                as its ``inopts`` dictionary.
+
+        See Also:
+            `pycma <https://github.com/CMA-ES/pycma>`_ and its
+            `API documentation
+            <https://cma-es.github.io/apidocs-pycma/index.html>`_.
         """
         try:
             import cma
@@ -217,7 +262,7 @@ class CMA:
 
     @property
     def opt_loss(self) -> ArrayLike:
-        """Loss correstponding to the optimal parameter values.
+        """Loss corresponding to the optimal parameter values.
 
         Returns:
             ArrayLike: loss.
@@ -229,7 +274,7 @@ class CMA:
 
         Args:
             x (ArrayLike): list or array of candidate solution points, most
-                presumably the values delivered by method `ask()`.
+                presumably the values delivered by method ``ask()``.
             loss (ArrayLike): list or array of objective function loss values
                 corresponding to the respective points.
         """
@@ -253,6 +298,7 @@ class CMA:
 
 
 class OptunaHub:
+    """Ask-tell wrapper around an OptunaHub sampler."""
 
     def __init__(
         self,
@@ -264,38 +310,42 @@ class OptunaHub:
         ubounds:        float | ArrayLike = 1.,
         direction:      str = 'minimize',
     ) -> None:
-        """Generic wrapper around an OptunaHub sampler.
+        """Initialize an OptunaHub sampler wrapper.
 
-        This class lets any sampler published on OptunaHub
-        (https://hub.optuna.org/) be driven through qcal's `ask`/`tell`
-        optimizer interface, for use with the `Optimize` class.
-
-        See:
-        - https://optuna.github.io/optunahub/
-        - https://hub.optuna.org/
+        This class lets any sampler published on
+        `OptunaHub <https://hub.optuna.org/>`_ be driven through qcal's
+        ``ask``/``tell`` optimizer interface, for use with the
+        :class:`~qcal.optimization.optimize.Optimize` class. See also the
+        `OptunaHub documentation <https://optuna.github.io/optunahub/>`_.
 
         Args:
             x0 (float | ArrayLike): initial parameter values. Only used to
                 infer the number of parameters being optimized.
             sampler (str | Any, optional): name of an OptunaHub package to
-                load (e.g., 'samplers/auto_sampler', 'samplers/cmaes'), or an
-                already-instantiated `optuna.samplers.BaseSampler`. Defaults
-                to 'samplers/auto_sampler'.
+                load (e.g., ``'samplers/auto_sampler'``,
+                ``'samplers/cmaes'``), or an already-instantiated
+                ``optuna.samplers.BaseSampler``. Defaults to
+                ``'samplers/auto_sampler'``.
             sampler_kwargs (dict | None, optional): kwargs passed to the
-                sampler class constructor when `sampler` is a package name.
+                sampler class constructor when ``sampler`` is a package name.
                 Defaults to None.
             sampler_class (str | None, optional): name of the sampler class
                 to instantiate from the loaded OptunaHub module. If None,
                 the module is searched for a single class which subclasses
-                `optuna.samplers.BaseSampler`. Defaults to None.
+                ``optuna.samplers.BaseSampler``. Defaults to None.
             lbounds (float | ArrayLike, optional): lower bound(s) on the
                 parameter values, broadcast across all parameters if a
                 single float is given. Defaults to 0.
             ubounds (float | ArrayLike, optional): upper bound(s) on the
                 parameter values, broadcast across all parameters if a
                 single float is given. Defaults to 1.
-            direction (str, optional): 'minimize' or 'maximize'. Defaults to
-                'minimize'.
+            direction (str, optional): ``'minimize'`` or ``'maximize'``.
+                Defaults to ``'minimize'``.
+
+        Raises:
+            ValueError: if ``sampler`` is a package name, ``sampler_class``
+                is None, and the sampler class cannot be uniquely determined
+                from the package.
         """
         optuna.logging.set_verbosity(optuna.logging.WARNING)
 
@@ -356,7 +406,7 @@ class OptunaHub:
 
     @property
     def opt_loss(self) -> float:
-        """Loss correstponding to the optimal parameter values.
+        """Loss corresponding to the optimal parameter values.
 
         Returns:
             float: loss.
@@ -368,7 +418,7 @@ class OptunaHub:
         """Underlying Optuna study.
 
         Returns:
-            Any: `optuna.study.Study` object.
+            Any: ``optuna.study.Study`` object.
         """
         return self._study
 
@@ -392,8 +442,8 @@ class OptunaHub:
         """Report the loss for the most recent candidate solution.
 
         Args:
-            x (ArrayLike): candidate solution returned by `ask()`.
-            loss (ArrayLike): loss value(s) corresponding to `x`.
+            x (ArrayLike): candidate solution returned by ``ask()``.
+            loss (ArrayLike): loss value(s) corresponding to ``x``.
         """
         value = float(np.atleast_1d(loss).flatten()[0])
         self._study.tell(self._trial, value)
@@ -419,6 +469,11 @@ class OptunaHub:
 
 
 class LQG:
+    """Linear Quadratic Gaussian (LQG) controller.
+
+    Combines a Linear Quadratic Regulator (LQR) with a Kalman filter, using
+    the ``python-control`` package (which must be installed).
+    """
 
     def __init__(
         self,
@@ -435,7 +490,7 @@ class LQG:
         G:    NDArray = None,
         tol:  float = 1e-6,
     ) -> None:
-        """Linear Quadratic Gaussian controller (LQR + Kalman Filter).
+        """Initialize an LQG controller (LQR + Kalman filter).
 
         Args:
             x0 (float | NDArray): initial parameter values.
@@ -473,7 +528,8 @@ class LQG:
         # Set default process noise input matrix if not provided
         if G is None:
             # self._G = (
-            #     np.eye(len(x0)) if hasattr(x0, '__len__') else np.array([[1.]])
+            #     np.eye(len(x0)) if hasattr(x0, '__len__')
+            #     else np.array([[1.]])
             # )
             self._G = np.eye(B.shape[0])
         else:
@@ -482,7 +538,8 @@ class LQG:
         # Set default observation matrix if not provided
         if C is None:
             # self._C = (
-            #     np.eye(len(x0)) if hasattr(x0, '__len__') else np.array([[1.]])
+            #     np.eye(len(x0)) if hasattr(x0, '__len__')
+            #     else np.array([[1.]])
             # )
             self._C = np.eye(B.shape[0])
         else:
@@ -498,7 +555,8 @@ class LQG:
         self._lqr_gain, _, _ = dlqr(A, B, Q, R)
 
         # dlqe(A, Q, C, R) for Kalman filter
-        # Q_kf is process noise covariance, R_kf is measurement noise covariance
+        # Q_kf is process noise covariance, R_kf is measurement noise
+        # covariance
         self._kalman_gain, _, _ = dlqe(A, self._G, self._C, Q_kf, R_kf)
 
         # Initialize covariance matrix for Kalman filter
@@ -555,7 +613,7 @@ class LQG:
         return self._P_est
 
     def tell(self, x: float | NDArray, loss: float | NDArray) -> None:
-        """Pass the parameter values and loss values for computing the control.
+        """Pass the parameter and loss values for computing the control.
 
         The control is computed using LQR gain and Kalman-filtered state
         estimate.
@@ -622,6 +680,11 @@ class LQG:
 
 
 class LQR:
+    """Linear Quadratic Regulator (LQR) controller.
+
+    Uses :func:`control.dlqr` from the ``python-control`` package (which
+    must be installed) to compute the LQR gain.
+    """
 
     def __init__(
         self,
@@ -632,10 +695,11 @@ class LQR:
         R:   NDArray,
         tol: float = 1e-6,
     ) -> None:
-        """Linear Quadratic Regulator.
+        """Initialize an LQR controller.
 
-        See:
-        https://python-control.readthedocs.io/en/latest/generated/control.dlqr.html
+        See the `control.dlqr documentation
+        <https://python-control.readthedocs.io/en/latest/generated/
+        control.dlqr.html>`_.
 
         Args:
             x0 (float | NDArray): initial parameter values.
@@ -643,9 +707,9 @@ class LQR:
             B (NDArray): input matrix.
             Q (NDArray): state matrix.
             R (NDArray): input weight matrix.
-            tol (float, optional): convergence criteria. Defaults to 1e-4. If
-                the change in the cost is less than this value, the optimization
-                will terminate.
+            tol (float, optional): convergence criteria. Defaults to 1e-6.
+                If the change in the cost is less than this value, the
+                optimization will terminate.
         """
         try:
             import control
@@ -694,13 +758,13 @@ class LQR:
         return self._opt_loss
 
     def tell(self, x: float | NDArray, loss: float | NDArray) -> None:
-        """Pass the parameter values and loss values for computing the control.
+        """Pass the parameter and loss values for computing the control.
 
-        The control is computed according the LQR gain and the loss.
+        The control is computed according to the LQR gain and the loss.
 
         Args:
             x (float | NDArray): parameter values corresponding to the loss.
-            loss (float | NDArray): loss for each paramter value.
+            loss (float | NDArray): loss for each parameter value.
         """
         if np.abs(loss) < np.abs(self._opt_loss):
             self._opt_loss = loss.copy()

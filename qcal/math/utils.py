@@ -1,6 +1,4 @@
-"""Submodule for helper math functions.
-
-"""
+"""Submodule for helper math functions."""
 import logging
 from typing import Tuple
 
@@ -14,7 +12,7 @@ def round_sig_figures(x: float, n_sig_figs: int = 1) -> float:
 
     Args:
         x (float): number to round.
-        n_sig_decimals (int, optional): number of significant figures.
+        n_sig_figs (int, optional): number of significant figures.
             Defaults to 1.
 
     Returns:
@@ -37,7 +35,7 @@ def round_to_order_error(
             the error to. Defaults to 1.
 
     Returns:
-        Tuple[float]: rounded value, rounded error
+        Tuple[float]: rounded value, rounded error.
     """
     if err == 0:
         return float(val), 0.0

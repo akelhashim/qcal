@@ -1,12 +1,33 @@
 """Submodule for loading and saving experimental configuration files.
 
-Basic example useage:
+The :class:`Config` class loads a YAML hardware specification file and acts
+as the central store for per-qubit and per-pair parameters (frequencies,
+amplitudes, phases, native gates, readout settings, etc.). Parameters can
+be accessed and modified using ``'/'``-separated keys, and calibration
+routines read from and write back to the config. An example config
+shipped with the repository is available at :data:`EXAMPLE_CONFIG_PATH`.
 
-    cfg = Config('config.yaml')
-    cfg.qubits       # Returns a list of the qubits on the processor
-    cfg.qubit_pairs  # Returns a list of the qubit pairs on the processor
-    cfg.parameters   # Returns a dictionary of the entire config
-    cfg.draw_qpu()  # Plots the processor connectivity
+Example:
+    >>> from qcal.config import Config, EXAMPLE_CONFIG_PATH
+    >>> cfg = Config(EXAMPLE_CONFIG_PATH)  # or Config('config.yaml')
+    >>> cfg.qubits
+    (0, 1, 2, 3, 4, 5, 6, 7)
+    >>> cfg.qubit_pairs[:3]
+    [(0, 1), (1, 2), (2, 3)]
+    >>> cfg['single_qubit/0/GE/freq'] = 5.0e9
+    >>> cfg['single_qubit/0/GE/freq']
+    5000000000.0
+    >>> sorted(cfg.native_gates['set'])
+    ['CZ', 'X', 'X90']
+
+    Other useful methods and properties:
+
+    .. code-block:: python
+
+        cfg.parameters   # Returns a dictionary of the entire config
+        cfg.single_qubit  # Table of single-qubit parameters
+        cfg.draw_qpu()   # Plots the processor connectivity
+        cfg.save()       # Saves the config back to its YAML file
 """
 import ast
 import copy
@@ -49,6 +70,7 @@ def nested_index(dictionary: Dict, n_levels: int = 2) -> List[List]:
         List[List]: nested index list.
     """
     def itterdict(dct, lst, idx):
+        """Recursively fill the nested index lists for each level."""
         for key, value in dct.items():
             if isinstance(value, dict):
                 lst[idx].extend(
@@ -104,12 +126,32 @@ def recursive_values(dictionary: Dict):
 
 
 class Config:
-    """Class for loading and storing configuration files."""
+    """Class for loading and storing configuration files.
+
+    Example:
+        .. code-block:: python
+
+            from qcal.config import Config
+
+            cfg = Config('config.yaml')
+            cfg['single_qubit/0/GE/freq']             # Get a parameter
+            cfg.get(['single_qubit', 0, 'GE', 'freq'])  # Equivalent
+            cfg['single_qubit/0/GE/freq'] = 5.0e9      # Set a parameter
+            cfg.save()                                 # Save to the YAML
+    """
 
     __slots__ = ('_parameters', '_filename')
 
     def __init__(self, filename: str = None) -> None:
+        """Initialize a Config from a YAML file.
 
+        Args:
+            filename (str, optional): path to the YAML config file. Defaults
+                to None, in which case qcal attempts to load
+                ``config.yaml`` from ``Settings.config_path`` (see
+                :mod:`qcal.settings`); if that fails, an empty config is
+                created.
+        """
         self._filename = filename
         if filename is not None:
             self.load(filename)
@@ -126,6 +168,11 @@ class Config:
                 self._parameters = defaultdict(lambda: None, {})
 
     def __call__(self) -> Dict:
+        """Return the config parameters as a dictionary.
+
+        Returns:
+            Dict: config parameters.
+        """
         return dict(self._parameters)
 
     def __copy__(self, deep_copy=False) -> Dict:
@@ -148,7 +195,8 @@ class Config:
 
         Args:
             param (str): parameter of interest. This should be a string with
-                nested keys separate by '/' (e.g. 'single_qubit/0/GE/freq').
+                nested keys separated by ``'/'`` (e.g.
+                ``'single_qubit/0/GE/freq'``).
 
         Returns:
             Any: the string or value returned by config[param].
@@ -162,7 +210,8 @@ class Config:
 
         Args:
             param (str): parameter of interest. This should be a string with
-                nested keys separate by '/' (e.g. 'single_qubit/0/GE/freq').
+                nested keys separated by ``'/'`` (e.g.
+                ``'single_qubit/0/GE/freq'``).
             newvalue (Any): new value to assign to the parameter.
         """
         param = param.split('/')
@@ -188,9 +237,8 @@ class Config:
     def coherence_times(self) -> pd.DataFrame:
         """Coherences times of all of the qubits.
 
-        Args:
-            include_EF (bool, optional): include EF coherences.
-                Defaults to True.
+        Both GE and EF coherences (T1, T2*, T2e, T2DD) are included, when
+        they are present in the config.
 
         Returns:
             pd.DataFrame: DataFrame of coherences times.
@@ -397,29 +445,29 @@ class Config:
         return df
 
     @property
-    def qubits(self) -> list:
+    def qubits(self) -> Tuple[int, ...]:
         """Available qubits on the processor.
 
         Returns:
-            list: qubit labels.
+            tuple: qubit labels.
         """
         return tuple(self.parameters['single_qubit'].keys())
 
     @property
-    def qubits_even(self) -> list:
-        """Even labeled qubits on the process
+    def qubits_even(self) -> Tuple[int, ...]:
+        """Even labeled qubits on the processor.
 
         Returns:
-            list: qubit labels.
+            tuple: qubit labels.
         """
         return tuple([q for q in self.qubits if q % 2 == 0])
 
     @property
-    def qubits_odd(self) -> list:
-        """Odd labeled qubits on the process
+    def qubits_odd(self) -> Tuple[int, ...]:
+        """Odd labeled qubits on the processor.
 
         Returns:
-            list: qubit labels.
+            tuple: qubit labels.
         """
         return tuple([q for q in self.qubits if q % 2 == 1])
 
@@ -441,7 +489,7 @@ class Config:
         Args:
             param (List[Any]): parameter of interest. This should be a
                 list of entries used to index the parameters dictionary (e.g.
-                ['single_qubit', 0, 'GE', 'freq']).
+                ``['single_qubit', 0, 'GE', 'freq']``).
 
         Returns:
             Any: the string or value returned by config[param]. This defaults
@@ -460,9 +508,9 @@ class Config:
         """Set the parameter in the config to the given value.
 
         Args:
-            param (Union[List[str], str]): parameter of interest.  This should
-                be a list of entries used to index the parameters dictionary
-                (e.g. ['single_qubit', 0, 'GE', 'freq']).
+            param (List[str]): parameter of interest. This should be a list
+                of entries used to index the parameters dictionary (e.g.
+                ``['single_qubit', 0, 'GE', 'freq']``).
             newvalue (Any): new value to assign to the parameter.
         """
         if isinstance(newvalue, float):
@@ -475,10 +523,21 @@ class Config:
         logger.info(f' Param {param} set to {newvalue}.')
 
     def items(self) -> tuple:
+        """Return the items of the underlying parameters dictionary.
+
+        Returns:
+            tuple: ``(key, value)`` pairs of the top-level parameters.
+        """
         return self._parameters.items()
 
     def load(self, filename: str | None = None):
-        """Load the yaml file."""
+        """Load the YAML file.
+
+        Args:
+            filename (str | None, optional): path to the YAML file. Defaults
+                to None, in which case the config's current filename is
+                used.
+        """
         if filename is None:
             filename = self._filename
 
@@ -498,8 +557,7 @@ class Config:
         self.load()
 
     def draw_qpu(self):
-        """Plot a graph displaying the connectivity of the quantum processor.
-        """
+        """Plot a graph of the connectivity of the quantum processor."""
         from qcal.plotting.graphs import draw_qpu
         draw_qpu(self)
 
@@ -517,7 +575,9 @@ class Config:
         from qcal.plotting.cdf import CDF
 
         df = self.coherence_times
-        df = df[df['Qubit'].isin(qubits if qubits is not None else self.qubits)]
+        df = df[
+            df['Qubit'].isin(qubits if qubits is not None else self.qubits)
+        ]
         if not plot_EF:
             df = df[~df['Coherence Type'].str.contains('EF', na=False)]
 
@@ -527,7 +587,7 @@ class Config:
             qubits:      List | Tuple | None = None,
             qubit_pairs: List | Tuple | None = None
         ) -> None:
-        """Plot all qubit, two_qubit and readout frequencies.
+        """Plot all qubit, two-qubit and readout frequencies.
 
         Args:
             qubits (List | Tuple | None, optional): qubits to plot. Defaults to
@@ -585,11 +645,12 @@ class Config:
         )
 
     def save(self, filename: str | None = None):
-        """Save the config to a YAML file
+        """Save the config to a YAML file.
 
         Args:
             filename (str | None, optional): filename for the YAML file.
-                Defaults to None.
+                Defaults to None, in which case the config's current
+                filename is used.
         """
         if filename is None and self._filename is None:
             logger.warning(" No filename specified; config was not saved!")

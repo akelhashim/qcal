@@ -1,6 +1,4 @@
-""""Submodule for analyzing RPE experiments.
-
-"""
+"""Analysis routines for RPE experiments."""
 import logging
 from typing import Sequence, Tuple
 
@@ -41,7 +39,7 @@ def analyze_idle(
             interest. Defaults to None.
 
     Returns:
-        Tuple: angle estimates, angle errors, and index of last good depth
+        Tuple: angle estimates, angle errors, and index of last good depth.
     """
     cos_circs = {
         d: make_idle_cos_circ(d, qubits, gate_layer)
@@ -97,7 +95,7 @@ def analyze_x90(
             interest. Defaults to None.
 
     Returns:
-        Tuple: angle estimates, angle errors, and index of last good depth
+        Tuple: angle estimates, angle errors, and index of last good depth.
     """
     target_x = np.pi / 2
     eps = 1e-8  # Small additive factor to ensure we do not divide by zero
@@ -230,7 +228,7 @@ def analyze_cz(
             interest. Defaults to None.
 
     Returns:
-        Tuple: angle estimates, angle errors, and index of last good depth
+        Tuple: angle estimates, angle errors, and index of last good depth.
     """
     target_zz = -np.pi/2
     target_iz = target_zi = np.pi/2
@@ -358,9 +356,9 @@ def analyze_zz(
             interest. Defaults to None.
 
     Returns:
-        Tuple: angle estimates, angle errors, and index of last good depth
+        Tuple: angle estimates, angle errors, and index of last good depth.
     """
-    target_zz = target_iz = target_zi = 0
+    target_zz = 0
     eps = 1e-8  # Small additive factor to ensure we do not divide by zero
 
     state_pairs = [(0, 1), (2, 3), (3, 1)]
@@ -493,10 +491,10 @@ def rectify_angle(theta: float) -> float:
     """Rectify the angle to be in [-pi, pi].
 
     Args:
-        theta (float): angle
+        theta (float): angle.
 
     Returns:
-        float: rectified angle
+        float: rectified angle.
     """
     # if theta > np.pi:
     #     theta -= 2 * np.pi

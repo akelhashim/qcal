@@ -1,13 +1,16 @@
-"""Submodule for Pauli Noise Reconstruction/Pauli Noise Learning.
+"""Pauli noise reconstruction (Pauli noise learning) protocols.
 
-NOTE: we do not use TYPE_CHECKING for trueq types because this might fail if
-trueq is not installed when building docs.
+Provides :func:`KNR`, the True-Q implementation of K-body noise
+reconstruction (requires a valid True-Q license).
+
+Note:
+    ``TYPE_CHECKING`` is not used for True-Q types, because this might fail
+    if True-Q is not installed when building the docs.
 """
 from __future__ import annotations
 
 import logging
 from collections.abc import Iterable
-from typing import Callable
 
 import matplotlib.pyplot as plt
 from IPython.display import clear_output
@@ -15,6 +18,7 @@ from IPython.display import clear_output
 from qcal.config import Config
 from qcal.qpu.qpu import QPU
 from qcal.settings import Settings
+from qcal.utils import pop_deprecated_kwarg
 
 logger = logging.getLogger(__name__)
 
@@ -33,22 +37,24 @@ def KNR(
     n_circuits:           int = 30,
     n_subsystems:         int = 2,
     twirl:                str | trueq.Twirl = 'P',  # noqa: F821 # type: ignore
-    propogate_correction: bool = False,
+    propagate_correction: bool = False,
     compiled_pauli:       bool = True,
     include_rcal:         bool = False,
     **kwargs
-) -> Callable:
+) -> QPU:
     """K-body Noise Reconstruction.
 
     This is a True-Q protocol and requires a valid True-Q license.
 
     Args:
-        qpu (QPU): custom QPU object.
+        qpu (QPU): custom QPU class (not an instance). The returned
+            protocol object inherits from this class.
         config (Config): qcal Config object.
-        cycle (dict, trueq.Cycle): cycle (or subcircuit) to benchmark.
+        cycle (dict | trueq.Cycle): cycle (or subcircuit) to benchmark.
         circuit_depths (Iterable[int]): iterable of positive integers
             specifying how many interleaved cycles of the target cycle and
-            random Pauli operators to generate, for example, [4, 16, 64].
+            random Pauli operators to generate, for example,
+            ``[4, 16, 64]``.
         tq_config (str | trueq.Config, optional): True-Q config yaml file or
             config object. Defaults to None.
         n_circuits (int, optional): the number of circuits for each circuit
@@ -56,25 +62,32 @@ def KNR(
         n_subsystems (int, optional): a positive integer specifying the number
             of body errors to estimate on the subset of qubits in the cycle.
             Defaults to 2.
-        twirl (str | trueq.Twirl, optional): The Twirl to use in this protocol.
-            Defaults to 'P'. You can also specify a twirling group that will be
-            used to automatically instantiate a twirl based on the labels in
-            the given cycles.
+        twirl (str | trueq.Twirl, optional): The Twirl to use in this
+            protocol. Defaults to ``'P'``. You can also specify a twirling
+            group that will be used to automatically instantiate a twirl
+            based on the labels in the given cycles.
         propagate_correction (bool, optional): whether to propagate correction
             gates to the end of the circuit or compile them into neighbouring
             cycles. Defaults to False. Warning: this can result in arbitrary
             multi-qubit gates at the end of the circuit!
+            The misspelled alias ``propogate_correction`` is deprecated.
         compiled_pauli (bool, optional): whether or not to compile a random
             Pauli gate for each qubit in the cycle preceding a measurement
             operation. Defaults to True.
         include_rcal (bool, optional): whether to measure RCAL circuits in the
-            same circuit collection as the SRB circuit. Defaults to False. If
-            True, readout correction will be apply to the fit results
+            same circuit collection as the KNR circuits. Defaults to False.
+            If True, readout correction will be applied to the fit results
             automatically.
+        **kwargs: additional keyword arguments passed to the ``qpu``
+            constructor (e.g. ``n_shots``, ``compiler``, ``transpiler``).
 
     Returns:
-        Callable: KNR class instance.
+        QPU: KNR protocol instance (a subclass of ``qpu``).
     """
+    propagate_correction = pop_deprecated_kwarg(
+        kwargs, 'propogate_correction', 'propagate_correction',
+        propagate_correction, default=False,
+    )
 
     class KNR(qpu):
         """True-Q KNR protocol."""
@@ -88,7 +101,7 @@ def KNR(
             n_circuits:           int = 30,
             n_subsystems:         int = 2,
             twirl:                str | trueq.Twirl = 'P',  # noqa: F821 # type: ignore
-            propogate_correction: bool = False,
+            propagate_correction: bool = False,
             compiled_pauli:       bool = True,
             include_rcal:         bool = False,
             **kwargs
@@ -107,7 +120,7 @@ def KNR(
             self._n_circuits = n_circuits
             self._n_subsystems = n_subsystems
             self._twirl = twirl
-            self._propagate_correction = propogate_correction
+            self._propagate_correction = propagate_correction
             self._compiled_pauli = compiled_pauli
             self._include_rcal = include_rcal
 
@@ -249,7 +262,7 @@ def KNR(
         n_circuits=n_circuits,
         n_subsystems=n_subsystems,
         twirl=twirl,
-        propogate_correction=propogate_correction,
+        propagate_correction=propagate_correction,
         compiled_pauli=compiled_pauli,
         include_rcal=include_rcal,
         **kwargs

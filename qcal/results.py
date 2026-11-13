@@ -1,6 +1,37 @@
 """Submodule for storing and handling bitstring results.
 
-All results are stored in a Results object.
+All results are stored in a :class:`Results` object, which wraps a
+dictionary mapping bitstrings to counts and exposes counts,
+probabilities, expectation values, entropy, marginalization,
+post-selection, and readout correction (either using a confusion matrix,
+or quasi-probabilistic readout correction using randomized readout). The
+:class:`PerShotResults` class stores the per-shot outcomes of every
+measurement cycle of a circuit (e.g. for mid-circuit measurements).
+
+Example:
+    >>> from qcal.results import Results
+    >>> results = Results({'00': 500, '01': 100, '10': 100, '11': 300})
+    >>> results.n_shots, results.n_qudits
+    (1000, 2)
+    >>> results.states
+    ('00', '01', '10', '11')
+    >>> dict(results.populations)
+    {'00': 0.5, '01': 0.1, '10': 0.1, '11': 0.3}
+    >>> results.ev  # <ZZ>
+    0.6
+    >>> results.expectation_value(0)  # <ZI>
+    0.2
+    >>> results.marginalize(0).dict
+    {'0': 600, '1': 400}
+
+    Readout correction using a confusion matrix measured with
+    :func:`~qcal.benchmarking.readout.ReadoutFidelity`:
+
+    .. code-block:: python
+
+        results.apply_readout_correction(confusion_matrix)
+        # or, equivalently, at construction:
+        results = Results(counts, confusion_matrix=confusion_matrix)
 """
 from __future__ import annotations
 
@@ -35,8 +66,17 @@ class Results:
 
     This class should be passed a dictionary which maps bitstrings to counts.
 
-    Basic example useage:
-    ```results = Results({'000': 200, '010': 10, '100': 12, '111': 200})```
+    Example:
+        .. code-block:: python
+
+            from qcal.results import Results
+
+            results = Results({'000': 200, '010': 10, '100': 12, '111': 200})
+            results.counts         # Counts of each bitstring
+            results.probabilities  # Probabilities of each bitstring
+            results.ev             # Expectation value <ZZZ>
+            results.marginalize((0, 2))  # Marginalize over bits 0 and 2
+            results.plot()         # Plot a histogram of the results
     """
 
     def __init__(self,
@@ -83,11 +123,11 @@ class Results:
             self.apply_qp_readout_correction(rr_char_results)
 
     def _rebuild_df(self) -> None:
-        """(Re)build the counts/probabilities DataFrame from self._results.
+        """(Re)build the counts/probabilities DataFrame from the results.
 
-        The counts row is assigned first (not via the `_df` property) so
-        that `self.populations` (via `n_shots`/`counts`) reads the
-        already-cached counts row instead of recursing back into `_df`.
+        The counts row is assigned first (not via the ``_df`` property) so
+        that ``self.populations`` (via ``n_shots``/``counts``) reads the
+        already-cached counts row instead of recursing back into ``_df``.
         """
         self.__df = pd.DataFrame(
             [self._results], index=['counts'], dtype='object'
@@ -106,7 +146,7 @@ class Results:
         Deferred until first access: most Circuit objects are constructed
         without results ever being assigned to them (e.g. transient
         sub-circuits during circuit generation), so building this eagerly
-        in `__init__` wastes a pandas DataFrame + concat on every one of
+        in ``__init__`` wastes a pandas DataFrame + concat on every one of
         them.
         """
         if self.__df is None:
@@ -121,7 +161,7 @@ class Results:
 
         Returns:
             pd.Series: dataseries of counts and probabilities for a given
-                bistring.
+                bitstring.
         """
         if item not in self._results.keys():
             return pd.Series(
@@ -201,7 +241,7 @@ class Results:
     def ev(self) -> float:
         """Expectation value of Z on every measured bit.
 
-        This is the parity <Z...Z> over all bits of the bitstrings. Use
+        This is the parity ``<Z...Z>`` over all bits of the bitstrings. Use
         ``expectation_value`` for a Z-type Pauli on a subset of the bits.
 
         Returns:
@@ -210,12 +250,14 @@ class Results:
         return self.expectation_value()
 
     def expectation_value(self, idx: int | Tuple[int] | None = None) -> float:
-        """Expectation value of a Z-type Pauli on the given bitstring indices.
+        r"""Expectation value of a Z-type Pauli on the given bitstring indices.
 
-        For a Pauli with support s, each bitstring b contributes with sign
-        (-1)^(s . b), where s . b is the Z_2 inner product. Indices follow the
-        same convention as ``marginalize``, so ``expectation_value((0, 2))``
-        is equivalent to ``marginalize((0, 2)).ev``.
+        For a Pauli with support :math:`s`, each bitstring :math:`b`
+        contributes with sign :math:`(-1)^{s \cdot b}`, where
+        :math:`s \cdot b` is the :math:`\mathbb{Z}_2` inner product.
+        Indices follow the same convention as ``marginalize``, so
+        ``expectation_value((0, 2))`` is equivalent to
+        ``marginalize((0, 2)).ev``.
 
         Args:
             idx (int | Tuple[int] | None, optional): bitstring indices on
@@ -300,10 +342,10 @@ class Results:
     def probabilities(self) -> pd.Series:
         """Probabilities of each bitstring.
 
-        This is the same as self.populations, but stored in a DataFrame.
+        This is the same as ``self.populations``, but stored in a Series.
 
         Returns:
-            pd.Series: _description_
+            pd.Series: probabilities indexed by bitstring.
         """
         return self._df.loc['probabilities']
 
@@ -334,8 +376,7 @@ class Results:
 
     @property
     def rr_char_results(self) -> Results | Dict | None:
-        """Randomized readout characterization results used to correct the
-        results.
+        """Randomized readout results used to correct the results.
 
         Returns:
             Results | Dict | None: results of measuring the all-zero state
@@ -357,8 +398,8 @@ class Results:
         """Apply local readout correction using a measured confusion matrix.
 
         Args:
-            confusion_matrix (DataFrame): confusion matrix measured using the
-                ```qcal.benchmarking.fidelity.ReadoutFidelity``` module.
+            confusion_matrix (DataFrame): confusion matrix measured using
+                :func:`~qcal.benchmarking.readout.ReadoutFidelity`.
         """
         # Always correct the raw results so that repeated calls do not
         # compound the correction
@@ -443,9 +484,9 @@ class Results:
         self.__df = None
 
     def marginalize(self, idx: int | Tuple[int]):
-        """Marginalize the results over a given bistring index.
+        """Marginalize the results over a given bitstring index.
 
-        This method excepts a single index (e.g. 0) or a tuple of indicies
+        This method accepts a single index (e.g. 0) or a tuple of indices
         (e.g. (0, 2)). The bitstring results will be marginalized over these
         indices. For example, for idx = (0, 2), the bitstring '012' will be
         marginalized to '02', etc.
@@ -600,7 +641,8 @@ class Results:
                 'filename': 'results',
                 'height': 500,
                 'width': 1000,
-                'scale': 10 # Multiply title/legend/axis/canvas sizes by this factor
+                # Multiply title/legend/axis/canvas sizes by this factor
+                'scale': 10
             }
         }
 
@@ -618,7 +660,7 @@ class Results:
         return hellinger_fidelity(self, results)
 
     def tvd(self, results: Results) -> ufloat:
-        """Total Variation Distance
+        """Total Variation Distance.
 
         Args:
             results (Results): other results.
@@ -665,7 +707,7 @@ class PerShotResults:
         outcomes (NDArray): outcomes with shape ``(n_shots, n_reads)``, where
             ``n_reads`` is the total number of reads of all qubits in the
             circuit. Stored as int8 if this is lossless.
-        kept (NDArray[np.bool_]): whether each original shot was kept, with
+        kept (NDArray[bool]): whether each original shot was kept, with
             one entry per measured shot. The rows of ``outcomes`` are the
             kept shots, in order. This is stored instead of the indices of
             the kept shots, since it is 8x smaller.
@@ -716,7 +758,9 @@ class PerShotResults:
             raise ValueError("Shots must be indexed in increasing order.")
         if n_shots is None:
             n_shots = int(shot_index[-1]) + 1 if len(shot_index) else 0
-        if len(shot_index) and (shot_index[0] < 0 or shot_index[-1] >= n_shots):
+        if len(shot_index) and (
+            shot_index[0] < 0 or shot_index[-1] >= n_shots
+        ):
             raise ValueError(
                 f"Shots must be indexed in [0, {n_shots}), got "
                 f"[{shot_index[0]}, {shot_index[-1]}]."
@@ -816,8 +860,8 @@ def readout_correction(results: Results, confusion_matrix: DataFrame) -> Dict:
 
     Args:
         results (Results): Results object.
-        confusion_matrix (DataFrame): confusion matrix measured using the
-            ```qcal.benchmarking.fidelity.ReadoutFidelity``` module.
+        confusion_matrix (DataFrame): confusion matrix measured using
+            :func:`~qcal.benchmarking.readout.ReadoutFidelity`.
 
     Returns:
         Dict: corrected results dictionary.
@@ -888,43 +932,49 @@ def qp_readout_correction(
     max_iterations:   int = 10,
     tol:              float = 1e-3,
 ) -> Dict:
-    """Quasi-probabilistic readout correction (QPRC).
+    r"""Quasi-probabilistic readout correction (QPRC).
 
     Implements the readout correction scheme of
     https://arxiv.org/abs/2312.14139. Under measurement randomized compiling
     (MRC), readout noise is tailored into a stochastic bit-flip channel
-    described by a probability distribution p over error bitstrings x. This
-    distribution is obtained by measuring the all-zero state with randomized
-    readout (``rr_char_results``). Writing e = sum_{x != 0} p_x x, the order-k
+    described by a probability distribution :math:`p` over error bitstrings
+    :math:`x`. This distribution is obtained by measuring the all-zero state
+    with randomized readout (``rr_char_results``). Writing
+    :math:`e = \sum_{x \neq 0} p_x x`, the order-:math:`k`
     quasi-probabilistic inverse is
 
-        q^(k) = c * sum_{j=0}^{2k-1} (-e / p_0)^j,
+    .. math::
 
-    where powers denote convolution over bitwise addition mod 2 and c
-    normalizes q^(k) to unit sum. For k = 1, this reduces to
-    q = (p_0 0 - e) / (2 p_0 - 1). Residual readout errors are suppressed
-    from O(1 - p_0) to O((1 - p_0)^(2k)). The corrected counts are given by
-    the convolution of the measured counts with q^(k).
+        q^{(k)} = c \sum_{j=0}^{2k-1} (-e / p_0)^j,
 
-    The global inverse requires p_0 > 1/2, which is violated for large
-    numbers of qubits (e.g. ~34 qubits with independent 2% errors). In this
-    case, the correction is first performed over increasingly larger
-    partitions of the qubits (Appendix D): for each level of disjoint
-    partitions S_1, ..., S_m, the error distribution is marginalized over
-    each partition, the local inverses q_S1 ... q_Sm are applied to both
-    the measured counts and the error distribution, and the residual error
+    where powers denote convolution over bitwise addition mod 2 and
+    :math:`c` normalizes :math:`q^{(k)}` to unit sum. For :math:`k = 1`,
+    this reduces to :math:`q = (p_0 \mathbf{0} - e) / (2 p_0 - 1)`.
+    Residual readout errors are suppressed from :math:`O(1 - p_0)` to
+    :math:`O((1 - p_0)^{2k})`. The corrected counts are given by the
+    convolution of the measured counts with :math:`q^{(k)}`.
+
+    The global inverse requires :math:`p_0 > 1/2`, which is violated for
+    large numbers of qubits (e.g. ~34 qubits with independent 2% errors).
+    In this case, the correction is first performed over increasingly
+    larger partitions of the qubits (Appendix D): for each level of
+    disjoint partitions :math:`S_1, \ldots, S_m`, the error distribution is
+    marginalized over each partition, the local inverses
+    :math:`q_{S_1}, \ldots, q_{S_m}` are applied to both the measured
+    counts and the error distribution, and the residual error
     quasi-distribution is used for the next level.
 
     Finally, the global correction is performed. Each global correction is
     also applied to the error distribution, and is repeated on the residual
-    error quasi-distribution p' until ||p' - 0||_1 <= ``tol``. For p_0 close
-    to 1, a single correction typically suffices; repetition is needed when
-    p is far from the identity (e.g. after partitioned corrections in the
-    presence of correlated errors).
+    error quasi-distribution :math:`p'` until
+    :math:`\|p' - \mathbf{0}\|_1 \leq` ``tol``. For :math:`p_0` close to 1,
+    a single correction typically suffices; repetition is needed when
+    :math:`p` is far from the identity (e.g. after partitioned corrections
+    in the presence of correlated errors).
 
     Bitstrings are encoded as integers and convolved in a vectorized,
     chunked manner, so the cost scales with the number of observed
-    bitstrings rather than with 2^n.
+    bitstrings rather than with :math:`2^n`.
 
     Args:
         results (Results | Dict): measured results to correct. These must be
@@ -1078,7 +1128,7 @@ def _qp_inverse(
 ) -> Tuple[np.ndarray, np.ndarray]:
     """Order-k quasi-probabilistic inverse of an error distribution.
 
-    Computes q^(k) = c * sum_{j=0}^{2k-1} (-e / p0)^j, where e is the
+    Computes ``q^(k) = c * sum_{j=0}^{2k-1} (-e / p0)^j``, where e is the
     distribution p without the all-zero bitstring and c normalizes q^(k) to
     unit sum.
 
@@ -1214,8 +1264,9 @@ def _xor_convolve(
 ) -> Tuple[np.ndarray, np.ndarray]:
     """Convolve two sparse distributions over bitwise addition mod 2.
 
-    Computes r(z) = sum_{x ^ y = z} a(x) b(y). The outer product is evaluated
-    in chunks of at most ``max_size`` elements to bound memory usage.
+    Computes ``r(z) = sum_{x ^ y = z} a(x) b(y)``. The outer product is
+    evaluated in chunks of at most ``max_size`` elements to bound memory
+    usage.
 
     Args:
         keys1 (np.ndarray): integer-encoded bitstrings of the first

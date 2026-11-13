@@ -1,6 +1,4 @@
-"""Submodule for ploting Cumulative Distribution Functions.
-
-"""
+"""Submodule for plotting Cumulative Distribution Functions."""
 import logging
 
 import pandas as pd
@@ -14,7 +12,7 @@ def CDF(df: pd.DataFrame, x: str, color: str) -> None:
 
     Args:
         df (pd.DataFrame): Pandas DataFrame.
-        x (str): name of coloumn with the data to be plotted.
+        x (str): name of column with the data to be plotted.
         color (str): name of column with labels for sorting the data.
     """
     fig = px.ecdf(df, x=x, color=color, marginal="histogram")
@@ -40,7 +38,8 @@ def CDF(df: pd.DataFrame, x: str, color: str) -> None:
             'filename': 'frequency_plot',
             'height': 500,
             'width': 1000,
-            'scale': 10 # Multiply title/legend/axis/canvas sizes by this factor
+            # Multiply title/legend/axis/canvas sizes by this factor
+            'scale': 10
         }
     }
     fig.show(config=save_properties)
