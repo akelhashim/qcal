@@ -24,7 +24,7 @@ from qcal.fitting.fit import (
 )
 from qcal.fitting.utils import est_freq_fft
 from qcal.gates.single_qubit import X90, Idle, Rz, X
-from qcal.math.utils import round_to_order_error, wrap_phase
+from qcal.math.utils import wrap_phase
 from qcal.plotting.utils import calculate_nrows_ncols
 from qcal.qpu.qpu import QPU
 from qcal.settings import Settings
@@ -579,11 +579,7 @@ def Frequency(
 
                 if self._fit[q].fit_success:
                     a = self._fit[q].fit_params['a'].value
-                    newval, err = round_to_order_error(
-                        self._fit[q].fit_params['b'].value,
-                        self._fit[q].fit_params['a'].stderr,
-                        2
-                    )
+                    newval = self._fit[q].fit_params['b'].value
 
                     if a < 0:
                         logger.warning(
@@ -599,16 +595,12 @@ def Frequency(
                         self._cal_values[q] = (
                             self._config[self._params[q]] + newval
                         )
-                        self._errors[q] = err
 
         def save(self) -> None:
             """Save all circuits and data."""
             qpu.save(self)
             self._data_manager.save_to_csv(
                  pd.DataFrame([self._cal_values]), 'freq_values'
-            )
-            self._data_manager.save_to_csv(
-                 pd.DataFrame([self._errors]), 'freq_fit_errors'
             )
 
         def plot(self) -> None:
@@ -896,7 +888,7 @@ def Phase(
             # Y180_X90
             circuit_Y180_X90.extend([
                 Cycle({
-                    Rz(q, np.pi/2, subspace=level[self._n_levels])
+                    Rz(q, -np.pi/2, subspace=level[self._n_levels])
                     for q in self._qubits
                 }),
                 Cycle({
@@ -909,7 +901,7 @@ def Phase(
                     for q in self._qubits
                 }),
                 Cycle({
-                    Rz(q, -np.pi/2, subspace=level[self._n_levels])
+                    Rz(q, np.pi/2, subspace=level[self._n_levels])
                     for q in self._qubits
                 }),
                 Barrier(self._qubits),
@@ -933,7 +925,7 @@ def Phase(
                 }),
                 Barrier(self._qubits),
                 Cycle({
-                    Rz(q, np.pi/2, subspace=level[self._n_levels])
+                    Rz(q, -np.pi/2, subspace=level[self._n_levels])
                     for q in self._qubits
                 }),
                 Cycle({
@@ -941,7 +933,7 @@ def Phase(
                     for q in self._qubits
                 }),
                 Cycle({
-                    Rz(q, -np.pi/2, subspace=level[self._n_levels])
+                    Rz(q, np.pi/2, subspace=level[self._n_levels])
                     for q in self._qubits
                 }),
             ])
@@ -1037,7 +1029,7 @@ def Phase(
                     }
                     for fit_idx in range(2): # For each of the two linear fits
                         params = fit_df["params"][fit_idx]
-                        params.add('m', value=(-1.)**(fit_idx))
+                        params.add('m', value=(-1.)**(fit_idx + 1))
                         params.add('b', value=0.5)
                         self._fit[q][fit_idx].fit(
                             self._phases[q],

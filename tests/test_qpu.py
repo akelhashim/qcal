@@ -102,13 +102,13 @@ class TestConstruction:
         assert qpu.jit is True
 
     def test_n_levels_above_three_raises(self, config):
-        with pytest.raises(AssertionError, match='n_levels'):
+        with pytest.raises(ValueError, match='n_levels'):
             QPU(config, n_levels=4)
 
     def test_classifier_n_levels_mismatch_raises(self, config):
         classifier = ClassificationManager(qubits=(0, 1), n_levels=2)
 
-        with pytest.raises(AssertionError, match='n_levels'):
+        with pytest.raises(ValueError, match='n_levels'):
             QPU(config, classifier=classifier, n_levels=3)
 
     def test_explicit_classifier_is_used_as_is(self, config):

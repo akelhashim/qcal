@@ -1,7 +1,13 @@
 """Unit tests for qcal.post_processing.post_process.PostProcessor."""
 import numpy as np
+import pytest
 
 from qcal.config import Config
+from qcal.post_processing.passes import (
+    compute_conditional_counts,
+    compute_counts,
+    discard_heralded_shots,
+)
 from qcal.post_processing.post_process import PostProcessor
 
 EXAMPLE_CONFIG_PATH = 'examples/config/config.yaml'
@@ -23,7 +29,7 @@ class TestConstruction:
         ]
         pp = PostProcessor(config=_config(), results=results)
 
-        assert pp.qubits == [0, 1, 2]
+        assert pp.qubits == (0, 1, 2)
 
     def test_herald_idx_from_config(self):
         config = _config()
@@ -38,9 +44,26 @@ class TestConstruction:
         pp = PostProcessor(config=_config(), results=[])
 
         names = [p.__name__ for p in pp.passes]
-        assert names == [
-            'discard_heralded_shots', 'relabel_esp', 'compute_counts',
-        ]
+        assert names == ['discard_heralded_shots', 'relabel_esp']
+        assert pp.aggregate is compute_counts
+
+    def test_trailing_aggregation_pass_is_moved_to_aggregate(self):
+        # Backwards compatibility: passes used to end with the
+        # aggregation pass.
+        pp = PostProcessor(
+            config=_config(), results=[],
+            passes=[discard_heralded_shots, compute_conditional_counts],
+        )
+
+        assert pp.passes == [discard_heralded_shots]
+        assert pp.aggregate is compute_conditional_counts
+
+    def test_aggregation_pass_not_at_end_raises(self):
+        with pytest.raises(ValueError, match='aggregate'):
+            PostProcessor(
+                config=_config(), results=[],
+                passes=[compute_counts, discard_heralded_shots],
+            )
 
 
 class TestRun:

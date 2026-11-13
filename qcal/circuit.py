@@ -30,9 +30,9 @@ import plotly.io as pio
 from numpy.typing import NDArray
 
 from qcal.gates.gate import Gate
-from qcal.gates.single_qubit import Meas, basis_rotation
+from qcal.gates.single_qubit import Meas, basis_rotation, prep_rotation
 from qcal.plotting.sequence import plot_mock_sequence
-from qcal.results import Results
+from qcal.results import PerShotResults, Results
 
 # NOTE: Plotly's own auto-detected renderer is used by default; set
 # qcal.settings.Settings.plot_renderer to override it (e.g. in Colab,
@@ -402,7 +402,9 @@ class Layer(Cycle):
 
 class Circuit:
 
-    __slots__ = ('_cycles', '_qubits', '_results', '_mcm_results')
+    __slots__ = (
+        '_cycles', '_qubits', '_results', '_mcm_results', '_per_shot_results'
+    )
 
     def __init__(self,
             cycles_or_layers: Iterable[Cycle | Layer | Barrier] = None
@@ -428,6 +430,7 @@ class Circuit:
 
         self._results = Results()
         self._mcm_results = []
+        self._per_shot_results = None
 
     def __copy__(self) -> Circuit:
         """Make a deep copy of the Circuit."""
@@ -610,6 +613,18 @@ class Circuit:
         ].Partitions.iloc[0]
 
     @property
+    def per_shot_results(self) -> PerShotResults | None:
+        """Per-shot outcomes of every measurement cycle, e.g. for decoding.
+
+        Only recorded when explicitly requested, since they can be large.
+
+        Returns:
+            PerShotResults | None: per-shot outcomes, or None if they weren't
+                recorded.
+        """
+        return self._per_shot_results
+
+    @property
     def results(self) -> Results:
         """Circuit results.
 
@@ -651,7 +666,7 @@ class Circuit:
         Returns:
             NDArray: unitary matrix of the full circuit.
         """
-        cycles = [c for c in self._cycles if not c.is_barrier]
+        cycles = [c for c in reversed(self._cycles) if not c.is_barrier]
         if not cycles:
             return np.eye(2 ** self.n_qubits)
 
@@ -686,6 +701,15 @@ class Circuit:
     def mcm_results(self):
         """Clear all recorded mid-circuit measurement results."""
         self._mcm_results = []
+
+    @per_shot_results.setter
+    def per_shot_results(self, results: PerShotResults | None):
+        """Record the per-shot outcomes of the circuit.
+
+        Args:
+            results (PerShotResults | None): per-shot outcomes.
+        """
+        self._per_shot_results = results
 
     @results.setter
     def results(self, results: Dict):
@@ -904,8 +928,8 @@ class Circuit:
             {Meas(q, b) for q, b in zip(qubits, basis, strict=False)}
         )
         if all(
-            meas.properties['params']['basis'].upper() == 'Z' for meas in
-            meas_cycle
+            meas.properties['params']['basis'].upper() in ('I', 'Z') for
+            meas in meas_cycle
         ):
             # self.append(Barrier(self.qubits))
             self.append(meas_cycle)
@@ -938,6 +962,40 @@ class Circuit:
         """Removes the first cycle/layer at the front of the circuit."""
         self._cycles.popleft()
         self._update_qubits()
+
+    def prepare(
+        self,
+        pauli:  str | Sequence[str],
+        qubits: Sequence[int] | None = None,
+    ) -> None:
+        """Prepends a preparation cycle to the front of the circuit.
+
+        The preparation cycle rotates the qubits from the ground state to
+        the eigenstate of the given Pauli for each qubit: the +1 eigenstate
+        for an unsigned (or '+') Pauli, and the -1 eigenstate for a Pauli
+        with a '-' prefix.
+
+        Args:
+            pauli (str | Sequence[str]): Paulis defining the eigenstate to
+                prepare, one per qubit in `qubits`. Either an unsigned Pauli
+                string (e.g. 'XYZ'), or a sequence of (optionally signed)
+                Paulis (e.g. ['-X', 'Y', '-Z']).
+            qubits (Sequence[int] | None, optional): qubits to prepare.
+                Defaults to None.
+        """
+        if qubits is None:
+            qubits = self.qubits
+
+        if len(pauli) != len(qubits):
+            raise ValueError(
+                "Number of Paulis must match number of qubits to prepare!"
+            )
+
+        prep_cycle = Cycle(
+            {prep_rotation(q, p) for q, p in zip(qubits, pauli, strict=False)}
+        )
+        if not all(p.upper() in ('I', 'Z', '+Z') for p in pauli):
+            self.prepend(prep_cycle)
 
     def prepend(
             self, cycle_or_layer: Barrier | Cycle | Layer | Iterable

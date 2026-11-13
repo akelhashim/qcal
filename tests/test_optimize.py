@@ -6,15 +6,17 @@ so these tests can exercise Optimize/LinearResponse's own
 orchestration logic (scaling, config read/write, re-instantiating
 cost_func, loss aggregation, the run() loop) in isolation. Config
 objects are loaded from a tmp_path copy of the example config so
-Optimize.run()'s unconditional config.save() never touches the real
-example file.
+Optimize.run()'s config.save() (when settings.Settings.save_data is
+enabled) never touches the real example file.
 """
 import shutil
+import types
 
 import numpy as np
 import pytest
 from sklearn.preprocessing import MinMaxScaler
 
+import qcal.settings as settings
 from qcal.config import Config
 from qcal.optimization.optimize import LinearResponse, NoScaler, Optimize
 from qcal.utils import save_init
@@ -54,7 +56,7 @@ class FakeCostFunc:
 
 
 class StubOptimizer:
-    """Deterministic ask-tell-step stand-in for a real optimizer."""
+    """Deterministic ask-tell stand-in for a real optimizer."""
 
     def __init__(self, x0, step_size=0.01, **kwargs):
         self._x0 = x0
@@ -79,7 +81,7 @@ class StubOptimizer:
             self._opt_loss = loss_val
             self._opt_x = x.copy()
 
-    def step(self):
+    def ask(self):
         self._step_count += 1
         return self._x0 + self._step_size * self._step_count
 
@@ -200,7 +202,8 @@ class TestOptimizeRun:
             opt.optimizer[0].opt_x.flatten()[0]
         )
 
-    def test_run_saves_config_to_disk(self, config):
+    def test_run_does_not_save_config_by_default(self, config):
+        original = config[PARAM]
         cost_func = FakeCostFunc(config=config, m=1.0, b=-0.5)
         opt = Optimize(
             config=config, params={0: PARAM}, optimizer=StubOptimizer,
@@ -210,7 +213,28 @@ class TestOptimizeRun:
         opt.run()
 
         reloaded = Config(config._filename)
+        assert config[PARAM] != pytest.approx(original)
+        assert reloaded[PARAM] == pytest.approx(original)
+
+    def test_run_saves_config_when_save_data_enabled(
+        self, config, tmp_path, monkeypatch
+    ):
+        monkeypatch.setattr(settings.Settings, 'save_data', True)
+        cost_func = FakeCostFunc(config=config, m=1.0, b=-0.5)
+        # plot() writes figures to the cost function's data manager.
+        cost_func.data_manager = types.SimpleNamespace(
+            save_path=str(tmp_path) + '/'
+        )
+        opt = Optimize(
+            config=config, params={0: PARAM}, optimizer=StubOptimizer,
+            cost_func=cost_func, n_iters=2,
+        )
+
+        opt.run()
+
+        reloaded = Config(config._filename)
         assert reloaded[PARAM] == pytest.approx(config[PARAM])
+        assert (tmp_path / 'optimization_convergence.png').exists()
 
     def test_delta_bootstraps_an_extra_tell_call(self, config):
         cost_func = FakeCostFunc(config=config, m=1.0, b=-0.5)
@@ -234,6 +258,118 @@ class TestOptimizeRun:
         opt.run()
 
         assert len(opt.optimizer[0].tell_calls) == 2
+
+
+PARAM_1 = 'single_qubit/1/GE/X90/pulse/1/kwargs/amp'
+
+
+class TwoLabelFakeCostFunc:
+    """Stand-in cost function with independent losses for labels 0 and 1.
+
+    loss[ql] = m[ql] * (config[param_ql] - root[ql]).
+    """
+
+    @save_init
+    def __init__(self, config, roots, slopes=(1.0, 1.0)):
+        self._config = config
+        self._roots = roots
+        self._slopes = slopes
+        self._loss = self._compute()
+
+    def _compute(self):
+        return {
+            ql: [m * (self._config[p] - r)]
+            for ql, p, r, m in zip(
+                (0, 1), (PARAM, PARAM_1), self._roots, self._slopes,
+                strict=True,
+            )
+        }
+
+    @property
+    def loss(self):
+        return self._loss
+
+    def run(self):
+        self._loss = self._compute()
+
+
+def _global_min_optimize(config, global_min):
+    """Optimize two labels whose individual and joint optima differ.
+
+    StubOptimizer proposes x0 + 0.01 * k at iteration k = 1, 2, 3. Label
+    0's root sits at k = 1, label 1's (10x steeper) root at k = 3, so the
+    per-iteration losses are (0, -0.2), (0.01, -0.1), (0.02, 0): label 0
+    alone is best at k = 1, but the combined loss is smallest at k = 3.
+    """
+    x0_0, x0_1 = config[PARAM], config[PARAM_1]
+    cost_func = TwoLabelFakeCostFunc(
+        config=config, roots=(x0_0 + 0.01, x0_1 + 0.03),
+        slopes=(1.0, 10.0),
+    )
+    opt = Optimize(
+        config=config, params={0: PARAM, 1: PARAM_1},
+        optimizer=StubOptimizer, cost_func=cost_func, n_iters=3,
+        global_min=global_min,
+    )
+    opt.run()
+    return opt, x0_0, x0_1
+
+
+class TestOptimizeGlobalMin:
+
+    def test_defaults_to_false(self, config):
+        opt = Optimize(
+            config=config, params={0: PARAM}, optimizer=StubOptimizer,
+            cost_func=FakeCostFunc(config=config),
+        )
+        assert opt.global_min is False
+        assert opt.opt_loss_global == np.inf
+
+    def test_independent_selection_uses_each_labels_own_best(self, config):
+        opt, x0_0, x0_1 = _global_min_optimize(config, global_min=False)
+
+        assert opt.opt_params[0].flatten()[0] == pytest.approx(x0_0 + 0.01)
+        assert opt.opt_params[1].flatten()[0] == pytest.approx(x0_1 + 0.03)
+
+    def test_global_selection_uses_jointly_best_iteration(self, config):
+        opt, x0_0, x0_1 = _global_min_optimize(config, global_min=True)
+
+        assert opt.global_min is True
+        assert opt.opt_params[0].flatten()[0] == pytest.approx(x0_0 + 0.03)
+        assert opt.opt_params[1].flatten()[0] == pytest.approx(x0_1 + 0.03)
+        assert opt.opt_loss[0] == pytest.approx(0.02)
+        assert opt.opt_loss[1] == pytest.approx(0.0, abs=1e-12)
+        assert opt.opt_loss_global == pytest.approx(0.02)
+        assert config[PARAM] == pytest.approx(x0_0 + 0.03)
+        assert config[PARAM_1] == pytest.approx(x0_1 + 0.03)
+
+    def test_global_min_tracks_combined_loss(self, config):
+        opt = Optimize(
+            config=config, params={0: PARAM, 1: PARAM_1},
+            optimizer=StubOptimizer,
+            cost_func=TwoLabelFakeCostFunc(config=config, roots=(0., 0.)),
+        )
+        opt.update_global_best(
+            {0: np.array([1.0]), 1: np.array([2.0])},
+            {0: np.array(3.0), 1: np.array(4.0)},
+        )
+        assert opt.opt_loss_global == pytest.approx(5.0)
+
+        # A worse candidate leaves the stored optimum untouched.
+        opt.update_global_best(
+            {0: np.array([9.0]), 1: np.array([9.0])},
+            {0: np.array(6.0), 1: np.array(0.0)},
+        )
+        assert opt.opt_loss_global == pytest.approx(5.0)
+        np.testing.assert_array_equal(opt._global_opt_params[0], [1.0])
+
+        # A better one replaces it.
+        opt.update_global_best(
+            {0: np.array([7.0]), 1: np.array([8.0])},
+            {0: np.array(0.6), 1: np.array(0.8)},
+        )
+        assert opt.opt_loss_global == pytest.approx(1.0)
+        np.testing.assert_array_equal(opt._global_opt_params[1], [8.0])
 
 
 class LinearFakeCostFunc:

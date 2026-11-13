@@ -12,6 +12,7 @@ from IPython.display import clear_output
 from lmfit import Parameters
 from numpy.typing import NDArray
 from plotly.subplots import make_subplots
+from uncertainties import ufloat
 
 import qcal.settings as settings
 from qcal.characterization.characterize import Characterize
@@ -21,7 +22,7 @@ from qcal.fitting.fit import FitDecayingCosine
 from qcal.fitting.utils import est_freq_fft
 from qcal.gates.gate import Gate
 from qcal.gates.single_qubit import X90, Y90, Idle, Rz
-from qcal.math.utils import round_to_order_error, uncertainty_of_sum
+from qcal.math.utils import round_to_order_error
 from qcal.plotting.utils import calculate_nrows_ncols
 from qcal.qpu.qpu import QPU
 from qcal.units import MHz, kHz, us
@@ -440,7 +441,7 @@ def JAZZ(
                 Dict[Tuple[int, int], float]: loss for each qubit pair.
             """
             return {
-                qp: [self._char_values[qp]['val']]
+                qp: [self._char_values[qp].n]
                 for qp in self._qubits
                 if self._char_values[qp]
             }
@@ -536,9 +537,10 @@ def JAZZ(
                     seq_high_x: I_high, seq_high_y: Q_high,
                 }
 
-                # Use complex quadrature signal to resolve frequency sign.
-                z_low  = np.array(I_low)  - 1j * np.array(Q_low)
-                z_high = np.array(I_high) - 1j * np.array(Q_high)
+                # Use complex quadrature signal to resolve frequency sign,
+                # such that a positive Rz rate gives a positive frequency.
+                z_low  = np.array(I_low)  + 1j * np.array(Q_low)
+                z_high = np.array(I_high) + 1j * np.array(Q_high)
                 signed_freq_low  = est_freq_fft(self._times[qp], z_low)
                 signed_freq_high = est_freq_fft(self._times[qp], z_high)
 
@@ -579,13 +581,18 @@ def JAZZ(
                     self._freq_low[qp] is not False
                     and self._freq_high[qp] is not False
                 ):
-                    val = self._freq_high[qp] - self._freq_low[qp]
-                    err = uncertainty_of_sum([
-                        self._fit[qp][seq_low_x].fit_params['c'].stderr or 0.,
+                    freq_high_uf = ufloat(
+                        self._freq_high[qp],
                         self._fit[qp][seq_high_x].fit_params['c'].stderr or 0.,
-                    ])
-                    val, err = round_to_order_error(val, err)
-                    self._char_values[qp] = {'val': val, 'err': err}
+                    )
+                    freq_low_uf = ufloat(
+                        self._freq_low[qp],
+                        self._fit[qp][seq_low_x].fit_params['c'].stderr or 0.,
+                    )
+                    char_uf = freq_high_uf - freq_low_uf
+                    self._char_values[qp] = ufloat(
+                        *round_to_order_error(char_uf.n, char_uf.s)
+                    )
 
         def save(self):
             """Save all circuits and data."""
@@ -599,7 +606,10 @@ def JAZZ(
                     pd.DataFrame([self._results]), 'sweep_results'
                 )
                 self._data_manager.save_to_csv(
-                    pd.DataFrame([self._char_values]), 'characterized_values'
+                    pd.DataFrame([{
+                        qp: {'val': uf.n, 'err': uf.s}
+                        for qp, uf in self._char_values.items()
+                    }]), 'characterized_values'
                 )
 
         def _draw_ax(self, ax, qp) -> None:
@@ -636,8 +646,8 @@ def JAZZ(
 
             title = f'{qp} ZZ{self._conditional_phase}'
             if self._char_values[qp]:
-                val = self._char_values[qp]['val']
-                err = self._char_values[qp]['err']
+                val = self._char_values[qp].n
+                err = self._char_values[qp].s
                 title += f': {val / unit:.1f} ({err / unit:.1f}) {unit_str}'
             ax.set_title(title)
             ax.legend(loc=0, fontsize=12)
@@ -656,8 +666,8 @@ def JAZZ(
             for qp in self._qubits:
                 title = f'{qp} ZZ{self._conditional_phase}'
                 if self._char_values[qp]:
-                    val = self._char_values[qp]['val']
-                    err = self._char_values[qp]['err']
+                    val = self._char_values[qp].n
+                    err = self._char_values[qp].s
                     title += f' = {val/unit:.1f} ({err/unit:.1f}) {unit_str}'
                 subplot_titles.append(title)
 
@@ -812,15 +822,15 @@ def JAZZ(
             for qp in self._qubits:
                 if self._char_values[qp]:
                     self.set_param(
-                        self._params[qp], self._char_values[qp]['val']
+                        self._params[qp], self._char_values[qp].n
                     )
                     unit, unit_str = (MHz, 'MHz') if self._mq_gate else (
                         kHz, 'kHz'
                     )
                     print(
                         f"{qp} ZZ{self._conditional_phase}: ZZ = "
-                        f"{self._char_values[qp]['val']/unit:.3f} "
-                        f"({self._char_values[qp]['err']/unit:.3f}) {unit_str}"
+                        f"{self._char_values[qp].n/unit:.3f} "
+                        f"({self._char_values[qp].s/unit:.3f}) {unit_str}"
                     )
 
             if settings.Settings.save_data:

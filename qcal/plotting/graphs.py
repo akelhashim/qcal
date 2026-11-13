@@ -2,10 +2,11 @@
 """
 import logging
 from collections import defaultdict
-from typing import Dict
+from typing import Dict, Tuple, Union
 
 import networkx as nx
 import numpy as np
+import plotly.colors as pc
 import plotly.graph_objects as go
 import plotly.io as pio
 from plotly.graph_objs.scatter import Marker
@@ -17,11 +18,21 @@ from qcal.gates.gate import Gate
 logger = logging.getLogger(__name__)
 
 
-def format_gate_text(gate: Gate):
+MAX_LABELED_NODES = 2000
+"""Above this many (cycle, qubit) positions, per-gate text labels are
+omitted (rendering that many Plotly annotations is slow) and hover text
+drops the gate matrix (it dominates the hover-text JSON payload).
+"""
+
+
+def format_gate_text(gate: Gate, include_matrix: bool = True):
     """Format Gate text using the gate properties metadata.
 
     Args:
-        gate (Gate): qcal Gate object.
+        gate (Gate):           qcal Gate object.
+        include_matrix (bool): whether to include the gate's matrix in
+            the text. Defaults to True. For large circuits, this is set
+            to False to keep the hover-text payload small.
 
     Returns:
         str: text formatted for Plotly plot.
@@ -31,18 +42,14 @@ def format_gate_text(gate: Gate):
         text += f'Alias: {gate.alias}<br>'
     text += f'Qubits: {gate.qubits}<br>'
     text += f'Dim: {gate.dim}<br>'
-    if gate.unitary is not None:
-        text += (
-            'Unitary: <br>  '
-            + np.array_str(np.around(gate.unitary, 3)).replace(
-                "\n ", "<br>" + '   '
-            )
-            + '<br>'
+    if include_matrix:
+        label, matrix = (
+            ('Unitary', gate.unitary) if gate.unitary is not None
+            else ('Matrix', gate.matrix)
         )
-    else:
         text += (
-            'Matrix: <br>  '
-            + np.array_str(np.around(gate.matrix, 3)).replace(
+            f'{label}: <br>  '
+            + np.array_str(np.around(matrix, 3)).replace(
                 "\n ", "<br>" + '   '
             )
             + '<br>'
@@ -73,6 +80,10 @@ def draw_circuit(circuit: Circuit, show: bool = True):
     """
     pio.templates.default = 'plotly'
 
+    label_gates = (
+        circuit.circuit_depth * len(circuit.qubits) <= MAX_LABELED_NODES
+    )
+
     # https://plotly.com/python/marker-style/
     symbol_map = defaultdict(lambda: ['square', 'square'],
         {'Meas':   ['triangle-right'],
@@ -97,6 +108,20 @@ def draw_circuit(circuit: Circuit, show: bool = True):
         }
     )
 
+    # Parallel multi-qubit gates in the same cycle are colored distinctly
+    # (same palette as the CB Pauli decay plots), since their connecting
+    # lines can overlap.
+    mq_colors = pc.qualitative.Plotly
+
+    qubit_index = {q: i for i, q in enumerate(circuit.qubits)}
+
+    # Gates drawn independently on each qubit, even when a single gate
+    # object acts on multiple qubits (e.g. MCM:(1, 3)).
+    per_qubit_gates = ('Meas', 'MCM', 'Reset')
+
+    def is_per_qubit(gate: Gate) -> bool:
+        return gate.is_single_qudit or gate.name in per_qubit_gates
+
     node_x = []
     node_y = []
     node_text = []
@@ -104,6 +129,7 @@ def draw_circuit(circuit: Circuit, show: bool = True):
     gate_names = []
     marker_colors = []
     barrier_locs = []
+    mq_edge_traces = []
     qnode_text = defaultdict(lambda: False, {})
     n_barriers = 0
     for c, cycle in enumerate(circuit.cycles):
@@ -112,67 +138,91 @@ def draw_circuit(circuit: Circuit, show: bool = True):
             n_barriers += 1
         else:
             c -= n_barriers
+            n_mq = sum(not is_per_qubit(gate) for gate in cycle.gates)
+            k_mq = 0
             for gate in cycle.gates:
-                if gate.is_single_qudit:
+                if is_per_qubit(gate):
                     for q in gate.qubits:
                         node_x.append(c)
-                        node_y.append(circuit.qubits.index(q))
-                    name = gate.name
-                    if 'phase' in gate.properties['params'].keys():
-                        name += str(gate.properties['params']['phase'])
-                    elif name == 'Idle':
-                        name += str(gate.properties['params']['duration'])
-                    text = qnode_text[
-                        f'{name}{gate.subspace}:{gate.qubits}'
-                    ]
+                        node_y.append(qubit_index[q])
+                    # Gate identity includes params and matrix, so gates
+                    # with different phases/durations or merged matrices
+                    # get their own hover text.
+                    text = qnode_text[gate]
                     if not text:
-                        text = format_gate_text(gate)
-                        qnode_text[
-                            f'{gate.name}{gate.subspace}:{gate.qubits}'
-                        ] = text
+                        text = format_gate_text(
+                            gate, include_matrix=label_gates
+                        )
+                        qnode_text[gate] = text
                     node_text.extend(
                         [text] * len(gate.qubits)
                     )
                     node_symbols.extend(
                         [symbol_map[gate.name][0]] * len(gate.qubits)
                     )
-                    gate_names.append(
-                        {'x': c,
-                         'y': circuit.qubits.index(q),
-                         'text': 'M' if gate.name in ('Meas', 'MCM') else (
-                             gate.name if len(gate.name) < 3 else gate.name[:3]
-                         ),
-                         'font': {'color': 'black', 'size': 13},
-                         'showarrow': False
-                        }
-                    )
+                    if label_gates:
+                        gate_names.extend(
+                            {'x': c,
+                             'y': qubit_index[q],
+                             'text': 'M' if gate.name in (
+                                 'Meas', 'MCM'
+                             ) else (
+                                 gate.name if len(gate.name) < 3
+                                 else gate.name[:3]
+                             ),
+                             'font': {'color': 'black', 'size': 13},
+                             'showarrow': False
+                            } for q in gate.qubits
+                        )
                     marker_colors.extend(
                         [color_map[gate.name]] * len(gate.qubits)
                     )
                 elif gate.is_multi_qudit:
+                    edge_x_mq = []
+                    edge_y_mq = []
                     for q in gate.qubits:
                         node_x.append(c)
-                        node_y.append(circuit.qubits.index(q))
-                    text = qnode_text[
-                        f'{gate.name}{gate.subspace}:{gate.qubits}'
-                    ]
-                    if not text:
-                        text = format_gate_text(gate)
-                        qnode_text[
-                            f'{gate.name}{gate.subspace}:{gate.qubits}'
-                        ] = text
-                    node_text.extend([text] * 2)
-                    node_symbols.extend(symbol_map[gate.name])
-                    gate_names.append(
-                        {
-                            'x': c,
-                            'y': circuit.qubits.index(q),
-                            'text': '',
-                            'font': {'color': 'black', 'size': 13},
-                            'showarrow': False
-                        },
+                        node_y.append(qubit_index[q])
+                        edge_x_mq.append(c)
+                        edge_y_mq.append(qubit_index[q])
+                    mq_edge_traces.append(
+                        go.Scatter(
+                            x=edge_x_mq, y=edge_y_mq,
+                            line={'width': 2, 'color': '#888'},
+                            hoverinfo='none',
+                            mode='lines'
+                        )
                     )
-                    marker_colors.extend(['white', 'white'])
+                    text = qnode_text[gate]
+                    if not text:
+                        text = format_gate_text(
+                            gate, include_matrix=label_gates
+                        )
+                        qnode_text[gate] = text
+                    # Keep the marker lists aligned with node_x/node_y:
+                    # one symbol per qubit, padding with the last symbol
+                    # for gates on more qubits than the map specifies.
+                    n_q = len(gate.qubits)
+                    symbols = symbol_map[gate.name][:n_q]
+                    symbols += [symbols[-1]] * (n_q - len(symbols))
+                    node_text.extend([text] * n_q)
+                    node_symbols.extend(symbols)
+                    if label_gates:
+                        gate_names.append(
+                            {
+                                'x': c,
+                                'y': qubit_index[q],
+                                'text': '',
+                                'font': {'color': 'black', 'size': 13},
+                                'showarrow': False
+                            },
+                        )
+                    color = (
+                        mq_colors[k_mq % len(mq_colors)] if n_mq > 1
+                        else 'white'
+                    )
+                    k_mq += 1
+                    marker_colors.extend([color] * n_q)
 
     # ms_scale = 200
     node_trace = go.Scatter(
@@ -214,7 +264,7 @@ def draw_circuit(circuit: Circuit, show: bool = True):
             for gate in cycle.gates:
                 edge_x_mq = []
                 edge_y_mq = []
-                if gate.is_multi_qudit:
+                if not is_per_qubit(gate):
                     for q in gate.qubits:
                         edge_x_mq.append(c)
                         edge_y_mq.append(circuit.qubits.index(q))
@@ -486,7 +536,7 @@ def draw_qpu(config: Config):
             #'Hot' | 'Blackbody' | 'Earth' | 'Electric' | 'Viridis' |
             'colorscale': 'Tealgrn',
             'reversescale': False,
-            'opacity': 0.65,
+            'opacity': 1.0,
             'color': [],
             'size': 30,
             'colorbar': {
@@ -591,3 +641,215 @@ def draw_qpu(config: Config):
     }
 
     fig.show(config=save_properties)
+
+
+def draw_qpu_heatmap(
+    config:     Config,
+    values:     Dict[Union[int, Tuple[int, ...]], float],
+    label:      str = 'QPU',
+    cbar_label: str = 'Value',
+    *,
+    colorscale:    str = 'Tealgrn',
+    missing_color: str = "#FFFFFF",
+    plot_full_qpu: bool = False,
+    show:          bool = True
+):
+    """Draw a QPU connectivity graph colored by arbitrary values.
+
+    Nodes (qubits) and edges (qubit pairs) are colored according to a
+    shared colorscale based on the values passed in. This can be used,
+    e.g., to visualize per-qubit T1/T2 times, per-pair gate infidelities, etc.,
+    all on the same processor layout.
+
+    Args:
+        config (Config):  qcal Config.
+        values (Dict[int | Tuple[int, ...], float]): mapping from qubit
+            label (int) to a node value, or from qubit pair (tuple of
+            ints) to an edge value. Qubits/pairs not present in this
+            dict are drawn using `missing_color`.
+        label (str): figure title. Defaults to 'QPU'.
+        cbar_label (str): colorbar title (also used in the hover text)
+            describing what `values` represents (e.g. 'T1 (us)' or
+            'Gate Infidelity'). Defaults to 'Value'.
+        colorscale (str): Plotly colorscale name. Defaults to
+            'Tealgrn'.
+        missing_color (str): color used for qubits/pairs that are not
+            present in `values`. Defaults to '#FFFFFF'.
+        plot_full_qpu (bool): if True, plot the full QPU lattice from
+            `config.qubit_pairs`, filling in any qubits/pairs missing
+            from `values` with `missing_color`. If False (default),
+            only plot the qubits present in `values` (plus any qubits
+            only referenced via an edge key), along with any edges
+            between those qubits from `config.qubit_pairs` — edges
+            without a passed value are drawn in `missing_color`.
+        show (bool): whether to plot the figure. Defaults to True. If
+            False, the figure object is returned instead.
+    """
+    node_values = {}
+    edge_values = {}
+    for key, val in values.items():
+        if isinstance(key, (tuple, list)):
+            edge_values[tuple(key)] = val
+        else:
+            node_values[key] = val
+
+    G = nx.Graph()
+    if plot_full_qpu:
+        G.add_edges_from(config.qubit_pairs)
+        G.add_nodes_from(node_values.keys())
+    else:
+        G.add_edges_from(edge_values.keys())
+        G.add_nodes_from(node_values.keys())
+        plotted_nodes = set(G.nodes())
+        G.add_edges_from(
+            pair for pair in config.qubit_pairs
+            if set(pair).issubset(plotted_nodes)
+        )
+    pos = nx.kamada_kawai_layout(G)
+
+    all_values = list(node_values.values()) + list(edge_values.values())
+    if not all_values:
+        raise ValueError("`values` must contain at least one entry.")
+    vmin, vmax = min(all_values), max(all_values)
+    if vmin == vmax:
+        vmin, vmax = vmin - 0.5, vmax + 0.5
+
+    def to_color(val):
+        if val is None:
+            return missing_color
+        frac = (val - vmin) / (vmax - vmin)
+        frac = min(max(frac, 0.0), 1.0)
+        return pc.sample_colorscale(colorscale, frac)[0]
+
+    node_x, node_y, node_color, node_text = [], [], [], []
+    for node in sorted(G.nodes()):
+        x, y = pos[node]
+        node_x.append(x)
+        node_y.append(y)
+        val = node_values.get(node)
+        node_color.append(to_color(val))
+        node_text.append(
+            f'Q{node}<br>{cbar_label}: '
+            + (f'{val}<br>' if val is not None else 'N/A<br>')
+        )
+
+    node_trace = go.Scatter(
+        x=node_x, y=node_y,
+        mode='markers',
+        hoverinfo='text',
+        text=node_text,
+        marker={
+            'color': node_color,
+            'opacity': 0.85,
+            'size': 30,
+            'line_width': 2,
+            'line_color': 'black'
+        }
+    )
+
+    qubit_labels = go.Scatter(
+        x=node_x, y=node_y,
+        text=[f'Q{q}' for q in sorted(G.nodes())],
+        mode='text',
+        hoverinfo='text',
+        marker={'color': '#5D69B1', 'size': 0.01}
+    )
+
+    edge_traces = []
+    middle_node_x, middle_node_y, middle_node_text = [], [], []
+    for edge in G.edges():
+        x0, y0 = pos[edge[0]]
+        x1, y1 = pos[edge[1]]
+        val = edge_values.get(
+            edge, edge_values.get((edge[1], edge[0]))
+        )
+        edge_traces.append(
+            go.Scatter(
+                x=[x0, x1], y=[y0, y1],
+                line={'width': 5, 'color': to_color(val)},
+                hoverinfo='none',
+                mode='lines'
+            )
+        )
+        middle_node_x.append((x0 + x1) / 2)
+        middle_node_y.append((y0 + y1) / 2)
+        middle_node_text.append(
+            f'{edge}<br>{cbar_label}: '
+            + (f'{val}<br>' if val is not None else 'N/A<br>')
+        )
+
+    middle_node_trace = go.Scatter(
+        x=middle_node_x,
+        y=middle_node_y,
+        text=middle_node_text,
+        mode='markers',
+        hoverinfo='text',
+        marker=Marker(opacity=0)
+    )
+
+    # Invisible trace used solely to render a shared colorbar for both
+    # the node and edge colors.
+    colorbar_trace = go.Scatter(
+        x=[None], y=[None],
+        mode='markers',
+        hoverinfo='none',
+        showlegend=False,
+        marker={
+            'colorscale': colorscale,
+            'showscale': True,
+            'cmin': vmin,
+            'cmax': vmax,
+            'color': [vmin],
+            'colorbar': {
+                'thickness': 15,
+                'title': {
+                    'text': cbar_label,
+                    'side': 'right',
+                    'font': {'size': 20}
+                },
+                'tickfont': {'size': 15},
+                'xanchor': 'left',
+            }
+        }
+    )
+
+    fig = go.Figure(
+        data=(
+            edge_traces
+            + [node_trace, qubit_labels, middle_node_trace, colorbar_trace]
+        ),
+        layout=go.Layout(
+            title={'font': {'size': 16}},
+            showlegend=False,
+            hovermode='closest',
+            margin={'b': 20, 'l': 5, 'r': 5, 't': 40},
+            annotations=[{
+                'text': label,
+                'showarrow': False,
+                'xref': "paper", 'yref': "paper",
+                'x': 0.005, 'y': -0.002,
+                'font': {'size': 25}
+            }],
+            xaxis={
+                'showgrid': False, 'zeroline': False,
+                'showticklabels': False
+            },
+            yaxis={
+                'showgrid': False, 'zeroline': False,
+                'showticklabels': False
+            }
+        )
+    )
+
+    save_properties = {
+        'toImageButtonOptions': {
+            'format': 'png',  # one of png, svg, jpeg, webp
+            'filename': 'qpu_heatmap',
+            'scale': 10  # Multiply title/legend/axis/canvas sizes
+        }
+    }
+
+    if show:
+        fig.show(config=save_properties)
+    else:
+        return fig

@@ -12,22 +12,21 @@ logger = logging.getLogger(__name__)
 
 def plot_error_rates(
     error_rates: dict,
-    uncertainties: dict,
     ylabel: str = 'Error Rate',
     save_path: str | None = None
 ) -> None:
     """Plot error rates for randomized benchmarks.
 
     Args:
-        error_rates (dict): dictionary mapping qubit label to error rate.
-        uncertainties (dict): dictionary mapping qubit label to uncertainty.
+        error_rates (dict): dictionary mapping qubit label to a
+            ``uncertainties.ufloat`` error rate (e.g., process infidelity).
         ylabel (str, optional): y-axis label. Defaults to 'Error Rate'.
         save_path (str | None, optional): save path for figure. Defaults to
             None.
     """
     qlabels = sorted(error_rates.keys())
-    error_rates = [error_rates[ql] for ql in qlabels]
-    uncertainties = [uncertainties[ql] for ql in qlabels]
+    uncertainties = [error_rates[ql].s for ql in qlabels]
+    error_rates = [error_rates[ql].n for ql in qlabels]
 
     ms = 7
     x = np.arange(len(qlabels))

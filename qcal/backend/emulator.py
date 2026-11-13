@@ -27,12 +27,11 @@ Or load the bundled example config automatically::
     qpu.run(circuits)
 """
 import logging
-import pathlib
 
 import numpy as np
 
 from qcal.circuit import Circuit, CircuitSet
-from qcal.config import Config
+from qcal.config import EXAMPLE_CONFIG_PATH, Config
 from qcal.qpu.qpu import QPU
 from qcal.simulation.error_models import DepolarizingNoise
 from qcal.simulation.simulators import (
@@ -44,11 +43,6 @@ logger = logging.getLogger(__name__)
 
 __all__ = ('Emulator',)
 
-# Path to the example config shipped with the repository
-_EXAMPLE_CONFIG = (
-    pathlib.Path(__file__).parent.parent.parent
-    / 'examples' / 'config' / 'config.yaml'
-)
 
 # Default noise model. p0, p1 are the readout confusion matrix's
 # diagonal in qcal's row-stochastic convention: C[prep, meas] =
@@ -124,7 +118,7 @@ class Emulator(QPU):
                 Defaults to ``None``.
         """
         if config is None:
-            config = Config(str(_EXAMPLE_CONFIG))
+            config = Config(str(EXAMPLE_CONFIG_PATH))
 
         QPU.__init__(
             self,
@@ -154,7 +148,7 @@ class Emulator(QPU):
                 noise.add_readout_noise(q, cmat)
 
             self._simulator = DensityMatrixSimulator(
-                noise_model=noise,
+                error_model=noise,
                 n_shots=n_shots,
             )
 
@@ -217,16 +211,17 @@ class Emulator(QPU):
 
         - A ``'results'`` column is added (one results dict per
           circuit).
-        - A ``'states'`` column is added (one
-          ``state.pretty_print()`` string per circuit).
+        - A ``'state'`` column is added (one final ``quax`` state
+          object per circuit). Call ``.pretty_print()`` on an entry
+          for a readable string; this is not done eagerly because
+          formatting a density matrix scales as 4**n and dominates
+          runtime beyond a few qubits.
         - For qcal :class:`~qcal.circuit.Circuit` objects the results
           dict is also written to the circuit's ``.results``
           attribute directly.
         """
         all_results = self._measurements['results']
-        all_states = [
-            state.pretty_print() for state in self._measurements['states']
-        ]
+        all_states = self._measurements['states']
 
         for circuit_set in (
             self._circuits,
@@ -239,7 +234,7 @@ class Emulator(QPU):
             ):
                 continue
             circuit_set['results'] = all_results
-            circuit_set['states'] = all_states
+            circuit_set['state'] = all_states
             for circuit, results in zip(
                 circuit_set, all_results, strict=True
             ):

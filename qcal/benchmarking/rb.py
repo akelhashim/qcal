@@ -33,6 +33,7 @@ from pygsti.protocols import (
     SimultaneousExperimentDesign,
 )
 from pygsti.protocols.protocol import ProtocolData
+from uncertainties import UFloat, ufloat
 
 from qcal.analysis.leakage import analyze_leakage
 from qcal.circuit import CircuitSet
@@ -224,10 +225,9 @@ def CRB(
             self._dataset = None
             self._results = None
 
-            self._error_rates = {}
+            self._process_infidelity: Dict[int | Tuple[int, int], UFloat] = {}
             self._fit_params = {}
             self._success_probabilities = {}
-            self._uncertainties = {}
 
         @property
         def qubit_labels(self) -> Sequence[int | Tuple[int, int]]:
@@ -284,20 +284,9 @@ def CRB(
             return self._fit_params
 
         @property
-        def process_infidelity(self) -> (
-            Dict[int | Tuple[int, int], Dict[str, float]]
-        ):
-            """Process infidelity and uncertainty keyed by qubit label.
-
-            Each value is ``{'val': <infidelity>, 'err': <uncertainty>}``.
-            """
-            process_infidelity = {}
-            for ql, error_rate in self._error_rates.items():
-                process_infidelity[ql] = {
-                    'val': error_rate,
-                    'err': self._uncertainties[ql]
-                }
-            return process_infidelity
+        def process_infidelity(self) -> Dict[int | Tuple[int, int], UFloat]:
+            """Process infidelity and uncertainty keyed by qubit label."""
+            return self._process_infidelity
 
         @property
         def success_probabilities(self) -> Dict[int | Tuple[int, int], Any]:
@@ -431,8 +420,9 @@ def CRB(
                     rA = self._results.fits['A-fixed'].estimates['r']
                     rAstd = self._results.fits['A-fixed'].stds['r']
                     if rAstd < rstd:
-                        self._error_rates[self._qubit_labels[0]] = rA
-                        self._uncertainties[self._qubit_labels[0]] = rAstd
+                        self._process_infidelity[
+                            self._qubit_labels[0]
+                        ] = ufloat(rA, rAstd)
                         self._fit_params[self._qubit_labels[0]] = {
                             'base': self._results.fits['A-fixed'].estimates['p'],
                             'a': self._results.fits['A-fixed'].estimates['b'],
@@ -441,8 +431,9 @@ def CRB(
                         }
 
                     else:
-                        self._error_rates[self._qubit_labels[0]] = r
-                        self._uncertainties[self._qubit_labels[0]] = rstd
+                        self._process_infidelity[
+                            self._qubit_labels[0]
+                        ] = ufloat(r, rstd)
                         self._fit_params[self._qubit_labels[0]] = {
                             'base': self._results.fits['full'].estimates['p'],
                             'a': self._results.fits['full'].estimates['b'],
@@ -497,8 +488,9 @@ def CRB(
                         rA = self._results[qtup].fits['A-fixed'].estimates['r']
                         rAstd = self._results[qtup].fits['A-fixed'].stds['r']
                         if rAstd < rstd:
-                            self._error_rates[self._qubit_labels[i]] = rA
-                            self._uncertainties[self._qubit_labels[i]] = rAstd
+                            self._process_infidelity[
+                                self._qubit_labels[i]
+                            ] = ufloat(rA, rAstd)
                             self._fit_params[self._qubit_labels[i]] = {
                                 'base': self._results[qtup].fits[
                                     'A-fixed'
@@ -512,8 +504,9 @@ def CRB(
                                 ].estimates['a']
                             }
                         else:
-                            self._error_rates[self._qubit_labels[i]] = r
-                            self._uncertainties[self._qubit_labels[i]] = rstd
+                            self._process_infidelity[
+                                self._qubit_labels[i]
+                            ] = ufloat(r, rstd)
                             self._fit_params[self._qubit_labels[i]] = {
                                 'base': self._results[qtup].fits[
                                     'full'
@@ -544,7 +537,10 @@ def CRB(
                     'CRB_success_probabilities'
                 )
                 self._data_manager.save_to_csv(
-                    pd.DataFrame(self.process_infidelity),
+                    pd.DataFrame({
+                        ql: {'val': uf.n, 'err': uf.s}
+                        for ql, uf in self.process_infidelity.items()
+                    }),
                     'CRB_process_infidelity'
                 )
                 self._data_manager.save_to_csv(
@@ -696,8 +692,7 @@ def CRB(
                         )
 
                         legend_key = 'legend' if k == 0 else f'legend{k + 1}'
-                        er = self._error_rates.get(ql, None)
-                        un = self._uncertainties.get(ql, None)
+                        pinf = self._process_infidelity.get(ql, None)
 
                         if ql in self._fit_params and np.any(finite_mask):
                             max_depth = float(np.max(depths_arr[finite_mask]))
@@ -711,9 +706,8 @@ def CRB(
                                 **self._fit_params[ql],
                             )
                             fit_label = (
-                                f'r={er:1.2e} ({un:1.2e})'
-                                if er is not None and un is not None
-                                else 'Fit'
+                                f'r={pinf.n:1.2e} ({pinf.s:1.2e})'
+                                if pinf is not None else 'Fit'
                             )
                             pfig.add_trace(
                                 go.Scatter(
@@ -800,10 +794,9 @@ def CRB(
                     }
                     pfig.show(config=save_properties)
 
-            if len(self._error_rates) > 0:
+            if len(self._process_infidelity) > 0:
                 plot_error_rates(
-                    self._error_rates,
-                    self._uncertainties,
+                    self._process_infidelity,
                     ylabel='Process Infidelity',
                     save_path=self.data_manager.save_path
                     if Settings.save_data else None

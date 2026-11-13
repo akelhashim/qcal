@@ -44,7 +44,7 @@ class TestDefaultConstruction:
 
     def test_default_single_qubit_depolarizing_rate(self):
         emu = Emulator()
-        channel = emu.simulator.noise_model.channel_for('X')
+        channel = emu.simulator.error_model.channel_for('X')
         expected = quax.channels.depolarizing(
             DEFAULT_SINGLE_QUBIT_DEPOLARIZING, dims=(2,)
         )
@@ -52,7 +52,7 @@ class TestDefaultConstruction:
 
     def test_default_two_qubit_depolarizing_rate(self):
         emu = Emulator()
-        channel = emu.simulator.noise_model.channel_for('CZ')
+        channel = emu.simulator.error_model.channel_for('CZ')
         # Joint two-qubit noise acts on the full two-qubit Hilbert
         # space (16x16 superoperator), not a single-qubit-sized one.
         expected = quax.channels.depolarizing(
@@ -67,7 +67,7 @@ class TestDefaultConstruction:
         p0, p1 = DEFAULT_READOUT_P0, DEFAULT_READOUT_P1
         expected = np.array([[p0, 1 - p1], [1 - p0, p1]])
         for q in config.qubits:
-            cmat = emu.simulator.noise_model.confusion_matrix_for(f'Q{q}')
+            cmat = emu.simulator.error_model.confusion_matrix_for(f'Q{q}')
             assert np.allclose(cmat, expected)
 
 
@@ -98,10 +98,12 @@ class TestRun:
         assert circuit.results.n_shots == 10
         assert dict(circuit.results.dict) == {'1': 10}
 
-    def test_run_writes_results_and_states_columns(self):
+    def test_run_writes_results_and_state_columns(self):
         circuit = Circuit([Cycle(X(0)), Cycle(Meas(0))])
         emu = Emulator(simulator=StateVectorSimulator())
         emu.run(CircuitSet([circuit]), auto_save=False)
 
         assert list(emu.circuits['results']) == [{'1': 1024}]
-        assert emu.circuits['states'].iloc[0] == '1|1⟩'
+        # The final quax state object is stored (not pre-formatted);
+        # pretty_print() renders it on demand.
+        assert emu.circuits['state'].iloc[0].pretty_print() == '1|1⟩'

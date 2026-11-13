@@ -119,9 +119,9 @@ class TestStateVectorSimulator:
 
 class TestDensityMatrixSimulator:
 
-    def test_default_noise_model_is_empty(self):
+    def test_default_error_model_is_empty(self):
         sim = DensityMatrixSimulator()
-        assert sim.noise_model == {}
+        assert sim.error_model == {}
 
     def test_no_noise_matches_state_vector_simulator(self, bell_circuit):
         bell_circuit.measure()
@@ -131,11 +131,11 @@ class TestDensityMatrixSimulator:
             {'00': 0.5, '11': 0.5}
         )
 
-    def test_dict_noise_model_is_keyed_by_gate_class_name(self):
+    def test_dict_error_model_is_keyed_by_gate_class_name(self):
         circuit = qc.Circuit([qc.Cycle({qc.X(0)})])
         circuit.measure()
-        noise_model = {'X': quax.channels.amplitude_damping(0.2)}
-        sim = DensityMatrixSimulator(noise_model=noise_model)
+        error_model = {'X': quax.channels.amplitude_damping(0.2)}
+        sim = DensityMatrixSimulator(error_model=error_model)
         sim.run(circuit)
         results = dict(circuit.results.dict)
         # Amplitude damping after X(|0>-> |1>) decays P(1) below 1.
@@ -160,7 +160,7 @@ class TestDensityMatrixSimulator:
         )
         circuit = qc.Circuit([qc.Cycle({qc.CNOT(0, 1)})])
         circuit.measure()
-        sim = DensityMatrixSimulator(noise_model={'CNOT': flip})
+        sim = DensityMatrixSimulator(error_model={'CNOT': flip})
         sim.run(circuit)
         # |00> --CNOT--> |00> --flip both qubits--> |11>
         assert dict(circuit.results.dict) == pytest.approx({'11': 1.0})
@@ -170,7 +170,7 @@ class TestDensityMatrixSimulator:
         circuit.measure()
         two_qudit_channel = quax.channels.depolarizing(0.1, dims=(2, 2))
         sim = DensityMatrixSimulator(
-            noise_model={'X': two_qudit_channel}
+            error_model={'X': two_qudit_channel}
         )
         with pytest.raises(ValueError, match='qudits'):
             sim.run(circuit)
@@ -178,7 +178,7 @@ class TestDensityMatrixSimulator:
     def test_invalid_channel_type_raises_type_error(self):
         circuit = qc.Circuit([qc.Cycle({qc.X(0)})])
         circuit.measure()
-        sim = DensityMatrixSimulator(noise_model={'X': np.eye(2)})
+        sim = DensityMatrixSimulator(error_model={'X': np.eye(2)})
         with pytest.raises(TypeError, match='KrausMap or.*SuperOp'):
             sim.run(circuit)
 
@@ -216,7 +216,7 @@ class TestDensityMatrixSimulator:
 
         circuit = qc.Circuit([qc.Cycle({qc.X(0)})])
         circuit.measure()
-        sim = DensityMatrixSimulator(noise_model=noise)
+        sim = DensityMatrixSimulator(error_model=noise)
         sim.run(circuit)
 
         assert dict(circuit.results.dict) == pytest.approx({'0': 1.0})

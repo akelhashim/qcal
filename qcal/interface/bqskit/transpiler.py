@@ -19,7 +19,7 @@ from qcal.transpilation.utils import GateMapper
 logger = logging.getLogger(__name__)
 
 
-def to_bqskit(circuit: Circuit):
+def to_bqskit(circuit: Circuit) -> bqCircuit:
     """Compile a qcal circuit to a BQSKit circuit.
 
     Args:
@@ -32,7 +32,8 @@ def to_bqskit(circuit: Circuit):
     tcircuit = bqCircuit(circuit.n_qubits)
     for cycle in circuit:
         if cycle.is_barrier:
-            tcircuit.append_gate(bqBarrier(len(cycle.qubits)), cycle.qubits)
+            qubits = cycle.qubits or circuit.qubits
+            tcircuit.append_gate(bqBarrier(len(qubits)), qubits)
         else:
             for gate in cycle:
 
@@ -53,7 +54,7 @@ def to_bqskit(circuit: Circuit):
     return tcircuit
 
 
-def to_qcal(circuit, gate_mapper: GateMapper | Dict) -> Circuit:
+def to_qcal(circuit: bqCircuit, gate_mapper: GateMapper | Dict) -> Circuit:
     """Compile a BQSKit circuit to a qcal circuit.
 
     Args:

@@ -41,7 +41,6 @@ class Calibration(ABC):
         self._sweep_results = {}
         self._fit = {}
         self._cal_values = defaultdict(lambda: False, {})
-        self._errors = {}
 
         if self._config['readout/esp/enable']:
             logger.warning(
@@ -114,21 +113,11 @@ class Calibration(ABC):
 
     @abstractmethod
     def analyze(self) -> None:
-        """Analyze the data.
+        """Analyze the data."""
 
-        This method must be implemented by the child class.
-        """
-
+    @abstractmethod
     def generate_circuits(self) -> None:
-        """Generate all calibration circuits.
-
-        Raises:
-            NotImplementedError: this method should be handled in the child
-                class.
-        """
-        raise NotImplementedError(
-            'This method should be handled by the child class!'
-        )
+        """Generate all calibration circuits."""
 
     def final(self) -> None:
         """Save and load the config after changing parameters."""
@@ -160,10 +149,10 @@ class Calibration(ABC):
                         if (isinstance(self._params[q], (list, tuple)) and
                             isinstance(self._cal_values[q], (list, tuple))):
                             for param, val in zip(
-                                    self._params[q],
-                                    self._cal_values[q],
-                                    strict=False
-                                ):
+                                self._params[q],
+                                self._cal_values[q],
+                                strict=False
+                            ):
                                 self.set_param(param, val)
                         elif (
                             isinstance(self._params[q], (list, tuple)) and not
@@ -180,8 +169,8 @@ class Calibration(ABC):
             # self._config.load()
 
     def plot(
-            self, xlabel='Value Sweep', ylabel='Results', save_path=''
-        ) -> None:
+        self, xlabel='Value Sweep', ylabel='Results', save_path=''
+    ) -> None:
         """Plot the sweep and fit results.
 
         Args:

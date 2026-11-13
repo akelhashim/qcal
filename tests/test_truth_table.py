@@ -104,7 +104,7 @@ class TestTruthTableSimulatedRun:
         tt.run()
 
         assert tt.truth_table == pytest.approx(X_TRUTH_TABLE)
-        assert tt.fidelity['val'] == pytest.approx(1.0)
+        assert tt.fidelity.n == pytest.approx(1.0)
 
     def test_cnot_truth_table_is_exact_permutation(self, config):
         circuit = Circuit([Cycle(CNOT(0, 1))])
@@ -116,7 +116,7 @@ class TestTruthTableSimulatedRun:
         tt.run()
 
         assert tt.truth_table == pytest.approx(CNOT_TRUTH_TABLE)
-        assert tt.fidelity['val'] == pytest.approx(1.0)
+        assert tt.fidelity.n == pytest.approx(1.0)
 
     def test_fidelity_reflects_mismatch_with_wrong_ideal_unitary(
         self, config
@@ -133,7 +133,7 @@ class TestTruthTableSimulatedRun:
         tt.run()
 
         assert tt.truth_table == pytest.approx(CNOT_TRUTH_TABLE)
-        assert tt.fidelity['val'] == pytest.approx(0.5)
+        assert tt.fidelity.n == pytest.approx(0.5)
 
     def test_ancilla_superset_qubits_gives_ancilla_invariant_truth_table(
         self, config

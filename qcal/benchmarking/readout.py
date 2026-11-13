@@ -8,7 +8,7 @@ from collections.abc import Sequence
 from typing import Callable
 
 import pandas as pd
-from IPython.display import clear_output
+from IPython.display import clear_output, display
 
 import qcal.settings as settings
 from qcal.circuit import Barrier, Circuit, CircuitSet, Cycle
@@ -39,7 +39,7 @@ def ReadoutFidelity(
         qpu (QPU): custom QPU object.
         config (Config): qcal Config object.
         qubits (Sequence[int]): qubits to measure.
-        gate (str, optional): native gate used for state preparation. Defaults 
+        gate (str, optional): native gate used for state preparation. Defaults
             to 'X90'.
 
     Returns:
@@ -111,7 +111,6 @@ def ReadoutFidelity(
                             Cycle(
                               [X90(q, subspace=level[n]) for q in self._qubits]
                             ),
-                            Barrier(self._qubits),
                             Cycle(
                               [X90(q, subspace=level[n]) for q in self._qubits]
                             ),
@@ -171,9 +170,14 @@ def ReadoutFidelity(
                     self._cmat, 'confusion_matrix'
                 )
 
+        def plot(self):
+            """Plot the styled confusion matrix."""
+            if self._cmat is not None:
+                display(self.confusion_matrix)
+
         def final(self):
             """Final calibration method."""
-            print(f"Runtime: {repr(self._runtime)[8:]}\n")
+            print(f"\nRuntime: {repr(self._runtime)[8:]}\n")
 
         def run(self):
             """Run all experimental methods and analyze results."""
@@ -181,6 +185,7 @@ def ReadoutFidelity(
             qpu.run(self, self._circuits, auto_save=False)
             self.analyze()
             self.save()
+            self.plot()
             self.final()
 
     return ReadoutFidelity(
