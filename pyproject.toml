@@ -76,6 +76,7 @@ test = [
 [project.urls]
 Homepage = "https://github.com/akelhashim/qcal/"
 Repository = "https://github.com/akelhashim/qcal/"
+Documentation = "https://qcal.readthedocs.io"
 "Bug Tracker" = "https://github.com/akelhashim/qcal/issues"
 "Source Code" = "https://github.com/akelhashim/qcal/"
 

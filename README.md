@@ -1,6 +1,10 @@
 # qcal
 
+[![Documentation Status](https://readthedocs.org/projects/qcal/badge/?version=latest)](https://qcal.readthedocs.io/en/latest/)
+
 qcal is software for quantum calibration, characterization, and benchmarking. 
+
+**Documentation:** https://qcal.readthedocs.io
 
 # Installation
 
