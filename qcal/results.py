@@ -606,22 +606,24 @@ class Results:
 
         fig.show(config=save_properties)
 
-    def fidelity(self, results: Results) -> ufloat:
+    def fidelity(self, results: Results | Dict) -> ufloat:
         """Classical (Hellinger) fidelity with another distribution.
 
         Args:
-            results (Results): other results.
+            results (Results | Dict): other results, or a dictionary of
+                bitstring -> count.
 
         Returns:
             ufloat: fidelity, with propagated shot-noise uncertainty.
         """
         return hellinger_fidelity(self, results)
 
-    def tvd(self, results: Results) -> ufloat:
+    def tvd(self, results: Results | Dict) -> ufloat:
         """Total Variation Distance
 
         Args:
-            results (Results): other results.
+            results (Results | Dict): other results, or a dictionary of
+                bitstring -> count.
 
         Returns:
             ufloat: tvd, with propagated shot-noise uncertainty.

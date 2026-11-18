@@ -1,16 +1,24 @@
 """Submodule for math on probability distributions.
 
 """
+from __future__ import annotations
+
 import logging
+from typing import TYPE_CHECKING, Dict
 
 import numpy as np
 from uncertainties import ufloat
 from uncertainties.umath import sqrt as usqrt
 
+if TYPE_CHECKING:
+    from qcal.results import Results
+
 logger = logging.getLogger(__name__)
 
 
-def hellinger_fidelity(results1, results2) -> ufloat:
+def hellinger_fidelity(
+    results1: Results | Dict, results2: Results | Dict
+) -> ufloat:
     """Classical (Hellinger) fidelity.
 
     fidelity(p, q) = (sum_i sqrt(p_i * q_i))^2
@@ -33,13 +41,16 @@ def hellinger_fidelity(results1, results2) -> ufloat:
     zero contribution into a NaN uncertainty.
 
     Args:
-        results1 (Results): qcal Results object.
-        results2 (Results): qcal Results object.
+        results1 (Results | Dict): qcal Results object, or a dictionary of
+            bitstring -> count (converted to a Results object).
+        results2 (Results | Dict): qcal Results object, or a dictionary of
+            bitstring -> count (converted to a Results object).
 
     Returns:
         ufloat: Hellinger fidelity between results1 and results2,
             with propagated shot-noise uncertainty.
     """
+    results1, results2 = _to_results(results1), _to_results(results2)
     if results1.n_qudits != results2.n_qudits:
         raise ValueError('The results objects must be the same dimension!')
 
@@ -61,7 +72,9 @@ def hellinger_fidelity(results1, results2) -> ufloat:
     return sum(terms) ** 2
 
 
-def total_variation_distance(results1, results2) -> ufloat:
+def total_variation_distance(
+    results1: Results | Dict, results2: Results | Dict
+) -> ufloat:
     """Total Variation Distance.
 
     tvd(p, q) = 0.5 * sum_i |p_i - q_i|
@@ -81,13 +94,16 @@ def total_variation_distance(results1, results2) -> ufloat:
     returned tvd.
 
     Args:
-        results1 (Results): qcal Results object.
-        results2 (Results): qcal Results object.
+        results1 (Results | Dict): qcal Results object, or a dictionary of
+            bitstring -> count (converted to a Results object).
+        results2 (Results | Dict): qcal Results object, or a dictionary of
+            bitstring -> count (converted to a Results object).
 
     Returns:
         ufloat: total variation distance between results1 and
             results2, with propagated shot-noise uncertainty.
     """
+    results1, results2 = _to_results(results1), _to_results(results2)
     if results1.n_qudits != results2.n_qudits:
         raise ValueError('The results objects must be the same dimension!')
 
@@ -107,3 +123,27 @@ def total_variation_distance(results1, results2) -> ufloat:
         terms.append(diff if diff.nominal_value >= 0 else -diff)
 
     return sum(terms) / 2.
+
+
+def _to_results(results: Results | Dict) -> Results:
+    """Convert a dictionary of counts to a Results object.
+
+    Args:
+        results (Results | Dict): qcal Results object, or a dictionary of
+            bitstring -> count.
+
+    Returns:
+        Results: the input Results object, or a new Results object built
+            from the dictionary.
+    """
+    # Imported here to avoid a circular import, since qcal.results
+    # imports this module.
+    from qcal.results import Results
+
+    if isinstance(results, Results):
+        return results
+    if isinstance(results, dict):
+        return Results(results)
+    raise TypeError(
+        f'Expected a Results object or dict, got {type(results).__name__}!'
+    )
