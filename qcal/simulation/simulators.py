@@ -583,7 +583,7 @@ class DensityMatrixSimulator(Simulator):
                 if isinstance(self._error_model, ErrorModel):
                     for axis, q in enumerate(cycle_mcm_qudits):
                         cmat = self._error_model.confusion_matrix_for(
-                            f'Q{q}'
+                            q, qudit_dim[q]
                         )
                         if cmat is not None:
                             joint = _smear_confusion(joint, axis, cmat)
@@ -598,9 +598,7 @@ class DensityMatrixSimulator(Simulator):
                             idx = qudit_to_idx[q]
                             d = qudit_dim[q]
                             instrument = (
-                                self._error_model.instrument_for(
-                                    f'Q{q}', d,
-                                )
+                                self._error_model.instrument_for(q, d)
                                 if isinstance(
                                     self._error_model, ErrorModel
                                 )
@@ -689,11 +687,11 @@ class DensityMatrixSimulator(Simulator):
         # Classical per-qudit readout smearing for terminal Meas gates
         if isinstance(self._error_model, ErrorModel):
             for q in sorted(set(meas_qudits)):
-                cmat = self._error_model.confusion_matrix_for(f'Q{q}')
-                if cmat is None:
-                    continue
                 m = qudit_to_idx[q]
                 d = all_dims[m]
+                cmat = self._error_model.confusion_matrix_for(q, d)
+                if cmat is None:
+                    continue
                 s = strides[m]
                 probs_new = np.zeros_like(probs)
                 for raw in range(len(probs)):

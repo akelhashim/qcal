@@ -1,7 +1,7 @@
 """Unit tests for qcal.backend.emulator.Emulator.
 
-These pin the Emulator's own wiring contract (default config/noise
-model construction, custom simulator injection, and how results flow
+These pin the Emulator's own wiring contract (default noise model
+construction, custom simulator injection, and how results flow
 back into circuits/CircuitSets) rather than the physics of the
 underlying simulators, which are exercised elsewhere.
 """
@@ -26,9 +26,9 @@ from qcal.simulation.simulators import (
 
 class TestDefaultConstruction:
 
-    def test_default_config_is_example_config(self):
+    def test_default_config_is_none(self):
         emu = Emulator()
-        assert emu.config.filename.endswith('config.yaml')
+        assert emu.config is None
 
     def test_custom_config_is_used(self, config):
         emu = Emulator(config=config)
@@ -60,14 +60,14 @@ class TestDefaultConstruction:
         )
         assert np.allclose(channel.matrix, expected.matrix)
 
-    def test_default_readout_confusion_matrix_per_qubit(self, config):
-        emu = Emulator(config=config)
+    def test_default_readout_confusion_matrix_for_any_qubit(self):
+        emu = Emulator()
         # quax stores the column-stochastic transpose of qcal's
         # row-stochastic C[prep, meas] convention.
         p0, p1 = DEFAULT_READOUT_P0, DEFAULT_READOUT_P1
         expected = np.array([[p0, 1 - p1], [1 - p0, p1]])
-        for q in config.qubits:
-            cmat = emu.simulator.error_model.confusion_matrix_for(f'Q{q}')
+        for q in (0, 7, 123):
+            cmat = emu.simulator.error_model.confusion_matrix_for(q)
             assert np.allclose(cmat, expected)
 
 

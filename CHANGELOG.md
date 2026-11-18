@@ -9,8 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Breaking
 
+- `ErrorModel.add_readout_noise` takes the confusion matrix first:
+  `add_readout_noise(cmat, qudits=None)` instead of
+  `add_readout_noise(qudit, cmat)`. Qudit labels other than integers or
+  `'Q{n}'` raise a `ValueError` instead of being silently ignored
+- `ErrorModel.confusion_matrix_for` and `ErrorModel.instrument_for` take
+  an integer qudit (e.g. `0`) instead of a label (e.g. `'Q0'`)
+
 ### Added
 
+- `ErrorModel.add_readout_noise` sets a default confusion matrix for all
+  qudits when `qudits` is `None`, and accepts a list of qudits. Per-qudit
+  matrices take priority over the default, which only applies to qudits of
+  matching dimension
 - `hellinger_fidelity`, `total_variation_distance`, `Results.fidelity` and
   `Results.tvd` accept a dictionary of bitstring -> count in place of a
   `Results` object
@@ -20,6 +31,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   with a warning
 
 ### Changed
+
+- `Emulator()` no longer loads the example config when `config` is
+  `None`; the default readout noise applies to every measured qubit
+  without one. Protocols which read from or write to the config still
+  need one to be passed
 
 ### Deprecated
 

@@ -1338,7 +1338,7 @@ def CB(
                     continue
                 values[s[0] if len(s) == 1 else s] = e_F.n
 
-            if not values:
+            if not values or self.config is None:
                 return
 
             draw_qpu_heatmap(

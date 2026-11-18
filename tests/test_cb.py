@@ -613,8 +613,7 @@ class TestCBInjectedPauliNoise:
             {CZ(0, 1): TestCBInjectedPauliNoise.PAULI_ERRORS}
         )
         cmat = np.array([[0.98, 0.02], [0.05, 0.95]])
-        for q in range(2):
-            noise.add_readout_noise(q, cmat)
+        noise.add_readout_noise(cmat)
         cb = CB(
             Emulator, Config(EXAMPLE_CONFIG_PATH), Cycle({CZ(0, 1)}),
             [2, 4, 8], n_decays=15, n_randomizations=8, n_shots=1000,
@@ -961,8 +960,7 @@ def _simulator(single_qubit=0.0, two_qubit=0.0):
         single_qubit=single_qubit, two_qubit=two_qubit
     )
     cmat = np.array([[0.98, 0.02], [0.05, 0.95]])
-    for q in range(8):
-        noise.add_readout_noise(q, cmat)
+    noise.add_readout_noise(cmat)
     return DensityMatrixSimulator(error_model=noise)
 
 
