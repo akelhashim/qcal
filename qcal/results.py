@@ -7,7 +7,7 @@ from __future__ import annotations
 import copy
 import itertools
 import logging
-from collections import defaultdict
+from collections import Counter, defaultdict
 from dataclasses import dataclass
 from functools import reduce
 from typing import Dict, List, Sequence, Tuple
@@ -1069,6 +1069,67 @@ def qp_readout_correction(
         format(int(k), f'0{n}b'): int(c)
         for k, c in zip(keys, counts, strict=True) if c != 0
     }
+
+
+def majority_vote(
+    results:   Results,
+    idx:       int | Tuple[int] | None = None,
+    tie_break: str | None = None,
+) -> Results:
+    """Majority vote on the dit-strings of a Results object.
+
+    Each dit-string is replaced by the single level that occurs most often in
+    it, and the counts of dit-strings with the same outcome are summed. For
+    example, {'000': 90, '010': 5, '111': 5} becomes {'0': 95, '1': 5}.
+
+    Dit-strings in which two or more levels are tied for the most occurrences
+    (e.g. '01' or '012') are assigned to ``tie_break`` if it is given, or
+    are otherwise discarded with a warning.
+
+    Args:
+        results (Results): qcal Results object.
+        idx (int | Tuple[int] | None, optional): dit-string indices to vote
+            over. Defaults to None, in which case all dits are used.
+        tie_break (str | None, optional): level to assign to tied
+            dit-strings (e.g. '0'). Defaults to None, in which case tied
+            dit-strings are discarded.
+
+    Returns:
+        Results: single-dit results of the majority vote.
+
+    Raises:
+        ValueError: if ``tie_break`` is not a single level, or if every
+            dit-string is tied and discarded.
+    """
+    if tie_break is not None and len(tie_break) != 1:
+        raise ValueError(
+            f'tie_break = {tie_break!r} must be a single level (e.g. "0")!'
+        )
+    if idx is not None:
+        results = results.marginalize(idx)
+
+    voted = defaultdict(int)
+    n_tied = 0
+    for state, counts in results.dict.items():
+        (level, n), *rest = Counter(state).most_common(2)
+        if rest and rest[0][1] == n:
+            if tie_break is None:
+                n_tied += counts
+                continue
+            level = tie_break
+        voted[level] += counts
+
+    if not voted:
+        raise ValueError(
+            'Every dit-string is tied, so no results remain after the'
+            ' majority vote! Set tie_break to keep them.'
+        )
+    if n_tied:
+        logger.warning(
+            f' Discarded {n_tied} tied shot(s) in the majority vote. Set'
+            ' tie_break to keep them.'
+        )
+    return Results(dict(voted))
 
 
 def _qp_inverse(

@@ -11,6 +11,7 @@ import pytest
 from qcal.results import (
     PerShotResults,
     Results,
+    majority_vote,
     qp_readout_correction,
     readout_correction,
 )
@@ -229,6 +230,42 @@ class TestPostSelect:
     def test_nothing_remaining_raises(self):
         with pytest.raises(ValueError, match='No bitstrings remain'):
             Results({'2': 10, '22': 5}).post_select()
+
+
+class TestMajorityVote:
+
+    def test_votes_each_bitstring_and_sums_counts(self):
+        mv = majority_vote(
+            Results({'000': 90, '010': 5, '110': 3, '111': 2})
+        )
+        assert dict(mv.dict) == {'0': 95, '1': 5}
+
+    def test_qutrit_levels(self):
+        mv = majority_vote(Results({'022': 10, '212': 5, '000': 1}))
+        assert dict(mv.dict) == {'0': 1, '2': 15}
+
+    def test_idx_votes_over_subset_of_dits(self):
+        mv = majority_vote(Results({'0011': 10, '1100': 5}), idx=(1, 2, 3))
+        assert dict(mv.dict) == {'0': 5, '1': 10}
+
+    def test_ties_discarded_by_default(self, caplog):
+        mv = majority_vote(Results({'00': 10, '01': 4, '11': 6}))
+        assert dict(mv.dict) == {'0': 10, '1': 6}
+        assert 'Discarded 4 tied shot(s)' in caplog.text
+
+    def test_ties_assigned_to_tie_break(self):
+        mv = majority_vote(
+            Results({'00': 10, '01': 4, '012': 2}), tie_break='1'
+        )
+        assert dict(mv.dict) == {'0': 10, '1': 6}
+
+    def test_all_tied_raises(self):
+        with pytest.raises(ValueError, match='tied'):
+            majority_vote(Results({'01': 4, '10': 6}))
+
+    def test_invalid_tie_break_raises(self):
+        with pytest.raises(ValueError, match='single level'):
+            majority_vote(Results({'00': 1}), tie_break='01')
 
 
 class TestSubsample:

@@ -11,6 +11,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `hellinger_fidelity`, `total_variation_distance`, `Results.fidelity` and
+  `Results.tvd` accept a dictionary of bitstring -> count in place of a
+  `Results` object
+- `qcal.results.majority_vote(results, idx=None, tie_break=None)` replaces
+  each dit-string by its most common level and returns single-dit
+  `Results`. Tied dit-strings are assigned to `tie_break`, or discarded
+  with a warning
+
 ### Changed
 
 ### Deprecated

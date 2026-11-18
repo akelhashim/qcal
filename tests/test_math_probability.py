@@ -28,6 +28,17 @@ class TestHellingerFidelity:
         with pytest.raises(ValueError, match='dimension'):
             hellinger_fidelity(Results({'0': 10}), Results({'00': 10}))
 
+    def test_dict_inputs_match_results_inputs(self):
+        counts1, counts2 = {'00': 75, '01': 25}, {'00': 25, '01': 75}
+        f_dict = hellinger_fidelity(counts1, Results(counts2))
+        f_res = hellinger_fidelity(Results(counts1), Results(counts2))
+        assert f_dict.nominal_value == pytest.approx(f_res.nominal_value)
+        assert f_dict.std_dev == pytest.approx(f_res.std_dev)
+
+    def test_invalid_type_raises(self):
+        with pytest.raises(TypeError, match='Results object or dict'):
+            hellinger_fidelity([('00', 10)], {'00': 10})
+
 
 class TestTotalVariationDistance:
 
@@ -57,3 +68,10 @@ class TestTotalVariationDistance:
             total_variation_distance(
                 Results({'0': 10}), Results({'00': 10})
             )
+
+    def test_dict_inputs_match_results_inputs(self):
+        counts1, counts2 = {'00': 75, '01': 25}, {'00': 25, '01': 75}
+        t_dict = total_variation_distance(counts1, counts2)
+        t_res = total_variation_distance(Results(counts1), Results(counts2))
+        assert t_dict.nominal_value == pytest.approx(t_res.nominal_value)
+        assert t_dict.std_dev == pytest.approx(t_res.std_dev)
