@@ -27,6 +27,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `RandomizedReadout` no longer raises an `AssertionError` when saving data
+  with `settings.save_data` enabled
+
 ### Security
 
 ## [6.0.0] - 2026-11-06
