@@ -1132,6 +1132,49 @@ def majority_vote(
     return Results(dict(voted))
 
 
+def is_ideal(results: Results) -> bool:
+    """Whether a Results object holds an ideal (exact) distribution.
+
+    Ideal distributions are often passed as probabilities (e.g.
+    {'00': 0.5, '11': 0.5}), which sum to a single "shot" and/or have
+    non-integer counts. Treating these as sampled would assign them a
+    spurious binomial uncertainty (0.5 for p = 0.5 with n_shots = 1).
+    A genuine single-shot measurement has populations of exactly 0 or
+    1, whose binomial uncertainty is 0 anyway, so treating it as exact
+    changes nothing.
+
+    Args:
+        results (Results): qcal Results object.
+
+    Returns:
+        bool: True if results has at most one shot or any non-integer
+            count.
+    """
+    if results.n_shots <= 1:
+        return True
+    return any(not float(c).is_integer() for c in results.counts.values)
+
+
+def to_results(results: Results | Dict) -> Results:
+    """Convert a dictionary of counts to a Results object.
+
+    Args:
+        results (Results | Dict): qcal Results object, or a dictionary of
+            bitstring -> count.
+
+    Returns:
+        Results: the input Results object, or a new Results object built
+            from the dictionary.
+    """
+    if isinstance(results, Results):
+        return results
+    if isinstance(results, dict):
+        return Results(results)
+    raise TypeError(
+        f'Expected a Results object or dict, got {type(results).__name__}!'
+    )
+
+
 def _qp_inverse(
     p_keys:    np.ndarray,
     p_vals:    np.ndarray,

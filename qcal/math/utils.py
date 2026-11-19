@@ -1,12 +1,44 @@
 """Submodule for helper math functions.
 
 """
+from __future__ import annotations
+
 import logging
 from typing import Tuple
 
 import numpy as np
+from uncertainties import ufloat
 
 logger = logging.getLogger(__name__)
+
+
+def nominal(x: float | ufloat) -> float:
+    """Nominal value of a float or ufloat.
+
+    Args:
+        x (float | ufloat): value.
+
+    Returns:
+        float: nominal value of x.
+    """
+    return getattr(x, 'nominal_value', x)
+
+
+def population(p: float, n: int, ideal: bool) -> float | ufloat:
+    """Population with binomial shot-noise uncertainty.
+
+    Args:
+        p (float): estimated population.
+        n (int): number of shots.
+        ideal (bool): whether the population is exact.
+
+    Returns:
+        float | ufloat: p if ideal, otherwise p with standard error
+            sqrt(p * (1 - p) / n).
+    """
+    if ideal:
+        return p
+    return ufloat(p, np.sqrt(p * (1. - p) / n))
 
 
 def round_sig_figures(x: float, n_sig_figs: int = 1) -> float:
@@ -56,6 +88,20 @@ def round_to_order_error(
         np.format_float_scientific(err, precision=error_precision)
     )
     return val_rounded, err_rounded
+
+
+def to_ufloat(x: float | ufloat) -> ufloat:
+    """Convert a float to a ufloat with zero uncertainty.
+
+    Args:
+        x (float | ufloat): value.
+
+    Returns:
+        ufloat: x, unchanged if it is already a ufloat.
+    """
+    if hasattr(x, 'nominal_value'):
+        return x
+    return ufloat(x, 0.)
 
 
 def wrap_phase(phase: float) -> float:

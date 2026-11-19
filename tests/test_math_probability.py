@@ -35,6 +35,26 @@ class TestHellingerFidelity:
         assert f_dict.nominal_value == pytest.approx(f_res.nominal_value)
         assert f_dict.std_dev == pytest.approx(f_res.std_dev)
 
+    def test_ideal_distribution_adds_no_uncertainty(self):
+        # Probabilities sum to a single "shot", which would otherwise give
+        # each population an uncertainty of 0.5.
+        noisy, ideal = Results({'00': 50, '01': 50}), {'00': 0.5, '01': 0.5}
+        f = hellinger_fidelity(noisy, ideal)
+        assert f.nominal_value == pytest.approx(1.0)
+        assert f.std_dev == pytest.approx(0.0707, abs=1e-4)
+        f_rev = hellinger_fidelity(ideal, noisy)
+        assert f_rev.std_dev == pytest.approx(f.std_dev)
+
+    def test_single_shot_distribution_adds_no_uncertainty(self):
+        f = hellinger_fidelity(Results({'00': 50, '01': 50}), {'00': 1})
+        assert f.nominal_value == pytest.approx(0.5)
+        assert f.std_dev == pytest.approx(0.05)
+
+    def test_identical_ideal_distributions_give_exact_fidelity_one(self):
+        f = hellinger_fidelity({'00': 0.5, '01': 0.5}, {'00': 0.5, '01': 0.5})
+        assert f.nominal_value == pytest.approx(1.0)
+        assert f.std_dev == pytest.approx(0.0)
+
     def test_invalid_type_raises(self):
         with pytest.raises(TypeError, match='Results object or dict'):
             hellinger_fidelity([('00', 10)], {'00': 10})
@@ -75,3 +95,16 @@ class TestTotalVariationDistance:
         t_res = total_variation_distance(Results(counts1), Results(counts2))
         assert t_dict.nominal_value == pytest.approx(t_res.nominal_value)
         assert t_dict.std_dev == pytest.approx(t_res.std_dev)
+
+    def test_ideal_distribution_adds_no_uncertainty(self):
+        noisy, ideal = Results({'00': 75, '01': 25}), {'00': 0.5, '01': 0.5}
+        t = total_variation_distance(noisy, ideal)
+        assert t.nominal_value == pytest.approx(0.25)
+        assert t.std_dev == pytest.approx(0.0306, abs=1e-4)
+
+    def test_identical_ideal_distributions_give_exact_tvd_zero(self):
+        t = total_variation_distance(
+            {'00': 0.5, '01': 0.5}, {'00': 0.5, '01': 0.5}
+        )
+        assert t.nominal_value == pytest.approx(0.0)
+        assert t.std_dev == pytest.approx(0.0)

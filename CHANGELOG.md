@@ -29,6 +29,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `hellinger_fidelity`, `total_variation_distance`, `Results.fidelity` and
   `Results.tvd` accept a dictionary of bitstring -> count in place of a
   `Results` object
+- `qcal.results.is_ideal(results)` reports whether a `Results` object holds
+  an ideal distribution (at most one shot or non-integer counts), and
+  `qcal.results.to_results(results)` converts a dictionary of counts to a
+  `Results` object
 - `qcal.results.majority_vote(results, idx=None, tie_break=None)` replaces
   each dit-string by its most common level and returns single-dit
   `Results`. Tied dit-strings are assigned to `tie_break`, or discarded
@@ -54,6 +58,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `add_active_reset` measures into dedicated `ro_reset{q}` registers instead
   of the circuit's `ro{q}` registers, which left sequencers holding
   conflicting values for `ro{q}` and caused jobs to be rejected
+- `hellinger_fidelity`, `total_variation_distance`, `classical_entropy`,
+  `Results.fidelity`, `Results.tvd` and `Results.entropy` no longer assign shot-noise uncertainty to ideal
+  distributions, i.e. those with at most one shot or non-integer counts
+  (e.g. probabilities such as `{'00': 0.5, '11': 0.5}`)
 
 ### Security
 
