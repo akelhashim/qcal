@@ -13,6 +13,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `add_readout_noise(cmat, qudits=None)` instead of
   `add_readout_noise(qudit, cmat)`. Qudit labels other than integers or
   `'Q{n}'` raise a `ValueError` instead of being silently ignored
+- `CircuitSet.load` returns a `CircuitSet` instead of a `pandas.DataFrame`.
+  Files written by earlier versions of `CircuitSet.save` still load
+- `CircuitSet.append` returns `None` instead of the underlying
+  `pandas.DataFrame`
 - `ErrorModel.confusion_matrix_for` and `ErrorModel.instrument_for` take
   an integer qudit (e.g. `0`) instead of a label (e.g. `'Q0'`)
 
