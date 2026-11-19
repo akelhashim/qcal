@@ -862,6 +862,116 @@ class TestCBAnalyzeSubsystems:
         assert list(summary['Operation']) == ['Cycle', 'CZ', 'CZ']
 
 
+class TestCBReadoutCorrection:
+    """Symmetric readout bit flips on two disjoint, depolarized CZs.
+
+    The Emulator does not randomize readout, but a symmetric confusion
+    matrix is already the stochastic bit-flip channel randomized
+    readout produces, so the correction is exact: a weight-k Pauli's
+    EV is attenuated by (1 - 2 * FLIP)^k at every depth.
+    """
+
+    FLIP = 0.05
+    RATE = 0.02
+
+    @pytest.fixture(scope='class')
+    @staticmethod
+    def cb():
+        random.seed(5)
+        np.random.seed(5)
+        noise = DepolarizingNoise(
+            single_qubit=0.0, two_qubit=TestCBReadoutCorrection.RATE
+        )
+        flip = TestCBReadoutCorrection.FLIP
+        noise.add_readout_noise(
+            np.array([[1 - flip, flip], [flip, 1 - flip]])
+        )
+        cb = CB(
+            Emulator, Config(EXAMPLE_CONFIG_PATH),
+            Cycle({CZ(0, 1), CZ(2, 3)}), [2, 4, 8], n_decays=20,
+            n_randomizations=6, n_shots=2000, analyze_subsystems=True,
+            readout_correction=True,
+            simulator=DensityMatrixSimulator(error_model=noise),
+        )
+        _quiet(cb.run)
+        return cb
+
+    def test_readout_results_cover_every_qubit(self, cb):
+        results = cb.readout_results
+        assert results is not None
+        assert results.n_qudits == 4
+        assert results.n_shots == 2000
+
+    def test_readout_scale_matches_flip_rate(self, cb):
+        for positions in [(0,), (1, 3), (0, 1, 2, 3)]:
+            expected = (1 - 2 * self.FLIP) ** len(positions)
+            assert cb._readout_scale(positions) == pytest.approx(
+                expected, abs=0.03
+            )
+
+    def test_fit_amplitudes_are_near_one(self, cb):
+        amplitudes = [
+            fit.fit_params['a'].value
+            for fit in cb.fit['interleaved'].values()
+        ] + [
+            fit.fit_params['a'].value
+            for fits in cb.subsystem_fit['interleaved'].values()
+            for fit in fits.values()
+        ]
+        assert amplitudes
+        assert np.allclose(amplitudes, 1.0, atol=0.05)
+
+    def test_pauli_fidelities_are_unchanged(self, cb):
+        corrected = dict(cb.pauli_fidelities['interleaved'])
+        readout_results = cb._readout_results
+        try:
+            cb._readout_results = None
+            cb._readout_scales = {}
+            cb.analyze()
+            for pauli, f in cb.pauli_fidelities['interleaved'].items():
+                assert f.n == pytest.approx(corrected[pauli].n, abs=1e-6)
+        finally:
+            cb._readout_results = readout_results
+            cb._readout_scales = {}
+            cb.analyze()
+
+    def test_recovers_subsystem_infidelities(self, cb):
+        expected = _depolarizing_infidelity(self.RATE, 4)
+        for pair in [(0, 1), (2, 3)]:
+            e = cb.subsystem_infidelities[pair]
+            assert e.n == pytest.approx(expected, abs=N_SIGMA * e.s)
+
+    def test_disabled_by_default(self, config):
+        cb = CB(
+            Emulator, config, Cycle({X(0)}), [2], n_decays=1,
+            n_randomizations=1, n_shots=10,
+        )
+        _quiet(cb.run)
+        assert cb.readout_results is None
+        assert cb._readout_scale((0,)) == 1.0
+
+    def test_randomized_compiling_not_passed_to_readout(self, config):
+
+        class RCQPU(QPU):
+            def __init__(self, config, randomized_compiling=False, **kwargs):
+                super().__init__(config=config, **kwargs)
+
+        cb = CB(
+            RCQPU, config, Cycle({X(0)}), [2], n_shots=10,
+            readout_correction=True, randomized_compiling=True,
+        )
+        assert 'randomized_compiling' not in cb._qpu_kwargs
+        assert cb._qpu_kwargs['n_shots'] == 10
+
+    def test_warns_without_randomized_readout(self, config, caplog):
+        with caplog.at_level('WARNING', logger='qcal.benchmarking.cb'):
+            CB(
+                Emulator, config, Cycle({X(0)}), [2],
+                readout_correction=True,
+            )
+        assert 'randomized_readout' in caplog.text
+
+
 class TestCBRunSaving:
     """CB.run() must call QPU.run(..., auto_save=False) and then save
     exactly once itself, after analysis.

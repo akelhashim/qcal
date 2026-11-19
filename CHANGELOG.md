@@ -37,6 +37,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   each dit-string by its most common level and returns single-dit
   `Results`. Tied dit-strings are assigned to `tie_break`, or discarded
   with a warning
+- `readout_correction` option for `CB`: runs a `RandomizedReadout`
+  experiment on the cycle's qubits first, then divides each Pauli decay by
+  the readout attenuation on that Pauli's qubits, so decays start near 1.
+  The results are available from the new `readout_results` property.
 
 ### Changed
 

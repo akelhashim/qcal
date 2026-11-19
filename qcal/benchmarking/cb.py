@@ -32,6 +32,7 @@ from qcal.benchmarking.utils import (
     generate_random_n_qubit_paulis,
     sample_distinct_n_qubit_paulis,
 )
+from qcal.characterization.readout import RandomizedReadout
 from qcal.circuit import Barrier, Circuit, CircuitSet, Cycle
 from qcal.compilation.decompositions import decompose_cycle, pauli_to_cycle
 from qcal.compilation.merge import merge_cycles
@@ -116,6 +117,7 @@ def CB(
     include_ref_cycle:  bool = False,
     targeted_decays:    Sequence[str] | None = None,
     analyze_subsystems: bool = False,
+    readout_correction: bool = False,
     **kwargs,
 ) -> Callable:
     """Cycle Benchmarking (CB) without mirror inversion.
@@ -205,6 +207,23 @@ def CB(
             (e.g. crosstalk between two CZ pairs); it only reports each
             subsystem's own local Pauli error rate, the same limitation
             as marginal RB/GST.
+        readout_correction (bool): whether to correct the measured
+            expectation values for readout error. Defaults to False.
+            When True, run() first runs a RandomizedReadout experiment
+            on all qubits in cycle_or_circuit (with the same QPU
+            kwargs), and analyze() then divides every signed EV by the
+            all-zero-state parity <Z...Z> of that experiment,
+            marginalized onto the qubits with support in the Pauli
+            decay (or local subsystem pattern) being fit. Under
+            randomized readout the readout error is a stochastic
+            bit-flip channel, which rescales each Z-type parity by
+            exactly that factor, so the corrected decays start near 1.
+            This requires the CB circuits themselves to be measured
+            with randomized readout, e.g. by passing
+            randomized_readout=True to a backend that supports it.
+            Note: since the fit amplitude A is a free parameter, this
+            rescales A but leaves the fitted Pauli fidelities
+            unchanged.
 
     Returns:
         Callable: CB class instance.
@@ -224,6 +243,7 @@ def CB(
             include_ref_cycle:  bool = False,
             targeted_decays:    Sequence[str] | None = None,
             analyze_subsystems: bool = False,
+            readout_correction: bool = False,
             **kwargs,
         ) -> None:
             self._cycle_or_circuit = cycle_or_circuit
@@ -376,6 +396,29 @@ def CB(
                     s: [self._qubits.index(q) for q in s]
                     for s in gate_subsystems
                 })
+
+            self._readout_correction = readout_correction
+            # Kept so the RandomizedReadout experiment runs on an
+            # identically configured QPU (same shots, transpiler,
+            # randomized_readout setting, etc.), minus
+            # randomized_compiling, which it does not support.
+            self._qpu_kwargs = {
+                k: v for k, v in kwargs.items()
+                if k != 'randomized_compiling'
+            }
+            self._readout_results: Results | None = None
+            # Cache of bitstring positions -> readout scale factor
+            self._readout_scales: dict[tuple[int, ...], float] = {}
+            if readout_correction and not kwargs.get(
+                'randomized_readout', False
+            ):
+                logger.warning(
+                    " readout_correction assumes the CB circuits are "
+                    "measured with randomized readout, but "
+                    "randomized_readout=True was not passed; the "
+                    "correction is only exact for symmetric readout "
+                    "error."
+                )
 
             qpu.__init__(self, config=config, **kwargs)
 
@@ -606,6 +649,35 @@ def CB(
                     FitExponential)) map.
             """
             return self._subsystem_fit
+
+        @property
+        def readout_results(self) -> Results | None:
+            """Results of the RandomizedReadout experiment.
+
+            Only populated when readout_correction was True (after
+            characterize_readout() runs). Bitstrings are ordered by
+            self._qubits, matching the CB circuits.
+
+            Returns:
+                Results | None: all-zero-state readout results, or None
+                    if readout was not characterized.
+            """
+            return self._readout_results
+
+        def characterize_readout(self) -> None:
+            """Run a RandomizedReadout experiment on all CB qubits.
+
+            The experiment is run on a QPU configured with the same
+            kwargs as this CB instance, and its results are stored in
+            self._readout_results for use by analyze().
+            """
+            logger.info(" Characterizing readout...")
+            ro = RandomizedReadout(
+                qpu, self._config, self._qubits, **self._qpu_kwargs
+            )
+            ro.run()
+            self._readout_results = ro.results
+            self._readout_scales = {}
 
         def generate_circuits(self) -> None:
             """Generate all CB circuits and store them in self._circuits.
@@ -845,6 +917,10 @@ def CB(
 
               EV(Q, d) = mean_r [ sign(r) * marginalized_ev(result, Q) ]
 
+            If readout_correction is True, each signed EV is divided by
+            the all-zero-state parity on Q's support, measured by
+            characterize_readout() (see _readout_scale).
+
             Fits EV(Q, d) = A * f_Q^d per Pauli using FitExponential with
             offset fixed to zero (f_Q = exp(-b)), via the module-level
             _fit_decay_curve helper. Reports the process infidelity of
@@ -947,6 +1023,7 @@ def CB(
                             i for i, p in enumerate(pauli_tuple)
                             if p != 'I'
                         ]
+                        readout_scale = self._readout_scale(tuple(active))
 
                         # EV (per Pauli) at each depth, as a ufloat
                         # of the mean ± SEM over randomizations, in
@@ -980,6 +1057,7 @@ def CB(
                                     * results.marginalize(
                                         tuple(active)
                                     ).post_select().ev
+                                    / readout_scale
                                 )
 
                                 if self._analyze_subsystems:
@@ -1124,10 +1202,46 @@ def CB(
                     local_sign * results.marginalize(
                         tuple(local_active)
                     ).post_select().ev
+                    / self._readout_scale(tuple(local_active))
                 )
                 subsystem_local_evs[s].setdefault(
                     local_pattern, {}
                 ).setdefault(depth, []).append(local_ev)
+
+        def _readout_scale(self, positions: tuple[int, ...]) -> float:
+            """Readout attenuation of a Z-type parity on positions.
+
+            Under randomized readout, readout error acts as a
+            stochastic bit-flip channel, which rescales the parity
+            <Z_S> on any set of bits S by the same factor that it
+            rescales the all-zero state's parity, <Z_S>_0. This
+            returns <Z_S>_0, measured by characterize_readout().
+
+            Args:
+                positions (tuple[int, ...]): bitstring positions (into
+                    self._qubits) of the Pauli's support.
+
+            Returns:
+                float: the factor to divide the measured EV by; 1.0 if
+                    readout was not characterized, or if the measured
+                    factor is not positive (a warning is logged).
+            """
+            if self._readout_results is None or not positions:
+                return 1.0
+            if positions not in self._readout_scales:
+                scale = self._readout_results.marginalize(
+                    positions
+                ).post_select().ev
+                if scale <= 0:
+                    qubits = tuple(self._qubits[i] for i in positions)
+                    logger.warning(
+                        " Readout parity on qubits "
+                        f"{qubits} is {scale:.3f} <= 0; skipping readout "
+                        "correction for these qubits."
+                    )
+                    scale = 1.0
+                self._readout_scales[positions] = scale
+            return self._readout_scales[positions]
 
         def _fit_subsystem_decays(
             self,
@@ -1660,6 +1774,8 @@ def CB(
 
         def run(self) -> None:
             """Run all experimental methods and analyze results."""
+            if self._readout_correction:
+                self.characterize_readout()
             self.generate_circuits()
             qpu.run(self, self._circuits, auto_save=False)
             self.analyze()
@@ -1677,6 +1793,7 @@ def CB(
         include_ref_cycle=include_ref_cycle,
         targeted_decays=targeted_decays,
         analyze_subsystems=analyze_subsystems,
+        readout_correction=readout_correction,
         **kwargs,
     )
 
