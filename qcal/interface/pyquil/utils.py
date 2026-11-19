@@ -287,9 +287,14 @@ def add_active_reset(
 ) -> Program:  # type: ignore  # noqa: F821
     """Prepend active resets to a PyQuil program using Quil jump statements.
 
-    For each reset cycle, every qubit in the program is measured into a
-    dedicated ``ro_reset`` register. A ``JUMP-UNLESS`` branch skips the
-    correction pulses when the qubit is already in |0⟩. Successive reset
+    For each reset cycle, every qubit ``q`` in the program is measured
+    simultaneously into a dedicated ``ro_reset{q}`` register. A
+    ``JUMP-UNLESS`` branch per qubit then skips the correction pulses when the
+    qubit is already in |0⟩. The reset registers
+    are kept separate from the circuit's ``ro{q}`` registers since branching
+    on a register broadcasts it to every sequencer, while the circuit's final
+    readout is only written to the sequencers that take it; sharing a
+    register leaves them holding conflicting values. Successive reset
     cycles are separated by global FENCEs across all program qubits; a final
     global FENCE follows the last reset before the main program body.
 
@@ -320,7 +325,7 @@ def add_active_reset(
         from pyquil import Program
         from pyquil.gates import DELAY, FENCE, MEASURE
         from pyquil.quilatom import MemoryReference, Qubit
-        from pyquil.quilbase import Jump, JumpTarget, JumpUnless, Label
+        from pyquil.quilbase import Declare, Jump, JumpTarget, JumpUnless, Label
     except ImportError as exc:
         raise ImportError("Unable to import PyQuil!") from exc
 
@@ -328,16 +333,24 @@ def add_active_reset(
     esp_set = set(esp_qubits) if esp_qubits is not None else set()
 
     new_program: Program = program.copy_everything_except_instructions()
+    for q in all_qubits:
+        if f"ro_reset{q}" not in program.declarations:
+            new_program += Declare(f"ro_reset{q}", "BIT", 1)
+
     for r in range(n_resets):
         new_program += FENCE(*all_qubits)
+
+        # Measure every qubit at once, then branch on each result, so that a
+        # cycle costs a single readout rather than one per qubit
+        for q in all_qubits:
+            new_program += MEASURE(q, MemoryReference(f"ro_reset{q}", 0))
 
         for q in all_qubits:
             label_false = Label(f"ar_{r}_{q}_false")
             label_done  = Label(f"ar_{r}_{q}_done")
-            cref = MemoryReference(f"ro{q}", 0)
+            cref = MemoryReference(f"ro_reset{q}", 0)
             qubit_obj = Qubit(q)
 
-            new_program += MEASURE(q, cref)
             new_program += JumpUnless(label_false, cref)
             # $when_true: qubit measured |1⟩, apply correction pulses
             if esp and q in esp_set:

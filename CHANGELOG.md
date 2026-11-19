@@ -36,6 +36,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `None`; the default readout noise applies to every measured qubit
   without one. Protocols which read from or write to the config still
   need one to be passed
+- `add_active_reset` measures every qubit at once before branching on each
+  result, instead of measuring and branching one qubit at a time
 
 ### Deprecated
 
@@ -45,6 +47,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `RandomizedReadout` no longer raises an `AssertionError` when saving data
   with `settings.save_data` enabled
+- `add_active_reset` measures into dedicated `ro_reset{q}` registers instead
+  of the circuit's `ro{q}` registers, which left sequencers holding
+  conflicting values for `ro{q}` and caused jobs to be rejected
 
 ### Security
 
