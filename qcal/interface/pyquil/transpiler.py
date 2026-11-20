@@ -482,12 +482,12 @@ def to_pyquil(
         q: declarations.declare(f'ro{q}', 'BIT', 1)
         for q in circuit.qubits
     }
+    if circuit_for_loop and randomized_readout:
+        raise ValueError(
+            'Randomized readout cannot be used with circuit_for_loop.'
+        )
+
     if circuit_for_loop and not randomized_compiling:
-        if randomized_readout:
-            logger.warning(
-                'Randomized readout is not compatible with repeated '
-                'sub-circuits!'
-            )
         for sub_circuit, n_reps in circuit.partitions:
             if n_reps == 1:
                 _declarations, _tprogram = transpile_circuit(
@@ -498,7 +498,6 @@ def to_pyquil(
                         qubit_to_cref=qubit_to_cref,
                         cycles_to_defcircuits=cycles_to_defcircuits,
                         fence_between_cycles=fence_between_cycles,
-                        randomized_readout=randomized_readout
                 )
                 declarations += _declarations
                 tprogram += _tprogram
@@ -515,7 +514,6 @@ def to_pyquil(
                     qubit_to_cref=qubit_to_cref,
                     cycles_to_defcircuits=cycles_to_defcircuits,
                     fence_between_cycles=fence_between_cycles,
-                    # randomized_readout=randomized_readout
                 )
                 declarations += _declarations
 

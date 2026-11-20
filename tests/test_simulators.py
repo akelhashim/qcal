@@ -212,7 +212,7 @@ class TestDensityMatrixSimulator:
 
         noise = _NoGateNoise()
         # Row-stochastic: P(report 0 | prepared 1) = 1 -- always flips.
-        noise.add_readout_noise('Q0', np.array([[0.0, 1.0], [1.0, 0.0]]))
+        noise.add_readout_noise(np.array([[0.0, 1.0], [1.0, 0.0]]), 0)
 
         circuit = qc.Circuit([qc.Cycle({qc.X(0)})])
         circuit.measure()

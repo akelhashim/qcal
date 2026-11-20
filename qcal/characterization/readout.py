@@ -136,7 +136,8 @@ def RandomizedReadout(
             if settings.Settings.save_data:
                 qpu.save(self)
                 self._data_manager.save_to_csv(
-                    self._circuits[0].results.probabilities, 'probabilities'
+                    self._circuits[0].results.probabilities.to_frame(),
+                    'probabilities'
                 )
 
         def plot(self):

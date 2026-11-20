@@ -9,15 +9,81 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Breaking
 
+- `ErrorModel.add_readout_noise` takes the confusion matrix first:
+  `add_readout_noise(cmat, qudits=None)` instead of
+  `add_readout_noise(qudit, cmat)`. Qudit labels other than integers or
+  `'Q{n}'` raise a `ValueError` instead of being silently ignored
+- `CircuitSet.load` returns a `CircuitSet` instead of a `pandas.DataFrame`.
+  Files written by earlier versions of `CircuitSet.save` still load
+- `CircuitSet.append` returns `None` instead of the underlying
+  `pandas.DataFrame`
+- `ErrorModel.confusion_matrix_for` and `ErrorModel.instrument_for` take
+  an integer qudit (e.g. `0`) instead of a label (e.g. `'Q0'`)
+
 ### Added
 
+- `ErrorModel.add_readout_noise` sets a default confusion matrix for all
+  qudits when `qudits` is `None`, and accepts a list of qudits. Per-qudit
+  matrices take priority over the default, which only applies to qudits of
+  matching dimension
+- `hellinger_fidelity`, `total_variation_distance`, `Results.fidelity` and
+  `Results.tvd` accept a dictionary of bitstring -> count in place of a
+  `Results` object
+- `qcal.results.is_ideal(results)` reports whether a `Results` object holds
+  an ideal distribution (at most one shot or non-integer counts), and
+  `qcal.results.to_results(results)` converts a dictionary of counts to a
+  `Results` object
+- `qcal.results.majority_vote(results, idx=None, tie_break=None)` replaces
+  each dit-string by its most common level and returns single-dit
+  `Results`. Tied dit-strings are assigned to `tie_break`, or discarded
+  with a warning
+- `readout_correction` option for `CB`: runs a `RandomizedReadout`
+  experiment on the cycle's qubits first (with `max(1024, n_shots)`
+  shots), then divides each Pauli decay by
+  the readout attenuation on that Pauli's qubits, so decays start near 1.
+  The results are available from the new `readout_results` property.
+
 ### Changed
+
+- `Emulator()` no longer loads the example config when `config` is
+  `None`; the default readout noise applies to every measured qubit
+  without one. Protocols which read from or write to the config still
+  need one to be passed
+- `add_active_reset` measures every qubit at once before branching on each
+  result, instead of measuring and branching one qubit at a time
 
 ### Deprecated
 
 ### Removed
 
 ### Fixed
+
+- `RandomizedReadout` no longer raises an `AssertionError` when saving data
+  with `settings.save_data` enabled
+- `add_active_reset` measures into dedicated `ro_reset{q}` registers instead
+  of the circuit's `ro{q}` registers, which left sequencers holding
+  conflicting values for `ro{q}` and caused jobs to be rejected
+- `hellinger_fidelity`, `total_variation_distance`, `classical_entropy`,
+  `Results.fidelity`, `Results.tvd` and `Results.entropy` no longer assign shot-noise uncertainty to ideal
+  distributions, i.e. those with at most one shot or non-integer counts
+  (e.g. probabilities such as `{'00': 0.5, '11': 0.5}`)
+- Pauli conjugation (used by Cycle Benchmarking) no longer applies the
+  tabulated Clifford to gates that share its name but not its matrix:
+  `XY(t=0.5)` is conjugated by its actual unitary, and non-Clifford gates
+  such as `XY(t=0.25)` or `CPhase(theta=0.5)` raise a `ValueError` instead
+  of silently giving wrong CB signs. EF-subspace gates also raise
+- `to_pyquil` with `circuit_for_loop=True` and `randomized_readout=True`
+  raises a `ValueError` instead of an `UnboundLocalError`
+- CB raises a `ValueError` for empty or non-positive `circuit_depths`,
+  instead of a `ZeroDivisionError` or `NameError`
+- CB with `analyze_subsystems=True` no longer pools a circuit's EV more
+  than once when several decay Paulis measured from that circuit share a
+  local pattern on a subsystem, which made subsystem error bars too small
+- Randomized compiling and randomized readout in the PyQuil transpiler
+  raise a `ValueError` when a qubit has more than 3 `Rz`/`VirtualZ` gates
+  in one randomized layer, instead of silently overwriting the next
+  layer's phases (randomized compiling) or raising an `IndexError`
+  (randomized readout)
 
 ### Security
 

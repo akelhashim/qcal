@@ -9,29 +9,29 @@ Default noise model:
 
 - Depolarizing gate noise: 0.0005 on single-qubit gates, 0.005 on
   two-qubit gates.
-- Readout confusion matrix: diag(0.995, 0.98) applied to every qubit
-  defined in the config.
+- Readout confusion matrix: diag(0.995, 0.98) applied to every
+  measured qubit.
 
 Basic usage::
 
     from qcal.backend.emulator import Emulator
-    from qcal.config import Config
-
-    config = Config('examples/config/config.yaml')
-    qpu = Emulator(config)
-    qpu.run(circuits)
-
-Or load the bundled example config automatically::
 
     qpu = Emulator()
     qpu.run(circuits)
+
+A config is only needed by protocols which read from or write to it
+(e.g. calibrations)::
+
+    from qcal.config import Config
+
+    qpu = Emulator(Config('config.yaml'))
 """
 import logging
 
 import numpy as np
 
 from qcal.circuit import Circuit, CircuitSet
-from qcal.config import EXAMPLE_CONFIG_PATH, Config
+from qcal.config import Config
 from qcal.qpu.qpu import QPU
 from qcal.simulation.error_models import DepolarizingNoise
 from qcal.simulation.simulators import (
@@ -72,13 +72,13 @@ class Emulator(QPU):
     - **Gate noise** — depolarizing channel: 0.0005 on single-qubit
       gates, 0.005 on two-qubit gates.
     - **Readout noise** — confusion matrix diag(0.995, 0.98) applied
-      to every qubit defined in the config.
+      to every measured qubit.
 
     Basic example usage::
 
         from qcal.backend.emulator import Emulator
 
-        qpu = Emulator()          # uses example config + default noise
+        qpu = Emulator()          # no config + default noise
         qpu.run(circuit)
         print(circuit.results)
     """
@@ -96,10 +96,9 @@ class Emulator(QPU):
         """Initialize an Emulator QPU.
 
         Args:
-            config (Config | None, optional): qcal Config object. When
-                ``None``, the example config bundled under
-                ``examples/config/config.yaml`` is loaded. Defaults to
-                ``None``.
+            config (Config | None, optional): qcal Config object. Only
+                needed by protocols which read from or write to a
+                config. Defaults to ``None``.
             n_shots (int, optional): number of shots per circuit.
                 Defaults to 1024.
             n_batches (int, optional): number of measurement batches.
@@ -117,9 +116,6 @@ class Emulator(QPU):
                 to use in place of the default depolarizing model.
                 Defaults to ``None``.
         """
-        if config is None:
-            config = Config(str(EXAMPLE_CONFIG_PATH))
-
         QPU.__init__(
             self,
             config=config,
@@ -144,8 +140,7 @@ class Emulator(QPU):
                 [p0,       1.0 - p0],
                 [1.0 - p1, p1      ],
             ])
-            for q in config.qubits:
-                noise.add_readout_noise(q, cmat)
+            noise.add_readout_noise(cmat)
 
             self._simulator = DensityMatrixSimulator(
                 error_model=noise,

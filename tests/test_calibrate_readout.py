@@ -195,8 +195,7 @@ class TestFidelitySimulatedSweep:
             val = config[param_path]
             err = min(0.5 * abs(val - param_ideal), 0.49)
             cmat = np.array([[1 - err, err], [err, 1 - err]])
-            noise._confusion_matrices = {}
-            noise.add_readout_noise('Q0', cmat)
+            noise.add_readout_noise(cmat, 0)
             real_run()
 
         cal._rcal.run = _run_with_sweep_dependent_noise

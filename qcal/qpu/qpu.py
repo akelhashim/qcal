@@ -579,7 +579,10 @@ class QPU:
 
         self._data_manager.save_to_pickle(self._measurements, 'measurements')
         self._data_manager.save_to_csv(self._runtime, 'runtime')
-        self._config.save(self._data_manager._save_path + 'config.yaml')
+        if self._config is not None:
+            self._config.save(
+                self._data_manager._save_path + 'config.yaml'
+            )
 
         if self._classifier:
             self._data_manager.save_to_pickle(

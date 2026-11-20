@@ -1329,7 +1329,6 @@ class CircuitSet:
             [self._df, circuits._df],
             ignore_index=True if index is None else False
         )
-        return self._df
 
     def batch(self, batch_size: int):
         """Batch the circuits into smaller chunks.
@@ -1417,13 +1416,13 @@ class CircuitSet:
         return Results(dict(combined))
 
     @staticmethod
-    def load(path: str) -> pd.DataFrame:
-        """Load a saved CircuitSet
+    def load(path: str) -> CircuitSet:
+        """Load a saved CircuitSet.
 
         Args:
             path (str): filepath for saved CircuitSet.
 
         Returns:
-            pd.DataFrame: CircuitSet
+            CircuitSet: loaded CircuitSet.
         """
-        return pd.read_pickle(path)
+        return CircuitSet(pd.read_pickle(path))

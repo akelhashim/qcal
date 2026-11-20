@@ -46,7 +46,7 @@ def _readout_only_simulator(cmats: dict) -> DensityMatrixSimulator:
     """
     noise = DepolarizingNoise(single_qubit=0., two_qubit=0.)
     for q, cmat in cmats.items():
-        noise.add_readout_noise(q, np.asarray(cmat))
+        noise.add_readout_noise(np.asarray(cmat), q)
     return DensityMatrixSimulator(error_model=noise)
 
 

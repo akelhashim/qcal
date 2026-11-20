@@ -396,5 +396,6 @@ class TestCircuitSet:
         cs = CircuitSet([bell_circuit, bell_circuit])
         path = tmp_path / 'circuit_set.pkl'
         cs.save(str(path))
-        loaded_df = CircuitSet.load(str(path))
-        assert len(loaded_df) == 2
+        loaded = CircuitSet.load(str(path))
+        assert isinstance(loaded, CircuitSet)
+        assert loaded == cs

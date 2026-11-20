@@ -272,6 +272,26 @@ class TestConjugatePauliByGate:
         with pytest.raises(ValueError):
             conjugate_pauli_by_gate(('I', 'Y'), tq.CS(0, 1))
 
+    def test_tabulated_name_with_other_params_uses_unitary(self):
+        # XY(t=0.5) is iSWAP-like, not the tabulated XY(t=1).
+        gate = tq.XY(0, 1, t=0.5)
+        for p in TWO_QUBIT_PAULIS:
+            new, sign = conjugate_pauli_by_gate(p, gate)
+            np.testing.assert_allclose(
+                _conj(gate.matrix, p), sign * _pauli(new), atol=1e-12
+            )
+
+    @pytest.mark.parametrize('gate', [
+        tq.XY(0, 1, t=0.25), tq.CPhase(0, 1, theta=0.5)
+    ])
+    def test_non_clifford_with_tabulated_name_raises(self, gate):
+        with pytest.raises(ValueError, match='Clifford'):
+            conjugate_pauli_by_gate(('X', 'I'), gate)
+
+    def test_ef_gate_raises(self):
+        with pytest.raises(ValueError, match='EF'):
+            conjugate_pauli_by_gate(('X',), sq.X(0, subspace='EF'))
+
     def test_generic_gates_with_different_matrices_not_conflated(self):
         conjugate_pauli_by_gate.cache_clear()
         hadamard = Gate(sq.h, 91)

@@ -28,6 +28,9 @@ def classical_entropy(results) -> ufloat:
 
     Each population p_i is treated as an independent binomial
     proportion with standard error sqrt(p_i * (1 - p_i) / n_shots).
+    Ideal distributions (at most one shot or non-integer counts, e.g.
+    probabilities such as {'0': 0.5, '1': 0.5}) are treated as exact,
+    so their entropy has zero uncertainty.
 
     Args:
         results (Results): qcal Results object.
@@ -36,6 +39,10 @@ def classical_entropy(results) -> ufloat:
         ufloat: classical entropy, with propagated shot-noise
             uncertainty.
     """
+    # Imported here to avoid a circular import, since qcal.results
+    # imports this module.
+    from qcal.results import is_ideal
+
     d = results.dim
     if d < 2:
         return ufloat(0., 0.)
@@ -43,6 +50,9 @@ def classical_entropy(results) -> ufloat:
     n = results.n_shots
     p = np.asarray(results.probabilities, dtype=float)
     p = p[p > 0]
+
+    if is_ideal(results):
+        return ufloat(-np.sum(p * np.log(p)) / np.log(d), 0.)
 
     terms = [
         ufloat(pi, np.sqrt(pi * (1. - pi) / n)) for pi in p

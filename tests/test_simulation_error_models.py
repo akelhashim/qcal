@@ -82,37 +82,75 @@ class TestErrorModelBaseClass:
 
     def test_confusion_matrix_for_defaults_to_none(self):
         model = _NoOpModel()
-        assert model.confusion_matrix_for('Q0') is None
+        assert model.confusion_matrix_for(0) is None
 
     def test_instrument_for_defaults_to_none(self):
         model = _NoOpModel()
-        assert model.instrument_for('Q0') is None
+        assert model.instrument_for(0) is None
 
     def test_add_readout_noise_transposes_to_column_stochastic(self):
         model = _NoOpModel()
         # Row-stochastic: C[prep, meas].
         cmat = np.array([[0.9, 0.1], [0.2, 0.8]])
-        model.add_readout_noise('Q0', cmat)
-        np.testing.assert_allclose(model.confusion_matrix_for('Q0'), cmat.T)
+        model.add_readout_noise(cmat, 0)
+        np.testing.assert_allclose(model.confusion_matrix_for(0), cmat.T)
 
-    def test_add_readout_noise_accepts_integer_qudit_label(self):
+    def test_add_readout_noise_accepts_q_label(self):
         model = _NoOpModel()
-        model.add_readout_noise(0, np.eye(2))
-        assert model.confusion_matrix_for('Q0') is not None
+        model.add_readout_noise(np.eye(2), 'Q0')
+        assert model.confusion_matrix_for(0) is not None
+
+    @pytest.mark.parametrize('label', ['0', 'q0', 'Q', 'QA'])
+    def test_add_readout_noise_rejects_other_labels(self, label):
+        model = _NoOpModel()
+        with pytest.raises(ValueError, match='not of the form'):
+            model.add_readout_noise(np.eye(2), label)
 
     def test_add_readout_noise_accepts_dataframe(self):
         model = _NoOpModel()
         cmat = pd.DataFrame([[0.9, 0.1], [0.2, 0.8]])
-        model.add_readout_noise('Q0', cmat)
+        model.add_readout_noise(cmat, 0)
         np.testing.assert_allclose(
-            model.confusion_matrix_for('Q0'), cmat.to_numpy().T
+            model.confusion_matrix_for(0), cmat.to_numpy().T
         )
 
     def test_instrument_for_builds_instrument_once_registered(self):
         model = _NoOpModel()
-        model.add_readout_noise('Q0', np.eye(2))
-        instrument = model.instrument_for('Q0')
+        model.add_readout_noise(np.eye(2), 0)
+        instrument = model.instrument_for(0)
         assert isinstance(instrument, quax.QuantumInstrument)
+
+    def test_add_readout_noise_accepts_multiple_qudits(self):
+        model = _NoOpModel()
+        model.add_readout_noise(np.eye(2), [0, 'Q1'])
+        assert model.confusion_matrix_for(0) is not None
+        assert model.confusion_matrix_for(1) is not None
+        assert model.confusion_matrix_for(2) is None
+
+    def test_default_readout_noise_applies_to_every_qudit(self):
+        model = _NoOpModel()
+        cmat = np.array([[0.9, 0.1], [0.2, 0.8]])
+        model.add_readout_noise(cmat)
+        for qudit in (0, 5, 42):
+            np.testing.assert_allclose(
+                model.confusion_matrix_for(qudit), cmat.T
+            )
+        assert isinstance(model.instrument_for(5), quax.QuantumInstrument)
+
+    def test_per_qudit_readout_noise_overrides_default(self):
+        model = _NoOpModel()
+        own_cmat = np.array([[0.0, 1.0], [1.0, 0.0]])
+        model.add_readout_noise(np.eye(2))
+        model.add_readout_noise(own_cmat, 0)
+        np.testing.assert_allclose(model.confusion_matrix_for(0), own_cmat.T)
+        np.testing.assert_allclose(model.confusion_matrix_for(1), np.eye(2))
+
+    def test_default_readout_noise_skipped_on_dimension_mismatch(self):
+        model = _NoOpModel()
+        model.add_readout_noise(np.eye(2))
+        assert model.confusion_matrix_for(0, 2) is not None
+        assert model.confusion_matrix_for(0, 3) is None
+        assert model.instrument_for(0, 3) is None
 
 
 class TestDepolarizingNoise:
@@ -328,8 +366,8 @@ class TestCustomErrorModel:
     def test_empty_composite_returns_none_for_everything(self):
         noise = CustomErrorModel()
         assert noise.channel_for('X') is None
-        assert noise.confusion_matrix_for('Q0') is None
-        assert noise.instrument_for('Q0') is None
+        assert noise.confusion_matrix_for(0) is None
+        assert noise.instrument_for(0) is None
 
     def test_returns_the_single_submodel_channel_unchanged(self):
         sub = DepolarizingNoise(single_qubit=0.01)
@@ -380,21 +418,40 @@ class TestCustomErrorModel:
 
     def test_own_confusion_matrix_overrides_submodel(self):
         sub = _NoOpModel()
-        sub.add_readout_noise('Q0', np.eye(2))
+        sub.add_readout_noise(np.eye(2), 0)
         noise = CustomErrorModel(sub)
         own_cmat = np.array([[0.0, 1.0], [1.0, 0.0]])
-        noise.add_readout_noise('Q0', own_cmat)
+        noise.add_readout_noise(own_cmat, 0)
         np.testing.assert_allclose(
-            noise.confusion_matrix_for('Q0'), own_cmat.T
+            noise.confusion_matrix_for(0), own_cmat.T
         )
 
     def test_confusion_matrix_falls_through_to_submodel(self):
         sub = _NoOpModel()
         sub_cmat = np.array([[0.9, 0.1], [0.2, 0.8]])
-        sub.add_readout_noise('Q0', sub_cmat)
+        sub.add_readout_noise(sub_cmat, 0)
         noise = CustomErrorModel(sub)
         np.testing.assert_allclose(
-            noise.confusion_matrix_for('Q0'), sub_cmat.T
+            noise.confusion_matrix_for(0), sub_cmat.T
+        )
+
+    def test_own_default_confusion_matrix_overrides_submodel(self):
+        sub = _NoOpModel()
+        sub.add_readout_noise(np.eye(2), 0)
+        noise = CustomErrorModel(sub)
+        own_cmat = np.array([[0.0, 1.0], [1.0, 0.0]])
+        noise.add_readout_noise(own_cmat)
+        np.testing.assert_allclose(
+            noise.confusion_matrix_for(0), own_cmat.T
+        )
+
+    def test_default_confusion_matrix_falls_through_to_submodel(self):
+        sub = _NoOpModel()
+        sub_cmat = np.array([[0.9, 0.1], [0.2, 0.8]])
+        sub.add_readout_noise(sub_cmat)
+        noise = CustomErrorModel(sub)
+        np.testing.assert_allclose(
+            noise.confusion_matrix_for(3), sub_cmat.T
         )
 
     def test_channel_for_gate_falls_through_to_submodel(self):

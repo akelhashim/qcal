@@ -729,7 +729,8 @@ def conjugate_pauli_by_gate(
     the precomputed single-/two-qubit Clifford tables; only falls back to
     conjugating the actual unitary and identifying the resulting Pauli
     string (the expensive path) when `gate` isn't tabulated (e.g. a
-    gate with more than two qubits).
+    gate with more than two qubits), or when its matrix doesn't match the
+    tabulated Clifford (e.g. `XY(t=0.5)` or `CPhase(theta=0.5)`).
 
     Args:
         pauli (NQubitPauliString): Pauli labels for the qubits acted on
@@ -742,8 +743,9 @@ def conjugate_pauli_by_gate(
             string).
 
     Raises:
-        ValueError: if U P U† is not proportional to a Pauli operator with
-            real sign ±1, i.e. U is not a Clifford unitary.
+        ValueError: if `gate` acts in the EF subspace, or if U P U† is not
+            proportional to a Pauli operator with real sign ±1, i.e. U is
+            not a Clifford unitary.
     """
     if gate.is_measurement:
         # An ideal, no-reset (QND) measurement leaves the qubit in
@@ -755,7 +757,16 @@ def conjugate_pauli_by_gate(
         # conjugates through unchanged, with sign +1.
         return pauli, 1
 
-    computed = get_pauli_conjugation(gate, pauli)
+    if gate.subspace != 'GE':
+        raise ValueError(
+            f"Gate '{gate.name}' acts in the '{gate.subspace}' subspace; "
+            "Pauli conjugation is only defined for qubit (GE) gates."
+        )
+
+    computed = (
+        get_pauli_conjugation(gate, pauli) if _matches_table(gate)
+        else None
+    )
     if computed is not None:
         conjugate_pauli, sign = computed
         if isinstance(conjugate_pauli, str):
@@ -849,6 +860,43 @@ def conjugate_pauli(
         pauli, cycle_sign = conjugate_pauli_by_cycle(pauli, qubits, cycle)
         sign *= cycle_sign
     return pauli, sign
+
+
+@lru_cache(maxsize=1024)
+def _matches_table(gate: Gate) -> bool:
+    """Whether `gate`'s matrix agrees with its name's tabulated entries.
+
+    Tables are keyed by name only, so a gate whose name is tabulated but
+    whose parameters differ from the tabulated Clifford (e.g. `XY(t=0.5)`)
+    must not use them. Cached (bounded): Gate equality and hashing
+    include the matrix, so each distinct gate is checked once.
+
+    Args:
+        gate (Gate): gate to check.
+
+    Returns:
+        bool: True if every tabulated Pauli conjugation for `gate.name`
+            holds for `gate.matrix`, False if any doesn't or `gate.name`
+            isn't tabulated.
+    """
+    n = len(gate.qubits)
+    table = (
+        TWO_QUBIT_PAULI_CONJUGATION_TABLE if n == 2
+        else SINGLE_QUBIT_PAULI_CONJUGATION_TABLE if n == 1
+        else {}
+    )
+    entry = table.get(gate.name)
+    if entry is None or gate.matrix.shape != (2**n, 2**n):
+        return False
+
+    U = gate.matrix
+    for pauli, (new_pauli, sign) in entry.items():
+        M = U @ pauli_str_to_matrix(tuple(pauli)) @ U.conj().T
+        if not np.allclose(
+            M, sign * pauli_str_to_matrix(tuple(new_pauli)), atol=1e-6
+        ):
+            return False
+    return True
 
 
 def _parse_two_qubit_pauli(pauli: str | tuple) -> PauliString:

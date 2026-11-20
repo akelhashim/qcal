@@ -42,7 +42,7 @@ import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from itertools import product as _iproduct
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Sequence, Tuple
 
 import jax.numpy as jnp
 import numpy as np
@@ -431,21 +431,24 @@ class ErrorModel(ABC):
     resolves gate categories using :func:`gate_category` and then
     calls this interface.
 
-    Per-qudit readout confusion matrices can be registered with
-    :meth:`add_readout_noise` and retrieved as ``quax``
-    instruments via :meth:`instrument_for`.
+    Readout confusion matrices can be registered with
+    :meth:`add_readout_noise`, either per qudit or as a default for
+    all qudits, and retrieved as ``quax`` instruments via
+    :meth:`instrument_for`.
     """
 
     def __init__(self) -> None:
-        # qudit label (e.g. 'Q0') → column-stochastic confusion matrix
-        self._confusion_matrices: Dict[str, np.ndarray] = {}
+        # qudit → column-stochastic confusion matrix
+        self._confusion_matrices: Dict[int, np.ndarray] = {}
+        # column-stochastic confusion matrix for all other qudits
+        self._default_confusion_matrix: Optional[np.ndarray] = None
 
     def add_readout_noise(
         self,
-        qudit: str | int,
-        cmat:  'pd.DataFrame | np.ndarray',
+        cmat:   'pd.DataFrame | np.ndarray',
+        qudits: int | str | Sequence[int | str] | None = None,
     ) -> None:
-        """Register a per-qudit readout confusion matrix.
+        """Register a readout confusion matrix.
 
         Accepts either a ``pandas`` DataFrame (e.g. the per-qubit slice
         ``ReadoutFidelity.cmat['Q0']``) or a plain ``numpy`` array.
@@ -454,37 +457,72 @@ class ErrorModel(ABC):
         The matrix is transposed internally to the column-stochastic
         form expected by ``quax``.
 
+        When ``qudits`` is ``None``, the matrix becomes the default for
+        every qudit without its own matrix (and whose dimension matches
+        the matrix). Per-qudit matrices always take priority.
+
         Args:
-            qudit (str | int): qudit label. Both ``'Q0'`` and the
-                raw integer ``0`` are accepted; integers are
-                normalised to the ``'Q{n}'`` string key.
             cmat (pd.DataFrame | np.ndarray): confusion matrix in
                 the qcal row-stochastic convention.
+            qudits (int | str | Sequence[int | str] | None, optional):
+                qudit(s) to apply the matrix to. Labels of the form
+                ``'Q0'`` (e.g. confusion matrix column labels) are
+                accepted and converted to the integer qudit ``0``.
+                Defaults to ``None`` (all qudits).
+
+        Raises:
+            ValueError: if a qudit label is not of the form ``'Q{n}'``.
         """
-        key = f'Q{qudit}' if isinstance(qudit, int) else qudit
         if isinstance(cmat, pd.DataFrame):
             arr = cmat.to_numpy().astype(float)
         else:
             arr = np.asarray(cmat, dtype=float)
         # quax convention: C[i,j] = P(report i | system in j)
-        self._confusion_matrices[key] = arr.T
+        arr = arr.T
+
+        if qudits is None:
+            self._default_confusion_matrix = arr
+            return
+
+        if isinstance(qudits, (int, str)):
+            qudits = [qudits]
+        for qudit in qudits:
+            if isinstance(qudit, str):
+                if not (qudit.startswith('Q') and qudit[1:].isdigit()):
+                    raise ValueError(
+                        f"Qudit label '{qudit}' is not of the form 'Q{{n}}'."
+                    )
+                qudit = int(qudit[1:])
+            self._confusion_matrices[int(qudit)] = arr
 
     def confusion_matrix_for(
-        self, qudit: str
+        self, qudit: int, d: int | None = None
     ) -> Optional[np.ndarray]:
         """Return the stored column-stochastic confusion matrix, or ``None``.
 
+        A matrix registered for ``qudit`` takes priority over the
+        default matrix.
+
         Args:
-            qudit (str): qudit label, e.g. ``'Q0'``.
+            qudit (int): qudit.
+            d (int | None, optional): Hilbert-space dimension of the
+                qudit. If given, the default matrix is only returned
+                when its dimension matches. Defaults to ``None``.
 
         Returns:
             np.ndarray | None: column-stochastic confusion matrix, or
-                ``None`` if none was registered for this qudit.
+                ``None`` if none applies to this qudit.
         """
-        return self._confusion_matrices.get(qudit)
+        mat = self._confusion_matrices.get(qudit)
+        if mat is not None:
+            return mat
+        mat = self._default_confusion_matrix
+        if mat is None or (d is not None and mat.shape[0] != d):
+            return None
+        return mat
 
     def instrument_for(
-        self, qudit: str, d: int = 2
+        self, qudit: int, d: int = 2
     ) -> Optional['quax.QuantumInstrument']:
         """Build a noisy ``QuantumInstrument`` from a stored confusion matrix.
 
@@ -499,15 +537,15 @@ class ErrorModel(ABC):
         readout error with no effect on anything measured later.
 
         Args:
-            qudit (str): qudit label, e.g. ``'Q0'``.
+            qudit (int): qudit.
             d (int): Hilbert-space dimension. Defaults to ``2``.
 
         Returns:
             quax.QuantumInstrument | None: noisy measurement instrument,
-                or ``None`` if no confusion matrix was registered for
-                this qudit.
+                or ``None`` if no confusion matrix applies to this
+                qudit.
         """
-        arr = self._confusion_matrices.get(qudit)
+        arr = self.confusion_matrix_for(qudit, d)
         if arr is None:
             return None
         return quax.instrument_from_confusion_and_transition(
@@ -1601,7 +1639,7 @@ class CustomErrorModel(ErrorModel):
                 )
             ),
         )
-        noise.add_readout_noise('Q0', cmat)
+        noise.add_readout_noise(cmat, 0)
         sim = DensityMatrixSimulator(error_model=noise)
 
     Args:
@@ -1647,30 +1685,36 @@ class CustomErrorModel(ErrorModel):
             return channels[0]
         return _compose_channels(channels)
 
-    def confusion_matrix_for(self, qudit: str) -> Optional[np.ndarray]:
+    def confusion_matrix_for(
+        self, qudit: int, d: int | None = None
+    ) -> Optional[np.ndarray]:
         """Return the confusion matrix for ``qudit``, or ``None``.
 
-        Own matrices (added via :meth:`add_readout_noise`) take priority.
-        Falls back to sub-models in order.
+        Own matrices (added via :meth:`add_readout_noise`) take priority:
+        first the per-qudit matrix, then the own default. Falls back to
+        sub-models in order.
 
         Args:
-            qudit (str): qudit label, e.g. ``'Q0'``.
+            qudit (int): qudit.
+            d (int | None, optional): Hilbert-space dimension of the
+                qudit. If given, default matrices are only returned
+                when their dimension matches. Defaults to ``None``.
 
         Returns:
             np.ndarray | None: column-stochastic confusion matrix, or
                 ``None``.
         """
-        mat = self._confusion_matrices.get(qudit)
+        mat = super().confusion_matrix_for(qudit, d)
         if mat is not None:
             return mat
         for m in self._error_models:
-            mat = m.confusion_matrix_for(qudit)
+            mat = m.confusion_matrix_for(qudit, d)
             if mat is not None:
                 return mat
         return None
 
     def instrument_for(
-        self, qudit: str, d: int = 2
+        self, qudit: int, d: int = 2
     ) -> Optional['quax.QuantumInstrument']:
         """Build a :class:`quax.QuantumInstrument` from the resolved cmat.
 
@@ -1681,14 +1725,14 @@ class CustomErrorModel(ErrorModel):
         (see :meth:`ErrorModel.instrument_for`).
 
         Args:
-            qudit (str): qudit label, e.g. ``'Q0'``.
+            qudit (int): qudit.
             d (int): Hilbert-space dimension. Defaults to ``2``.
 
         Returns:
             quax.QuantumInstrument | None: noisy instrument, or ``None`` if
                 no confusion matrix is registered for this qudit.
         """
-        arr = self.confusion_matrix_for(qudit)
+        arr = self.confusion_matrix_for(qudit, d)
         if arr is None:
             return None
         return quax.instrument_from_confusion_and_transition(

@@ -60,6 +60,19 @@ class TestClassicalEntropy:
         entropy = classical_entropy(results)
         assert entropy.std_dev > 0.
 
+    @pytest.mark.parametrize(
+        'counts', [{'0': 0.5, '1': 0.5}, {'0': 1 / 3, '1': 2 / 3}]
+    )
+    def test_ideal_distribution_has_no_uncertainty(self, counts):
+        # Probabilities would otherwise be treated as a single shot,
+        # giving each population an uncertainty of up to 0.5.
+        probs = np.array(list(counts.values()))
+        entropy = classical_entropy(Results(counts))
+        assert entropy.nominal_value == pytest.approx(
+            -np.sum(probs * np.log2(probs))
+        )
+        assert entropy.std_dev == pytest.approx(0.)
+
     def test_explicit_zero_probability_state_is_ignored_not_nan(self):
         # Regression test: a state present in the results dict with a
         # count of 0 used to produce `0 * log2(0) == nan` (via
