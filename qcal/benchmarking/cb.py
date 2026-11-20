@@ -211,7 +211,8 @@ def CB(
             expectation values for readout error. Defaults to False.
             When True, run() first runs a RandomizedReadout experiment
             on all qubits in cycle_or_circuit (with the same QPU
-            kwargs), and analyze() then divides every signed EV by the
+            kwargs, but with max(1024, n_shots) shots), and analyze()
+            then divides every signed EV by the
             all-zero-state parity <Z...Z> of that experiment,
             marginalized onto the qubits with support in the Pauli
             decay (or local subsystem pattern) being fit. Under
@@ -399,13 +400,18 @@ def CB(
 
             self._readout_correction = readout_correction
             # Kept so the RandomizedReadout experiment runs on an
-            # identically configured QPU (same shots, transpiler,
+            # identically configured QPU (same transpiler,
             # randomized_readout setting, etc.), minus
-            # randomized_compiling, which it does not support.
+            # randomized_compiling, which it does not support. The
+            # readout characterization uses at least 1024 shots, since
+            # it generally needs more shots than the decay circuits.
             self._qpu_kwargs = {
                 k: v for k, v in kwargs.items()
                 if k != 'randomized_compiling'
             }
+            self._qpu_kwargs['n_shots'] = max(
+                1024, kwargs.get('n_shots', 1024)
+            )
             self._readout_results: Results | None = None
             # Cache of bitstring positions -> readout scale factor
             self._readout_scales: dict[tuple[int, ...], float] = {}
@@ -668,7 +674,8 @@ def CB(
             """Run a RandomizedReadout experiment on all CB qubits.
 
             The experiment is run on a QPU configured with the same
-            kwargs as this CB instance, and its results are stored in
+            kwargs as this CB instance, except with max(1024, n_shots)
+            shots, and its results are stored in
             self._readout_results for use by analyze().
             """
             logger.info(" Characterizing readout...")
