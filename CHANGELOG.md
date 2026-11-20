@@ -9,6 +9,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Breaking
 
+### Added
+
+### Changed
+
+### Deprecated
+
+### Removed
+
+### Fixed
+
+### Security
+
+## [7.0.0] - 2026-11-20
+
+### Breaking
+
 - `ErrorModel.add_readout_noise` takes the confusion matrix first:
   `add_readout_noise(cmat, qudits=None)` instead of
   `add_readout_noise(qudit, cmat)`. Qudit labels other than integers or
@@ -52,10 +68,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `add_active_reset` measures every qubit at once before branching on each
   result, instead of measuring and branching one qubit at a time
 
-### Deprecated
-
-### Removed
-
 ### Fixed
 
 - `RandomizedReadout` no longer raises an `AssertionError` when saving data
@@ -84,8 +96,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   in one randomized layer, instead of silently overwriting the next
   layer's phases (randomized compiling) or raising an `IndexError`
   (randomized readout)
-
-### Security
 
 ## [6.0.0] - 2026-11-06
 
@@ -599,7 +609,8 @@ post-processing
 - Single- and two-qubit benchmarking methods
 - Advanced compilation tools
 
-[Unreleased]: https://github.com/akelhashim/qcal/compare/v6.0.0...HEAD
+[Unreleased]: https://github.com/akelhashim/qcal/compare/v7.0.0...HEAD
+[7.0.0]: https://github.com/akelhashim/qcal/releases/tag/v7.0.0
 [6.0.0]: https://github.com/akelhashim/qcal/releases/tag/v6.0.0
 [5.0.0]: https://github.com/akelhashim/qcal/releases/tag/v5.0.0
 [4.0.1]: https://github.com/akelhashim/qcal/releases/tag/v4.0.1
