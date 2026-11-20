@@ -293,6 +293,13 @@ class TestCBConstruction:
         cb = CB(Emulator, config, Cycle({CZ(0, 1)}), [8, 2, 4])
         assert cb._circuit_depths == [2, 4, 8]
 
+    @pytest.mark.parametrize('depths', [[0, 2, 4], [-2, 2], []])
+    def test_non_positive_or_empty_depths_are_rejected(
+        self, config, depths
+    ):
+        with pytest.raises(ValueError, match='positive integers'):
+            CB(Emulator, config, Cycle({CZ(0, 1)}), depths)
+
     def test_non_identity_depth_is_rejected(self, config):
         with pytest.raises(ValueError, match='not the identity'):
             CB(Emulator, config, Cycle({X(0)}), [1])
@@ -861,6 +868,33 @@ class TestCBAnalyzeSubsystems:
         assert list(summary['Subset']) == cb.subsystems
         assert list(summary['Operation']) == ['Cycle', 'CZ', 'CZ']
 
+    def test_shared_local_pattern_pooled_once_per_circuit(self):
+        # 'XZII' and 'XZZI' are measured from the same circuits and share
+        # the local pattern 'XZ' on (0, 1): each circuit's EV must be
+        # pooled once, not once per group member.
+        n_randomizations = 3
+        cb = CB(
+            Emulator, Config(EXAMPLE_CONFIG_PATH),
+            Cycle({CZ(0, 1), CZ(2, 3)}), [2],
+            n_randomizations=n_randomizations, n_shots=10,
+            targeted_decays=['XZII', 'XZZI'], analyze_subsystems=True,
+        )
+        pooled = {}
+        fit_subsystem_decays = cb._fit_subsystem_decays
+
+        def capture(experiment, depths, subsystem_local_evs):
+            pooled[experiment] = subsystem_local_evs
+            return fit_subsystem_decays(
+                experiment, depths, subsystem_local_evs
+            )
+
+        cb._fit_subsystem_decays = capture
+        _quiet(cb.run)
+
+        assert len(cb._pauli_groups) == 1
+        evs = pooled['interleaved'][(0, 1)][('X', 'Z')][2]
+        assert len(evs) == n_randomizations
+
 
 class TestCBReadoutCorrection:
     """Symmetric readout bit flips on two disjoint, depolarized CZs.
@@ -961,7 +995,21 @@ class TestCBReadoutCorrection:
             readout_correction=True, randomized_compiling=True,
         )
         assert 'randomized_compiling' not in cb._qpu_kwargs
-        assert cb._qpu_kwargs['n_shots'] == 10
+
+    @pytest.mark.parametrize(
+        'kwargs, expected', [
+            ({}, 1024), ({'n_shots': None}, 1024),
+            ({'n_shots': 10}, 1024), ({'n_shots': 4096}, 4096),
+        ]
+    )
+    def test_readout_uses_at_least_1024_shots(
+        self, config, kwargs, expected
+    ):
+        cb = CB(
+            Emulator, config, Cycle({X(0)}), [2],
+            readout_correction=True, **kwargs,
+        )
+        assert cb._qpu_kwargs['n_shots'] == expected
 
     def test_warns_without_randomized_readout(self, config, caplog):
         with caplog.at_level('WARNING', logger='qcal.benchmarking.cb'):

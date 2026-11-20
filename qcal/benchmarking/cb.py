@@ -157,11 +157,11 @@ def CB(
         config (Config): qcal Config object.
         cycle_or_circuit (Cycle | Circuit): the cycle or sub-circuit to
             benchmark.
-        circuit_depths (Iterable[int]): number of interleaved cycle_or_circuit
-            instances per circuit, e.g. [1, 2, 4, 8, 16].
-        n_decays (int): number of randomly sampled Pauli decay strings. Defaults
-            to 20. Warning: values below min(20, 4^n - 1) may bias the process
-            fidelity estimate.
+        circuit_depths (Iterable[int]): positive numbers of interleaved
+            cycle_or_circuit instances per circuit, e.g. [1, 2, 4, 8, 16].
+        n_decays (int): number of randomly sampled Pauli decay strings.
+            Defaults to 20. Warning: values below min(20, 4^n - 1) may bias
+            the process fidelity estimate.
         n_randomizations (int): number of random Pauli twirl instances per
             (Pauli, depth) pair. Defaults to 30.
         decompose_to_zxzxz (bool): whether to decompose all single-qubit gates
@@ -249,6 +249,11 @@ def CB(
         ) -> None:
             self._cycle_or_circuit = cycle_or_circuit
             self._circuit_depths = sorted(circuit_depths)
+            if not self._circuit_depths or self._circuit_depths[0] < 1:
+                raise ValueError(
+                    'circuit_depths must be a non-empty collection of '
+                    f'positive integers; got {self._circuit_depths}.'
+                )
             self._n_decays = n_decays
             self._n_randomizations = n_randomizations
             self._decompose_to_zxzxz = decompose_to_zxzxz
@@ -410,7 +415,7 @@ def CB(
                 if k != 'randomized_compiling'
             }
             self._qpu_kwargs['n_shots'] = max(
-                1024, kwargs.get('n_shots', 1024)
+                1024, kwargs.get('n_shots') or 1024
             )
             self._readout_results: Results | None = None
             # Cache of bitstring positions -> readout scale factor
@@ -1013,6 +1018,11 @@ def CB(
                 subsystem_local_evs: dict[
                     tuple, dict[tuple, dict[int, list[float]]]
                 ] = {s: {} for s in self._subsystems}
+                # (circuit, subsystem, local pattern) entries already
+                # pooled: group members share each circuit, so two
+                # members with the same local pattern must not add that
+                # circuit's EV twice.
+                pooled_subsystem_evs: set[tuple] = set()
                 # Sign propagation depends on which gate was actually
                 # interleaved for this experiment (the empty Cycle for
                 # 'reference'), matching generate_circuits().
@@ -1076,6 +1086,8 @@ def CB(
                                         pauli_tuple, depth, results,
                                         twirl_tuples, interleaved_op,
                                         subsystem_local_evs,
+                                        (measurement_basis, depth, r),
+                                        pooled_subsystem_evs,
                                     )
 
                             pauli_evs.append(_mean_sem(evs))
@@ -1159,6 +1171,8 @@ def CB(
             subsystem_local_evs:  dict[
                 tuple, dict[tuple, dict[int, list[float]]]
             ],
+            circuit_key:          tuple,
+            pooled:               set[tuple],
         ) -> None:
             """Marginalize one circuit's result onto every subsystem
             pauli_tuple has non-identity overlap with.
@@ -1183,6 +1197,13 @@ def CB(
                 subsystem_local_evs (dict): accumulator, mutated in
                     place: subsystem -> local pattern -> depth -> list
                     of signed EVs.
+                circuit_key (tuple): identifies the circuit `results`
+                    came from, (measurement basis, depth, randomization).
+                pooled (set[tuple]): (circuit_key, subsystem, local
+                    pattern) entries already accumulated, mutated in
+                    place. Group members share each circuit, so a local
+                    pattern shared by two members is only pooled once
+                    per circuit.
             """
             for s in self._subsystems:
                 positions_s = self._subsystem_positions[s]
@@ -1195,6 +1216,9 @@ def CB(
                 local_pattern = tuple(pauli_tuple[i] for i in positions_s)
                 if all(p == 'I' for p in local_pattern):
                     continue
+                if (circuit_key, s, local_pattern) in pooled:
+                    continue
+                pooled.add((circuit_key, s, local_pattern))
 
                 local_active = [
                     i for i in positions_s if pauli_tuple[i] != 'I'

@@ -67,6 +67,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `Results.fidelity`, `Results.tvd` and `Results.entropy` no longer assign shot-noise uncertainty to ideal
   distributions, i.e. those with at most one shot or non-integer counts
   (e.g. probabilities such as `{'00': 0.5, '11': 0.5}`)
+- Pauli conjugation (used by Cycle Benchmarking) no longer applies the
+  tabulated Clifford to gates that share its name but not its matrix:
+  `XY(t=0.5)` is conjugated by its actual unitary, and non-Clifford gates
+  such as `XY(t=0.25)` or `CPhase(theta=0.5)` raise a `ValueError` instead
+  of silently giving wrong CB signs. EF-subspace gates also raise
+- `to_pyquil` with `circuit_for_loop=True` and `randomized_readout=True`
+  raises a `ValueError` instead of an `UnboundLocalError`
+- CB raises a `ValueError` for empty or non-positive `circuit_depths`,
+  instead of a `ZeroDivisionError` or `NameError`
+- CB with `analyze_subsystems=True` no longer pools a circuit's EV more
+  than once when several decay Paulis measured from that circuit share a
+  local pattern on a subsystem, which made subsystem error bars too small
+- Randomized compiling and randomized readout in the PyQuil transpiler
+  raise a `ValueError` when a qubit has more than 3 `Rz`/`VirtualZ` gates
+  in one randomized layer, instead of silently overwriting the next
+  layer's phases (randomized compiling) or raising an `IndexError`
+  (randomized readout)
 
 ### Security
 

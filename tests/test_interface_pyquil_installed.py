@@ -177,6 +177,17 @@ class TestToPyquil:
                 randomized_compiling=True, circuit_for_loop=True,
             )
 
+    @pytest.mark.parametrize('randomized_compiling', [False, True])
+    def test_randomized_readout_with_for_loop_raises(
+        self, randomized_compiling
+    ):
+        with pytest.raises(ValueError, match='circuit_for_loop'):
+            to_pyquil(
+                _rc_circuit(), DEFAULT_GATEMAPPER,
+                randomized_compiling=randomized_compiling,
+                randomized_readout=True, circuit_for_loop=True,
+            )
+
     def test_randomized_readout_only_randomizes_final_layer(self):
         program = to_pyquil(
             _rc_circuit(), DEFAULT_GATEMAPPER, randomized_readout=True

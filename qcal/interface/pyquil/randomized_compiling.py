@@ -504,6 +504,7 @@ class RCLayerTracker:
         from pyquil.quilbase import MemoryReference
 
         q = gate.qubits[0]
+        _check_angle_index(self.angle_index[q], q)
         phase = gate.properties['params']['phase']
         if readout_tracker is not None:
             # Only passed for the final pre-measurement layer (see
@@ -650,6 +651,7 @@ class ReadoutLayerTracker:
         from pyquil.quilatom import MemoryReference
 
         q = gate.qubits[0]
+        _check_angle_index(self.angle_index[q], q)
         phase = gate.properties['params']['phase']
         self.source_phases[q][self.angle_index[q]] = phase / (2 * np.pi)
 
@@ -658,6 +660,28 @@ class ReadoutLayerTracker:
         )
         self.angle_index[q] += 1
         return RZ(2 * np.pi * ref, q)
+
+
+def _check_angle_index(angle_index: int, qubit: int) -> None:
+    """Raise if a qubit already has a full ZXZXZ template in this layer.
+
+    Each randomized layer holds one ZXZXZ template (3 Rz angles) per
+    qubit; a 4th phase gate would otherwise overwrite the next layer's
+    slots.
+
+    Args:
+        angle_index (int): the qubit's current angle index in the layer.
+        qubit (int): qubit label.
+
+    Raises:
+        ValueError: if `angle_index` is already 3.
+    """
+    if angle_index >= 3:
+        raise ValueError(
+            f'Qubit {qubit} has more than 3 Rz/VirtualZ gates in one '
+            'randomized layer; each layer must hold a single ZXZXZ '
+            'template per qubit.'
+        )
 
 
 def _minimal_period(layers: Sequence[object]) -> int:

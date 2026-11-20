@@ -641,6 +641,16 @@ class TestRCLayerTracker:
             'RZ', ('scaled', 2 * np.pi, _FakeRef('dest_q0', 1)), 0
         )
 
+    def test_fourth_phase_gate_in_layer_raises(self, fake_pyquil):
+        tracker = RCLayerTracker(_rc_config())
+        for _ in range(3):
+            tracker.emit_phase_gate(Rz(0, np.pi))
+
+        with pytest.raises(ValueError, match='more than 3'):
+            tracker.emit_phase_gate(Rz(0, np.pi))
+        # The next layer's slots are untouched.
+        assert tracker.source_phases['source_phases_q0'][3:] == [0.0] * 3
+
 
 class TestReadoutLayerTracker:
 
@@ -665,6 +675,14 @@ class TestReadoutLayerTracker:
             'RZ', ('scaled', 2 * np.pi, _FakeRef('dest_q1', 0)), 1
         )
         assert second[1][2] == _FakeRef('dest_q1', 1)
+
+    def test_fourth_phase_gate_raises(self, fake_pyquil):
+        tracker = ReadoutLayerTracker(_readout_config())
+        for _ in range(3):
+            tracker.emit_phase_gate(Rz(1, np.pi))
+
+        with pytest.raises(ValueError, match='more than 3'):
+            tracker.emit_phase_gate(Rz(1, np.pi))
 
 
 class TestU2Randomization:
