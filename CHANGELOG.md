@@ -19,6 +19,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+### Security
+
+## [7.0.1] - 2026-11-23
+
+### Fixed
+
 - Randomized readout in the pyQuil transpiler (`to_pyquil`/
   `transpile_circuit` with `randomized_readout=True`) only randomizes the
   qubits measured in the final Cycle, instead of every qubit in the
@@ -26,8 +32,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   final-layer twirl when `randomized_compiling=True`, and get no
   `measurement_*` registers. Combining `rc_kwargs={'skip_final_layer':
   True}` with a partially measured circuit raises a `ValueError`
-
-### Security
 
 ## [7.0.0] - 2026-11-20
 
@@ -617,7 +621,8 @@ post-processing
 - Single- and two-qubit benchmarking methods
 - Advanced compilation tools
 
-[Unreleased]: https://github.com/akelhashim/qcal/compare/v7.0.0...HEAD
+[Unreleased]: https://github.com/akelhashim/qcal/compare/v7.0.1...HEAD
+[7.0.1]: https://github.com/akelhashim/qcal/releases/tag/v7.0.1
 [7.0.0]: https://github.com/akelhashim/qcal/releases/tag/v7.0.0
 [6.0.0]: https://github.com/akelhashim/qcal/releases/tag/v6.0.0
 [5.0.0]: https://github.com/akelhashim/qcal/releases/tag/v5.0.0
