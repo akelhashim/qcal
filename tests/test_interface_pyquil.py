@@ -525,6 +525,27 @@ class TestTranspileCircuitRandomizedReadout:
             0,
         )]
 
+    def test_unmeasured_qubits_are_not_randomized(self, fake_pyquil):
+        circuit = Circuit([
+            Cycle({CZ(0, 1)}),
+            Cycle({Rz(0, np.pi / 2), Rz(1, np.pi)}),
+            Cycle({X90(0), X90(1)}),
+            Cycle({Meas(0)}),
+        ])
+        _, program = transpile_circuit(
+            circuit, _gate_mapper(), randomized_readout=True
+        )
+
+        assert program.readout_configuation.qubits == (0,)
+        assert program.readout_source_phases == {0: [0.25, 0.0, 0.0]}
+        # Qubit 1's final-layer phase is emitted literally.
+        assert _Inst('RZ', np.pi, 1) in program
+        assert _Inst(
+            'RZ',
+            ('scaled', 2 * np.pi, _Ref('measurement_unitary_q0', 0)),
+            0,
+        ) in program
+
     def test_only_final_layer_pulses_are_fenced_per_qubit(
         self, fake_pyquil
     ):

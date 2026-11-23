@@ -458,8 +458,10 @@ def to_pyquil(
             between every cycle. Defaults to ``True``.
         randomized_compiling (bool, optional): whether to randomly compile
             the circuit. Defaults to ``False``.
-        randomized_readout (bool, optional): whether to randomize the readout.
-            Defaults to ``False``.
+        randomized_readout (bool, optional): whether to randomize the readout
+            of the qubits measured in the final Cycle (assumed to be the
+            terminal measurement); other qubits' final layers are left
+            literal. Defaults to ``False``.
         rc_kwargs (Dict | None, optional): keyword arguments forwarded to
             `RandomizedCompilingConfiguration` when `randomized_compiling`
             is ``True`` (e.g. `invert_random_paulis`,
@@ -630,8 +632,10 @@ def transpile_circuit(
             between every cycle. Defaults to ``True``.
         randomized_compiling (bool, optional): whether to randomly compile
             the circuit. Defaults to ``False``.
-        randomized_readout (bool, optional): whether to randomize the readout.
-            Defaults to ``False``.
+        randomized_readout (bool, optional): whether to randomize the readout
+            of the qubits measured in the final Cycle (assumed to be the
+            terminal measurement); other qubits' final layers are left
+            literal. Defaults to ``False``.
         rc_kwargs (Dict | None, optional): keyword arguments forwarded to
             `RandomizedCompilingConfiguration` when `randomized_compiling`
             is ``True`` (e.g. `invert_random_paulis`,
@@ -673,19 +677,39 @@ def transpile_circuit(
         not cycle.is_barrier for cycle in circuit.cycles[:-1]
     )
 
+    # Only the qubits measured in the final Cycle (assumed to be the
+    # terminal measurement) are readout-randomized: an unmeasured qubit has
+    # no final measurement whose flip could be undone, and any other reads
+    # of it (heralding, active reset, MCMs) must not be.
+    readout_qubits = circuit.cycles[-1].qubits if randomized_readout else ()
+
     rc_tracker = None
     if randomized_compiling:
         rc_kwargs = dict(rc_kwargs or {})
         reserve_final_layer = has_trailing_single_qubit_layer(
             circuit, layer_period
         )
-        if randomized_readout:
+        all_measured = set(readout_qubits) >= set(qubits)
+        if randomized_readout and all_measured:
             # The final layer's phases are written into the readout
             # destination register instead (see
             # `RCLayerTracker.emit_phase_gate`), and the accumulated Pauli
             # frame is undone there via `apply_pauli_pair` below, so RC's
             # own final-layer twirl would never be read.
             rc_kwargs.setdefault('skip_final_layer', True)
+        elif randomized_readout:
+            # An unmeasured qubit's final layer isn't readout-randomized,
+            # so it must read RC's own final-layer twirl (which undoes the
+            # previous layer's random Pauli). `skip_final_layer` applies to
+            # every qubit, so the measured qubits' final-layer twirl is
+            # also allocated, but never read.
+            if rc_kwargs.get('skip_final_layer') and reserve_final_layer:
+                raise ValueError(
+                    'skip_final_layer=True requires every qubit to be '
+                    'measured in the final Cycle: an unmeasured qubit\'s '
+                    'final layer reads RC\'s twirled unitary memory, which '
+                    'skip_final_layer leaves unallocated.'
+                )
         elif rc_kwargs.get('skip_final_layer') and reserve_final_layer:
             raise ValueError(
                 'skip_final_layer=True requires randomized_readout: '
@@ -713,7 +737,7 @@ def transpile_circuit(
     readout_final_layer = frozenset()
     if randomized_readout:
         readout_configuation = _U2Randomization(
-            qubits=qubits,
+            qubits=readout_qubits,
             destination_names=lambda qubit: f"measurement_unitary_q{qubit}",
             seed_names=lambda qubit: f"measurement_seed_q{qubit}",
             source_names=lambda qubit: f"measurement_source_unitaries_q{qubit}",
@@ -821,7 +845,9 @@ def transpile_circuit(
         rc_program = rc_configuration.build_quil_program()
         if randomized_readout:
             rc_program += readout_configuation.build_quil_program()
-            for qubit in qubits:
+            # An unmeasured qubit's frame is undone by RC's own final
+            # layer instead (see `RCLayerTracker.emit_phase_gate`).
+            for qubit in readout_qubits:
                 call = rc_configuration.apply_pauli_pair(
                     qubit,
                     rc_configuration.cycle_count,

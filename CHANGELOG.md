@@ -19,6 +19,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Randomized readout in the pyQuil transpiler (`to_pyquil`/
+  `transpile_circuit` with `randomized_readout=True`) only randomizes the
+  qubits measured in the final Cycle, instead of every qubit in the
+  circuit. Unmeasured qubits keep literal final-layer phases, or RC's own
+  final-layer twirl when `randomized_compiling=True`, and get no
+  `measurement_*` registers. Combining `rc_kwargs={'skip_final_layer':
+  True}` with a partially measured circuit raises a `ValueError`
+
 ### Security
 
 ## [7.0.0] - 2026-11-20

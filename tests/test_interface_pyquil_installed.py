@@ -207,6 +207,55 @@ class TestToPyquil:
         ]
 
 
+    def test_randomized_readout_skips_unmeasured_qubits(self):
+        program = to_pyquil(
+            _partially_measured_circuit(), DEFAULT_GATEMAPPER,
+            randomized_readout=True,
+        )
+        rz = [line for line in _lines(program) if line.startswith('RZ')]
+
+        assert program.readout_configuation.qubits == (0,)
+        assert set(program.readout_source_phases) == {0}
+        assert 'measurement_unitary_q1' not in str(program)
+        # Every layer of qubit 1, including the final one, stays literal.
+        assert [line for line in rz if line.endswith(' 1')] == [
+            'RZ(0.1) 1', 'RZ(0.2) 1', 'RZ(0.3) 1',
+        ] * 2
+
+    def test_randomized_compiling_and_readout_skip_unmeasured_qubits(self):
+        program = to_pyquil(
+            _partially_measured_circuit(), DEFAULT_GATEMAPPER,
+            randomized_compiling=True, randomized_readout=True,
+        )
+        lines = _lines(program)
+        rz = [line for line in lines if line.startswith('RZ')]
+
+        assert program.readout_configuation.qubits == (0,)
+        assert set(program.readout_source_phases) == {0}
+        assert 'measurement_unitary_q1' not in str(program)
+        # Qubit 1 isn't measured, so RC still twirls its final layer,
+        # undoing the previous layer's random Pauli.
+        assert not program.rc_configuration.skip_final_layer
+        assert [line for line in rz if line.endswith(' 1')] == [
+            f'RZ((2*pi)*unitaries_q1[{i}]) 1' for i in range(6)
+        ]
+        assert program.source_phases['source_phases_q1'] == (
+            pytest.approx([a / (2 * np.pi) for a in ANGLES * 2])
+        )
+        # Qubit 0's final layer reads the readout register.
+        assert [line for line in rz if line.endswith(' 0')][3:] == [
+            f'RZ((2*pi)*measurement_unitary_q0[{i}]) 0' for i in range(3)
+        ]
+
+    def test_skip_final_layer_with_unmeasured_qubits_raises(self):
+        with pytest.raises(ValueError, match='skip_final_layer'):
+            to_pyquil(
+                _partially_measured_circuit(), DEFAULT_GATEMAPPER,
+                randomized_compiling=True, randomized_readout=True,
+                rc_kwargs={'skip_final_layer': True},
+            )
+
+
 class TestPyQuilTranspiler:
 
     def test_transpiles_every_circuit(self):
@@ -247,6 +296,35 @@ def _rc_circuit() -> Circuit:
         *_zxzxz(0),
         Cycle({Meas(0), Meas(1)}),
     ])
+
+
+def _partially_measured_circuit() -> Circuit:
+    """Like `_rc_circuit`, on both qubits, but only qubit 0 is measured.
+
+    Returns:
+        Circuit: circuit compiled to ZXZXZ form.
+    """
+    return Circuit([
+        *_zxzxz_both(),
+        Cycle({CZ(0, 1)}),
+        *_zxzxz_both(),
+        Cycle({Meas(0)}),
+    ])
+
+
+def _zxzxz_both() -> list[Cycle]:
+    """Cycles of parallel ZXZXZ templates on qubits 0 and 1.
+
+    Returns:
+        list[Cycle]: the five Rz/X90 cycles.
+    """
+    return [
+        Cycle({Rz(0, ANGLES[0]), Rz(1, ANGLES[0])}),
+        Cycle({X90(0), X90(1)}),
+        Cycle({Rz(0, ANGLES[1]), Rz(1, ANGLES[1])}),
+        Cycle({X90(0), X90(1)}),
+        Cycle({Rz(0, ANGLES[2]), Rz(1, ANGLES[2])}),
+    ]
 
 
 def _zxzxz(q: int) -> list[Cycle]:

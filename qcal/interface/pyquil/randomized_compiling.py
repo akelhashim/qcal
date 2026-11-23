@@ -492,9 +492,11 @@ class RCLayerTracker:
             gate (Rz | VirtualZ): qcal Rz or VirtualZ gate.
             readout_tracker (ReadoutLayerTracker | None, optional): when
                 randomized readout is also active, the readout tracker
-                for the final pre-measurement layer; the phase is
+                for the final pre-measurement layer; for a qubit it
+                randomizes (one measured at the end), the phase is
                 recorded into its `source_phases` and its destination
-                register is referenced, instead of the RC ones.
+                register is referenced, instead of the RC ones. Any
+                other qubit's final layer is twirled by RC as usual.
                 Defaults to `None`.
 
         Returns:
@@ -506,7 +508,10 @@ class RCLayerTracker:
         q = gate.qubits[0]
         _check_angle_index(self.angle_index[q], q)
         phase = gate.properties['params']['phase']
-        if readout_tracker is not None:
+        if (
+            readout_tracker is not None
+            and q in readout_tracker.configuration.qubits
+        ):
             # Only passed for the final pre-measurement layer (see
             # `transpile_circuit`), at layer_index == cycle_count, which
             # `skip_final_layer` excludes from the RC registers. Its
@@ -651,8 +656,11 @@ class ReadoutLayerTracker:
         from pyquil.quilatom import MemoryReference
 
         q = gate.qubits[0]
-        _check_angle_index(self.angle_index[q], q)
         phase = gate.properties['params']['phase']
+        if q not in self.configuration.qubits:
+            # Only qubits measured at the end are readout-randomized.
+            return RZ(phase, q)
+        _check_angle_index(self.angle_index[q], q)
         self.source_phases[q][self.angle_index[q]] = phase / (2 * np.pi)
 
         ref = MemoryReference(
